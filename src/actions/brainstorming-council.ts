@@ -20,12 +20,12 @@
  *   tier='strategy' → 2 rounds (5 specialists)
  *
  * Model mapping (OpenRouter, non-Anthropic per cost-discipline rule):
- *   Fiona (host/closer)    → deepseek/deepseek-v4-flash
+ *   Cal   (host/closer)    → mistralai/mistral-large-2407
  *   Sage  (strategist)     → google/gemini-3.1-pro-preview
  *   Finn  (finance-lead)   → deepseek/deepseek-v4-flash
  *   Max   (cto)            → deepseek/deepseek-v4-flash
  *   Sal   (sales-lead)     → deepseek/deepseek-v4-flash
- *   Cal   (chief-of-staff) → mistralai/mistral-large-2407
+ *   Fiona (fundraising)    → deepseek/deepseek-v4-flash (specialist, no longer host)
  *
  * W51 fix: specialist maxTokens raised from 800 → 4096 so Gemini 3.1 Pro
  * (a reasoning model) has enough budget for its internal reasoning trace
@@ -48,22 +48,38 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     // his entire trace including "I am Finn... Key points I might hit...
     // Sharpest take..." into the user-facing card). Per cost-discipline
     // rule: V4-Pro is for STRUCTURED reasoning only, never prose.
-    "fundraising-advisor": "deepseek/deepseek-v4-flash",
+    // Cal is now host — Mistral Large handles opening + closing synthesis.
+    // Fiona is now a regular specialist (fundraising domain).
+    "chief-of-staff":      "mistralai/mistral-large-2407",  // host (Cal)
+    "fundraising-advisor": "deepseek/deepseek-v4-flash",    // specialist (Fiona)
     "strategist":          "google/gemini-3.1-pro-preview",
     "finance-lead":        "deepseek/deepseek-v4-flash",
     "cto":                 "deepseek/deepseek-v4-flash",
     "sales-lead":          "deepseek/deepseek-v4-flash",
-    "chief-of-staff":      "mistralai/mistral-large-2407",
+    "vp-manufacturing":    "deepseek/deepseek-v4-flash",
+    "vp-supply-chain":     "google/gemini-3.1-pro-preview",
+    "product-lead":        "deepseek/deepseek-v4-flash",
+    "growth-marketer":     "deepseek/deepseek-v4-flash",
+    "vp-engineering":      "deepseek/deepseek-v4-flash",
+    "hiring-team":         "deepseek/deepseek-v4-flash",
+    "legal-counsel":       "deepseek/deepseek-v4-flash",
 }
 
-// Model label shown in the response card (matches BrainstormingCouncilView MODEL_TIER_LABELS)
+// Model label shown in the response card
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
+    "chief-of-staff":      "Mistral Large",
     "fundraising-advisor": "DeepSeek V4-Flash",
     "strategist":          "Gemini 3.1 Pro",
     "finance-lead":        "DeepSeek V4-Flash",
     "cto":                 "DeepSeek V4-Flash",
     "sales-lead":          "DeepSeek V4-Flash",
-    "chief-of-staff":      "Mistral Large",
+    "vp-manufacturing":    "DeepSeek V4-Flash",
+    "vp-supply-chain":     "Gemini 3.1 Pro",
+    "product-lead":        "DeepSeek V4-Flash",
+    "growth-marketer":     "DeepSeek V4-Flash",
+    "vp-engineering":      "DeepSeek V4-Flash",
+    "hiring-team":         "DeepSeek V4-Flash",
+    "legal-counsel":       "DeepSeek V4-Flash",
 }
 
 // W50: Signature close headers used in Round 2 prompts so each specialist
@@ -75,6 +91,13 @@ const ROUND2_CLOSE_HEADER: Record<string, string> = {
     "sales-lead":          "SEND THIS TODAY:",
     "chief-of-staff":      "NEXT CONCRETE ACTION:",
     "fundraising-advisor": "WHAT INVESTORS WANT TO SEE:",
+    "vp-manufacturing":    "BUILD THIS WEEK:",
+    "vp-supply-chain":     "PROCURE THIS WEEK:",
+    "product-lead":        "SHIP THIS SPRINT:",
+    "growth-marketer":     "RUN THIS EXPERIMENT:",
+    "vp-engineering":      "MERGE THIS WEEK:",
+    "hiring-team":         "HIRE FOR THIS:",
+    "legal-counsel":       "PROTECT THIS WEEK:",
 }
 
 // ─── Specialist system prompts ───────────────────────────────────────────────
@@ -106,22 +129,37 @@ Your angle: Revenue, pipeline, and commercial execution. Translate the question 
 Your angle: Operational execution, decision clarity, and priority management. What is the founder actually deciding? Name the one decision that unlocks everything else.`,
         "fundraising-advisor": `
 Your angle: Fundraising, investor narrative, and financial strategy. You have seen hundreds of raises. Cut to what investors actually care about, not what founders think they care about.`,
+        "vp-manufacturing": `
+Your angle: Manufacturing, production processes, and factory economics. Think in lead times, yield rates, tooling cost, and minimum order quantities. Name the unit economics that change the decision.`,
+        "vp-supply-chain": `
+Your angle: Supply chain, procurement, and logistics. Who are the real suppliers? What is the actual lead time? Where is the single point of failure? Translate the question into sourcing risk.`,
+        "product-lead": `
+Your angle: Product management, feature prioritisation, and user requirements. What does the customer actually need? What is the minimum viable change that unlocks the most value?`,
+        "growth-marketer": `
+Your angle: Growth, marketing, and customer acquisition. Where does revenue come from? What is the channel that works at this stage? Name the one growth lever the founder should pull this week.`,
+        "vp-engineering": `
+Your angle: Engineering execution, team velocity, and technical debt. What slows down the build? What is the architectural decision that cannot be undone? Translate the question into engineering effort.`,
+        "hiring-team": `
+Your angle: People, hiring, culture, and organisational design. Who does the founder need in the room? What is the hiring decision that changes the trajectory? Name the role and why it matters now.`,
+        "legal-counsel": `
+Your angle: Legal risk, contracts, intellectual property, and regulatory compliance. What is the exposure? What clause or structure protects the founder? Be specific — "get legal advice" is not an answer.`,
     }
 
     return baseInstructions + (specialistVoice[specialistId] ?? "")
 }
 
-// ─── Fiona opening prompt ────────────────────────────────────────────────────
+// ─── Cal opening prompt ──────────────────────────────────────────────────────
+// W68: Cal (Chief of Staff) is now the host, replacing Fiona.
 
-function getFionaOpeningPrompt(question: string, specialistNames: string[]): string {
-    return `You are Fiona, fundraising advisor and host of the Brainstorming Council at Fractional Forge.
+function getCalOpeningPrompt(question: string, specialistNames: string[]): string {
+    return `You are Cal, Chief of Staff and host of the Brainstorming Council at Fractional Forge.
 
 Your job as host: read the founder's question, name what is actually worth disagreeing about in 2–3 sentences, then introduce the specialists who will respond. You do NOT answer the question yourself — you frame it.
 
 Voice rules:
 - British spelling (colour, behaviour, programme)
 - Specific and direct — no filler, no "great question"
-- First-person, calm authority
+- First-person, calm authority — you are the person in the room who noticed what others missed
 - 3–4 sentences maximum
 - End by naming the specialists joining: ${specialistNames.join(", ")}
 
@@ -130,9 +168,10 @@ The founder's question: "${question}"
 Frame the question and introduce the council. Do not answer it.`
 }
 
-// ─── Fiona closing prompt ────────────────────────────────────────────────────
+// ─── Cal closing prompt ───────────────────────────────────────────────────────
+// W68: Cal (Chief of Staff) is now the host, replacing Fiona.
 
-function getFionaClosingPrompt(
+function getCalClosingPrompt(
     question: string,
     round1Responses: Array<{ name: string; response: string }>,
     round2Responses: Array<{ name: string; response: string }>,
@@ -151,7 +190,7 @@ function getFionaClosingPrompt(
         councilText = round1Text
     }
 
-    return `You are Fiona, fundraising advisor and host of the Brainstorming Council at Fractional Forge.
+    return `You are Cal, Chief of Staff and host of the Brainstorming Council at Fractional Forge.
 
 The council has responded to the founder's question${round2Responses.length > 0 ? " across two rounds of discussion" : ""}. Your job: synthesise where they agreed, name the sharpest disagreement, and close with ONE concrete action the founder should take this week.
 
@@ -262,13 +301,14 @@ export async function conveneCouncil(
 
     const specialistNames = specialists.map(s => s.name)
 
-    // ── Step 1: Fiona opening ──────────────────────────────────────────────
+    // ── Step 1: Cal opening ───────────────────────────────────────────────
+    // W68: Cal (Chief of Staff) is now the host, replacing Fiona.
     // Run in parallel with specialists so a slow opening doesn't gate the
     // whole council. If opening fails we fall back to a generic frame.
     const fionaOpeningPromise = callOpenRouter({
-        model: COUNCIL_MODEL_MAP["fundraising-advisor"],
-        system: "You are Fiona, the council host at Fractional Forge. You frame questions and introduce specialists. British English. 3–4 sentences max.",
-        prompt: getFionaOpeningPrompt(question, specialistNames),
+        model: COUNCIL_MODEL_MAP["chief-of-staff"],
+        system: "You are Cal, Chief of Staff and council host at Fractional Forge. You frame questions and introduce specialists. British English. 3–4 sentences max.",
+        prompt: getCalOpeningPrompt(question, specialistNames),
         maxTokens: 1200,
         temperature: 0.7,
         timeoutMs: 60_000,
@@ -328,6 +368,7 @@ export async function conveneCouncil(
     ])
     const round1Responses = round1Results.filter((r): r is SpecialistResponse => r !== null)
 
+    // W68: host is now Cal
     const fionaOpening = fionaOpeningResult.ok
         ? fionaOpeningResult.text.trim()
         : `I've put your question to ${specialistNames.length} specialists — ${specialistNames.slice(0, -1).join(", ")}${specialistNames.length > 1 ? " and " : ""}${specialistNames[specialistNames.length - 1]}. They each look at it through their own lens. Read their take, then I'll close with what to do next.`
@@ -398,9 +439,9 @@ export async function conveneCouncil(
         .map(r => ({ name: r.name, response: r.round2Response! }))
 
     const fionaClosingResult = await callOpenRouter({
-        model: COUNCIL_MODEL_MAP["fundraising-advisor"],
-        system: "You are Fiona, the council host at Fractional Forge. You synthesise the council's responses into a closing. British English. 4–6 sentences max.",
-        prompt: getFionaClosingPrompt(
+        model: COUNCIL_MODEL_MAP["chief-of-staff"],
+        system: "You are Cal, Chief of Staff and council host at Fractional Forge. You synthesise the council's responses into a closing. British English. 4–6 sentences max.",
+        prompt: getCalClosingPrompt(
             question,
             successfulRound1.map(r => ({ name: r.name, response: r.response })),
             r2ForFiona,

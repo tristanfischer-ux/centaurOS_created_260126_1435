@@ -27,7 +27,8 @@
 
 "use client"
 
-import { useState, useRef, useTransition, useCallback } from "react"
+import { useState, useRef, useTransition, useCallback, useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
@@ -41,7 +42,7 @@ import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
 
 // ─── Council tier definitions (Quick / Full / Deep / Strategy) ───────────────
 
-type CouncilTier = "quick" | "full" | "deep" | "strategy"
+type CouncilTier = "quick" | "full" | "deep" | "strategy" | "full-council"
 
 interface TierMeta {
     id: CouncilTier
@@ -63,22 +64,29 @@ const COUNCIL_TIERS: TierMeta[] = [
         id: "full",
         label: "On reflection",
         subtitle: "3 specialists · ~12s",
-        hint: "Three voices with different angles. Fiona opens, three specialists respond in parallel, Fiona closes.",
+        hint: "Three voices with different angles. Cal opens, three specialists respond in parallel, Cal closes.",
         specialists: 3,
     },
     {
         id: "deep",
         label: "Thinking further",
         subtitle: "4 specialists · ~14s",
-        hint: "Four specialists in the 2×2 grid. Fiona synthesises where they agree and disagree, plus a concrete next action.",
+        hint: "Four specialists in the 2×2 grid. Cal synthesises where they agree and disagree, plus a concrete next action.",
         specialists: 4,
     },
     {
         id: "strategy",
         label: "Council split",
         subtitle: "5 specialists · ~18s",
-        hint: "The full council — five voices, maximum lineage diversity. Best for high-stakes strategic questions.",
+        hint: "Five voices, maximum lineage diversity. Best for high-stakes strategic questions.",
         specialists: 5,
+    },
+    {
+        id: "full-council",
+        label: "Full council",
+        subtitle: "12 specialists · ~30s",
+        hint: "Every specialist in the room — all 12 voices across every domain. Best for major strategic decisions where no angle should be missed.",
+        specialists: 12,
     },
 ]
 
@@ -144,22 +152,91 @@ const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
 ]
 
 // ─── Council member subset selection ────────────────────────────────────────
-// Fiona always hosts; the council picks from a preferred ordering by role breadth.
+// Cal always hosts; the council picks from a preferred ordering by role breadth.
+// Fiona stays available as a specialist when the topic is fundraising/cap-table.
+// All 12 non-Cal specialists are listed here; tier determines the count used.
 
-const COUNCIL_MEMBER_IDS = [
-    "strategist",      // Sage — Strategy (Gemini 3.1 Pro)
-    "finance-lead",    // Finn — Finance  (DeepSeek V4-Pro)
-    "sales-lead",      // Sal  — Sales    (gpt-4.1-mini)
-    "cto",             // Max  — CTO      (DeepSeek V4)
-    "chief-of-staff",  // Cal  — Chief of Staff (Opus)
+const ALL_SPECIALIST_IDS = [
+    "strategist",          // Sage  — Strategy
+    "finance-lead",        // Finn  — Finance
+    "sales-lead",          // Sal   — Sales
+    "cto",                 // Max   — CTO
+    "fundraising-advisor", // Fiona — Fundraising
+    "vp-manufacturing",    // Fang  — Manufacturing
+    "vp-supply-chain",     // Chase — Supply Chain
+    "product-lead",        // Priya — Product
+    "growth-marketer",     // Mia   — Marketing
+    "vp-engineering",      // Jian  — Engineering
+    "hiring-team",         // Harper — HR
+    "legal-counsel",       // Leo  — Legal
 ] as const
 
-// Fiona is always host/closer
-const FIONA = SPECIALISTS.find(s => s.id === "fundraising-advisor")!
+// Cal is always host/closer
+const CAL = SPECIALISTS.find(s => s.id === "chief-of-staff")!
 
-function getCouncilMembers(tier: CouncilTier): Specialist[] {
-    const count = COUNCIL_TIERS.find(t => t.id === tier)!.specialists
-    return COUNCIL_MEMBER_IDS
+// ─── Domain-aware default specialist selection ───────────────────────────────
+// Keyword → preferred specialist IDs (ordered by relevance).
+// Tier bounds the count — the list is truncated or padded with fallback IDs.
+
+const DOMAIN_KEYWORD_MAP: Array<{ keywords: string[]; specialists: string[] }> = [
+    {
+        keywords: ["bom", "bill of materials", "cost", "manufacturing", "production", "factory", "supply", "component"],
+        specialists: ["cto", "vp-manufacturing", "vp-supply-chain", "finance-lead", "product-lead"],
+    },
+    {
+        keywords: ["fundraising", "valuation", "cap table", "seed", "series", "investor", "raise", "round", "term sheet"],
+        specialists: ["fundraising-advisor", "finance-lead", "strategist", "legal-counsel", "vp-engineering"],
+    },
+    {
+        keywords: ["sales", "pricing", "gtm", "go-to-market", "distribution", "revenue", "customer", "pipeline", "deal"],
+        specialists: ["sales-lead", "growth-marketer", "finance-lead", "product-lead", "strategist"],
+    },
+    {
+        keywords: ["product", "spec", "regulatory", "certification", "design", "feature", "roadmap", "launch"],
+        specialists: ["product-lead", "cto", "legal-counsel", "vp-manufacturing", "growth-marketer"],
+    },
+    {
+        keywords: ["hiring", "team", "culture", "org", "people", "recruit", "hr", "talent"],
+        specialists: ["hiring-team", "strategist", "growth-marketer", "finance-lead", "vp-engineering"],
+    },
+    {
+        keywords: ["legal", "contract", "ip", "patent", "intellectual property", "compliance", "regulation"],
+        specialists: ["legal-counsel", "fundraising-advisor", "cto", "product-lead", "strategist"],
+    },
+    {
+        keywords: ["strategy", "market", "pivot", "position", "competitive", "moat", "expand", "growth", "geographic"],
+        specialists: ["strategist", "finance-lead", "growth-marketer", "sales-lead", "fundraising-advisor"],
+    },
+    {
+        keywords: ["lead time", "logistics", "freight", "shipping", "warehouse", "inventory"],
+        specialists: ["vp-supply-chain", "vp-manufacturing", "finance-lead", "cto", "product-lead"],
+    },
+]
+
+const FALLBACK_SPECIALIST_IDS = ["strategist", "finance-lead", "sales-lead", "cto", "fundraising-advisor"]
+
+/** Returns the auto-selected specialist IDs for a given question text. */
+function getAutoSelectedIds(questionText: string, count: number): string[] {
+    const lower = questionText.toLowerCase()
+    for (const { keywords, specialists } of DOMAIN_KEYWORD_MAP) {
+        if (keywords.some(k => lower.includes(k))) {
+            const base = specialists.slice(0, count)
+            if (base.length < count) {
+                // Pad with fallbacks that aren't already in the list
+                const extra = FALLBACK_SPECIALIST_IDS.filter(id => !base.includes(id))
+                base.push(...extra.slice(0, count - base.length))
+            }
+            return base.slice(0, count)
+        }
+    }
+    return FALLBACK_SPECIALIST_IDS.slice(0, count)
+}
+
+function getCouncilMembers(tier: CouncilTier, selectedIds?: string[]): Specialist[] {
+    const tierMeta = COUNCIL_TIERS.find(t => t.id === tier)!
+    const count = tierMeta.specialists
+    const ids = selectedIds ?? ALL_SPECIALIST_IDS.slice(0, Math.min(count, ALL_SPECIALIST_IDS.length))
+    return ids
         .slice(0, count)
         .map(id => SPECIALISTS.find(s => s.id === id)!)
         .filter(Boolean)
@@ -169,11 +246,11 @@ function getCouncilMembers(tier: CouncilTier): Specialist[] {
 
 function getAvatarClass(specialistId: string): string {
     const map: Record<string, string> = {
-        "strategist":     "bc-av-sage",
-        "finance-lead":   "bc-av-finn",
-        "sales-lead":     "bc-av-sal",
-        "cto":            "bc-av-max",
-        "chief-of-staff": "bc-av-cal",
+        "strategist":          "bc-av-sage",
+        "finance-lead":        "bc-av-finn",
+        "sales-lead":          "bc-av-sal",
+        "cto":                 "bc-av-max",
+        "chief-of-staff":      "bc-av-cal",
         "fundraising-advisor": "bc-av-fiona",
     }
     return map[specialistId] ?? "bc-av-default"
@@ -183,11 +260,12 @@ function getAvatarClass(specialistId: string): string {
 
 function getSigCloseLabel(specialistId: string): string {
     const map: Record<string, string> = {
-        "strategist":     "What to do Monday morning",
-        "finance-lead":   "The numbers that matter",
-        "sales-lead":     "Send this today",
-        "cto":            "Ship this week",
-        "chief-of-staff": "Next concrete action",
+        "strategist":          "What to do Monday morning",
+        "finance-lead":        "The numbers that matter",
+        "sales-lead":          "Send this today",
+        "cto":                 "Ship this week",
+        "chief-of-staff":      "Next concrete action",
+        "fundraising-advisor": "What investors want to see",
     }
     return map[specialistId] ?? "Next step"
 }
@@ -205,9 +283,11 @@ type SessionPhase = "idle" | "pending" | "done" | "error"
 
 interface CouncilSession {
     phase: SessionPhase
-    fionaOpening: string
+    hostOpening: string
     specialistResponses: SpecialistResponse[]
-    fionaClosing: string
+    hostClosing: string
+    /** W56: per-specialist arrival tracking — IDs that have already rendered. */
+    arrivedIds: Set<string>
     errorMessage: string
     /** The question that was submitted — captured at submit time to prevent
      *  stale-closure context leaks when the user edits the input mid-flight. */
@@ -216,6 +296,8 @@ interface CouncilSession {
      *  so the council grid renders the correct specialist count even if the
      *  user changes the tier while the session is pending / done. */
     submittedTier: CouncilTier
+    /** The specialist IDs locked in at submit time. */
+    submittedSpecialistIds: string[]
     /** W50: true when the council ran two rounds (tier !== 'quick'). */
     hadRound2: boolean
     /** W52: UUID of the persisted meeting_thread — used by graphic/audio
@@ -225,22 +307,26 @@ interface CouncilSession {
 
 const EMPTY_SESSION: CouncilSession = {
     phase: "idle",
-    fionaOpening: "",
+    hostOpening: "",
     specialistResponses: [],
-    fionaClosing: "",
+    hostClosing: "",
+    arrivedIds: new Set(),
     errorMessage: "",
     submittedQuestion: "",
     submittedTier: "deep",
+    submittedSpecialistIds: [],
     hadRound2: false,
     savedThreadId: null,
 }
 
 export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewProps) {
+    const router = useRouter()
     const [activeTier, setActiveTier] = useState<CouncilTier>("deep")
     const [question, setQuestion] = useState("")
     const [session, setSession] = useState<CouncilSession>(EMPTY_SESSION)
     const [isPending, startTransition] = useTransition()
-    const inputRef = useRef<HTMLInputElement>(null)
+    const inputRef = useRef<HTMLTextAreaElement>(null)
+    const audioReadyRef = useRef<HTMLDivElement>(null)
     // W7: bump this counter after each successful session save to trigger
     // MeetingHistory to re-fetch its list.
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
@@ -251,15 +337,47 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
     // image and audio render inline on the page (not just in the saved-sessions panel).
     const [generatedCoverUrl, setGeneratedCoverUrl] = useState<string | null>(null)
     const [generatedAudioClips, setGeneratedAudioClips] = useState<Array<{ specialistId: string; voice: string; url: string; durationMs: number | null }> | null>(null)
+    // W70: show "audio ready" callout after generation
+    const [audioReadyVisible, setAudioReadyVisible] = useState(false)
+    // W57: manual specialist override picker
+    const [showPicker, setShowPicker] = useState(false)
+    const [selectedSpecialistIds, setSelectedSpecialistIds] = useState<string[]>(() =>
+        getAutoSelectedIds("", COUNCIL_TIERS.find(t => t.id === "deep")!.specialists)
+    )
+    // W56: loading text animation index
+    const [loadingLineIdx, setLoadingLineIdx] = useState(0)
+
+    const LOADING_LINES = [
+        "Reading your question…",
+        "Cutting through the noise…",
+        "Drafting a take…",
+        "Stress-testing the assumption…",
+    ]
+
+    // Cycle loading lines every 2.5s during pending
+    useEffect(() => {
+        if (session.phase !== "pending") return
+        const iv = setInterval(() => setLoadingLineIdx(i => (i + 1) % LOADING_LINES.length), 2500)
+        return () => clearInterval(iv)
+    }, [session.phase])
+
+    // W57: update auto-selection when tier or question changes (only if not in a session)
+    useEffect(() => {
+        if (session.phase !== "idle") return
+        const count = COUNCIL_TIERS.find(t => t.id === activeTier)!.specialists
+        const newIds = getAutoSelectedIds(question, Math.min(count, ALL_SPECIALIST_IDS.length))
+        setSelectedSpecialistIds(newIds)
+    }, [activeTier, question, session.phase])
 
     const submitted = session.phase !== "idle"
     // W8: always derive council members from activeTier for the pre-session
     // roster view. After submission, the rendered result grid uses
     // session.submittedTier so changing the picker mid-session doesn't
     // swap the specialist cards under live content.
-    const councilMembers = getCouncilMembers(activeTier)
+    const tierCount = COUNCIL_TIERS.find(t => t.id === activeTier)!.specialists
+    const councilMembers = getCouncilMembers(activeTier, selectedSpecialistIds.slice(0, Math.min(tierCount, ALL_SPECIALIST_IDS.length)))
     // The members that correspond to the in-flight or completed session.
-    const sessionCouncilMembers = getCouncilMembers(session.submittedTier)
+    const sessionCouncilMembers = getCouncilMembers(session.submittedTier, session.submittedSpecialistIds)
 
     // W10: extracted to a named, stable callback so both the form onSubmit
     // and the button's onClick can reference it. React synthetic events
@@ -276,12 +394,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
         // W2: capture the tier and specialists at the exact moment of
         // submission so they are locked for this session's lifecycle.
-        // Previously `activeTier` was read inside the async transition
-        // which meant a user changing the tier selector while the LLM
-        // calls were in flight could silently alter the specialist list
-        // mid-call.
         const tierSnapshot: CouncilTier = activeTier
-        const specialistsForTier = getCouncilMembers(tierSnapshot).map(s => ({
+        const snapshotCount = COUNCIL_TIERS.find(t => t.id === tierSnapshot)!.specialists
+        const snapshotIds = selectedSpecialistIds.slice(0, Math.min(snapshotCount, ALL_SPECIALIST_IDS.length))
+        const specialistsForTier = getCouncilMembers(tierSnapshot, snapshotIds).map(s => ({
             id: s.id,
             name: s.name,
             title: s.title,
@@ -290,16 +406,16 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
         // W2: clear the question input immediately on submit so the user
         // cannot accidentally re-send the previous question by hitting
-        // submit a second time without typing new text. This also prevents
-        // the stale-question context leak where the input value from
-        // question N would silently ride along into question N+1.
+        // submit a second time without typing new text.
         setQuestion("")
+        setShowPicker(false)
 
         setSession({
             ...EMPTY_SESSION,
             phase: "pending",
             submittedQuestion: trimmedQ,
             submittedTier: tierSnapshot,
+            submittedSpecialistIds: snapshotIds,
         })
 
         startTransition(async () => {
@@ -312,12 +428,14 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             if (!result.ok) {
                 setSession({
                     phase: "error",
-                    fionaOpening: "",
+                    hostOpening: "",
                     specialistResponses: [],
-                    fionaClosing: "",
+                    hostClosing: "",
+                    arrivedIds: new Set(),
                     errorMessage: result.error,
                     submittedQuestion: trimmedQ,
                     submittedTier: tierSnapshot,
+                    submittedSpecialistIds: snapshotIds,
                     hadRound2: false,
                     savedThreadId: null,
                 })
@@ -326,18 +444,21 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
             setSession({
                 phase: "done",
-                fionaOpening: result.fionaOpening,
+                hostOpening: result.fionaOpening,
                 specialistResponses: result.specialistResponses,
-                fionaClosing: result.fionaClosing,
+                hostClosing: result.fionaClosing,
+                arrivedIds: new Set(result.specialistResponses.map((r: SpecialistResponse) => r.id)),
                 errorMessage: "",
                 submittedQuestion: trimmedQ,
                 submittedTier: tierSnapshot,
+                submittedSpecialistIds: snapshotIds,
                 hadRound2: result.hadRound2 ?? false,
                 savedThreadId: null, // filled in after createMeetingThread returns
             })
             // Reset asset generation buttons + cached URLs for the new session
             setGraphicStatus("idle")
             setAudioStatus("idle")
+            setAudioReadyVisible(false)
             setGeneratedCoverUrl(null)
             setGeneratedAudioClips(null)
 
@@ -346,12 +467,12 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             //     generateSessionInfographic (cover image) and
             //     generateSessionAudio in the background.
             //   - The saved thread row appears in SavedSessionsPanel.
-            // Build entries: Fiona opening, each specialist R1, R2 entries
-            // (if present), Fiona closing.
+            // Build entries: Cal opening, each specialist R1, R2 entries
+            // (if present), Cal closing.
             const entries = [
                 {
-                    specialistId: "fundraising-advisor",
-                    specialistName: "Fiona",
+                    specialistId: "chief-of-staff",
+                    specialistName: "Cal",
                     councilPosition: "opener" as const,
                     roundNumber: 1,
                     content: result.fionaOpening,
@@ -380,8 +501,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         }))
                     : []),
                 {
-                    specialistId: "fundraising-advisor",
-                    specialistName: "Fiona",
+                    specialistId: "chief-of-staff",
+                    specialistName: "Cal",
                     councilPosition: "host-close" as const,
                     roundNumber: result.hadRound2 ? 2 : 1,
                     content: result.fionaClosing,
@@ -415,8 +536,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         setSession(EMPTY_SESSION)
         setGraphicStatus("idle")
         setAudioStatus("idle")
+        setAudioReadyVisible(false)
         setGeneratedCoverUrl(null)
         setGeneratedAudioClips(null)
+        setShowPicker(false)
         // Return focus to the question input so the next question
         // is immediately ready to type without an extra click.
         setTimeout(() => inputRef.current?.focus(), 50)
@@ -474,7 +597,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 /* ─── Tier picker ─── */
                 .bc-tier-picker {
                     display: grid;
-                    grid-template-columns: repeat(4, 1fr);
+                    grid-template-columns: repeat(5, 1fr);
                     gap: 10px;
                     margin-bottom: 22px;
                 }
@@ -516,11 +639,15 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     border-radius: 14px;
                     padding: 14px 16px;
                     box-shadow: var(--bc-shadow-sm);
-                    display: grid;
-                    grid-template-columns: auto 1fr auto;
-                    gap: 14px;
-                    align-items: center;
-                    margin-bottom: 28px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 12px;
+                    margin-bottom: 16px;
+                }
+                .bc-qbar-top {
+                    display: flex;
+                    align-items: flex-start;
+                    gap: 12px;
                 }
                 .bc-qbar .bc-qlabel {
                     display: flex;
@@ -531,7 +658,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     color: var(--bc-fg-muted);
                     text-transform: uppercase;
                     letter-spacing: 0.08em;
-                    padding-left: 4px;
+                    padding-top: 10px;
+                    flex-shrink: 0;
                 }
                 .bc-qbar .bc-qlabel .bc-icon {
                     width: 28px; height: 28px; border-radius: 100%;
@@ -541,7 +669,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     font-size: 14px;
                     font-weight: 700;
                 }
-                .bc-qbar input[type="text"] {
+                .bc-qbar textarea {
                     border: none;
                     font-size: 16px;
                     font-family: inherit;
@@ -550,8 +678,20 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     width: 100%;
                     padding: 8px 4px;
                     font-weight: 500;
+                    resize: none;
+                    min-height: 48px;
+                    line-height: 1.55;
+                    overflow: hidden;
                 }
-                .bc-qbar input[type="text"]:focus { outline: none; }
+                .bc-qbar textarea:focus { outline: none; }
+                .bc-qbar-bottom {
+                    display: flex;
+                    justify-content: flex-end;
+                    align-items: center;
+                    gap: 10px;
+                    padding-top: 4px;
+                    border-top: 1px solid var(--bc-border-soft);
+                }
                 .bc-qbar .bc-convene {
                     background: var(--bc-brand);
                     color: #fff;
@@ -568,6 +708,121 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     box-shadow: 0 1px 0 rgba(255,69,0,0.5) inset, 0 6px 14px rgba(255,69,0,0.20);
                 }
                 .bc-qbar .bc-convene:hover { background: #e63e00; }
+                /* ─── Specialist picker panel ─── */
+                .bc-picker {
+                    background: var(--bc-surface);
+                    border: 1px solid var(--bc-border);
+                    border-radius: 14px;
+                    padding: 16px 18px;
+                    margin-bottom: 20px;
+                    box-shadow: var(--bc-shadow-sm);
+                }
+                .bc-picker-head {
+                    display: flex;
+                    align-items: center;
+                    justify-content: space-between;
+                    margin-bottom: 14px;
+                }
+                .bc-picker-head .bc-picker-title {
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: var(--bc-fg);
+                    text-transform: uppercase;
+                    letter-spacing: 0.07em;
+                }
+                .bc-picker-head .bc-picker-hint {
+                    font-size: 11.5px;
+                    color: var(--bc-fg-muted);
+                }
+                .bc-picker-grid {
+                    display: grid;
+                    grid-template-columns: repeat(3, 1fr);
+                    gap: 8px;
+                }
+                .bc-picker-item {
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                    padding: 8px 10px;
+                    border: 1px solid var(--bc-border);
+                    border-radius: 8px;
+                    cursor: pointer;
+                    background: var(--bc-surface);
+                    transition: border-color 0.12s, background 0.12s;
+                    font-family: inherit;
+                    text-align: left;
+                }
+                .bc-picker-item:hover { border-color: var(--bc-brand); }
+                .bc-picker-item.selected {
+                    border-color: var(--bc-brand);
+                    background: var(--bc-brand-soft);
+                }
+                .bc-picker-item .bc-pi-check {
+                    width: 16px; height: 16px;
+                    border: 1.5px solid var(--bc-border-strong);
+                    border-radius: 4px;
+                    display: flex; align-items: center; justify-content: center;
+                    flex-shrink: 0;
+                    font-size: 11px;
+                    color: transparent;
+                    background: var(--bc-surface);
+                }
+                .bc-picker-item.selected .bc-pi-check {
+                    background: var(--bc-brand);
+                    border-color: var(--bc-brand);
+                    color: #fff;
+                }
+                .bc-picker-item .bc-pi-label {
+                    flex: 1;
+                    min-width: 0;
+                }
+                .bc-picker-item .bc-pi-name {
+                    font-size: 12.5px;
+                    font-weight: 700;
+                    color: var(--bc-fg);
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                .bc-picker-item .bc-pi-role {
+                    font-size: 10.5px;
+                    color: var(--bc-fg-muted);
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                }
+                /* ─── Loading animation ─── */
+                @keyframes bc-pulse {
+                    0%, 100% { opacity: 1; }
+                    50% { opacity: 0.45; }
+                }
+                .bc-loading-pulse {
+                    animation: bc-pulse 1.4s ease-in-out infinite;
+                }
+                /* ─── Audio ready callout ─── */
+                .bc-audio-ready {
+                    display: flex;
+                    align-items: center;
+                    gap: 10px;
+                    padding: 12px 16px;
+                    background: var(--bc-blue-soft);
+                    border: 1px solid var(--bc-blue-dim);
+                    border-radius: 10px;
+                    margin-bottom: 12px;
+                    font-size: 13.5px;
+                    font-weight: 600;
+                    color: var(--bc-blue);
+                }
+                .bc-audio-ready button {
+                    margin-left: auto;
+                    background: none;
+                    border: none;
+                    cursor: pointer;
+                    color: var(--bc-fg-muted);
+                    font-size: 16px;
+                    line-height: 1;
+                    padding: 0 4px;
+                }
                 /* ─── Section labels ─── */
                 .bc-section-label {
                     display: flex;
@@ -771,6 +1026,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 .bc-sig-close.bc-sig-sal  .bc-sig-label { color: #b91c1c; }
                 .bc-sig-close.bc-sig-max  .bc-sig-label { color: #44403c; }
                 .bc-sig-close.bc-sig-cal  .bc-sig-label { color: #14532d; }
+                .bc-sig-close.bc-sig-fiona .bc-sig-label { color: #ff4500; }
                 .bc-sig-close .bc-sig-body { color: var(--bc-fg-muted); line-height: 1.6; }
                 /* ─── Empty card (slot) ─── */
                 .bc-empty-card {
@@ -906,13 +1162,19 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     font-weight: 500;
                 }
                 /* ─── Responsive ─── */
+                @media (max-width: 900px) {
+                    .bc-tier-picker { grid-template-columns: repeat(3, 1fr); }
+                }
                 @media (max-width: 780px) {
                     .bc-page { padding: 18px 16px 60px; }
                     .bc-tier-picker { grid-template-columns: repeat(2, 1fr); }
-                    .bc-qbar { grid-template-columns: 1fr; gap: 10px; }
                     .bc-council-grid { grid-template-columns: 1fr; }
                     .bc-council-grid.specialists-3 { grid-template-columns: 1fr; }
                     .bc-suggestions-grid { grid-template-columns: 1fr; }
+                    .bc-picker-grid { grid-template-columns: repeat(2, 1fr); }
+                }
+                @media (max-width: 480px) {
+                    .bc-picker-grid { grid-template-columns: 1fr; }
                 }
             `}</style>
 
@@ -924,7 +1186,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     <div style={{ height: "32px", width: "6px", background: "#ff4500", borderRadius: "9999px", boxShadow: "0 0 10px rgba(255,69,0,0.5)" }} />
                     <h1 style={{ margin: 0 }}>Brainstorming Council</h1>
                 </div>
-                <p style={{ paddingLeft: "18px" }}>You ask one question. Fiona frames it, {activeTier === "quick" ? "two specialists chime in" : activeTier === "full" ? "three specialists chime in" : activeTier === "deep" ? "four specialists chime in from different perspectives" : "five specialists chime in from different perspectives"} in parallel, and Fiona closes with what they agreed on, where they disagreed, and the one thing to do this week.</p>
+                <p style={{ paddingLeft: "18px" }}>You ask one question. Cal frames it, {activeTier === "quick" ? "two specialists chime in" : activeTier === "full" ? "three specialists chime in" : activeTier === "deep" ? "four specialists chime in from different perspectives" : activeTier === "strategy" ? "five specialists chime in from different perspectives" : "all twelve specialists weigh in"} in parallel, and Cal closes with what they agreed on, where they disagreed, and the one thing to do this week.</p>
             </div>
 
             {/* ── Tier picker ── */}
@@ -956,8 +1218,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             type="button"
                             className="bc-suggestion-chip"
                             onClick={() => {
+                                // W67: chip click ONLY populates the question.
+                                // Tier is set only by clicking a tier card.
                                 setQuestion(s.text)
-                                setActiveTier(s.tier)
                                 inputRef.current?.focus()
                             }}
                         >
@@ -968,75 +1231,152 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 </div>
             </div>
 
-            {/* ── Question bar ── */}
-            <form className="bc-qbar" onSubmit={handleConvene} aria-label="Council question">
-                <div className="bc-qlabel">
-                    <span className="bc-icon">?</span>
-                    What&apos;s the question
+            {/* ── Question bar — W66: vertical stack (textarea above, Convene below) ── */}
+            <form className="bc-qbar" onSubmit={handleConvene} aria-label="Council question" style={{ marginBottom: showPicker ? "12px" : "28px" }}>
+                <div className="bc-qbar-top">
+                    <div className="bc-qlabel">
+                        <span className="bc-icon">?</span>
+                        What&apos;s the question
+                    </div>
+                    <textarea
+                        ref={inputRef}
+                        value={question}
+                        onChange={(e) => {
+                            setQuestion(e.target.value)
+                            // auto-grow: reset height then set to scrollHeight
+                            e.target.style.height = "auto"
+                            e.target.style.height = `${e.target.scrollHeight}px`
+                        }}
+                        onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault()
+                                handleConvene(e as unknown as React.FormEvent)
+                            }
+                        }}
+                        placeholder="e.g. Should I raise £2M now or hit 100 paying users first?"
+                        aria-label="Your question for the council"
+                        rows={2}
+                    />
                 </div>
-                <input
-                    ref={inputRef}
-                    type="text"
-                    value={question}
-                    onChange={(e) => setQuestion(e.target.value)}
-                    placeholder="e.g. Should I raise £2M now or hit 100 paying users first?"
-                    aria-label="Your question for the council"
-                    autoComplete="off"
-                />
-                {/* W10: dual-wire onClick + form onSubmit so the button fires
-                    even when React's synthetic event bubbling stalls on first
-                    interaction (observed in agent-browser walkthrough). */}
-                <button
-                    className="bc-convene"
-                    type="submit"
-                    onClick={handleConvene}
-                    disabled={isPending}
-                    style={isPending ? { opacity: 0.6, cursor: "wait" } : undefined}
-                >
-                    {isPending ? "Convening…" : "Convene the council  →"}
-                </button>
+                <div className="bc-qbar-bottom">
+                    {/* W57: "Choose your council" toggle */}
+                    <button
+                        type="button"
+                        onClick={() => setShowPicker(p => !p)}
+                        style={{
+                            background: "none",
+                            border: "1px solid var(--bc-border)",
+                            borderRadius: "8px",
+                            padding: "7px 14px",
+                            fontSize: "12.5px",
+                            fontWeight: 600,
+                            color: "var(--bc-fg-muted)",
+                            cursor: "pointer",
+                            fontFamily: "inherit",
+                            transition: "border-color 0.12s, color 0.12s",
+                        }}
+                    >
+                        {showPicker ? "Close picker" : "Choose your council"}
+                    </button>
+                    {/* W10: dual-wire onClick + form onSubmit */}
+                    <button
+                        className="bc-convene"
+                        type="submit"
+                        onClick={handleConvene}
+                        disabled={isPending}
+                        style={isPending ? { opacity: 0.6, cursor: "wait" } : undefined}
+                    >
+                        {isPending ? "Convening…" : "Convene the council  →"}
+                    </button>
+                </div>
             </form>
 
+            {/* W57: Manual specialist picker — shown when user clicks "Choose your council" */}
+            {showPicker && (
+                <div className="bc-picker" style={{ marginBottom: "28px" }}>
+                    <div className="bc-picker-head">
+                        <span className="bc-picker-title">Choose your council</span>
+                        <span className="bc-picker-hint">
+                            {(() => {
+                                const max = Math.min(COUNCIL_TIERS.find(t => t.id === activeTier)!.specialists, ALL_SPECIALIST_IDS.length)
+                                return `Pick up to ${max} — ${selectedSpecialistIds.filter(id => (ALL_SPECIALIST_IDS as readonly string[]).includes(id)).length} selected`
+                            })()}
+                        </span>
+                    </div>
+                    <div className="bc-picker-grid">
+                        {(ALL_SPECIALIST_IDS as readonly string[]).map(id => {
+                            const sp = SPECIALISTS.find(s => s.id === id)
+                            if (!sp) return null
+                            const isSelected = selectedSpecialistIds.includes(id)
+                            const max = Math.min(COUNCIL_TIERS.find(t => t.id === activeTier)!.specialists, ALL_SPECIALIST_IDS.length)
+                            const atMax = selectedSpecialistIds.length >= max && !isSelected
+                            return (
+                                <button
+                                    key={id}
+                                    type="button"
+                                    className={`bc-picker-item${isSelected ? " selected" : ""}`}
+                                    disabled={atMax}
+                                    style={atMax ? { opacity: 0.45, cursor: "not-allowed" } : undefined}
+                                    onClick={() => {
+                                        setSelectedSpecialistIds(prev => {
+                                            if (prev.includes(id)) return prev.filter(x => x !== id)
+                                            if (prev.length >= max) return prev
+                                            return [...prev, id]
+                                        })
+                                    }}
+                                >
+                                    <span className="bc-pi-check">{isSelected ? "✓" : ""}</span>
+                                    <span className="bc-pi-label">
+                                        <span className="bc-pi-name">{sp.name}</span>
+                                        <span className="bc-pi-role">{sp.title}</span>
+                                    </span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+            )}
+
             {/* ══════════════════════════════════════════════════════════════
-                SECTION 1 — Fiona frames the question
+                SECTION 1 — Cal frames the question
             ══════════════════════════════════════════════════════════════ */}
             <div className="bc-section-label">
                 <span className="bc-step">1</span>
                 <h2>
                     {session.phase === "idle"
-                        ? "Fiona frames the question"
+                        ? "Cal frames the question"
                         : session.phase === "pending"
-                        ? "Fiona is framing the question…"
-                        : "Fiona’s framing"}
+                        ? "Cal is framing the question…"
+                        : "Cal’s framing"}
                 </h2>
                 <span className="bc-rule" />
                 <span className="bc-hint">Host &middot; runs every brainstorm</span>
             </div>
 
             {session.phase === "idle" ? (
-                /* Pre-submission: show Fiona's role / what she does */
+                /* Pre-submission: show Cal's role / what she does */
                 <div className="bc-fiona-card">
                     <div className="bc-fiona-head">
-                        <div className={`bc-sp-avatar bc-av-fiona`}>FI</div>
+                        <div className={`bc-sp-avatar bc-av-cal`}>CA</div>
                         <div className="bc-who">
                             <div className="bc-name">
-                                {FIONA?.name ?? "Fiona"}
-                                <span className="bc-role-chip">Host &middot; Fundraising lead</span>
+                                {CAL?.name ?? "Cal"}
+                                <span className="bc-role-chip">Host &middot; Chief of Staff</span>
                             </div>
-                            <div className="bc-role">Fractional Forge &mdash; investor narrative + diligence prep</div>
+                            <div className="bc-role">Fractional Forge &mdash; Chief of Staff &middot; operational execution</div>
                         </div>
                     </div>
                     <p style={{ fontSize: "14px", lineHeight: "1.7", margin: "0 0 14px", color: "var(--bc-fg)" }}>
-                        Fiona opens every brainstorm. She reads your question, names what is actually worth
+                        Cal opens every brainstorm. She reads your question, names what is actually worth
                         disagreeing about, and calls in the specialists best suited to answer it. She
                         comes back at the end with where they agreed, where they split, and the one concrete
                         thing to do this week.
                     </p>
                     <ul style={{ listStyle: "none", padding: 0, margin: "0 0 16px", display: "grid", gap: "10px" }}>
                         {[
-                            "She frames the question before anyone gives you an answer — so you are not handed five answers to a question that was never quite right.",
-                            "She calls in three to five specialists from different model lineages, in parallel — no single perspective dominates.",
-                            "She closes with a synthesis that names the sharpest disagreement and lands a single next action.",
+                            "Cal frames the question before anyone gives you an answer — so you are not handed five answers to a question that was never quite right.",
+                            "Cal calls in three to five specialists from different model lineages, in parallel — no single perspective dominates.",
+                            "Cal closes with a synthesis that names the sharpest disagreement and lands a single next action.",
                         ].map((item, i) => (
                             <li
                                 key={i}
@@ -1066,12 +1406,14 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     </p>
                 </div>
             ) : session.phase === "pending" ? (
-                /* Loading: calls in flight */
+                /* Loading: calls in flight — W56: animated loading state */
                 <div className="bc-fiona-empty">
-                    <div className="bc-stub-avatar">FI</div>
+                    <div className="bc-stub-avatar bc-loading-pulse">CA</div>
                     <p>
-                        <strong>Fiona is reading your question and framing what is worth disagreeing about.</strong><br />
-                        Specialist calls are firing in parallel — this takes 10–20 seconds.
+                        <strong>Cal is reading your question and framing what is worth disagreeing about.</strong><br />
+                        <span className="bc-loading-pulse" style={{ fontStyle: "italic", color: "var(--bc-fg-muted)" }}>
+                            {LOADING_LINES[loadingLineIdx]}
+                        </span>
                     </p>
                 </div>
             ) : session.phase === "error" ? (
@@ -1091,20 +1433,20 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     </p>
                 </div>
             ) : (
-                /* Done: show Fiona's real opening */
+                /* Done: show Cal's real opening */
                 <div className="bc-fiona-card">
                     <div className="bc-fiona-head">
-                        <div className={`bc-sp-avatar bc-av-fiona`}>FI</div>
+                        <div className={`bc-sp-avatar bc-av-cal`}>CA</div>
                         <div className="bc-who">
                             <div className="bc-name">
-                                {FIONA?.name ?? "Fiona"}
-                                <span className="bc-role-chip">Host &middot; Fundraising lead</span>
+                                {CAL?.name ?? "Cal"}
+                                <span className="bc-role-chip">Host &middot; Chief of Staff</span>
                             </div>
-                            <div className="bc-role">Fractional Forge &mdash; investor narrative + diligence prep</div>
+                            <div className="bc-role">Fractional Forge &mdash; Chief of Staff &middot; operational execution</div>
                         </div>
                     </div>
                     <p style={{ fontSize: "14.5px", lineHeight: "1.75", margin: 0, color: "var(--bc-fg)", whiteSpace: "pre-wrap" }}>
-                        {session.fionaOpening}
+                        {session.hostOpening}
                     </p>
                 </div>
             )}
@@ -1129,11 +1471,12 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         const sigLabel = getSigCloseLabel(specialist.id)
                         const initials = specialist.name.slice(0, 2).toUpperCase()
                         const sigColorMap: Record<string, string> = {
-                            "strategist":     "bc-sig-sage",
-                            "finance-lead":   "bc-sig-finn",
-                            "sales-lead":     "bc-sig-sal",
-                            "cto":            "bc-sig-max",
-                            "chief-of-staff": "bc-sig-cal",
+                            "strategist":          "bc-sig-sage",
+                            "finance-lead":        "bc-sig-finn",
+                            "sales-lead":          "bc-sig-sal",
+                            "cto":                 "bc-sig-max",
+                            "chief-of-staff":      "bc-sig-cal",
+                            "fundraising-advisor": "bc-sig-fiona",
                         }
                         const sigColorClass = sigColorMap[specialist.id] ?? ""
 
@@ -1165,15 +1508,15 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     })}
                 </div>
             ) : session.phase === "pending" ? (
-                /* Loading: show shimmer placeholders while calls are in flight */
+                /* Loading: W56 animated placeholders — each one shows a pulsing avatar + cycling loading text */
                 <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
-                    {sessionCouncilMembers.map((specialist, idx) => (
-                        <div key={idx} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border)" }}>
-                            <div className={`bc-sp-avatar ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
+                    {sessionCouncilMembers.map((specialist, i) => (
+                        <div key={i} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border)" }}>
+                            <div className={`bc-sp-avatar bc-loading-pulse ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
                                 {specialist.name.slice(0, 2).toUpperCase()}
                             </div>
                             <h3>{specialist.name}</h3>
-                            <p style={{ fontStyle: "italic" }}>{specialist.thinkingIndicator}</p>
+                            <p style={{ fontStyle: "italic" }}>{LOADING_LINES[loadingLineIdx]}</p>
                         </div>
                     ))}
                 </div>
@@ -1186,11 +1529,12 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         const initials = resp.name.slice(0, 2).toUpperCase()
                         const sigLabel = getSigCloseLabel(resp.id)
                         const sigColorMap: Record<string, string> = {
-                            "strategist":     "bc-sig-sage",
-                            "finance-lead":   "bc-sig-finn",
-                            "sales-lead":     "bc-sig-sal",
-                            "cto":            "bc-sig-max",
-                            "chief-of-staff": "bc-sig-cal",
+                            "strategist":          "bc-sig-sage",
+                            "finance-lead":        "bc-sig-finn",
+                            "sales-lead":          "bc-sig-sal",
+                            "cto":                 "bc-sig-max",
+                            "chief-of-staff":      "bc-sig-cal",
+                            "fundraising-advisor": "bc-sig-fiona",
                         }
                         const sigColorClass = sigColorMap[resp.id] ?? ""
                         return (
@@ -1249,11 +1593,12 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 const avatarClass = getAvatarClass(resp.id)
                                 const initials = resp.name.slice(0, 2).toUpperCase()
                                 const sigColorMap: Record<string, string> = {
-                                    "strategist":     "bc-sig-sage",
-                                    "finance-lead":   "bc-sig-finn",
-                                    "sales-lead":     "bc-sig-sal",
-                                    "cto":            "bc-sig-max",
-                                    "chief-of-staff": "bc-sig-cal",
+                                    "strategist":          "bc-sig-sage",
+                                    "finance-lead":        "bc-sig-finn",
+                                    "sales-lead":          "bc-sig-sal",
+                                    "cto":                 "bc-sig-max",
+                                    "chief-of-staff":      "bc-sig-cal",
+                                    "fundraising-advisor": "bc-sig-fiona",
                                 }
                                 const sigColorClass = sigColorMap[resp.id] ?? ""
                                 return (
@@ -1283,11 +1628,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             )}
 
             {/* ══════════════════════════════════════════════════════════════
-                SECTION 3 — Fiona closes
+                SECTION 3 — Cal closes
             ══════════════════════════════════════════════════════════════ */}
             <div className="bc-section-label" style={{ marginTop: "36px" }}>
                 <span className="bc-step">3</span>
-                <h2>Fiona closes &mdash; synthesis + next action</h2>
+                <h2>Cal closes &mdash; synthesis + next action</h2>
                 <span className="bc-rule" />
                 <span className="bc-hint">Host &middot; seals every brainstorm</span>
             </div>
@@ -1296,10 +1641,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 /* Pre-submission: preview the closing card structure */
                 <div className="bc-fiona-card bc-closing">
                     <div className="bc-fiona-head">
-                        <div className={`bc-sp-avatar bc-av-fiona`}>FI</div>
+                        <div className={`bc-sp-avatar bc-av-cal`}>CA</div>
                         <div className="bc-who">
                             <div className="bc-name">
-                                Fiona
+                                Cal
                                 <span className="bc-role-chip">Synthesis</span>
                             </div>
                             <div className="bc-role">Closing the loop &middot; Fractional Forge fundraising lead</div>
@@ -1311,7 +1656,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 Where they agreed
                             </div>
                             <p style={{ margin: 0, fontSize: "13.5px", lineHeight: "1.55", color: "var(--bc-fg-muted)" }}>
-                                Fiona will name what all {councilMembers.length} specialist{councilMembers.length !== 1 ? "s" : ""} agreed on &mdash; the common ground that tells you which assumptions the whole council shares.
+                                Cal will name what all {councilMembers.length} specialist{councilMembers.length !== 1 ? "s" : ""} agreed on &mdash; the common ground that tells you which assumptions the whole council shares.
                             </p>
                         </div>
                         <div style={{ background: "rgba(255,255,255,0.8)", border: "1px solid var(--bc-brand-dim)", borderRadius: "10px", padding: "14px 16px" }}>
@@ -1346,34 +1691,34 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             One action. One deadline. No ambiguity.
                         </h3>
                         <p style={{ margin: 0, fontSize: "13.5px", lineHeight: "1.6", color: "var(--bc-fg)", position: "relative" }}>
-                            Fiona closes with the single most important thing to do this week &mdash; not a list, not options. One action with a deadline.
+                            Cal closes with the single most important thing to do this week &mdash; not a list, not options. One action with a deadline.
                         </p>
                     </div>
                     <p style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed var(--bc-brand-dim)", fontSize: "12.5px", color: "var(--bc-fg-muted)", fontStyle: "italic" }}>
-                        &mdash; Fiona, Fractional Forge fundraising lead. The closing synthesis appears once the council has returned.
+                        &mdash; Cal, Fractional Forge Chief of Staff. The closing synthesis appears once the council has returned.
                     </p>
                 </div>
             ) : session.phase === "pending" ? (
                 /* Loading: closing held */
                 <div className="bc-closing-held">
                     <div className="bc-label">Closing synthesis &mdash; held</div>
-                    <p>Fiona will close once all specialists have returned.</p>
+                    <p>Cal will close once all specialists have returned.</p>
                 </div>
-            ) : session.phase === "done" && session.fionaClosing ? (
-                /* Done: real Fiona closing */
+            ) : session.phase === "done" && session.hostClosing ? (
+                /* Done: real Cal closing */
                 <div className="bc-fiona-card bc-closing">
                     <div className="bc-fiona-head">
-                        <div className={`bc-sp-avatar bc-av-fiona`}>FI</div>
+                        <div className={`bc-sp-avatar bc-av-cal`}>CA</div>
                         <div className="bc-who">
                             <div className="bc-name">
-                                Fiona
+                                Cal
                                 <span className="bc-role-chip">Synthesis</span>
                             </div>
                             <div className="bc-role">Closing the loop &middot; Fractional Forge fundraising lead</div>
                         </div>
                     </div>
                     <p style={{ fontSize: "14.5px", lineHeight: "1.75", margin: "0 0 18px", color: "var(--bc-fg)", whiteSpace: "pre-wrap" }}>
-                        {session.fionaClosing}
+                        {session.hostClosing}
                     </p>
                     <p style={{ marginTop: "16px", paddingTop: "14px", borderTop: "1px dashed var(--bc-brand-dim)", fontSize: "12.5px", color: "var(--bc-fg-muted)", fontStyle: "italic", margin: 0 }}>
                         <button
@@ -1390,7 +1735,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 /* Error or no closing — fallback */
                 <div className="bc-closing-held">
                     <div className="bc-label">Synthesis unavailable</div>
-                    <p>Fiona&apos;s closing could not be generated.{" "}
+                    <p>Cal&apos;s closing could not be generated.{" "}
                         <button
                             type="button"
                             onClick={handleReset}
@@ -1445,6 +1790,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                         setGeneratedCoverUrl(urls.coverUrl)
                                     }
                                     setGraphicStatus("done")
+                                    // W72: refresh router to pick up newly-generated cover in saved-sessions panel
+                                    router.refresh()
                                 } else {
                                     setGraphicStatus("error")
                                 }
@@ -1485,13 +1832,17 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 const result = await generateSessionAudio(session.savedThreadId)
                                 if (result.ok) {
                                     // W54: fetch signed URLs for all audio clips so the
-                                    // audio player renders inline. Previously the component
-                                    // had no render block for the generated clips.
+                                    // audio player renders inline.
                                     const urls = await refreshSessionAssetUrls(session.savedThreadId)
                                     if (urls.audioClips.length > 0) {
                                         setGeneratedAudioClips(urls.audioClips)
                                     }
                                     setAudioStatus("done")
+                                    // W70: show ready callout + auto-scroll to audio section
+                                    setAudioReadyVisible(true)
+                                    setTimeout(() => {
+                                        audioReadyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
+                                    }, 200)
                                 } else {
                                     setAudioStatus("error")
                                 }
@@ -1530,12 +1881,24 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 Cover image: 16:9 rounded block, full-width.
                 Audio: one <audio> player per clip, labelled with specialist name. */}
             {(generatedCoverUrl || (generatedAudioClips && generatedAudioClips.length > 0)) && (
-                <div style={{
+                <div ref={audioReadyRef} style={{
                     marginTop: "20px",
                     display: "flex",
                     flexDirection: "column",
                     gap: "16px",
                 }}>
+                    {/* W70: Audio ready callout — auto-dismissible */}
+                    {audioReadyVisible && generatedAudioClips && generatedAudioClips.length > 0 && (
+                        <div className="bc-audio-ready">
+                            <span>🔊</span>
+                            <span>Your audio summary is ready</span>
+                            <button
+                                type="button"
+                                onClick={() => setAudioReadyVisible(false)}
+                                aria-label="Dismiss"
+                            >×</button>
+                        </div>
+                    )}
                     {generatedCoverUrl && (
                         <div style={{
                             borderRadius: "12px",
