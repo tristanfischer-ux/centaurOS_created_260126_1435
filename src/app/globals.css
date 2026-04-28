@@ -210,7 +210,9 @@
 
 @layer base {
   * {
-    @apply border-border;
+    border-width: 0;
+    border-style: solid;
+    border-color: var(--color-border, currentColor);
   }
 
   body {
