@@ -54,6 +54,7 @@ const STAGE_LABELS: Record<AutopilotStage, string> = {
     proofreading: "proofreading the report",
     generating_pdf: "generating PDF pack",
     done: "done",
+    failed: "failed — retries exhausted",
 }
 
 const POLL_INTERVAL_MS = 15_000

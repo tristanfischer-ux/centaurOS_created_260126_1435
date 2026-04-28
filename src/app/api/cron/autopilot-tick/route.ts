@@ -191,7 +191,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
             continue
         }
 
-        const config = STAGE_CONFIG[stage as Exclude<AutopilotStage, "done">]
+        const config = STAGE_CONFIG[stage as Exclude<AutopilotStage, "done" | "failed">]
         if (!config) {
             details.push({
                 projectId: project.id,

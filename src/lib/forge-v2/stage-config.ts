@@ -84,7 +84,7 @@ export type StageConfig = SynchronousStageConfig | FireStageConfig
 /** Declarative state machine. The cron tick reads this; nothing else
  *  should hold a copy of stage→step or stage→nextStage knowledge. */
 export const STAGE_CONFIG: Record<
-    Exclude<AutopilotStage, "done">,
+    Exclude<AutopilotStage, "done" | "failed">,
     StageConfig
 > = {
     waiting_chase: {

@@ -109,9 +109,9 @@ export async function GET(
         // the cron's fire pattern — the receiving Lambda continues for 800s.
         try {
             const autopilotState = (project.autopilot_state as AutopilotState | null) ?? null
-            if (autopilotState && !autopilotState.finished_at && autopilotState.stage !== "done") {
+            if (autopilotState && !autopilotState.finished_at && autopilotState.stage !== "done" && autopilotState.stage !== "failed") {
                 const stage = autopilotState.stage as AutopilotStage
-                const config = STAGE_CONFIG[stage as Exclude<AutopilotStage, "done">]
+                const config = STAGE_CONFIG[stage as Exclude<AutopilotStage, "done" | "failed">]
                 if (config && config.kind === "fire") {
                     const { data: trackingRow } = await admin
                         .from("pipeline_runs")

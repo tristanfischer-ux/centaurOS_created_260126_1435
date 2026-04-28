@@ -134,6 +134,14 @@ export const STAGE_NARRATIVES: Record<AutopilotStage, StageNarrative> = {
         inFlight: "",
         narrative: "Your plan is ready. The full report is below as a downloadable PDF.",
     },
+    failed: {
+        // Set by recordFailure() when retries are exhausted on a stage.
+        // Cron filter excludes by `stage NOT IN ('done','failed')`.
+        // Placeholder to satisfy Record<AutopilotStage, ...> exhaustiveness.
+        label: "Stopped — retries exhausted",
+        inFlight: "",
+        narrative: "The autopilot stopped because a stage exhausted its retries. The most recent error is in the project's autopilot state.",
+    },
 }
 
 /**

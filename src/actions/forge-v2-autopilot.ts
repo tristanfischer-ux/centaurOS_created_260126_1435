@@ -71,6 +71,8 @@ export type AutopilotStage =
     | "proofreading"    // v1.4 (2026-04-25 NIGHT): Engine self-review before PDF
     | "generating_pdf"  // v1.2: final PDF export so founder gets a deliverable
     | "done"
+    | "failed"          // v1.5 (2026-04-28): set by recordFailure() when retries
+                        // exhausted; cron filter excludes by `stage NOT IN ('done','failed')`
 
 export interface AutopilotState {
     started_at: string
