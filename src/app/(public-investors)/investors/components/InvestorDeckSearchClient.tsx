@@ -947,13 +947,13 @@ function FilterChip({ children, active }: { children: React.ReactNode; active?: 
 // Behaviour (why-fit / pitch-guidance / shortlist / lock-state / view-cap) is
 // unchanged — only the visual shell is replaced.
 
-const SCORECARD_PILLARS: Array<{ key: keyof FirmMatchResult['pillars']; label: string }> = [
-  { key: 'thesis',     label: 'Thesis' },
-  { key: 'stage',      label: 'Stage' },
-  { key: 'geo',        label: 'Geo' },
-  { key: 'cheque',     label: 'Cheque' },
-  { key: 'activity',   label: 'Activity' },
-  { key: 'confidence', label: 'Confidence' },
+const SCORECARD_PILLARS: Array<{ key: keyof FirmMatchResult['pillars']; label: string; weight: string }> = [
+  { key: 'thesis',     label: 'Thesis',     weight: '55%' },
+  { key: 'stage',      label: 'Stage',      weight: '10%' },
+  { key: 'geo',        label: 'Geo',        weight: '15%' },
+  { key: 'cheque',     label: 'Cheque',     weight: '10%' },
+  { key: 'activity',   label: 'Activity',   weight: '3%'  },
+  { key: 'confidence', label: 'Confidence', weight: '2%'  },
 ]
 
 interface MatchCardProps {
@@ -1265,7 +1265,7 @@ function MatchCard({
 
       {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
       <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
-        {SCORECARD_PILLARS.map(({ key, label }) => {
+        {SCORECARD_PILLARS.map(({ key, label, weight }) => {
           const raw   = pillars?.[key]
           const hasScore = raw !== undefined
           const value = hasScore ? raw : 0
@@ -1283,10 +1283,17 @@ function MatchCard({
             <div key={key} className="text-center">
               {/* 9px uppercase label */}
               <div
-                className="font-medium uppercase mb-1 truncate"
+                className="font-medium uppercase mb-0 truncate"
                 style={{ fontSize: '9px', color: 'hsl(var(--muted-foreground))', letterSpacing: '0.3px' }}
               >
                 {label}
+              </div>
+              {/* Weight annotation — shows the formula contribution */}
+              <div
+                className="mb-1 truncate"
+                style={{ fontSize: '8px', color: 'hsl(var(--muted-foreground))', opacity: 0.6 }}
+              >
+                wt {weight}
               </div>
               {/* 5px-tall bar */}
               <div
@@ -1316,37 +1323,12 @@ function MatchCard({
         })}
       </div>
 
-      {/* ── Match reason caption — top 2 pillars + optional weakness ── */}
-      {pillars && (() => {
-        const PILLAR_LABELS: Record<keyof FirmMatchResult['pillars'], string> = {
-          thesis:     'thesis fit',
-          stage:      'stage fit',
-          geo:        'geography',
-          cheque:     'cheque size',
-          activity:   'recent activity',
-          confidence: 'data confidence',
-        }
-        type PillarKey = keyof FirmMatchResult['pillars']
-        const entries = (Object.keys(pillars) as PillarKey[])
-          .map((k) => ({ key: k, label: PILLAR_LABELS[k], value: pillars[k] }))
-          .sort((a, b) => b.value - a.value)
-
-        const top1 = entries[0]
-        const top2 = entries[1]
-        const bottom = entries[entries.length - 1]
-
-        if (!top1 || !top2) return null
-
-        const weaknessPart = bottom && bottom.value < 40 && bottom.key !== top1.key && bottom.key !== top2.key
-          ? `; weaker on ${bottom.label} (${bottom.value}%)`
-          : ''
-
-        return (
-          <p className="text-[11px] text-muted-foreground mb-2 leading-snug">
-            Match reason: strong on {top1.label} ({top1.value}%) and {top2.label} ({top2.value}%){weaknessPart}.
-          </p>
-        )
-      })()}
+      {/* ── Formula key — shows weights so composite % is verifiable ── */}
+      {pillars && matchScore !== undefined && (
+        <p className="text-[10px] text-muted-foreground mb-2 leading-snug">
+          Composite {Math.round(matchScore)}% = thesis×55% + geo×15% + stage×10% + cheque×10% + activity×3% + confidence×2% (missing dimensions excluded and weights renormalised)
+        </p>
+      )}
 
       {/* ── Thesis paragraph — 260 chars max ── */}
       {thesis && (
