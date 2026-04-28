@@ -492,6 +492,9 @@ async function skeletonBomInternal(
   const [supplierContextForSkeleton] = await Promise.all([
     fetchMarketplaceSupplierContextForBom(bomQueryText),
   ])
+  if (supplierContextForSkeleton) {
+    console.info("[bom:fix1] BOM skeleton grounded on marketplace_listings supplier context")
+  }
 
   const moduleDescriptions = modules.map((m) => {
     const diagInfo = diagnosticAnswers?.[m.id]
