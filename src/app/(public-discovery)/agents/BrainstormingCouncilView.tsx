@@ -35,6 +35,8 @@ import type { Specialist } from "@/lib/agents/specialists-config"
 import { conveneCouncil } from "@/actions/brainstorming-council"
 import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council-types"
 import { createMeetingThread } from "@/actions/meeting-threads"
+import { generateSessionInfographic } from "@/actions/brainstorm-cover"
+import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
 
 // ─── Council tier definitions (Quick / Full / Deep / Strategy) ───────────────
@@ -214,6 +216,11 @@ interface CouncilSession {
      *  so the council grid renders the correct specialist count even if the
      *  user changes the tier while the session is pending / done. */
     submittedTier: CouncilTier
+    /** W50: true when the council ran two rounds (tier !== 'quick'). */
+    hadRound2: boolean
+    /** W52: UUID of the persisted meeting_thread — used by graphic/audio
+     *  re-generation buttons. null until createMeetingThread returns. */
+    savedThreadId: string | null
 }
 
 const EMPTY_SESSION: CouncilSession = {
@@ -224,6 +231,8 @@ const EMPTY_SESSION: CouncilSession = {
     errorMessage: "",
     submittedQuestion: "",
     submittedTier: "deep",
+    hadRound2: false,
+    savedThreadId: null,
 }
 
 export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewProps) {
@@ -235,6 +244,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
     // W7: bump this counter after each successful session save to trigger
     // MeetingHistory to re-fetch its list.
     const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
+    // W52: inline status for the graphic / audio re-generation buttons
+    const [graphicStatus, setGraphicStatus] = useState<"idle" | "running" | "done" | "error">("idle")
+    const [audioStatus, setAudioStatus] = useState<"idle" | "running" | "done" | "error">("idle")
 
     const submitted = session.phase !== "idle"
     // W8: always derive council members from activeTier for the pre-session
@@ -302,6 +314,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     errorMessage: result.error,
                     submittedQuestion: trimmedQ,
                     submittedTier: tierSnapshot,
+                    hadRound2: false,
+                    savedThreadId: null,
                 })
                 return
             }
@@ -314,14 +328,20 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 errorMessage: "",
                 submittedQuestion: trimmedQ,
                 submittedTier: tierSnapshot,
+                hadRound2: result.hadRound2 ?? false,
+                savedThreadId: null, // filled in after createMeetingThread returns
             })
+            // Reset asset generation buttons for the new session
+            setGraphicStatus("idle")
+            setAudioStatus("idle")
 
             // W1 + W6 + W7: persist the completed session so:
             //   - createMeetingThread triggers after() which fires
             //     generateSessionInfographic (cover image) and
             //     generateSessionAudio in the background.
             //   - The saved thread row appears in SavedSessionsPanel.
-            // Build entries: Fiona opening, each specialist, Fiona closing.
+            // Build entries: Fiona opening, each specialist R1, R2 entries
+            // (if present), Fiona closing.
             const entries = [
                 {
                     specialistId: "fundraising-advisor",
@@ -331,6 +351,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     content: result.fionaOpening,
                     role: "specialist" as const,
                 },
+                // Round 1 specialist responses
                 ...result.specialistResponses.map((resp: SpecialistResponse) => ({
                     specialistId: resp.id,
                     specialistName: resp.name,
@@ -339,23 +360,41 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     content: resp.response,
                     role: "specialist" as const,
                 })),
+                // Round 2 specialist responses (only when hadRound2 and content present)
+                ...(result.hadRound2
+                    ? result.specialistResponses
+                        .filter((resp: SpecialistResponse) => resp.round2Response)
+                        .map((resp: SpecialistResponse) => ({
+                            specialistId: resp.id,
+                            specialistName: resp.name,
+                            councilPosition: "reactor" as const,
+                            roundNumber: 2,
+                            content: resp.round2Response!,
+                            role: "specialist" as const,
+                        }))
+                    : []),
                 {
                     specialistId: "fundraising-advisor",
                     specialistName: "Fiona",
                     councilPosition: "host-close" as const,
-                    roundNumber: 1,
+                    roundNumber: result.hadRound2 ? 2 : 1,
                     content: result.fionaClosing,
                     role: "specialist" as const,
                 },
             ]
 
             try {
-                await createMeetingThread({
+                const saveResult = await createMeetingThread({
                     topic: trimmedQ,
                     councilTier: tierSnapshot,
                     specialistIds: specialistsForTier.map(s => s.id),
                     entries,
                 })
+                if (saveResult?.threadId) {
+                    // W52: store threadId so the graphic/audio buttons can call
+                    // the generation actions for this specific session.
+                    setSession(prev => ({ ...prev, savedThreadId: saveResult.threadId }))
+                }
                 // Bump the refresh key so MeetingHistory re-fetches.
                 setHistoryRefreshKey(k => k + 1)
             } catch (saveErr) {
@@ -1180,6 +1219,59 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             )}
 
             {/* ══════════════════════════════════════════════════════════════
+                SECTION 2b — Round 2: specialists update after seeing peers
+                W50: Only rendered when hadRound2 is true (tier !== 'quick')
+                and the session is done with round2Response data present.
+            ══════════════════════════════════════════════════════════════ */}
+            {session.phase === "done" && session.hadRound2 && session.specialistResponses.some(r => r.round2Response) && (
+                <>
+                    <div className="bc-section-label" style={{ marginTop: "36px" }}>
+                        <span className="bc-step" style={{ background: "var(--bc-blue)" }}>2b</span>
+                        <h2>Round 2 &mdash; after seeing each other</h2>
+                        <span className="bc-rule" />
+                        <span className="bc-hint">Each specialist updated their view</span>
+                    </div>
+                    <div className={`bc-council-grid${session.specialistResponses.filter(r => r.round2Response).length === 3 ? " specialists-3" : ""}`}>
+                        {session.specialistResponses
+                            .filter(r => r.round2Response)
+                            .map((resp) => {
+                                const avatarClass = getAvatarClass(resp.id)
+                                const initials = resp.name.slice(0, 2).toUpperCase()
+                                const sigColorMap: Record<string, string> = {
+                                    "strategist":     "bc-sig-sage",
+                                    "finance-lead":   "bc-sig-finn",
+                                    "sales-lead":     "bc-sig-sal",
+                                    "cto":            "bc-sig-max",
+                                    "chief-of-staff": "bc-sig-cal",
+                                }
+                                const sigColorClass = sigColorMap[resp.id] ?? ""
+                                return (
+                                    <div key={`r2-${resp.id}`} className="bc-specialist-card" style={{ borderColor: "var(--bc-blue-dim)", background: "linear-gradient(180deg, #f0f9ff 0%, var(--bc-surface) 40%)" }}>
+                                        <div className="bc-specialist-head">
+                                            <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
+                                            <div className="bc-sp-meta">
+                                                <div className="bc-name-row">
+                                                    <span className="bc-sp-name">{resp.name}</span>
+                                                    <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", background: "var(--bc-blue-soft)", color: "var(--bc-blue)", padding: "2px 6px", borderRadius: "4px", border: "1px solid var(--bc-blue-dim)" }}>Round 2</span>
+                                                </div>
+                                                <div className="bc-sp-role">{resp.title}</div>
+                                            </div>
+                                        </div>
+                                        <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
+                                            {resp.round2Response}
+                                        </div>
+                                        <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
+                                            <div className="bc-sig-label">{getSigCloseLabel(resp.id)}</div>
+                                        </div>
+                                    </div>
+                                )
+                            })
+                        }
+                    </div>
+                </>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════
                 SECTION 3 — Fiona closes
             ══════════════════════════════════════════════════════════════ */}
             <div className="bc-section-label" style={{ marginTop: "36px" }}>
@@ -1296,6 +1388,106 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             Try again
                         </button>
                     </p>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════
+                W52 — Generate graphic summary / audio transcript buttons.
+                Rendered after the council closes (session.phase === 'done').
+                Requires a saved threadId to call the generation actions.
+            ══════════════════════════════════════════════════════════════ */}
+            {session.phase === "done" && session.savedThreadId && (
+                <div style={{
+                    marginTop: "28px",
+                    padding: "20px 24px",
+                    background: "var(--bc-surface-soft)",
+                    border: "1px solid var(--bc-border)",
+                    borderRadius: "14px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "12px",
+                    alignItems: "center",
+                }}>
+                    <div style={{ flex: "1 1 200px", minWidth: 0 }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--bc-fg-muted)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "4px" }}>
+                            Session assets
+                        </div>
+                        <p style={{ margin: 0, fontSize: "12.5px", color: "var(--bc-fg-muted)", lineHeight: "1.5" }}>
+                            Generate a visual summary or audio transcript of this discussion.
+                        </p>
+                    </div>
+                    {/* Generate graphic summary button */}
+                    <button
+                        type="button"
+                        disabled={graphicStatus === "running"}
+                        onClick={async () => {
+                            if (!session.savedThreadId || graphicStatus === "running") return
+                            setGraphicStatus("running")
+                            try {
+                                const result = await generateSessionInfographic(session.savedThreadId)
+                                setGraphicStatus(result.ok ? "done" : "error")
+                            } catch {
+                                setGraphicStatus("error")
+                            }
+                        }}
+                        style={{
+                            background: graphicStatus === "done" ? "var(--bc-success)" : graphicStatus === "error" ? "#b91c1c" : "var(--bc-fg)",
+                            color: "#fff",
+                            border: "none",
+                            padding: "10px 18px",
+                            borderRadius: "10px",
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            cursor: graphicStatus === "running" ? "wait" : "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontFamily: "inherit",
+                            opacity: graphicStatus === "running" ? 0.7 : 1,
+                            transition: "background 0.15s",
+                        }}
+                    >
+                        {graphicStatus === "running" ? "Generating…" :
+                         graphicStatus === "done" ? "✓ Graphic saved" :
+                         graphicStatus === "error" ? "Error — retry" :
+                         "Generate graphic summary"}
+                    </button>
+                    {/* Create audio transcript button */}
+                    <button
+                        type="button"
+                        disabled={audioStatus === "running"}
+                        onClick={async () => {
+                            if (!session.savedThreadId || audioStatus === "running") return
+                            setAudioStatus("running")
+                            try {
+                                const result = await generateSessionAudio(session.savedThreadId)
+                                setAudioStatus(result.ok ? "done" : "error")
+                            } catch {
+                                setAudioStatus("error")
+                            }
+                        }}
+                        style={{
+                            background: audioStatus === "done" ? "var(--bc-success)" : audioStatus === "error" ? "#b91c1c" : "var(--bc-blue)",
+                            color: "#fff",
+                            border: "none",
+                            padding: "10px 18px",
+                            borderRadius: "10px",
+                            fontSize: "13px",
+                            fontWeight: 700,
+                            cursor: audioStatus === "running" ? "wait" : "pointer",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            fontFamily: "inherit",
+                            opacity: audioStatus === "running" ? 0.7 : 1,
+                            transition: "background 0.15s",
+                        }}
+                    >
+                        {audioStatus === "running" ? "Generating…" :
+                         audioStatus === "done" ? "✓ Audio saved" :
+                         audioStatus === "error" ? "Error — retry" :
+                         "Create audio transcript"}
+                    </button>
                 </div>
             )}
 

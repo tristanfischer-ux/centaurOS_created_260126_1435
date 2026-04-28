@@ -18,6 +18,10 @@ export interface SpecialistResponse {
     title: string
     modelLabel: string
     response: string
+    /** W50: Round 2 update response — present when tier supports 2 rounds.
+     *  Each specialist sees all R1 responses from peers + own R1, then
+     *  provides a 2–3 paragraph update. Absent for tier='quick' (1 round). */
+    round2Response?: string
 }
 
 export interface CouncilResult {
@@ -25,6 +29,8 @@ export interface CouncilResult {
     fionaOpening: string
     specialistResponses: SpecialistResponse[]
     fionaClosing: string
+    /** W50: true when the council ran two rounds (tier != 'quick'). */
+    hadRound2: boolean
 }
 
 export interface CouncilError {
