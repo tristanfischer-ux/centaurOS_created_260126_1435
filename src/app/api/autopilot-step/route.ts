@@ -650,8 +650,21 @@ async function runFangReviewsForAllModules(
         `[autopilot-step:fang-reviews] firing ${modulesToReview.length} of ${modules.length} modules (${modules.length - modulesToReview.length} already terminal/running)`,
     )
 
-    const { runFangReviewBackground } = await import(
-        "@/actions/specialists/run-fang-review"
+    // Route to Modal when FANG_VIA_MODAL=true; otherwise use the legacy path.
+    // Both functions have identical signatures — same args, same return type.
+    const fangViaModal =
+        (process.env.FANG_VIA_MODAL ?? "").trim().toLowerCase() === "true" ||
+        (process.env.FANG_VIA_MODAL ?? "").trim().toLowerCase() === "1" ||
+        (process.env.FANG_VIA_MODAL ?? "").trim().toLowerCase() === "on"
+
+    const reviewFn = fangViaModal
+        ? (await import("@/actions/specialists/run-fang-review-via-modal"))
+              .runFangReviewBackgroundViaModal
+        : (await import("@/actions/specialists/run-fang-review"))
+              .runFangReviewBackground
+
+    console.info(
+        `[autopilot-step:fang-reviews] dispatch path: ${fangViaModal ? "Modal (FANG_VIA_MODAL=true)" : "legacy Vercel"}`,
     )
 
     const CONCURRENCY = 2
@@ -661,7 +674,7 @@ async function runFangReviewsForAllModules(
         const batch = modulesToReview.slice(i, i + CONCURRENCY)
         const settled = await Promise.allSettled(
             batch.map((m) =>
-                runFangReviewBackground(
+                reviewFn(
                     projectId,
                     m.id,
                     foundryId,
