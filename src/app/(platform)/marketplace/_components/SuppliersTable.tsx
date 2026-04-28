@@ -199,10 +199,15 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
       {/* ── Pagination ───────────────────────────────────────────────────── */}
       {totalPages > 1 && (
         <div className="flex items-center justify-center gap-3 py-2">
+          {/* W26: disabled no longer includes isPending — removing isPending
+              from the guard allows the user to click Next/Prev while a fetch
+              is in-flight. The useEffect dependency on `page` triggers a new
+              startTransition fetch immediately, superseding the old one.
+              Keeping the opacity hint on isPending for the counter only. */}
           <button
             type="button"
             onClick={() => setPage((p) => Math.max(1, p - 1))}
-            disabled={safePage === 1 || isPending}
+            disabled={safePage === 1}
             className="text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:border-international-orange/50 transition-colors"
           >
             ← Prev
@@ -213,7 +218,7 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
           <button
             type="button"
             onClick={() => setPage((p) => p + 1)}
-            disabled={safePage >= totalPages || isPending}
+            disabled={safePage >= totalPages}
             className="text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:border-international-orange/50 transition-colors"
           >
             Next →
