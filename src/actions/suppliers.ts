@@ -137,17 +137,55 @@ export async function searchSuppliers(
     try {
       const queryEmbedding = await embedQuery(filters.query)
       // GOTCHA: Supabase RPC expects vector as string representation, not number[]
-      const { data, error } = await supabase.rpc('match_marketplace_listings', {
-        query_embedding: JSON.stringify(queryEmbedding) as unknown as string,
-        match_threshold: 0.3,
-        match_count: limit + offset + 50, // over-fetch for filtering
-      })
+      // INTENT: Migrated 2026-04-28 from `match_marketplace_listings` (v1) to
+      // `match_marketplace_listings_v2` with category filter at the DB layer,
+      // mirroring the investor-side path. Three changes vs the old call:
+      //   1. match_threshold lowered 0.3 → 0.0 (parity with investor side; was
+      //      dropping mid-relevance matches that the user's query genuinely
+      //      semantically matched).
+      //   2. match_count bumped from ~70 (limit + offset + 50) to 250 PER
+      //      CATEGORY × 2 categories = 500 effective candidate pool. The old
+      //      cap was 0.35% of the 20K supplier corpus — too tight for narrow
+      //      queries to surface real matches.
+      //   3. Filter category at the DB layer instead of post-RPC JS filter.
+      //      Previously v1 returned top-N across ALL categories and we threw
+      //      away Finance rows in JS, which left fewer effective supplier
+      //      slots when the query semantically also matched investor theses.
+      // Skipping People (100 rows) + AI (21 rows) — neither is a real supplier
+      // category in practice. If that changes, add them as more parallel calls.
+      const PER_CATEGORY = 250
+      const supplierCategories = ['Services', 'Products'] as const
+      const queryEmbStr = JSON.stringify(queryEmbedding) as unknown as string
+      const pageResults = await Promise.all(
+        supplierCategories.map(cat =>
+          supabase.rpc('match_marketplace_listings_v2', {
+            query_embedding: queryEmbStr,
+            filter_category: cat,
+            match_threshold: 0.0,
+            match_count: PER_CATEGORY,
+            p_offset: 0,
+          }),
+        ),
+      )
+      const firstError = pageResults.find(r => r.error)?.error
+      if (firstError) throw firstError
 
-      if (error) throw error
-
-      // Filter to non-Finance categories (suppliers only) and extract IDs + similarity
-      const supplierMatches = (data || [])
-        .filter((r: Record<string, unknown>) => r.category !== 'Finance')
+      // Concatenate + dedupe by id (overlaps shouldn't happen across categories
+      // but guard anyway), then sort by similarity DESC so the top of the list
+      // is the strongest semantic match across both supplier categories.
+      const seen = new Set<string>()
+      const supplierMatches: Array<Record<string, unknown>> = []
+      for (const r of pageResults) {
+        for (const row of (r.data ?? []) as Array<Record<string, unknown>>) {
+          const id = String(row.id)
+          if (seen.has(id)) continue
+          seen.add(id)
+          supplierMatches.push(row)
+        }
+      }
+      supplierMatches.sort((a, b) =>
+        (Number(b.similarity) || 0) - (Number(a.similarity) || 0)
+      )
 
       if (supplierMatches.length === 0) {
         return { results: [], total: 0, searchMode: 'semantic' }
