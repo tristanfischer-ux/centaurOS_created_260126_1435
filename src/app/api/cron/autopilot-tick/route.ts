@@ -8,8 +8,9 @@
  *
  * ## Per-project decision tree
  *
- * For each active project (autopilot_state.stage NOT IN ('done','failed')
- * AND autopilot_state.finished_at IS NULL):
+ * For each active project (autopilot_state.stage NOT IN ('done','failed')):
+ * (`finished_at` is intentionally NOT part of the active filter — see the
+ *  comment in the lookup query for why.)
  *
  *  1. If `STAGE_CONFIG[stage].kind === "synchronous"` (only `locking_brief`
  *     today): run the work inline (small DB ops), then `advance()` or
@@ -122,14 +123,20 @@ async function tickOnce(request: Request): Promise<TickResult> {
     let skipped = 0
     let failed = 0
 
-    // Active projects only — push the filters into SQL (filtering after a
-    // LIMIT was a latent bug that crowded out fresh projects with old
-    // abandoned ones; observed 2026-04-24 run 15).
+    // Active projects only — filter by `stage` (not `finished_at`).
+    //
+    // The previous filter `.is("autopilot_state->>finished_at", null)` was
+    // semantically wrong: `recordFailure()` stamps `finished_at` whenever a
+    // stage exhausts its retries, even mid-pipeline. That made every project
+    // that hit retry-exhaustion permanently invisible to the cron — the
+    // root cause of "wedged" demos diagnosed 2026-04-28. The correct
+    // condition for "active" is `stage NOT IN ('done', 'failed')`, which is
+    // the canonical end-of-pipeline check from the plan.
     const { data: projects, error } = await admin
         .from("cad_lab_projects")
         .select("id, autopilot_state")
         .not("autopilot_state", "is", null)
-        .is("autopilot_state->>finished_at", null)
+        .not("autopilot_state->>stage", "in", '("done","failed")')
         .not("autopilot_state->>started_at", "is", null)
         .order("updated_at", { ascending: false })
         .limit(MAX_PROJECTS_PER_TICK * 2)
@@ -143,9 +150,8 @@ async function tickOnce(request: Request): Promise<TickResult> {
         .filter((p) => {
             const state = p.autopilot_state as AutopilotState | null
             if (!state) return false
-            if (state.finished_at) return false
             if (!state.started_at) return false
-            if (state.stage === "done") return false
+            if (state.stage === "done" || state.stage === "failed") return false
             return true
         })
         .slice(0, MAX_PROJECTS_PER_TICK)
