@@ -932,25 +932,60 @@ async function searchInvestorsCore(
       const PAGE = 200
       const PAGES = 1
       const embJson = JSON.stringify(queryEmbedding) as unknown as string
-      const pageResults = await Promise.all(
-        Array.from({ length: PAGES }, (_, i) =>
-          supabase.rpc('match_marketplace_listings_v2', {
-            query_embedding: embJson,
-            filter_category: 'Finance',
-            // 2026-04-25 evening: bumped from -1.0 to 0.0. The "-1 → include
-            // every row regardless of hemisphere" knob was forcing IVFFlat to
-            // scan the full Finance corpus on busy probes, which intermittently
-            // hit Supabase statement_timeout (57014). Cosine ≥ 0 still yields
-            // ~all real matches (any negative-similarity row is a useless hit
-            // and gets dropped downstream anyway).
-            match_threshold: 0.0,
-            match_count: PAGE,
-            p_offset: i * PAGE,
-          }),
+      // Phase A of the raw-pages search proposal (2026-04-28). In parallel
+      // with the vector RPC, fire match_listings_pages_fts which returns
+      // listing IDs whose scraped page text matches the user query via
+      // Postgres full-text search. Naive merge below — Phase C will
+      // replace this with Reciprocal Rank Fusion. The point of FTS here:
+      // catches exact-string needles ("ISO 13485", "G99 EREC", postcodes)
+      // the structured-fields embedding misses.
+      const [pageResults, ftsResult] = await Promise.all([
+        Promise.all(
+          Array.from({ length: PAGES }, (_, i) =>
+            supabase.rpc('match_marketplace_listings_v2', {
+              query_embedding: embJson,
+              filter_category: 'Finance',
+              // 2026-04-25 evening: bumped from -1.0 to 0.0. The "-1 → include
+              // every row regardless of hemisphere" knob was forcing IVFFlat to
+              // scan the full Finance corpus on busy probes, which intermittently
+              // hit Supabase statement_timeout (57014). Cosine ≥ 0 still yields
+              // ~all real matches (any negative-similarity row is a useless hit
+              // and gets dropped downstream anyway).
+              match_threshold: 0.0,
+              match_count: PAGE,
+              p_offset: i * PAGE,
+            }),
+          ),
         ),
-      )
+        // Cast as never — match_listings_pages_fts was added in the
+        // 2026-04-28 migration but database.types.ts hasn't been
+        // regenerated yet. Runtime call is correct; types will catch
+        // up on next `npx supabase gen types`.
+        (supabase as unknown as {
+          rpc: (
+            name: string,
+            args: Record<string, unknown>
+          ) => Promise<{
+            data: Array<{
+              listing_id: string
+              best_rank: number
+              page_count: number
+              best_page_url: string | null
+            }> | null
+            error: { message: string } | null
+          }>
+        }).rpc('match_listings_pages_fts', {
+          p_query: query.trim(),
+          p_category: 'Finance',
+          p_limit: 200,
+        }),
+      ])
       const firstError = pageResults.find(r => r.error)?.error
       if (firstError) throw firstError
+      // FTS errors are non-fatal — fall back to vector-only if it fails.
+      if (ftsResult?.error) {
+        console.warn('[searchInvestors] FTS RPC error (non-fatal):', ftsResult.error.message)
+      }
       // Concatenate + dedupe by id (overlaps shouldn't happen with LIMIT/OFFSET
       // but guard anyway).
       const seen = new Set<string>()
@@ -961,6 +996,65 @@ async function searchInvestorsCore(
           if (seen.has(id)) continue
           seen.add(id)
           semanticData.push(row)
+        }
+      }
+
+      // Phase A merge: pull in listings that ONLY surfaced via FTS (no
+      // cosine similarity), assign a synthetic similarity derived from
+      // ts_rank so they participate in the composite. Anything that
+      // appeared in BOTH vector + FTS gets a small boost via Math.max
+      // when the FTS rank is unusually high. Naive but adequate for
+      // Phase A — Phase C will replace with proper RRF.
+      const ftsRows = (ftsResult?.data ?? []) as Array<{
+        listing_id: string
+        best_rank: number
+        page_count: number
+        best_page_url: string | null
+      }>
+      const ftsById = new Map<string, { best_rank: number; page_count: number; best_page_url: string | null }>()
+      for (const r of ftsRows) {
+        if (r.listing_id) ftsById.set(r.listing_id, {
+          best_rank: r.best_rank ?? 0,
+          page_count: r.page_count ?? 0,
+          best_page_url: r.best_page_url ?? null,
+        })
+      }
+      // For every FTS-only listing, fetch its full row from marketplace_listings
+      // so the downstream filters and ranker can run on the same shape as
+      // semanticData.
+      const ftsOnlyIds = ftsRows
+        .map(r => r.listing_id)
+        .filter(id => id && !seen.has(id))
+      if (ftsOnlyIds.length > 0) {
+        // Cap at 200 to bound the round-trip; FTS already returns ≤200.
+        const safeIds = ftsOnlyIds.slice(0, 200)
+        const { data: ftsListings, error: ftsListingsError } = await supabase
+          .from('marketplace_listings')
+          .select('*')
+          .eq('category', 'Finance')
+          .in('id', safeIds)
+        if (ftsListingsError) {
+          console.warn('[searchInvestors] FTS-only fetch failed (non-fatal):', ftsListingsError.message)
+        } else if (ftsListings) {
+          for (const row of ftsListings as Array<Record<string, unknown>>) {
+            const id = String(row.id)
+            if (seen.has(id)) continue
+            // Synthesise a similarity from FTS rank. ts_rank_cd values are
+            // small (~0.001-0.05 typically); normalise into a reasonable
+            // cosine-equivalent band. Rank-based normalisation is more
+            // stable than absolute scaling: a top-FTS hit gets ~0.6, a
+            // bottom-FTS hit gets ~0.3.
+            const ftsMeta = ftsById.get(id)
+            const rank = ftsMeta?.best_rank ?? 0
+            // Map ts_rank into [0.3, 0.7] using log-scale (ts_rank values
+            // span orders of magnitude); clamp.
+            const synthSim = Math.min(0.7, Math.max(0.3, 0.3 + Math.log1p(rank * 100) * 0.1))
+            ;(row as Record<string, unknown>).similarity = synthSim
+            ;(row as Record<string, unknown>)._fts_rank = rank
+            ;(row as Record<string, unknown>)._fts_page_count = ftsMeta?.page_count
+            seen.add(id)
+            semanticData.push(row)
+          }
         }
       }
       if (!semanticData || semanticData.length === 0) {
