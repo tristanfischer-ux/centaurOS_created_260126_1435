@@ -30,7 +30,13 @@ import {
     loadAutopilotState,
     tickAutopilotStage,
     type AutopilotStage,
+    type AutopilotState,
 } from "@/actions/forge-v2-autopilot"
+import {
+    STAGE_CONFIG,
+    AUTOPILOT_TRACKING_SPECIALIST,
+    STALE_RUNNING_MS,
+} from "@/lib/forge-v2/stage-config"
 
 export const dynamic = "force-dynamic"
 
@@ -84,13 +90,71 @@ export async function GET(
             return NextResponse.json({ error: "not found" }, { status: 404 })
         }
 
-        // 2. Cron-tick nudge — keep the engine moving forward.
-        // Idempotent: each stage runner self-checks before firing work.
+        // 2. Status-read tick (idempotent no-op in the cron architecture).
         try {
             await tickAutopilotStage(projectId)
         } catch (err) {
             console.warn(
                 "[FORGE-STATUS] tickAutopilotStage failed (non-fatal):",
+                err instanceof Error ? err.message : err,
+            )
+        }
+
+        // 2b. Fallback dispatch — fire the autopilot step directly when there
+        // is no recent tracking row. This makes the polling endpoint act as a
+        // cron surrogate on preview deployments where Vercel crons don't run.
+        // The autopilot-step endpoint inserts a 'running' row immediately, so
+        // concurrent fires (cron + poll) are safe: the second fire sees the
+        // running row, skips, and returns. AbortSignal.timeout(2000) mirrors
+        // the cron's fire pattern — the receiving Lambda continues for 800s.
+        try {
+            const autopilotState = (project.autopilot_state as AutopilotState | null) ?? null
+            if (autopilotState && !autopilotState.finished_at && autopilotState.stage !== "done") {
+                const stage = autopilotState.stage as AutopilotStage
+                const config = STAGE_CONFIG[stage as Exclude<AutopilotStage, "done">]
+                if (config && config.kind === "fire") {
+                    const { data: trackingRow } = await admin
+                        .from("pipeline_runs")
+                        .select("id, status, started_at")
+                        .eq("project_id", projectId)
+                        .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+                        .eq("stage", stage)
+                        .order("created_at", { ascending: false })
+                        .limit(1)
+                        .maybeSingle()
+
+                    const shouldFire = !trackingRow ||
+                        (trackingRow.status === "running" &&
+                            Date.now() - Date.parse(trackingRow.started_at) > STALE_RUNNING_MS) ||
+                        trackingRow.status === "failed"
+
+                    if (shouldFire) {
+                        const renderSecret = process.env.FORGE_RENDER_STAGE_SECRET ?? ""
+                        if (renderSecret) {
+                            const proto = _request.headers.get("x-forwarded-proto") ?? "https"
+                            const host =
+                                _request.headers.get("x-forwarded-host") ??
+                                _request.headers.get("host") ??
+                                "fractionalforge.app"
+                            const fireUrl = `${proto}://${host}/api/autopilot-step`
+                            void fetch(fireUrl, {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    Authorization: `Bearer ${renderSecret}`,
+                                },
+                                body: JSON.stringify({ projectId, step: config.fireStep }),
+                                signal: AbortSignal.timeout(2_000),
+                            }).catch(() => {
+                                // fire-and-forget; Lambda continues independently
+                            })
+                        }
+                    }
+                }
+            }
+        } catch (err) {
+            console.warn(
+                "[FORGE-STATUS] fallback dispatch failed (non-fatal):",
                 err instanceof Error ? err.message : err,
             )
         }

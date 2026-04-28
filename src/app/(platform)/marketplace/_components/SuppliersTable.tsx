@@ -212,7 +212,7 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
           </span>
           <button
             type="button"
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            onClick={() => setPage((p) => p + 1)}
             disabled={safePage >= totalPages || isPending}
             className="text-xs font-semibold px-3 py-1.5 rounded-md border border-border bg-card text-foreground disabled:opacity-40 disabled:cursor-not-allowed hover:border-international-orange/50 transition-colors"
           >

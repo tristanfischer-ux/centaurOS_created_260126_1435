@@ -19,8 +19,9 @@
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import type { Metadata } from "next"
-import { Download, Mail, Link2, ChevronLeft } from "lucide-react"
+import { Download, ChevronLeft } from "lucide-react"
 
+import { PlanShareButtons } from "./plan-share-buttons"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
 import { buildSpatialPlanSvg } from "@/lib/pdf/rasterise-spatial-plan"
@@ -325,22 +326,7 @@ export default async function PlanPage({
                     >
                         <Download className="h-4 w-4" /> Download PDF
                     </Link>
-                    <button
-                        type="button"
-                        disabled
-                        title="Ships in V1.1"
-                        className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-xs font-semibold hover:bg-secondary"
-                    >
-                        <Mail className="h-3.5 w-3.5" /> Email me
-                    </button>
-                    <button
-                        type="button"
-                        disabled
-                        title="Ships in V1.1"
-                        className="inline-flex items-center gap-2 rounded-md border border-input bg-background px-3 py-2 text-xs font-semibold hover:bg-secondary"
-                    >
-                        <Link2 className="h-3.5 w-3.5" /> Share link
-                    </button>
+                    <PlanShareButtons planName={plan.name ?? plan.subject ?? "Your plan"} />
                 </div>
 
                 <section
@@ -623,13 +609,22 @@ export default async function PlanPage({
                     </div>
                 </section>
 
-                {parts.length > 0 && (
-                    <section id="bom" className="mb-16 scroll-mt-24">
-                        <SectionHeader
-                            number="5"
-                            title="Bill of materials"
-                            subtitle={`${parts.length} rows across ${modules.length} modules. Make vs buy flagged.`}
-                        />
+                <section id="bom" className="mb-16 scroll-mt-24">
+                    <SectionHeader
+                        number="5"
+                        title="Bill of materials"
+                        subtitle={
+                            parts.length > 0
+                                ? `${parts.length} rows across ${modules.length} modules. Make vs buy flagged.`
+                                : "Parts will appear here once the costing stage completes."
+                        }
+                    />
+                    {parts.length === 0 ? (
+                        <p className="text-sm italic text-muted-foreground">
+                            No parts recorded yet — the bill of materials populates once the
+                            costing stage finishes. Download the PDF for the full detail.
+                        </p>
+                    ) : (
                         <div className="overflow-hidden rounded-md border border-border bg-card">
                             <table className="w-full text-xs">
                                 <thead>
@@ -685,8 +680,8 @@ export default async function PlanPage({
                                 </div>
                             )}
                         </div>
-                    </section>
-                )}
+                    )}
+                </section>
 
                 {moduleCosts.length > 0 && (
                     <section id="cost" className="mb-16 scroll-mt-24">

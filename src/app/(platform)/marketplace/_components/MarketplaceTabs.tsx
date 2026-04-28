@@ -63,6 +63,20 @@ export function MarketplaceTabs({
   isPaid,
 }: MarketplaceTabsProps) {
   const [tab, setTab] = useState<'overview' | 'suppliers' | 'contacts'>('overview')
+  // Lazy-mount: SuppliersTable / ContactsTable only mount on first visit.
+  // Prevents their on-mount useEffect fetches from running while the user
+  // is on the Overview tab — those async startTransition calls blocked
+  // click events on the TabsTriggers (React defers interaction during
+  // pending transitions). Mounting on first activation eliminates the race.
+  const [suppliersVisited, setSuppliersVisited] = useState(false)
+  const [contactsVisited, setContactsVisited] = useState(false)
+
+  const handleTabChange = (v: string): void => {
+    const next = v as typeof tab
+    setTab(next)
+    if (next === 'suppliers') setSuppliersVisited(true)
+    if (next === 'contacts') setContactsVisited(true)
+  }
 
   const suppliersBadge = totalSuppliers > 0 ? ` (${fmtCount(totalSuppliers)})` : ''
   // Prefer the prop-supplied total when known; fall back to facets.
@@ -70,7 +84,7 @@ export function MarketplaceTabs({
   const contactsBadge = effectiveContactsCount > 0 ? ` (${fmtCount(effectiveContactsCount)})` : ''
 
   return (
-    <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
+    <Tabs value={tab} onValueChange={handleTabChange} className="w-full">
       <TabsList className="grid w-full max-w-md grid-cols-3">
         <TabsTrigger value="overview" className="gap-1.5">
           <LayoutGrid className="h-3.5 w-3.5" />
@@ -93,16 +107,20 @@ export function MarketplaceTabs({
 
       {/* ── Suppliers tab — Phase B (table + filters + pagination) ──────── */}
       <TabsContent value="suppliers" className="mt-6">
-        <SuppliersTable facets={suppliersFacets} initialPage={suppliersInitialPage} />
+        {suppliersVisited && (
+          <SuppliersTable facets={suppliersFacets} initialPage={suppliersInitialPage} />
+        )}
       </TabsContent>
 
       {/* ── Contacts tab — Phase C (supplier key-people directory) ──────── */}
       <TabsContent value="contacts" className="mt-6">
-        <ContactsTable
-          facets={contactsFacets}
-          initialPage={contactsInitialPage}
-          isPaid={isPaid}
-        />
+        {contactsVisited && (
+          <ContactsTable
+            facets={contactsFacets}
+            initialPage={contactsInitialPage}
+            isPaid={isPaid}
+          />
+        )}
       </TabsContent>
     </Tabs>
   )

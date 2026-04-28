@@ -193,8 +193,12 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                             </a>
                         </Button>
                     ) : null}
-                    {/* Request Quote — available for any listing with contact_email */}
-                    {category !== 'People' && listing.contact_email && (
+                    {/* Request Quote — available for any non-People listing.
+                        Falls back to attrs.contact_email when the top-level
+                        contact_email column is unpopulated (common for CH-only
+                        enriched rows like EUROLINK where the email lives in
+                        the attributes JSONB rather than the top-level column). */}
+                    {category !== 'People' && (listing.contact_email || attrs.contact_email) && (
                         <QuoteRequestDialog
                             listings={listing}
                             trigger={
