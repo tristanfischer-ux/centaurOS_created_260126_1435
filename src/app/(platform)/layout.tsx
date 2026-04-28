@@ -24,7 +24,6 @@ import { CadLabProvider } from "@/app/(platform)/the-forge/cad-lab/cad-lab-conte
 
 import { PostHogProvider } from "@/components/PostHogProvider";
 import { BrowseContextProvider } from "@/contexts/browse-context";
-import { FloatingSpecialistFAB } from "@/components/specialists/floating-specialist-fab";
 import { ProfileSetupRequired } from "@/components/ProfileSetupRequired";
 import { BackgroundOpsIndicator } from "@/components/BackgroundOpsIndicator";
 import { MobileDesktopBanner } from "@/components/mobile-desktop-banner";
@@ -168,9 +167,6 @@ export default async function PlatformLayout({
                             </main>
                         </MainContentArea>
                         <MobileNav foundryName={foundryName} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} />
-                        <Suspense fallback={null}>
-                            <FloatingSpecialistFAB />
-                        </Suspense>
                         <PWARegister />
                         <DragDropPolyfill />
                         <OfflineIndicator />
