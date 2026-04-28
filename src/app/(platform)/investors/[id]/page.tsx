@@ -320,12 +320,19 @@ export default async function InvestorDetailPage({ params }: PageProps) {
           </div>
         )}
 
-        {/* Header */}
+        {/* Header — Tristan 2026-04-28 (audit P0): added the canonical
+            red-bar accent inline with the firm title to match the My Profile
+            page-header pattern. Audit quote: "implement the canonical
+            page-header pattern by adding the small red-bar accent to the
+            left of the firm title." */}
         <div className="space-y-3">
           <div className="flex items-start gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
-              <h1 className="text-2xl font-bold text-foreground">{firm.title}</h1>
-              <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="h-8 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)] flex-shrink-0" />
+                <h1 className="text-2xl font-bold text-foreground tracking-tight">{firm.title}</h1>
+              </div>
+              <div className="flex items-center gap-2 mt-2 flex-wrap pl-4">
                 {firm.subcategory && (
                   <Badge variant="secondary">{firm.subcategory}</Badge>
                 )}
