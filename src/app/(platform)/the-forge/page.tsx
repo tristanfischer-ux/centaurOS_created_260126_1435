@@ -12,5 +12,8 @@
 import { redirect } from "next/navigation"
 
 export default function TheForgeRedirectPage(): never {
-  redirect("/the-forge-v2/start")
+  // Flow A: redirect to the guided intake wizard (5-step brief capture).
+  // /the-forge-v2/start (single textarea) remains available for express access
+  // from /the-forge-v2/start directly.
+  redirect("/the-forge-v2/new")
 }
