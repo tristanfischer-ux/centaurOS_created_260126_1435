@@ -119,7 +119,7 @@ export async function estimateModuleCostsAi(
   techniqueInsights?: Record<string, ProcessInsights>,
   trusted?: TrustedContext,
 ): Promise<EstimateResult | EstimateError> {
-  return withAIGate('cad_lab_cost', async () => {
+  return withAIGate('cad_lab_cost', async ({ trackUsage }) => {
   const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
   if (!apiKey) {
     return { success: false, error: "DEEPSEEK_API_KEY not configured" }
@@ -430,6 +430,17 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
     const processes = new Set(allParts.filter(p => p.type === "make").map(p => p.process).filter(Boolean))
     console.info(`[CAD-LAB-COST] Distribution: ${buyCount} buy, ${makeCount} make, ${processes.size} unique processes: ${[...processes].join(", ")}`)
     if (buyCount === 0) console.warn("[CAD-LAB-COST] WARNING: Zero buy parts detected — prompt may need strengthening")
+
+    // AUDIT: Track model + token usage so the cost dashboard sees real data
+    // instead of 'unknown'. The withAIGate auto-tracker fires with no model
+    // when trackUsage is never called — this prevents that.
+    if (anyTokens) {
+      await trackUsage({
+        model: firstModelId ?? 'deepseek-chat',
+        promptTokens: totalIn,
+        completionTokens: totalOut,
+      })
+    }
 
     return {
       success: true,

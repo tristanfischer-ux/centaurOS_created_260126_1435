@@ -190,7 +190,7 @@ export async function generateCadLabSingleImageAction(
   referenceMimeType?: string,
   trusted?: TrustedContext,
 ): Promise<ImageGenResult | { error: string }> {
-  return withAIGate('cad_lab_images', async ({ supabase, foundryId }) => {
+  return withAIGate('cad_lab_images', async ({ supabase, foundryId, trackUsage }) => {
     // SECURITY: Block cross-foundry projectId — generateModuleImage writes to
     // xray-images/<projectId>/module-<id>.png via the admin client.
     const ownershipErr = await ensureCadLabProjectOwnership(supabase, projectId, foundryId)
@@ -258,6 +258,12 @@ export async function generateCadLabSingleImageAction(
         stylePreamble,
         referenceMimeType,
       )
+
+      // AUDIT: Track which image model was used so the cost dashboard sees real
+      // data. Without this call, withAIGate auto-tracks with model='unknown'.
+      // Image gen is billed per-image: pass tokensIn=1 as a nominal count so
+      // the price map can apply the per-image equivalent rate.
+      await trackUsage({ model: modelUsed, promptTokens: 1, completionTokens: 0 })
 
       return {
         imageUrl: url,
