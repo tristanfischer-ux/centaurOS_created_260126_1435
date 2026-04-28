@@ -972,7 +972,7 @@ function MatchCard({
       // STRUCTURE: Forge Capital search-result-card (locked variant)
       // 1px border · white bg · 12px radius · 14px padding (p-3.5)
       <div
-        className={`bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all opacity-80`}
+        className={`bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all opacity-80`}
       >
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -1050,7 +1050,7 @@ function MatchCard({
   //     card content semantically outside the anchor so it's valid HTML5.
   return (
     <div
-      className={`relative bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
+      className={`relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
     >
       {/* Cover link — makes the whole card navigable via native <a> href */}
       <Link

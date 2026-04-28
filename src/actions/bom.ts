@@ -66,6 +66,7 @@ import { fetchCatalogueForPrompt, extractSearchKeywords } from "./component-libr
 import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 import { renderOracleHint } from "@/lib/cost/oracle-benchmarks"
 import { callOpenRouter, CHEAP_STRUCTURED_MODEL } from "@/lib/ai/openrouter"
+import { embedText } from "@/lib/search/semantic-search"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -394,6 +395,67 @@ export async function skeletonBom(
  * TODO: track usage via admin-variant of trackAIUsage once the stage pattern
  * is proven.
  */
+/**
+ * Pre-fetches the top matching marketplace_listings suppliers for a given BOM
+ * domain query and formats them as a prompt context block.
+ *
+ * FIX 1 (audit Fix 1, 2026-04-27): Ground the BOM skeleton generator on the
+ * 19,928-row marketplace_listings manufacturer database BEFORE part invention,
+ * not only AFTER in the supplier-match stage. This constrains Max to specify
+ * parts that have realistic procurement paths, rather than generating from
+ * training-data priors with no reference to what is actually sourceable.
+ *
+ * Cap: top 20 semantic matches (Products/Services only) to keep prompt lean.
+ * On error: returns empty string — BOM still generates without grounding.
+ */
+async function fetchMarketplaceSupplierContextForBom(
+  queryText: string,
+): Promise<string> {
+  try {
+    const admin = createAdminClient()
+    const embedding = await embedText(queryText)
+    if (!embedding) return ""
+
+    const { data: semantic } = await admin.rpc("match_marketplace_listings", {
+      query_embedding: JSON.stringify(embedding),
+      match_threshold: 0.25,
+      match_count: 20,
+    })
+
+    if (!semantic || semantic.length === 0) return ""
+
+    const ids = semantic.map((r: { id: string }) => r.id)
+    const { data: listings } = await admin
+      .from("marketplace_listings")
+      .select("id, title, subcategory, specialties, materials, description")
+      .in("id", ids)
+      .in("category", ["Products", "Services"])
+
+    if (!listings || listings.length === 0) return ""
+
+    const lines = listings.slice(0, 20).map((l) => {
+      const parts: string[] = []
+      if (l.title) parts.push(l.title)
+      if (l.subcategory) parts.push(`(${l.subcategory})`)
+      const mats = Array.isArray(l.materials)
+        ? (l.materials as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 3).join(", ")
+        : null
+      if (mats) parts.push(`materials: ${mats}`)
+      const specs = Array.isArray(l.specialties)
+        ? (l.specialties as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 3).join(", ")
+        : null
+      if (specs) parts.push(`specialties: ${specs}`)
+      return `- ${parts.join(" | ")}`
+    }).join("\n")
+
+    return `\nKNOWN SUPPLIERS IN OUR DIRECTORY FOR THIS DOMAIN (sourced from 19,928-supplier database):\n${lines}\n\nGenerate a BOM that is practically sourceable from suppliers like these. Do NOT specify materials, processes, or components that have no realistic supplier match in this list. Where a part category is well-represented in the list above, prefer those categories.`
+  } catch (err) {
+    // Non-fatal — BOM still generates without marketplace grounding
+    console.warn("[bom:fix1] fetchMarketplaceSupplierContextForBom failed (non-fatal):", err instanceof Error ? err.message : err)
+    return ""
+  }
+}
+
 async function skeletonBomInternal(
   projectId: string,
   modules: CadLabModule[],
@@ -415,6 +477,22 @@ async function skeletonBomInternal(
     return { success: false, error: "Project not found", parts: [], bomLines: [] }
   }
 
+  // FIX 1 (audit Fix 1, 2026-04-27): pre-fetch matching marketplace suppliers
+  // BEFORE generating the BOM skeleton. Run in parallel with module description
+  // assembly so there's no wall-clock penalty.
+  const allKeyParts = modules.flatMap((m) => m.keyParts)
+  const bomQueryText = [
+    typeof project.subject === "string" ? project.subject : "",
+    modules.map((m) => `${m.name} ${m.purpose}`).join(" "),
+    allKeyParts.slice(0, 20).join(" "),
+    designBrief?.targetProcess ?? "",
+    designBrief?.targetMaterial ?? "",
+  ].filter(Boolean).join(" ").slice(0, 2000)
+
+  const [supplierContextForSkeleton] = await Promise.all([
+    fetchMarketplaceSupplierContextForBom(bomQueryText),
+  ])
+
   const moduleDescriptions = modules.map((m) => {
     const diagInfo = diagnosticAnswers?.[m.id]
       ? `\nDiagnostic answers: ${JSON.stringify(diagnosticAnswers[m.id])}`
@@ -433,6 +511,7 @@ Description: ${truncate(m.description, MAX_PROMPT_FIELD_LENGTH)}${diagInfo}`
     : ""
 
   const systemPrompt = `You are a manufacturing engineer creating a Bill of Materials skeleton from product module decomposition data.
+${supplierContextForSkeleton}
 
 Your task (SKELETON ONLY — no detailed specs):
 1. Expand each module's keyParts into named parts with a manufacturing process type
