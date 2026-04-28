@@ -199,25 +199,34 @@ export function InvestorStatsCharts({ stats }: Props) {
           </ResponsiveContainer>
         </div>
 
-        {/* Stage Focus — vertical bar, single colour #0891b2cc, borderRadius 4, no legend */}
+        {/* Stage Focus — horizontal bar (categorical Y-axis).
+            2026-04-28: switched from vertical-bar with rotated x-axis labels
+            to horizontal-bar layout so the 8 stage names ("Pre-Seed",
+            "Seed", "Series A/B/C", "Growth", "Late Stage", "Early Stage")
+            don't collide on a 375px-wide chart. Mirrors the Top Sectors
+            chart pattern in this same file, which already renders cleanly
+            on mobile. */}
         <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Stage Focus</h4>
-          <ResponsiveContainer width="100%" height={260}>
+          <ResponsiveContainer width="100%" height={Math.max(260, stats.stageFocus.length * 26)}>
             <BarChart
               data={stats.stageFocus}
-              margin={{ top: 0, right: 8, bottom: 24, left: 0 }}
+              layout="vertical"
+              margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
+              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" />
               <XAxis
-                dataKey="name"
-                tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
-                angle={-35}
-                textAnchor="end"
-                interval={0}
-              />
-              <YAxis
+                type="number"
                 tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
                 tickFormatter={fmt}
+              />
+              <YAxis
+                type="category"
+                dataKey="name"
+                width={90}
+                interval={0}
+                tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                tickFormatter={(v: string) => v.length > 14 ? v.slice(0, 13) + '…' : v}
               />
               <Tooltip
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -229,8 +238,7 @@ export function InvestorStatsCharts({ stats }: Props) {
                   fontSize: '12px',
                 }}
               />
-              {/* Forge Capital: single colour #0891b2cc, borderRadius:4 */}
-              <Bar dataKey="value" fill={BAR_COLOR_STAGE} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" fill={BAR_COLOR_STAGE} fillOpacity={0.8} radius={[0, 4, 4, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
