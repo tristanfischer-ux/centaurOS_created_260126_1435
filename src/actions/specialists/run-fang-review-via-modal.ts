@@ -86,7 +86,12 @@ const MAX_TOKENS = 16384
 
 // ─── Public ───────────────────────────────────────────────────────────
 
-export function isFangViaModalEnabled(): boolean {
+// CONSTRAINT: "use server" files can ONLY export async functions (Next.js
+// rule, breaks `next build` even though tsc passes). Keeping this helper
+// async-shaped so it can stay co-located with the runner without forcing a
+// sibling file. There are no synchronous callers — the route handler at
+// /api/autopilot-step inlines its own check.
+export async function isFangViaModalEnabled(): Promise<boolean> {
     const v = (process.env.FANG_VIA_MODAL ?? "").trim().toLowerCase()
     return v === "true" || v === "1" || v === "on"
 }
