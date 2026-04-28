@@ -37,40 +37,6 @@ import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-
 import { createMeetingThread } from "@/actions/meeting-threads"
 import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
 
-// ─── Model tier → human-readable badge label ────────────────────────────────
-
-const MODEL_TIER_LABELS: Record<string, string> = {
-    claude:          "Claude Opus 4.7",
-    sonnet:          "Claude Sonnet 4.6",
-    haiku:           "Claude Haiku 4.5",
-    deepseek:        "DeepSeek V4",
-    "deepseek-v4-pro": "DeepSeek V4-Pro",
-    google:          "Gemini 3.1 Pro",
-    openai:          "gpt-5.4",
-    "gpt-mini":      "gpt-4.1-mini",
-    "qwen-235b":     "Qwen 3 235B",
-    qwen:            "Qwen 3.5-Plus",
-    "qwen-local":    "Qwen (local)",
-    minimax:         "MiniMax M2.7",
-}
-
-// ─── Model tier → lineage CSS class (drives swatch colour) ──────────────────
-
-const MODEL_TIER_LINEAGE: Record<string, string> = {
-    claude:          "claude",
-    sonnet:          "claude",
-    haiku:           "claude",
-    deepseek:        "deepseek",
-    "deepseek-v4-pro": "deepseek",
-    google:          "gpt",      // no "google" class in mockup — closest is gpt (green)
-    openai:          "gpt",
-    "gpt-mini":      "gpt",
-    "qwen-235b":     "qwen",
-    qwen:            "qwen",
-    "qwen-local":    "qwen",
-    minimax:         "mistral",  // fallback
-}
-
 // ─── Council tier definitions (Quick / Full / Deep / Strategy) ───────────────
 
 type CouncilTier = "quick" | "full" | "deep" | "strategy"
@@ -647,23 +613,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     color: var(--bc-fg-muted);
                     margin-top: 2px;
                 }
-                .bc-model-badge {
-                    display: inline-flex;
-                    align-items: center;
-                    gap: 6px;
-                    background: #fff;
-                    border: 1px solid var(--bc-opus-dim);
-                    color: var(--bc-opus);
-                    font-size: 11.5px;
-                    font-weight: 600;
-                    padding: 6px 12px;
-                    border-radius: 100px;
-                    white-space: nowrap;
-                }
-                .bc-model-badge .bc-dot {
-                    width: 7px; height: 7px; border-radius: 100%;
-                    background: var(--bc-opus);
-                }
                 /* ─── Fiona empty state ─── */
                 .bc-fiona-empty {
                     background: var(--bc-surface);
@@ -746,34 +695,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     color: var(--bc-fg-muted);
                     margin-bottom: 6px;
                 }
-                .bc-specialist-head .bc-lineage {
-                    display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
-                }
-                .bc-lineage-chip {
-                    display: inline-flex; align-items: center; gap: 5px;
-                    font-size: 10.5px;
-                    font-weight: 600;
-                    padding: 3px 8px;
-                    border-radius: 100px;
-                    background: var(--bc-surface-muted);
-                    color: var(--bc-fg-muted);
-                    border: 1px solid var(--bc-border);
-                }
-                .bc-lineage-chip .bc-swatch {
-                    width: 6px; height: 6px; border-radius: 100%;
-                }
-                .bc-lineage-chip.bc-mistral .bc-swatch  { background: #ff7000; }
-                .bc-lineage-chip.bc-deepseek .bc-swatch { background: #4d6bfe; }
-                .bc-lineage-chip.bc-qwen .bc-swatch     { background: #615ced; }
-                .bc-lineage-chip.bc-gpt .bc-swatch      { background: #10a37f; }
-                .bc-lineage-chip.bc-claude .bc-swatch   { background: #d97706; }
-                .bc-lineage-chip.bc-opus .bc-swatch     { background: var(--bc-opus); }
-                .bc-lineage-chip.bc-mistral  { color: #c2410c; background: #fff7ed; border-color: #fed7aa; }
-                .bc-lineage-chip.bc-deepseek { color: #1e3a8a; background: #eff6ff; border-color: #bfdbfe; }
-                .bc-lineage-chip.bc-gpt      { color: #047857; background: #ecfdf5; border-color: #a7f3d0; }
-                .bc-lineage-chip.bc-qwen     { color: #4c1d95; background: #f5f3ff; border-color: #ddd6fe; }
-                .bc-lineage-chip.bc-claude   { color: #92400e; background: #fffbeb; border-color: #fde68a; }
-                .bc-lineage-chip.bc-opus     { color: var(--bc-opus); background: var(--bc-opus-soft); border-color: var(--bc-opus-dim); }
                 /* ─── Specialist card body ─── */
                 .bc-sp-body {
                     font-size: 13.5px;
@@ -872,11 +793,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     color: var(--bc-brand);
                     border-color: var(--bc-brand-dim);
                 }
-                .bc-fiona-card.bc-closing .bc-model-badge {
-                    color: var(--bc-brand);
-                    border-color: var(--bc-brand-dim);
-                }
-                .bc-fiona-card.bc-closing .bc-model-badge .bc-dot { background: var(--bc-brand); }
                 /* ─── Tier hint tooltip ─── */
                 .bc-tier-hint {
                     font-size: 11.5px;
@@ -1059,10 +975,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             </div>
                             <div className="bc-role">Fractional Forge &mdash; investor narrative + diligence prep</div>
                         </div>
-                        <div className="bc-model-badge">
-                            <span className="bc-dot" />
-                            DeepSeek V4-Pro
-                        </div>
                     </div>
                     <p style={{ fontSize: "14px", lineHeight: "1.7", margin: "0 0 14px", color: "var(--bc-fg)" }}>
                         Fiona opens every brainstorm. She reads your question, names what is actually worth
@@ -1140,10 +1052,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             </div>
                             <div className="bc-role">Fractional Forge &mdash; investor narrative + diligence prep</div>
                         </div>
-                        <div className="bc-model-badge">
-                            <span className="bc-dot" />
-                            DeepSeek V4-Pro
-                        </div>
                     </div>
                     <p style={{ fontSize: "14.5px", lineHeight: "1.75", margin: 0, color: "var(--bc-fg)", whiteSpace: "pre-wrap" }}>
                         {session.fionaOpening}
@@ -1167,8 +1075,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 /* Pre-submission: show the specialist roster with their personas */
                 <div className={`bc-council-grid${councilMembers.length === 3 ? " specialists-3" : ""}`}>
                     {councilMembers.map((specialist) => {
-                        const lineage = MODEL_TIER_LINEAGE[specialist.modelTier] ?? "deepseek"
-                        const modelLabel = MODEL_TIER_LABELS[specialist.modelTier] ?? "model TBD"
                         const avatarClass = getAvatarClass(specialist.id)
                         const sigLabel = getSigCloseLabel(specialist.id)
                         const initials = specialist.name.slice(0, 2).toUpperCase()
@@ -1190,12 +1096,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                             <span className="bc-sp-name">{specialist.name}</span>
                                         </div>
                                         <div className="bc-sp-role">{specialist.title}</div>
-                                        <div className="bc-lineage">
-                                            <span className={`bc-lineage-chip bc-${lineage}`}>
-                                                <span className="bc-swatch" />
-                                                {modelLabel}
-                                            </span>
-                                        </div>
                                     </div>
                                 </div>
                                 <div className="bc-sp-body">
@@ -1243,13 +1143,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             "chief-of-staff": "bc-sig-cal",
                         }
                         const sigColorClass = sigColorMap[resp.id] ?? ""
-                        // Determine lineage from modelLabel
-                        const lineageFromLabel = resp.modelLabel.toLowerCase().includes("gemini") ? "gpt"
-                            : resp.modelLabel.toLowerCase().includes("mistral") ? "mistral"
-                            : resp.modelLabel.toLowerCase().includes("deepseek") ? "deepseek"
-                            : resp.modelLabel.toLowerCase().includes("qwen") ? "qwen"
-                            : "deepseek"
-
                         return (
                             <div key={resp.id} className="bc-specialist-card">
                                 <div className="bc-specialist-head">
@@ -1259,12 +1152,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                             <span className="bc-sp-name">{resp.name}</span>
                                         </div>
                                         <div className="bc-sp-role">{resp.title}</div>
-                                        <div className="bc-lineage">
-                                            <span className={`bc-lineage-chip bc-${lineageFromLabel}`}>
-                                                <span className="bc-swatch" />
-                                                {resp.modelLabel}
-                                            </span>
-                                        </div>
                                     </div>
                                 </div>
                                 <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
@@ -1313,10 +1200,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 <span className="bc-role-chip">Synthesis</span>
                             </div>
                             <div className="bc-role">Closing the loop &middot; Fractional Forge fundraising lead</div>
-                        </div>
-                        <div className="bc-model-badge">
-                            <span className="bc-dot" />
-                            DeepSeek V4-Pro
                         </div>
                     </div>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
@@ -1384,10 +1267,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 <span className="bc-role-chip">Synthesis</span>
                             </div>
                             <div className="bc-role">Closing the loop &middot; Fractional Forge fundraising lead</div>
-                        </div>
-                        <div className="bc-model-badge">
-                            <span className="bc-dot" />
-                            DeepSeek V4-Pro
                         </div>
                     </div>
                     <p style={{ fontSize: "14.5px", lineHeight: "1.75", margin: "0 0 18px", color: "var(--bc-fg)", whiteSpace: "pre-wrap" }}>
