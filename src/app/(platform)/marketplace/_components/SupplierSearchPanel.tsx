@@ -261,37 +261,42 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
           )}
         </div>
 
-        {/* Top Materials — vertical bar, #0891b2, borderRadius 4, no legend */}
+        {/* Top Materials — horizontal bar (categorical Y-axis).
+            2026-04-28: switched from vertical-bar with rotated x-axis
+            labels to horizontal-bar layout so the material names don't
+            collide on a 375px-wide chart. Mirrors the Top Capabilities
+            chart pattern above which already renders cleanly on mobile. */}
         <div className="bg-card shadow-sm rounded-xl p-5">
           <h4 className="text-sm font-bold text-foreground mb-4">Top Materials</h4>
           {stats.topMaterials.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-10">No data yet</p>
           ) : (
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={Math.max(260, stats.topMaterials.length * 26)}>
               <BarChart
                 data={stats.topMaterials}
-                margin={{ top: 0, right: 8, bottom: 48, left: 0 }}
+                layout="vertical"
+                margin={{ top: 0, right: 24, bottom: 0, left: 0 }}
               >
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={gridStroke} />
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={gridStroke} />
                 <XAxis
-                  dataKey="name"
-                  tick={tickStyle}
-                  angle={-35}
-                  textAnchor="end"
-                  interval={0}
-                  tickFormatter={(v: string) => v.length > 14 ? v.slice(0, 13) + '…' : v}
-                />
-                <YAxis
+                  type="number"
                   tick={tickStyle}
                   tickFormatter={fmt}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="name"
+                  width={120}
+                  interval={0}
+                  tick={tickStyle}
+                  tickFormatter={(v: string) => v.length > 18 ? v.slice(0, 17) + '…' : v}
                 />
                 <Tooltip
                   // eslint-disable-next-line @typescript-eslint/no-explicit-any
                   formatter={(value: any) => [fmt(Number(value)), 'Suppliers']}
                   contentStyle={tooltipStyle}
                 />
-                {/* Forge Capital: single colour #0891b2cc, borderRadius:4, vertical */}
-                <Bar dataKey="value" fill={BAR_COLOR_MATERIALS} fillOpacity={0.8} radius={[4, 4, 0, 0]} />
+                <Bar dataKey="value" fill={BAR_COLOR_MATERIALS} fillOpacity={0.8} radius={[0, 4, 4, 0]} />
               </BarChart>
             </ResponsiveContainer>
           )}
