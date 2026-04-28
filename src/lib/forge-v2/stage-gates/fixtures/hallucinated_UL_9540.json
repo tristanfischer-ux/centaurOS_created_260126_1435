@@ -1,0 +1,54 @@
+{
+  "_fixture": "hallucinated_UL_9540",
+  "_gate": 6,
+  "_type": "deterministic",
+  "_description": "Gate 6 regression fixture — Chase cites 'UL 9540' and 'ISO 99999' (hallucinated), alongside real standard 'IEC 62619'. UL 9540 DOES exist in design_standards (energy domain). ISO 99999 does NOT. Gate must report 1 hallucinated code and trigger FAIL.",
+  "_how_to_use": "Feed project.citedCodes + resolvedRows + unresolvedCodes into gate6.check(). Assert result matches expected_check_result.",
+
+  "_database_reality": {
+    "UL 9540": "EXISTS in design_standards (standard_code='UL 9540', industry_domain='energy'). NOT hallucinated.",
+    "IEC 62619": "EXISTS in design_standards (standard_code='IEC 62619', industry_domain='energy'). Legitimate cite.",
+    "ISO 99999": "DOES NOT EXIST in design_standards. Hallucinated by Chase."
+  },
+
+  "input": {
+    "project": {
+      "projectId": "fixture-bess-battery-storage-001",
+      "citedCodes": ["UL 9540", "IEC 62619", "ISO 99999"],
+      "industryDomain": "energy"
+    },
+    "resolvedRows": [
+      {
+        "standard_code": "UL 9540",
+        "standard_name": "Energy Storage Systems and Equipment",
+        "industry_domain": "energy"
+      },
+      {
+        "standard_code": "IEC 62619",
+        "standard_name": "Secondary lithium cells and batteries for industrial applications — Safety requirements",
+        "industry_domain": "energy"
+      }
+    ],
+    "unresolvedCodes": ["ISO 99999"]
+  },
+
+  "expected_check_result": {
+    "check_name": "standards_existence",
+    "passed": false,
+    "actual_pattern": "1 cited standard(s) not found in design_standards table: ISO 99999",
+    "expected": "0 unresolved standards (all cited codes must resolve to a table row)"
+  },
+
+  "expected_gate_verdict": "FAIL",
+  "expected_severity": "P1",
+
+  "_domain_coverage_note": "With only 2 resolved energy-domain standards (UL 9540 + IEC 62619), the domain coverage sub-check would also return WARN (<3 required). However, the existence check fires first and produces FAIL before the coverage check runs. The WARN path for domain coverage is tested separately by the domain_coverage_only fixture variant (see gate-6-hallucinated-standards.json notes section).",
+
+  "_implementation_notes": [
+    "gate6.check() receives the pre-built Gate6Input directly — no DB call in the pure check function.",
+    "loadInput() does the Supabase query; this fixture simulates the data AFTER that query.",
+    "resolveGate6Verdict(checkResult) maps check_name='standards_existence' + passed=false → 'FAIL'.",
+    "resolveGate6Verdict(checkResult) maps check_name='standards_domain_coverage' + passed=false → 'WARN'.",
+    "sampleCheckOutput(input) is the test-harness entry point — no DB required."
+  ]
+}
