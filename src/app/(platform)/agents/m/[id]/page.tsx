@@ -63,6 +63,7 @@ export default async function MeetingThreadPage({ params }: MeetingThreadPagePro
             currentUserId={user.id}
             userTier={userTier}
             coverImageUrl={assets.coverUrl}
+            audioUrl={assets.audioUrl}
             audioClips={assets.audioClips}
         />
     )

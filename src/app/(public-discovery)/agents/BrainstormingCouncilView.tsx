@@ -115,14 +115,19 @@ interface SuggestionPrompt {
 
 const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
     {
-        text: "Should I lock in the Tier 1 contract manufacturer now or run a second prototype with the design house?",
+        text: "I want to create a new hardware product in the forge — where do I start and what does the first 90 days look like?",
         tier: "quick",
-        category: "Manufacturing",
+        category: "Product development",
     },
     {
         text: "Is £50K monthly recurring revenue enough to start a serious Seed raise on a hardware product?",
         tier: "quick",
         category: "Fundraising",
+    },
+    {
+        text: "Should I lock in the Tier 1 contract manufacturer now or run a second prototype with the design house?",
+        tier: "full",
+        category: "Manufacturing",
     },
     {
         text: "How do I price a hardware product to leave 35% gross margin after first-year freight and warranty?",
@@ -131,7 +136,7 @@ const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
     },
     {
         text: "What design changes can get my Bill of Materials cost down 30% before the second production run?",
-        tier: "full",
+        tier: "deep",
         category: "Bill of Materials",
     },
     {
@@ -141,13 +146,8 @@ const SUGGESTION_PROMPTS: SuggestionPrompt[] = [
     },
     {
         text: "What is our defensible moat once a Shenzhen clone of our product arrives at half our price in 12 months?",
-        tier: "deep",
-        category: "Defensibility",
-    },
-    {
-        text: "Should we raise £5M now or wait six months until our medical device certification is signed off?",
         tier: "strategy",
-        category: "Fundraising",
+        category: "Defensibility",
     },
     {
         text: "Is now the right time to take our hardware product from the United Kingdom into the United States?",
@@ -368,6 +368,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
     // W54: generated asset URLs — populated after generation completes so the
     // image and audio render inline on the page (not just in the saved-sessions panel).
     const [generatedCoverUrl, setGeneratedCoverUrl] = useState<string | null>(null)
+    // Combined audio URL for new sessions (2026-04-28+). Legacy sessions
+    // populate generatedAudioClips instead — both are shown via backwards-compat
+    // logic in the render section below.
+    const [generatedAudioUrl, setGeneratedAudioUrl] = useState<string | null>(null)
     const [generatedAudioClips, setGeneratedAudioClips] = useState<Array<{ specialistId: string; voice: string; url: string; durationMs: number | null }> | null>(null)
     // W70: show "audio ready" callout after generation
     const [audioReadyVisible, setAudioReadyVisible] = useState(false)
@@ -588,6 +592,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             setAudioStatus("idle")
             setAudioReadyVisible(false)
             setGeneratedCoverUrl(null)
+            setGeneratedAudioUrl(null)
             setGeneratedAudioClips(null)
 
             // W1 + W6 + W7: persist the completed session so:
@@ -666,6 +671,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         setAudioStatus("idle")
         setAudioReadyVisible(false)
         setGeneratedCoverUrl(null)
+        setGeneratedAudioUrl(null)
         setGeneratedAudioClips(null)
         setShowPicker(false)
         // Return focus to the question input so the next question
@@ -1581,6 +1587,32 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             <div className="bc-role">Fractional Forge &mdash; Chief of Staff &middot; operational execution</div>
                         </div>
                     </div>
+                    {/* Question callout — anchors context so the reader
+                        does not lose sight of what was asked once the
+                        brainstorm is in full flow. */}
+                    {session.submittedQuestion && (
+                        <div style={{
+                            margin: "0 0 16px",
+                            paddingLeft: "12px",
+                            borderLeft: "3px solid rgba(255,69,0,0.4)",
+                        }}>
+                            <div style={{
+                                fontSize: "10px",
+                                fontWeight: 700,
+                                letterSpacing: "0.08em",
+                                textTransform: "uppercase",
+                                color: "var(--bc-fg-muted)",
+                                marginBottom: "5px",
+                            }}>Question</div>
+                            <p style={{
+                                margin: 0,
+                                fontSize: "13.5px",
+                                fontStyle: "italic",
+                                lineHeight: "1.6",
+                                color: "var(--bc-fg-muted)",
+                            }}>{session.submittedQuestion}</p>
+                        </div>
+                    )}
                     <p style={{ fontSize: "14.5px", lineHeight: "1.75", margin: 0, color: "var(--bc-fg)", whiteSpace: "pre-wrap" }}>
                         {session.hostOpening}
                     </p>
@@ -2019,10 +2051,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             try {
                                 const result = await generateSessionAudio(session.savedThreadId)
                                 if (result.ok) {
-                                    // W54: fetch signed URLs for all audio clips so the
-                                    // audio player renders inline.
+                                    // Fetch signed URLs. New sessions return audioUrl (single file);
+                                    // legacy sessions return audioClips array.
                                     const urls = await refreshSessionAssetUrls(session.savedThreadId)
-                                    if (urls.audioClips.length > 0) {
+                                    if (urls.audioUrl) {
+                                        setGeneratedAudioUrl(urls.audioUrl)
+                                    } else if (urls.audioClips.length > 0) {
+                                        // Backwards compat: old-style per-clip sessions
                                         setGeneratedAudioClips(urls.audioClips)
                                     }
                                     setAudioStatus("done")
@@ -2068,7 +2103,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 generation; disappears on reset/new session.
                 Cover image: 16:9 rounded block, full-width.
                 Audio: one <audio> player per clip, labelled with specialist name. */}
-            {(generatedCoverUrl || (generatedAudioClips && generatedAudioClips.length > 0)) && (
+            {(generatedCoverUrl || generatedAudioUrl || (generatedAudioClips && generatedAudioClips.length > 0)) && (
                 <div ref={audioReadyRef} style={{
                     marginTop: "20px",
                     display: "flex",
@@ -2076,10 +2111,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     gap: "16px",
                 }}>
                     {/* W70: Audio ready callout — auto-dismissible */}
-                    {audioReadyVisible && generatedAudioClips && generatedAudioClips.length > 0 && (
+                    {audioReadyVisible && (generatedAudioUrl || (generatedAudioClips && generatedAudioClips.length > 0)) && (
                         <div className="bc-audio-ready">
                             <span>🔊</span>
-                            <span>Your audio summary is ready</span>
+                            <span>Your audio summary is ready — listen to the full council discussion</span>
                             <button
                                 type="button"
                                 onClick={() => setAudioReadyVisible(false)}
@@ -2102,7 +2137,34 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             />
                         </div>
                     )}
-                    {generatedAudioClips && generatedAudioClips.length > 0 && (
+                    {/* Single combined audio player — new sessions (2026-04-28+) */}
+                    {generatedAudioUrl && (
+                        <div style={{
+                            padding: "16px 20px",
+                            background: "var(--bc-blue-soft)",
+                            border: "1px solid var(--bc-blue-dim)",
+                            borderRadius: "12px",
+                            display: "flex",
+                            flexDirection: "column",
+                            gap: "10px",
+                        }}>
+                            <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--bc-fg-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+                                Listen to the full council discussion
+                            </div>
+                            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                            <audio
+                                controls
+                                src={generatedAudioUrl}
+                                aria-label="Full council discussion audio"
+                                style={{ width: "100%" }}
+                            />
+                            <p style={{ margin: 0, fontSize: "11.5px", color: "var(--bc-fg-muted)", lineHeight: "1.5" }}>
+                                Each specialist is introduced by name. Works well on the go.
+                            </p>
+                        </div>
+                    )}
+                    {/* Legacy per-clip fallback — old sessions without a combined file */}
+                    {!generatedAudioUrl && generatedAudioClips && generatedAudioClips.length > 0 && (
                         <div style={{
                             padding: "16px 20px",
                             background: "var(--bc-blue-soft)",

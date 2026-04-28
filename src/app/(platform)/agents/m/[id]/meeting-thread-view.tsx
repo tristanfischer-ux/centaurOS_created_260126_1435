@@ -63,7 +63,9 @@ interface MeetingThreadViewProps {
     userTier: SubscriptionTier
     /** F2: signed cover-image URL (null if not yet ready) */
     coverImageUrl?: string | null
-    /** F3: signed audio-clip URLs in council order */
+    /** F3 (new, 2026-04-28+): single combined audio URL — one file, one player */
+    audioUrl?: string | null
+    /** F3 (legacy): signed per-clip audio URLs in council order — old sessions only */
     audioClips?: MeetingAudioClip[]
 }
 
@@ -484,27 +486,28 @@ export function MeetingThreadView({
     currentUserId,
     userTier,
     coverImageUrl,
+    audioUrl,
     audioClips,
 }: MeetingThreadViewProps) {
     const router = useRouter()
     const [entries, setEntries] = useState<MeetingEntryRow[]>(thread.entries)
     const [branchingEntryId, setBranchingEntryId] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
-    // F3: playlist controls
+    // F3 legacy playlist controls (used only when audioUrl is absent)
     const [activeClipIdx, setActiveClipIdx] = useState(0)
     const audioRef = useRef<HTMLAudioElement | null>(null)
-    const hasAudio = Array.isArray(audioClips) && audioClips.length > 0
-    const activeClip = hasAudio ? audioClips![activeClipIdx] ?? null : null
+    const hasLegacyClips = !audioUrl && Array.isArray(audioClips) && audioClips.length > 0
+    const activeClip = hasLegacyClips ? audioClips![activeClipIdx] ?? null : null
 
     const handleClipEnded = useCallback(() => {
-        if (!hasAudio) return
+        if (!hasLegacyClips) return
         const next = activeClipIdx + 1
         if (next < audioClips!.length) {
             setActiveClipIdx(next)
             // Autoplay the next clip after it loads
             setTimeout(() => audioRef.current?.play().catch(() => {}), 50)
         }
-    }, [hasAudio, audioClips, activeClipIdx])
+    }, [hasLegacyClips, audioClips, activeClipIdx])
 
     const handleSelectClip = useCallback((idx: number) => {
         setActiveClipIdx(idx)
@@ -598,10 +601,30 @@ export function MeetingThreadView({
                 </Card>
             )}
 
-            {/* F3: Audio player — shows after audio generation completes.
-                Per-clip MP3s are stitched together via an HTML <audio>
-                playlist that auto-advances on `ended`. No ffmpeg required. */}
-            {hasAudio && activeClip && (
+            {/* F3: Audio player — single combined file for new sessions (2026-04-28+);
+                legacy per-clip playlist for old sessions. */}
+            {audioUrl ? (
+                <Card className="border">
+                    <CardContent className="pt-5 space-y-3">
+                        <div className="flex items-center gap-2">
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-electric-blue/10 text-electric-blue">
+                                <BookOpen className="h-3.5 w-3.5" />
+                            </span>
+                            <h3 className="text-sm font-semibold text-foreground">Listen to the full council discussion</h3>
+                        </div>
+                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
+                        <audio
+                            src={audioUrl}
+                            controls
+                            preload="metadata"
+                            className="w-full"
+                        />
+                        <p className="text-[10px] text-muted-foreground">
+                            Each specialist is introduced by name. Works well on the go.
+                        </p>
+                    </CardContent>
+                </Card>
+            ) : hasLegacyClips && activeClip ? (
                 <Card className="border">
                     <CardContent className="pt-5 space-y-4">
                         <div className="flex items-center justify-between gap-3">
@@ -658,7 +681,7 @@ export function MeetingThreadView({
                         </p>
                     </CardContent>
                 </Card>
-            )}
+            ) : null}
 
             {/* Header */}
             <div className="space-y-3">

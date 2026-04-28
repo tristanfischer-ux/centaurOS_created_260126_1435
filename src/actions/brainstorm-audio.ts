@@ -137,16 +137,29 @@ function plainText(content: string): string {
 }
 
 /**
- * Generate per-specialist audio clips for a meeting thread.
+ * Generate a single combined audio file for a meeting thread.
  *
- * @description Iterates entries in council order, renders each through
- * tts-1 with the mapped voice, uploads MP3 per clip to
- * brainstorm-assets/<threadId>/audio/<idx>-<specialistId>.mp3, then
- * persists audio_clips JSONB + audio_status='ready'.
+ * @description Assembles a single TTS script from all specialist entries,
+ * using inline "Name:" labels as speaker separators and a comma-pause
+ * between turns. One OpenAI tts-1 call → one MP3 file → one <audio> player.
+ *
+ * This is simpler and better than the previous per-clip approach:
+ *   - One player means the founder can listen in the car without touching
+ *     the screen between each speaker.
+ *   - Single-call TTS produces more natural prosody across turn boundaries
+ *     than stitching separate clips.
+ *   - No ffmpeg dependency.
+ *
+ * Storage path: brainstorm-assets/<threadId>/audio/combined.mp3
+ * The row gains an audio_url TEXT column alongside the legacy audio_clips
+ * JSONB (kept for backwards compat with old sessions).
  *
  * Cost guard: if combined char count > CHAR_BUDGET, status is set to
- * 'refused_too_long' and no API calls happen. Founder sees the explicit
- * UI message rather than a silent ~$1 spend.
+ * 'refused_too_long' and no API call happens.
+ *
+ * Voice: we use 'nova' (Cal's mapped voice) for the combined script — calm,
+ * clear, and natural for continuous listening. The inline "Name:" labels let
+ * the listener follow who is speaking without voice-switching complexity.
  *
  * @param threadId — UUID of the meeting_thread
  * @returns ok flag + total char count + error
@@ -228,8 +241,28 @@ export async function generateSessionAudio(
         return { ok: false, charCount: 0, error: 'No specialist entries' }
     }
 
+    // ── Build the combined script ─────────────────────────────────────────
+    // Format: "Name: <plain text>. , , , " with comma-pauses between turns
+    // to give the listener a beat to absorb each perspective before the next
+    // speaker begins. The inline label ("Sage:") reads naturally in TTS.
+    const scriptParts: string[] = []
+    for (const entry of entries) {
+        const text = plainText(entry.content)
+        if (!text || text.length < 30) continue
+        const label = entry.specialist_name ?? 'Specialist'
+        scriptParts.push(`${label}: ${text}`)
+    }
+
+    if (scriptParts.length === 0) {
+        await setAudioStatus(threadId, 'refused_too_long')
+        return { ok: false, charCount: 0, error: 'No audio-worthy entries' }
+    }
+
+    // Join with a double-comma pause (TTS reads each comma as a brief pause).
+    const combinedScript = scriptParts.join(' , , , ')
+    const totalChars = combinedScript.length
+
     // Cost guard
-    const totalChars = entries.reduce((sum, e) => sum + (e.content?.length ?? 0), 0)
     if (totalChars > CHAR_BUDGET) {
         console.warn('[BrainstormAudio] Refused — over budget:', {
             threadId,
@@ -244,139 +277,104 @@ export async function generateSessionAudio(
         }
     }
 
-    // Already in 'generating' state from the atomic claim above.
-
-    const clips: AudioClip[] = []
-    let processedChars = 0
-    let billedChars = 0 // total chars sent to OpenAI, including the failing call
-
     try {
-        // Run sequentially to avoid hammering OpenAI rate limits + keep
-        // ordering deterministic. Each tts-1 call returns ~1 MP3 in
-        // 2-5 seconds; 5 specialists = ~15s total, well within Vercel
-        // after()'s 5-minute envelope.
-        for (let i = 0; i < entries.length; i++) {
-            const entry = entries[i]!
-            const text = plainText(entry.content)
-            if (!text || text.length < 30) {
-                // Skip — too short to be meaningful audio. Logged so
-                // founders / debugging can see why a clip is missing.
-                console.info('[BrainstormAudio] Skipped short entry:', {
-                    threadId,
-                    entryIdx: i,
-                    chars: text?.length ?? 0,
-                    specialist: entry.specialist_name,
-                })
-                continue
-            }
+        // Single TTS call — 'nova' voice is calm and clear for continuous
+        // listening. Inline name labels handle speaker differentiation.
+        const resp = await fetch(OPENAI_TTS_URL, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${OPENAI_API_KEY}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: TTS_MODEL,
+                voice: 'nova',
+                input: combinedScript,
+                response_format: AUDIO_FORMAT,
+                speed: 1.0,
+            }),
+            signal: AbortSignal.timeout(120_000),
+        })
 
-            const voice = voiceFor(entry.specialist_id)
-            // Defensive: never let an unknown voice hit OpenAI
-            const safeVoice = (VALID_VOICES as readonly string[]).includes(voice) ? voice : 'alloy'
+        if (!resp.ok) {
+            const body = await resp.text().catch(() => '')
+            console.error('[BrainstormAudio] OpenAI TTS error:', {
+                threadId,
+                status: resp.status,
+                body: body.slice(0, 300),
+            })
+            await setAudioStatus(threadId, 'failed')
+            await logUsage(
+                threadId,
+                (thread as { foundry_id: string }).foundry_id,
+                (thread as { author_user_id: string }).author_user_id,
+                totalChars,
+                false,
+            )
+            return { ok: false, charCount: totalChars, error: `TTS ${resp.status}` }
+        }
 
-            // Pre-charge billedChars so failures still log accurate cost.
-            billedChars += text.length
+        const arr = new Uint8Array(await resp.arrayBuffer())
+        const mp3 = Buffer.from(arr)
 
-            const resp = await fetch(OPENAI_TTS_URL, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${OPENAI_API_KEY}`,
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({
-                    model: TTS_MODEL,
-                    voice: safeVoice,
-                    input: text,
-                    response_format: AUDIO_FORMAT,
-                    speed: 1.0,
-                }),
-                signal: AbortSignal.timeout(60_000),
+        // Single file at a predictable path under <threadId>/audio/
+        const path = `${threadId}/audio/combined.mp3`
+
+        const { error: uploadErr } = await admin.storage
+            .from(AUDIO_BUCKET)
+            .upload(path, mp3, {
+                contentType: 'audio/mpeg',
+                upsert: true,
+                cacheControl: '3600',
             })
 
-            if (!resp.ok) {
-                const body = await resp.text().catch(() => '')
-                console.error('[BrainstormAudio] OpenAI TTS error:', {
-                    threadId,
-                    entryIdx: i,
-                    status: resp.status,
-                    body: body.slice(0, 300),
-                })
-                // Bail on first failure — partial audio is worse than no audio
-                await setAudioStatus(threadId, 'failed')
-                // Log billedChars (not processedChars) so cost telemetry
-                // reflects the actual OpenAI spend, including the failing
-                // call we just made. DeepSeek V3.1 Terminus Phase 3 review.
-                await logUsage(
-                    threadId,
-                    (thread as { foundry_id: string }).foundry_id,
-                    (thread as { author_user_id: string }).author_user_id,
-                    billedChars,
-                    false,
-                )
-                return { ok: false, charCount: billedChars, error: `TTS ${resp.status}` }
-            }
-
-            const arr = new Uint8Array(await resp.arrayBuffer())
-            const mp3 = Buffer.from(arr)
-
-            // Storage path lives strictly under <threadId>/audio/ — the
-            // refreshSessionAssetUrls path-traversal guard refuses any
-            // path that isn't prefixed with this directory.
-            const safeSpecialistId = (entry.specialist_id ?? 'unknown').replace(/[^a-z0-9-]/gi, '')
-            const path = `${threadId}/audio/${String(i).padStart(2, '0')}-${safeSpecialistId}.mp3`
-
-            const { error: uploadErr } = await admin.storage
-                .from(AUDIO_BUCKET)
-                .upload(path, mp3, {
-                    contentType: 'audio/mpeg',
-                    upsert: true,
-                    cacheControl: '3600',
-                })
-
-            if (uploadErr) {
-                console.error('[BrainstormAudio] Storage upload failed:', {
-                    threadId,
-                    path,
-                    err: uploadErr.message,
-                })
-                await setAudioStatus(threadId, 'failed')
-                return { ok: false, charCount: processedChars, error: 'Storage upload failed' }
-            }
-
-            clips.push({
-                specialist_id: entry.specialist_id,
-                specialist_name: entry.specialist_name,
-                voice: safeVoice,
+        if (uploadErr) {
+            console.error('[BrainstormAudio] Storage upload failed:', {
+                threadId,
                 path,
-                char_count: text.length,
+                err: uploadErr.message,
             })
-            processedChars += text.length
+            await setAudioStatus(threadId, 'failed')
+            return { ok: false, charCount: totalChars, error: 'Storage upload failed' }
         }
 
-        if (clips.length === 0) {
-            // All entries were too short — record refused state so the UI
-            // doesn't sit in 'generating' forever.
-            await setAudioStatus(threadId, 'refused_too_long')
-            return { ok: false, charCount: 0, error: 'No audio-worthy entries' }
+        // Persist the combined audio path. We also write a synthetic
+        // audio_clips array with a single entry so the legacy path in
+        // refreshSessionAssetUrls (which signs audio_clips) still works for
+        // any code that reads it. New UI reads audio_url directly.
+        const legacyClip: AudioClip = {
+            specialist_id: null,
+            specialist_name: 'Full council discussion',
+            voice: 'nova',
+            path,
+            char_count: totalChars,
         }
+        const adminUpdate: Record<string, unknown> = {
+            audio_status: 'ready',
+            audio_clips: [legacyClip],
+            // audio_url persists the storage path for the new single-player UI.
+            // refreshSessionAssetUrls signs this path alongside cover_image_url.
+            audio_url: path,
+        }
+        await admin.from('meeting_threads').update(adminUpdate).eq('id', threadId)
 
-        await setAudioStatus(threadId, 'ready', clips)
         await logUsage(
             threadId,
             (thread as { foundry_id: string }).foundry_id,
             (thread as { author_user_id: string }).author_user_id,
-            processedChars,
+            totalChars,
             true,
         )
 
-        console.info('[BrainstormAudio] Audio generated:', {
+        console.info('[BrainstormAudio] Combined audio generated:', {
             threadId,
-            clipCount: clips.length,
-            chars: processedChars,
-            costUsd: ((processedChars / 1_000_000) * COST_PER_MILLION).toFixed(4),
+            speakerCount: scriptParts.length,
+            chars: totalChars,
+            sizeKb: Math.round(mp3.length / 1024),
+            costUsd: ((totalChars / 1_000_000) * COST_PER_MILLION).toFixed(4),
         })
 
-        return { ok: true, charCount: processedChars, error: null }
+        return { ok: true, charCount: totalChars, error: null }
     } catch (err) {
         const message = err instanceof Error ? err.message : 'Unknown error'
         console.error('[BrainstormAudio] Fatal:', { threadId, message })
@@ -385,9 +383,9 @@ export async function generateSessionAudio(
             threadId,
             (thread as { foundry_id: string }).foundry_id,
             (thread as { author_user_id: string }).author_user_id,
-            processedChars,
+            0,
             false,
         )
-        return { ok: false, charCount: processedChars, error: message }
+        return { ok: false, charCount: 0, error: message }
     }
 }

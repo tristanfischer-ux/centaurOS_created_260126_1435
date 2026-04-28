@@ -905,11 +905,12 @@ export async function refreshSessionAssetUrls(
   threadId: string,
 ): Promise<{
   coverUrl: string | null
+  audioUrl: string | null
   audioClips: Array<{ specialistId: string; voice: string; url: string; durationMs: number | null }>
   error: string | null
 }> {
   if (!isValidUUID(threadId)) {
-    return { coverUrl: null, audioClips: [], error: 'Invalid thread id' }
+    return { coverUrl: null, audioUrl: null, audioClips: [], error: 'Invalid thread id' }
   }
 
   const supabase = await createClient()
@@ -917,10 +918,11 @@ export async function refreshSessionAssetUrls(
     data: { user },
   } = await supabase.auth.getUser()
   if (!user) {
-    return { coverUrl: null, audioClips: [], error: 'Not authenticated' }
+    return { coverUrl: null, audioUrl: null, audioClips: [], error: 'Not authenticated' }
   }
 
-  // RLS on meeting_threads enforces foundry isolation
+  // RLS on meeting_threads enforces foundry isolation.
+  // audio_clips: legacy per-clip array kept for backwards compat with old sessions.
   const { data: row, error } = await supabase
     .from('meeting_threads')
     .select('cover_status, audio_clips')
@@ -928,10 +930,23 @@ export async function refreshSessionAssetUrls(
     .single()
 
   if (error || !row) {
-    return { coverUrl: null, audioClips: [], error: 'Thread not found' }
+    return { coverUrl: null, audioUrl: null, audioClips: [], error: 'Thread not found' }
   }
 
   const admin = createAdminClient()
+
+  // audio_url: combined-audio path written by generateSessionAudio (2026-04-28+).
+  // The Supabase-generated types lag behind the actual schema — read via a
+  // separate admin select cast to unknown to bypass the generated-types check.
+  // The column is TEXT NULL on meeting_threads. Once types are regenerated this
+  // cast can be removed.
+  const { data: audioUrlRow } = await admin
+    .from('meeting_threads')
+    .select('audio_url')
+    .eq('id', threadId)
+    .single()
+  const rawAudioUrl = (audioUrlRow as unknown as { audio_url?: unknown } | null)?.audio_url
+
   let coverUrl: string | null = null
 
   if ((row as { cover_status: string }).cover_status === 'ready') {
@@ -941,12 +956,25 @@ export async function refreshSessionAssetUrls(
     coverUrl = signed?.signedUrl ?? null
   }
 
+  // Sign the combined audio URL (new sessions, 2026-04-28+)
+  let audioUrl: string | null = null
+  if (rawAudioUrl && typeof rawAudioUrl === 'string') {
+    const { data: signed } = await admin.storage
+      .from('brainstorm-assets')
+      .createSignedUrl(rawAudioUrl, 60 * 60 * 24)
+    audioUrl = signed?.signedUrl ?? null
+  }
+
+  // Sign legacy per-clip array (old sessions that have audio_clips but no audio_url)
   const clipsRaw = ((row as { audio_clips: unknown }).audio_clips as Array<Record<string, unknown>>) ?? []
   const refreshedClips: Array<{ specialistId: string; voice: string; url: string; durationMs: number | null }> = []
 
   for (const clip of clipsRaw) {
     const path = clip.path as string | undefined
     if (!path) continue
+    // Skip the synthetic legacy clip written by the new combined-audio path
+    // (its path is combined.mp3 — that URL is already covered by audioUrl above).
+    if (path.endsWith('/combined.mp3')) continue
     const { data: signed } = await admin.storage
       .from('brainstorm-assets')
       .createSignedUrl(path, 60 * 60 * 24)
@@ -960,5 +988,5 @@ export async function refreshSessionAssetUrls(
     }
   }
 
-  return { coverUrl, audioClips: refreshedClips, error: null }
+  return { coverUrl, audioUrl, audioClips: refreshedClips, error: null }
 }
