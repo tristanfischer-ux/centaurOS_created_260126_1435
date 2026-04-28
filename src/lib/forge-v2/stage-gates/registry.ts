@@ -31,11 +31,11 @@ import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
 // ── Phase 2 gate imports (uncomment as each sub-agent lands) ───────────────
 //
-// import { gate1 } from "./gate-1"
-// import { gate2 } from "./gate-2"
-// import { gate3 } from "./gate-3"
-// import { gate5 } from "./gate-5"
-// import { gate6 } from "./gate-6"
+// import { gate1 } from "./gate-1"  // ← Gate 1 (hybrid LLM vote) still in flight
+import { gate2 } from "./gate-2"
+import { gate3 } from "./gate-3"
+import { gate5 } from "./gate-5"
+import { gate6 } from "./gate-6"
 
 // ── Stage→gate map ──────────────────────────────────────────────────────────
 //
@@ -49,21 +49,39 @@ import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 export const STAGE_GATE_MAP: Partial<Record<AutopilotStage, GateRunner>> = {
     // Gate 6 — right after Chase research, before brief is locked.
     // Catches hallucinated standards before 9 stages compound the error.
-    // waiting_chase: gate6, // ← Gate 6 sub-agent fills this in
+    // NOTE: Gate 6 produces FAIL on missing-standards (hard) and intends WARN
+    // on domain-coverage shortfall. The runner currently maps any
+    // `passed: false → FAIL`. The cron handler should call
+    // `resolveGate6Verdict()` after the verdict to reclassify domain-coverage
+    // failures to WARN. (Tracked: post-Phase-2 follow-up in stage-gates/gate-6.ts.)
+    waiting_chase: gate6,
 
     // Gate 1 — brief scope alignment (LLM vote). Runs after locking_brief.
-    // locking_brief: gate1, // ← Gate 1 sub-agent fills this in
+    // Wired in once Gate 1 sub-agent lands. v2.0.
+    // locking_brief: gate1,
 
     // Gate 2 — module key-parts completeness (deterministic).
-    // waiting_max: gate2, // ← Gate 2 sub-agent fills this in
+    // NOTE: Remediation injects `_gate2_remediation` context on the project
+    // for targeted Max re-expansion. Cron handler must pass that context
+    // through when re-firing Max for the failing modules only.
+    waiting_max: gate2,
 
     // Gate 3 — solver feasibility check (deterministic).
-    // waiting_sizing: gate3, // ← Gate 3 sub-agent fills this in
+    // Catches `dimension_sheet.feasible === false && module_dimensions populated`
+    // (the INFEASIBLE-but-emitted pattern that produced the BESS/vertical-farm
+    // stub PDFs in Loop 19). Attempt 1 re-fires Fang sizing with relaxed
+    // constraints; attempt 2 escalates to Max re-decompose.
+    waiting_sizing: gate3,
 
     // Gate 5 — supplier liveness + ≥3 per BOM row (deterministic).
-    // matching_suppliers: gate5, // ← Gate 5 sub-agent fills this in
+    // NOTE: Gate 5's `check` is async (HEAD/GET liveness over the network)
+    // but `DeterministicGate<T>.check` is currently typed sync. The gate's
+    // implementation casts via `unknown as DeterministicCheckResult`; safe
+    // because runner.ts awaits the runGate() result. Future refactor: widen
+    // the interface to accept `Promise<DeterministicCheckResult>`.
+    matching_suppliers: gate5,
 
     // Gate 4 — cost realism (hybrid — Oracle library primary + LLM secondary).
-    // Deferred to v2.1 as per spec.
+    // Deferred to v2.1 per spec.
     // waiting_finn: gate4,
 }
