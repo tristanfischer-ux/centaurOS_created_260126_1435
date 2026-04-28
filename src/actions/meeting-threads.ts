@@ -22,6 +22,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage, isValidUUID } from '@/lib/security/sanitize'
+import { rateLimit } from '@/lib/security/rate-limit'
 import type { Json } from '@/types/database.types'
 
 // ============================================================================
@@ -157,6 +158,20 @@ export async function createMeetingThread(
 
   if (!input.topic?.trim()) {
     return { threadId: null, error: 'Topic is required' }
+  }
+
+  // SECURITY: rate-limit per user to prevent denial-of-wallet — every
+  // saved thread schedules a ~$0.04 image + up to ~$0.20 of TTS audio
+  // via after(). 20 saves per 10-minute window per user is plenty for
+  // legitimate use (the unsubsidised UI tier is capped at 30 / month
+  // separately). Caught by Gemini 2.5 Pro final review (P1).
+  const rl = await rateLimit('api', `create-meeting-thread:${user.id}`, {
+    limit: 20,
+    window: 10 * 60 * 1000,
+  })
+  if (!rl.success) {
+    console.warn('[MeetingThreads] Rate limit hit:', { userId: user.id, remaining: rl.remaining })
+    return { threadId: null, error: 'Too many sessions. Please wait a moment before saving another.' }
   }
 
   // Insert thread row

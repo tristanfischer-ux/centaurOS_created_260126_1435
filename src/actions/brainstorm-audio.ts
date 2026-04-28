@@ -27,6 +27,7 @@
  * - src/actions/meeting-threads.ts (refreshSessionAssetUrls signs MP3 URLs)
  */
 
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isValidUUID } from '@/lib/security/sanitize'
 
@@ -159,6 +160,26 @@ export async function generateSessionAudio(
     if (!OPENAI_API_KEY) {
         console.error('[BrainstormAudio] OPENAI_API_KEY missing')
         return { ok: false, charCount: 0, error: 'OPENAI_API_KEY not configured' }
+    }
+
+    // SECURITY: same auth gate as brainstorm-cover — server actions are
+    // public RPC endpoints by default. Without this gate, an attacker
+    // could trigger TTS generation for any thread they know the ID of,
+    // billing the owning foundry. Caught by Gemini 2.5 Pro final review.
+    const userClient = await createClient()
+    const {
+        data: { user },
+    } = await userClient.auth.getUser()
+    if (!user) {
+        return { ok: false, charCount: 0, error: 'Not authenticated' }
+    }
+    const { data: gateRow, error: gateErr } = await userClient
+        .from('meeting_threads')
+        .select('id')
+        .eq('id', threadId)
+        .single()
+    if (gateErr || !gateRow) {
+        return { ok: false, charCount: 0, error: 'Not authorised' }
     }
 
     const admin = createAdminClient()

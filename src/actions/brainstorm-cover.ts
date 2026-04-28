@@ -19,6 +19,7 @@
  * - src/actions/meeting-threads.ts (refreshSessionAssetUrls signs the URL)
  */
 
+import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isValidUUID } from '@/lib/security/sanitize'
 
@@ -174,6 +175,32 @@ export async function generateSessionInfographic(
     if (!OPENAI_API_KEY) {
         console.error('[BrainstormCover] OPENAI_API_KEY missing')
         return { ok: false, error: 'OPENAI_API_KEY not configured' }
+    }
+
+    // SECURITY: this is a `'use server'` exported action and is therefore
+    // reachable as a public RPC by any authenticated user. Without an
+    // auth check, a malicious caller could spam arbitrary threadIds and
+    // (a) leak meeting content to OpenAI, (b) bill another foundry's
+    // budget. Caught by the final-pass Gemini 2.5 Pro review (P0).
+    //
+    // Gate: caller must be authenticated AND able to SELECT the thread
+    // through their RLS-scoped client. The server-action entry path
+    // (createMeetingThread → after()) already runs in the original user
+    // context, so this passes naturally there.
+    const userClient = await createClient()
+    const {
+        data: { user },
+    } = await userClient.auth.getUser()
+    if (!user) {
+        return { ok: false, error: 'Not authenticated' }
+    }
+    const { data: gateRow, error: gateErr } = await userClient
+        .from('meeting_threads')
+        .select('id')
+        .eq('id', threadId)
+        .single()
+    if (gateErr || !gateRow) {
+        return { ok: false, error: 'Not authorised' }
     }
 
     const admin = createAdminClient()
