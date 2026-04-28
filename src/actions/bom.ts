@@ -65,7 +65,6 @@ import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { fetchCatalogueForPrompt, extractSearchKeywords } from "./component-library"
 import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 import { renderOracleHint } from "@/lib/cost/oracle-benchmarks"
-import { withLlmPermit } from "@/lib/ai/llm-permit"
 import { callOpenRouter, CHEAP_STRUCTURED_MODEL } from "@/lib/ai/openrouter"
 
 // ─── Constants ──────────────────────────────────────────────────────
