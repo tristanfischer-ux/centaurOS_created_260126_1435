@@ -46,9 +46,13 @@ import {
 } from "@/lib/forge-v2/stage-config"
 
 export const dynamic = "force-dynamic"
-// Each fire gets a fresh Vercel Lambda with its own 300 s budget. Most
-// specialists complete in 30-180 s; Fang reviews fan-out can take ~120 s.
-export const maxDuration = 300
+// Each fire gets a fresh Vercel Lambda with its own 800 s budget. Most
+// specialists complete in 30-180 s; Chase research can spike to 9-12 min on
+// aerospace/HAPS-class briefs (Loop 17 verification 2026-04-28 saw 3 consecutive
+// SIGKILLs at the prior 300 s cap). Vercel Pro tier supports up to 900 s.
+// Fang reviews are routed to Modal (FANG_VIA_MODAL flag) when their per-module
+// runtime risks the cap; this Lambda budget covers everything else.
+export const maxDuration = 800
 
 const UUID_RE =
     /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
