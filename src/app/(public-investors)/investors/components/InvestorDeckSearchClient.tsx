@@ -26,6 +26,7 @@ import {
   enrichInvestorMatchOnDemand,
   addToShortlist,
   removeFromShortlist,
+  getShortlist,
   type InvestorFirm,
   type ShortlistStage,
   type InvestorTierAccess,
@@ -200,9 +201,12 @@ export function InvestorDeckSearchClient({
   // Forge Capital top-matches pagination state. Resets to page 0 on every
   // new search so the founder always sees their best matches first.
   const [topPage, setTopPage] = useState(0)
+  // ── Favourites toggle ────────────────────────────────────────────────────
+  const [showSaved, setShowSaved] = useState(false)
 
   const isPaid = PAID_TIERS.has(tier)
   const isFree = tier === 'free'
+  const savedCount = Object.keys(shortlistIds).length
 
   // View cap
   const cap = viewCapStatus?.cap ?? null
@@ -536,129 +540,183 @@ export function InvestorDeckSearchClient({
         />
       )}
 
-      {/* ── Paste panel ───────────────────────────────────────────────────── */}
-      <PastePanel
-        query={query}
-        setQuery={setQuery}
-        textareaRef={textareaRef}
-        onChipClick={handleChipClick}
-        onFindInvestors={handleFindInvestors}
-        onReRun={hasSearched ? handleReRun : undefined}
-        hasSearched={hasSearched}
-        isPending={isPending}
-        companyContext={companyContext}
-        isPaid={isPaid}
-      />
+      {/* ── Favourites toggle bar ─────────────────────────────────────────── */}
+      <div className="flex items-center justify-between mb-4">
+        <button
+          type="button"
+          onClick={() => setShowSaved(prev => !prev)}
+          className={`inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-sm font-medium border transition-all duration-200 ${
+            showSaved
+              ? 'bg-international-orange text-white border-international-orange shadow-sm'
+              : 'bg-background text-foreground border-border hover:border-international-orange/60 hover:text-international-orange'
+          }`}
+          aria-pressed={showSaved}
+        >
+          {showSaved ? '★' : '☆'}
+          <span>Saved</span>
+          {savedCount > 0 && (
+            <span className={`text-xs tabular-nums px-1.5 py-0.5 rounded-full font-bold ${
+              showSaved ? 'bg-white/25 text-white' : 'bg-international-orange/10 text-international-orange'
+            }`}>
+              {savedCount}
+            </span>
+          )}
+        </button>
+        {showSaved && (
+          <button
+            type="button"
+            onClick={() => setShowSaved(false)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ← Back to search
+          </button>
+        )}
+      </div>
 
-      {/* ── Extracted profile ─────────────────────────────────────────────── */}
-      {hasSearched && extractedProfile && (
-        <ExtractedProfileCard profile={extractedProfile} />
-      )}
-
-      {/* ── Results bar ───────────────────────────────────────────────────── */}
-      {hasSearched && firms.length > 0 && (
-        <ResultsBar
-          total={total}
-          visibleCount={visibleFirms.length}
-          isPaid={isPaid}
-          isFree={isFree}
-          freeVisible={FREE_VISIBLE}
-          lastQuery={lastQuery}
-          isPending={isPending}
+      {/* ── Favourites view (replaces search when toggled on) ─────────────── */}
+      {showSaved && (
+        <FavouritesView
+          shortlistIds={shortlistIds}
+          onUnsave={async (firm: InvestorFirm) => {
+            setShortlistIds(prev => { const n = { ...prev }; delete n[firm.id]; return n })
+            try {
+              await removeFromShortlist(firm.id)
+              toast.success(`Removed ${firm.title} from saved`)
+            } catch {
+              setShortlistIds(prev => ({ ...prev, [firm.id]: 'researching' as ShortlistStage }))
+              toast.error('Failed to remove — please try again')
+            }
+          }}
         />
       )}
 
-      {/* ── Match cards (paginated for paid; first 5 only for free) ──────── */}
-      {hasSearched && (isPaid ? paginatedTop : visibleFirms).map((firm, i) => {
-        const rank = isPaid ? safeTopPage * TOP_PER_PAGE + i + 1 : i + 1
-        return (
-          <MatchCard
-            key={firm.id}
-            rank={rank}
-            firm={firm}
-            matchScore={matchScores[firm.id]?.score}
-            pillars={matchScores[firm.id]?.pillars}
-            matchOutput={matchOutputs[firm.id]}
-            isSaved={!!shortlistIds[firm.id]}
-            onSave={() => handleSave(firm)}
-            onRevealWhyFit={isPaid ? () => handleRevealWhyFit(firm.id) : undefined}
-            isLocked={false}
+      {/* ── Search UI (hidden when Favourites is active) ──────────────────── */}
+      {!showSaved && (
+        <>
+          <PastePanel
+            query={query}
+            setQuery={setQuery}
+            textareaRef={textareaRef}
+            onChipClick={handleChipClick}
+            onFindInvestors={handleFindInvestors}
+            onReRun={hasSearched ? handleReRun : undefined}
+            hasSearched={hasSearched}
+            isPending={isPending}
+            companyContext={companyContext}
             isPaid={isPaid}
           />
-        )
-      })}
 
-      {/* ── Top-matches pagination (paid only, > 1 page) ─────────────────── */}
-      {hasSearched && isPaid && totalTopPages > 1 && (
-        <TopMatchesPagination
-          page={safeTopPage}
-          totalPages={totalTopPages}
-          onPrev={() => setTopPage(p => Math.max(0, p - 1))}
-          onNext={() => setTopPage(p => Math.min(totalTopPages - 1, p + 1))}
-        />
-      )}
+          {/* ── Extracted profile ─────────────────────────────────────────── */}
+          {hasSearched && extractedProfile && (
+            <ExtractedProfileCard profile={extractedProfile} />
+          )}
 
-      {/* ── Paywall (free + results) ──────────────────────────────────────── */}
-      {hasSearched && isFree && firms.length > 0 && (
-        <PaywallCard hiddenCount={hiddenCount} />
-      )}
+          {/* ── Results bar ───────────────────────────────────────────────── */}
+          {hasSearched && firms.length > 0 && (
+            <ResultsBar
+              total={total}
+              visibleCount={visibleFirms.length}
+              isPaid={isPaid}
+              isFree={isFree}
+              freeVisible={FREE_VISIBLE}
+              lastQuery={lastQuery}
+              isPending={isPending}
+            />
+          )}
 
-      {/* ── Locked blurred cards (preview of what's behind paywall) ──────── */}
-      {hasSearched && lockedFirms.map((firm, i) => (
-        <MatchCard
-          key={firm.id}
-          rank={FREE_VISIBLE + i + 1}
-          firm={firm}
-          matchScore={matchScores[firm.id]?.score}
-          pillars={matchScores[firm.id]?.pillars}
-          matchOutput={undefined}
-          isSaved={false}
-          onSave={undefined}
-          onRevealWhyFit={undefined}
-          isLocked={true}
-          isPaid={false}
-        />
-      ))}
+          {/* ── Match cards (paginated for paid; first 5 only for free) ──── */}
+          {hasSearched && (isPaid ? paginatedTop : visibleFirms).map((firm, i) => {
+            const rank = isPaid ? safeTopPage * TOP_PER_PAGE + i + 1 : i + 1
+            return (
+              <MatchCard
+                key={firm.id}
+                rank={rank}
+                firm={firm}
+                matchScore={matchScores[firm.id]?.score}
+                pillars={matchScores[firm.id]?.pillars}
+                matchOutput={matchOutputs[firm.id]}
+                isSaved={!!shortlistIds[firm.id]}
+                onSave={() => handleSave(firm)}
+                onRevealWhyFit={isPaid ? () => handleRevealWhyFit(firm.id) : undefined}
+                isLocked={false}
+                isPaid={isPaid}
+              />
+            )
+          })}
 
-      {/* ── Near Misses (paid only) ──────────────────────────────────────── */}
-      {hasSearched && isPaid && partitioned.nearMiss.length > 0 && (
-        <NearMissesSection groups={nearMissGroups} totalCount={partitioned.nearMiss.length} />
-      )}
+          {/* ── Top-matches pagination (paid only, > 1 page) ─────────────── */}
+          {hasSearched && isPaid && totalTopPages > 1 && (
+            <TopMatchesPagination
+              page={safeTopPage}
+              totalPages={totalTopPages}
+              onPrev={() => setTopPage(p => Math.max(0, p - 1))}
+              onNext={() => setTopPage(p => Math.min(totalTopPages - 1, p + 1))}
+            />
+          )}
 
-      {/* ── Advisory Intelligence (paid only) ────────────────────────────── */}
-      {hasSearched && isPaid && advisoryItems.length > 0 && (
-        <AdvisorySection items={advisoryItems} />
-      )}
+          {/* ── Paywall (free + results) ──────────────────────────────────── */}
+          {hasSearched && isFree && firms.length > 0 && (
+            <PaywallCard hiddenCount={hiddenCount} />
+          )}
 
-      {/* ── Pre-search charts (visible before search, hidden after results) ── */}
-      {!hasSearched && investorStats && (
-        <InvestorStatsCharts stats={investorStats} />
-      )}
+          {/* ── Locked blurred cards (preview of what's behind paywall) ───── */}
+          {hasSearched && lockedFirms.map((firm, i) => (
+            <MatchCard
+              key={firm.id}
+              rank={FREE_VISIBLE + i + 1}
+              firm={firm}
+              matchScore={matchScores[firm.id]?.score}
+              pillars={matchScores[firm.id]?.pillars}
+              matchOutput={undefined}
+              isSaved={false}
+              onSave={undefined}
+              onRevealWhyFit={undefined}
+              isLocked={true}
+              isPaid={false}
+            />
+          ))}
 
-      {/* ── Empty state (before search, no stats available) ──────────────── */}
-      {!hasSearched && !investorStats && <EmptyState />}
+          {/* ── Near Misses (paid only) ──────────────────────────────────── */}
+          {hasSearched && isPaid && partitioned.nearMiss.length > 0 && (
+            <NearMissesSection groups={nearMissGroups} totalCount={partitioned.nearMiss.length} />
+          )}
 
-      {/* ── Search failure callout (engine error / rate limit) ───────────── */}
-      {hasSearched && !isPending && searchFailureMessage && (
-        <div className="rounded-xl border border-amber-300 bg-amber-50 p-5 mt-6 flex items-start gap-3">
-          <span className="mt-0.5 text-amber-500 shrink-0" aria-hidden>&#9888;</span>
-          <div>
-            <p className="text-sm font-medium text-amber-800">{searchFailureMessage}</p>
-            <p className="text-xs text-amber-700 mt-0.5">
-              Your query was received — the issue is on our end. Waiting a moment and searching again usually resolves it.
-            </p>
-          </div>
-        </div>
-      )}
+          {/* ── Advisory Intelligence (paid only) ────────────────────────── */}
+          {hasSearched && isPaid && advisoryItems.length > 0 && (
+            <AdvisorySection items={advisoryItems} />
+          )}
 
-      {/* ── Empty results (search with 0 results, no engine failure) ─────── */}
-      {hasSearched && !isPending && firms.length === 0 && !searchFailureMessage && (
-        <div className="rounded-xl border border-dashed border-border bg-muted/30 p-10 text-center mt-6">
-          <p className="text-sm font-medium text-foreground">No investors matched that description</p>
-          <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
-            Try broadening your description — include the sector, stage, and geography.
-          </p>
-        </div>
+          {/* ── Pre-search charts (visible before search, hidden after results) */}
+          {!hasSearched && investorStats && (
+            <InvestorStatsCharts stats={investorStats} />
+          )}
+
+          {/* ── Empty state (before search, no stats available) ────────────── */}
+          {!hasSearched && !investorStats && <EmptyState />}
+
+          {/* ── Search failure callout (engine error / rate limit) ─────────── */}
+          {hasSearched && !isPending && searchFailureMessage && (
+            <div className="rounded-xl border border-amber-300 bg-amber-50 p-5 mt-6 flex items-start gap-3">
+              <span className="mt-0.5 text-amber-500 shrink-0" aria-hidden>&#9888;</span>
+              <div>
+                <p className="text-sm font-medium text-amber-800">{searchFailureMessage}</p>
+                <p className="text-xs text-amber-700 mt-0.5">
+                  Your query was received — the issue is on our end. Waiting a moment and searching again usually resolves it.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* ── Empty results (search with 0 results, no engine failure) ───── */}
+          {hasSearched && !isPending && firms.length === 0 && !searchFailureMessage && (
+            <div className="rounded-xl border border-dashed border-border bg-muted/30 p-10 text-center mt-6">
+              <p className="text-sm font-medium text-foreground">No investors matched that description</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto leading-relaxed">
+                Try broadening your description — include the sector, stage, and geography.
+              </p>
+            </div>
+          )}
+        </>
       )}
     </div>
   )
@@ -667,6 +725,229 @@ export function InvestorDeckSearchClient({
 // ─────────────────────────────────────────────────────────────────────────────
 // Sub-components
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ── Favourites view ──────────────────────────────────────────────────────────
+//
+// Renders saved investors (from investor_shortlist) with the same MatchCard
+// visual as the main search results. Fetches on mount via getShortlist().
+// Shows the full 6-pillar scorecard + ★ unsave toggle per card.
+
+interface FavouritesViewProps {
+  shortlistIds: Record<string, ShortlistStage>
+  onUnsave: (firm: InvestorFirm) => Promise<void>
+}
+
+type ShortlistItemWithStage = InvestorFirm & {
+  shortlistStage: ShortlistStage
+  shortlistUpdatedAt: string
+}
+
+function FavouritesView({ shortlistIds, onUnsave }: FavouritesViewProps) {
+  const [items, setItems] = useState<ShortlistItemWithStage[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Reload saved firms on mount
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+    getShortlist()
+      .then(({ items: data }) => {
+        setItems(data)
+        setLoading(false)
+      })
+      .catch(() => {
+        setError('Could not load your saved investors — please try again.')
+        setLoading(false)
+      })
+  }, [])
+
+  // Remove an item from local state and call the parent unsave handler
+  const handleUnsave = useCallback(async (firm: InvestorFirm) => {
+    // Optimistic: remove from local list immediately
+    setItems(prev => prev.filter(i => i.id !== firm.id))
+    await onUnsave(firm)
+  }, [onUnsave])
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 gap-3 text-muted-foreground">
+        <div className="h-7 w-7 animate-spin rounded-full border-2 border-muted-foreground border-t-transparent" />
+        <p className="text-sm">Loading your saved investors…</p>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-6 text-center mt-4">
+        <p className="text-sm font-medium text-destructive">{error}</p>
+      </div>
+    )
+  }
+
+  // Sync: if the parent unsaved someone from the search results while this view
+  // is mounted, remove them here too.
+  const visibleItems = items.filter(i => i.id in shortlistIds)
+
+  if (visibleItems.length === 0) {
+    return (
+      <div className="bg-card border border-dashed border-border rounded-xl px-10 py-16 text-center mt-2">
+        <div className="text-4xl mb-4">☆</div>
+        <h3 className="text-lg font-semibold text-foreground mb-2">No saved investors yet</h3>
+        <p className="text-sm text-muted-foreground max-w-sm mx-auto leading-relaxed">
+          Search for investors and click <strong>☆ Save</strong> on any match to add them here.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-2 mt-2">
+      <p className="text-sm text-muted-foreground pb-1">
+        {visibleItems.length} saved investor{visibleItems.length !== 1 ? 's' : ''} — click ★ to remove
+      </p>
+      {visibleItems.map((item, i) => (
+        <SavedInvestorCard
+          key={item.id}
+          rank={i + 1}
+          firm={item}
+          onUnsave={() => handleUnsave(item)}
+        />
+      ))}
+    </div>
+  )
+}
+
+// ── Saved investor card ──────────────────────────────────────────────────────
+//
+// Slimmed version of MatchCard for the favourites view: same layout shell but
+// no match score (not stored at save time), no Why-fit expand, unsave replaces
+// Save button. Still shows thesis, stage focus, cheque range, sectors.
+
+function SavedInvestorCard({
+  rank,
+  firm,
+  onUnsave,
+}: {
+  rank: number
+  firm: InvestorFirm
+  onUnsave: () => void
+}) {
+  const attrs = firm.attributes
+  const firmType = attrs.firm_type ? normaliseFirmType(attrs.firm_type) : firm.subcategory ?? 'VC'
+  const city = attrs.hq_city ?? null
+  const chequeMin = attrs.cheque_range_gbp?.min
+  const chequeMax = attrs.cheque_range_gbp?.max
+  const chequeStr = chequeMin || chequeMax
+    ? [chequeMin ? `£${fmtCheque(chequeMin)}` : null, chequeMax ? `£${fmtCheque(chequeMax)}` : null]
+        .filter(Boolean).join('–')
+    : null
+  const stageFocusArr = attrs.stage_focus ?? []
+  const stageStr = stageFocusArr.slice(0, 2).join(' / ') || null
+  const thesis = attrs.investment_thesis ?? attrs.ideal_company_profile ?? firm.description ?? null
+  const sectors = attrs.sectors ?? []
+
+  const handleUnsaveClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    onUnsave()
+  }
+
+  return (
+    <div className="relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px">
+      {/* Cover link — makes whole card navigable */}
+      <Link
+        href={`/investors/${firm.id}`}
+        className="absolute inset-0 rounded-xl"
+        aria-hidden
+        tabIndex={-1}
+      />
+
+      {/* ── Header row ── */}
+      <div className="flex items-start justify-between gap-3 mb-1.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-bold text-sm text-foreground leading-snug">
+              {rank}. {firm.title}
+            </span>
+            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground font-bold tracking-wider uppercase flex-shrink-0">
+              {firmType}
+            </span>
+          </div>
+          <div className="text-xs text-muted-foreground mt-0.5">
+            {[city, chequeStr, stageStr].filter(Boolean).join(' · ') || ' '}
+          </div>
+        </div>
+
+        {/* Unsave button */}
+        <div className="relative z-10 flex-shrink-0">
+          <button
+            type="button"
+            onClick={handleUnsaveClick}
+            className="text-[10px] px-2 py-0.5 rounded border transition-all border-international-orange text-international-orange bg-international-orange/10 hover:bg-international-orange hover:text-white"
+            aria-label={`Remove ${firm.title} from saved`}
+          >
+            ★ Saved
+          </button>
+        </div>
+      </div>
+
+      {/* ── Chip row ── */}
+      {(firmType || stageFocusArr.length > 0 || chequeStr) && (
+        <div className="flex flex-wrap gap-1.5 mb-2">
+          {firmType && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground font-semibold uppercase tracking-wide">
+              {firmType}
+            </span>
+          )}
+          {stageFocusArr.slice(0, 3).map(stage => (
+            <span key={stage} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground uppercase tracking-wide">
+              {stage}
+            </span>
+          ))}
+          {chequeStr && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground uppercase tracking-wide">
+              {chequeStr}
+            </span>
+          )}
+          {attrs.is_active_deploying === true && (
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">
+              ✓ Active
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Thesis paragraph ── */}
+      {thesis && (
+        <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
+          {thesis.length > 260 ? thesis.slice(0, 260) + '…' : thesis}
+        </p>
+      )}
+
+      {/* ── Sector tags ── */}
+      {sectors.length > 0 && (
+        <div className="flex flex-wrap gap-1.5 mb-1">
+          {sectors.slice(0, 4).map(s => (
+            <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground truncate max-w-[120px]">
+              {s.length > 16 ? s.slice(0, 15) + '…' : s}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── View profile link ── */}
+      <div className="mt-2 relative z-10">
+        <Link
+          href={`/investors/${firm.id}`}
+          className="text-xs text-international-orange font-semibold hover:underline"
+        >
+          View full profile →
+        </Link>
+      </div>
+    </div>
+  )
+}
 
 // ── Usage meter (paid tier) ─────────────────────────────────────────────────
 
