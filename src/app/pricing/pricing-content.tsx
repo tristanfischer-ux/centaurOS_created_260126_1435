@@ -164,14 +164,20 @@ export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
         </div>
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 pb-16 sm:pb-24">
-          {/* Header */}
+          {/* Header — Tristan 2026-04-28 (design audit cross-cutting fix #3):
+              applied the canonical red-bar + bold-title + subtitle pattern.
+              Previously a centred grey-uppercase eyebrow ("BUILT FOR HARDWARE
+              FOUNDERS") + centred H1 + centred subtitle, which the audit
+              flagged as drifting from My Profile's canonical pattern. Kept
+              the centred alignment because /pricing is a marketing page, but
+              now leads with the red-bar + H1 stack and drops the eyebrow. */}
           <div className="text-center space-y-4 mb-8">
-            <p className="text-xs font-mono uppercase tracking-widest text-international-orange">
-              Built for Hardware Founders
-            </p>
-            <h1 className="text-4xl sm:text-5xl font-display font-bold text-foreground tracking-tight">
-              Start free. Scale when ready.
-            </h1>
+            <div className="inline-flex items-center gap-3 mb-1">
+              <div className="h-10 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)] hidden sm:block" />
+              <h1 className="text-4xl sm:text-5xl font-display font-bold text-foreground tracking-tight">
+                Start free. Scale when ready.
+              </h1>
+            </div>
             <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
               Five free brainstorming sessions a month, five free saved investor searches, and unlimited supplier search across 18,000 UK and European manufacturers. Upgrade when you want more leads or deeper Council sessions.
             </p>

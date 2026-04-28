@@ -439,61 +439,76 @@ export function Sidebar({
             )}
 
             {/* ─── Footer stack ─── */}
-            <div className="p-3 mt-auto space-y-2">
-                {/* Util row: Pricing · Settings · Sign Out */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href="/pricing"
-                            aria-current={isRouteActive(pathname, "/pricing") ? "page" : undefined}
-                            className={cn(
-                                "flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors",
-                                isRouteActive(pathname, "/pricing")
-                                    ? "text-international-orange font-semibold"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            <PoundSterling className="h-3.5 w-3.5" aria-hidden="true" />
-                            Pricing
-                        </Link>
-                        <Link
-                            href="/settings"
-                            aria-current={isRouteActive(pathname, "/settings") ? "page" : undefined}
-                            className={cn(
-                                "flex items-center gap-1.5 px-2 py-1 text-xs rounded-md transition-colors",
-                                isRouteActive(pathname, "/settings")
-                                    ? "text-international-orange font-semibold"
-                                    : "text-muted-foreground hover:text-foreground"
-                            )}
-                        >
-                            <Settings className="h-3.5 w-3.5" aria-hidden="true" />
-                            Settings
-                        </Link>
-                    </div>
-                    <form action={signOut}>
-                        <button
-                            type="submit"
-                            className="flex items-center gap-1.5 px-2 py-1 text-xs text-muted-foreground hover:text-foreground transition-colors rounded-md"
-                        >
-                            <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
-                            Sign Out
-                        </button>
-                    </form>
-                </div>
-
+            {/* Tristan 2026-04-28 (design audit #110 cross-cutting fix #1): the
+                old footer crammed Pricing / Settings / Sign Out + THIS WEEK +
+                Enterprise into a single row + bare bars stack with inconsistent
+                alignment. Audit P0/P1 across welcome / agents / the-forge /
+                my-profile / marketplace-suppliers. Refactored layout:
+                  1. Status block (TimeWeek + AICredits) consolidated, sits on
+                     a soft muted background so it reads as ONE group.
+                  2. Subtle divider.
+                  3. Action links (Pricing · Settings · Sign Out) stacked
+                     vertically and icon-aligned with the primary nav above
+                     (h-4 w-4 icons + same gap-3 + same text-sm). */}
+            <div className="mt-auto">
                 {/* Forge Ambassador badge — visible when user has 10+ active paid referrals */}
                 {isForgeAmbassador && (
-                    <div className="px-1">
+                    <div className="px-3 pt-2 pb-1">
                         <ForgeAmbassadorBadge className="text-[9px]" />
                     </div>
                 )}
 
-                {/* Status bars: Time (this week) + Credits. Per CLAUDE.md no-AI-emphasis
-                    rule, the in-product label stays "Credits", not "AI Credits". */}
-                <div className="space-y-1">
+                {/* Status block — single grouped surface for the two meters,
+                    visually contained so it reads as one unit, not two
+                    floating bars. */}
+                <div className="mx-3 mb-2 rounded-lg bg-muted/40 px-3 py-2 space-y-1.5">
                     <TimeWeekBarLoader />
                     <AICreditsBarLoader />
                 </div>
+
+                {/* Soft divider keeps the action links visually distinct from
+                    the status block above. */}
+                <div className="mx-3 border-t border-border/30" />
+
+                {/* Action links — vertically stacked, icon + label, aligned
+                    with the primary nav above (sized to match SidebarItem). */}
+                <nav className="px-3 py-2 flex flex-col gap-0.5" aria-label="Account">
+                    <Link
+                        href="/pricing"
+                        aria-current={isRouteActive(pathname, "/pricing") ? "page" : undefined}
+                        className={cn(
+                            "flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors",
+                            isRouteActive(pathname, "/pricing")
+                                ? "text-international-orange font-semibold bg-international-orange/[0.06]"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                        )}
+                    >
+                        <PoundSterling className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        Pricing
+                    </Link>
+                    <Link
+                        href="/settings"
+                        aria-current={isRouteActive(pathname, "/settings") ? "page" : undefined}
+                        className={cn(
+                            "flex items-center gap-3 px-2 py-1.5 rounded-md text-sm transition-colors",
+                            isRouteActive(pathname, "/settings")
+                                ? "text-international-orange font-semibold bg-international-orange/[0.06]"
+                                : "text-muted-foreground hover:text-foreground hover:bg-muted/40"
+                        )}
+                    >
+                        <Settings className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        Settings
+                    </Link>
+                    <form action={signOut}>
+                        <button
+                            type="submit"
+                            className="w-full flex items-center gap-3 px-2 py-1.5 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors text-left"
+                        >
+                            <LogOut className="h-4 w-4 shrink-0" aria-hidden="true" />
+                            Sign Out
+                        </button>
+                    </form>
+                </nav>
 
                 {/* Milestone toast — fires once per session when ambassador threshold is crossed */}
                 <ForgeAmbassadorMilestoneToast since={ambassadorSince} />
