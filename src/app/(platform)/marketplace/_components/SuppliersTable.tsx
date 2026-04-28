@@ -227,7 +227,7 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
 // ─── Row component ──────────────────────────────────────────────────────────
 
 function SupplierRow({ row }: { row: SuppliersDirectoryRow }) {
-  const verified = row.verifiedAt != null
+  const verified = row.isVerified
   const scoreClass = row.score == null
     ? 'text-muted-foreground'
     : row.score >= 70 ? 'text-success'

@@ -36,8 +36,10 @@ export interface SuppliersDirectoryRow {
   certification: string | null
   /** 0–100 quality / nightshift score. */
   score: number | null
-  /** Public verification timestamp (column on marketplace_listings). */
-  verifiedAt: string | null
+  /** Whether the listing has been verified (is_verified column). */
+  isVerified: boolean
+  /** Last enrichment timestamp (last_enriched_at column). */
+  lastEnrichedAt: string | null
   websiteUrl: string | null
 }
 
@@ -90,13 +92,14 @@ function rowToDirectoryRow(row: Record<string, unknown>): SuppliersDirectoryRow 
     title: String(row.title ?? '—'),
     category: row.category as SuppliersDirectoryRow['category'],
     subcategory: (row.subcategory as string | null) ?? null,
-    country: (attrs.country as string | null) ?? null,
-    city: (attrs.city as string | null) ?? null,
+    country: (attrs.country as string | null) ?? (row.country as string | null) ?? null,
+    city: (attrs.city as string | null) ?? (row.city as string | null) ?? null,
     industries,
     certification: firstCert,
     score: score != null && !isNaN(score) ? Math.round(score) : null,
-    verifiedAt: (row.verified_at as string | null) ?? null,
-    websiteUrl: (attrs.website_url as string | null) ?? null,
+    isVerified: Boolean(row.is_verified),
+    lastEnrichedAt: (row.last_enriched_at as string | null) ?? null,
+    websiteUrl: (attrs.website_url as string | null) ?? (row.website_url as string | null) ?? null,
   }
 }
 
@@ -366,7 +369,7 @@ export async function getSuppliersDirectoryPage(
 
   let query = admin
     .from('marketplace_listings')
-    .select('id, title, category, subcategory, attributes, verified_at', { count: 'exact' })
+    .select('id, title, category, subcategory, attributes, is_verified, last_enriched_at, website_url, country, city', { count: 'exact' })
     .eq('is_demo', false)
 
   // Category filter — default Products + Services for the "Suppliers" tab.
@@ -382,11 +385,11 @@ export async function getSuppliersDirectoryPage(
   }
 
   // Status filter:
-  //   verified  → verified_at IS NOT NULL
+  //   verified  → is_verified = true (boolean column on marketplace_listings)
   //   pushed    → attributes->>data_source = 'nightshift_pushed'
   //   enriched  → attributes->>capability_summary IS NOT NULL  (proxy for synth)
   if (params.status === 'verified') {
-    query = query.not('verified_at', 'is', null)
+    query = query.eq('is_verified', true)
   } else if (params.status === 'pushed') {
     query = query.filter('attributes->>data_source', 'eq', 'nightshift_pushed')
   } else if (params.status === 'enriched') {
@@ -408,9 +411,13 @@ export async function getSuppliersDirectoryPage(
     query = query.ilike('title', `%${safe}%`)
   }
 
-  // Sort: verified first, then by score descending (nulls last).
+  // Sort: verified first (boolean DESC), then by last_enriched_at DESC as
+  // tiebreaker (most recently enriched rows surface first), then title ASC.
+  // NOTE: verified_at does not exist on marketplace_listings — the boolean
+  // is_verified column is the correct verified indicator (fixed 2026-04-27).
   query = query
-    .order('verified_at', { ascending: false, nullsFirst: false })
+    .order('is_verified', { ascending: false })
+    .order('last_enriched_at', { ascending: false, nullsFirst: false })
     .order('title', { ascending: true })
     .range(from, to)
 
