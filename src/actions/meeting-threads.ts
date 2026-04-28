@@ -17,6 +17,7 @@
  * - src/app/(platform)/agents/team-meeting-dialog.tsx — Meeting runner
  */
 
+import { after } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
@@ -221,6 +222,39 @@ export async function createMeetingThread(
     topic: input.topic.slice(0, 60),
     entryCount: input.entries.length,
     foundryId,
+  })
+
+  // F2 + F3: schedule cover-image and audio generation in the background.
+  // Per CLAUDE.md "Vercel after(fetch) silently drops on short-lived
+  // handlers" gotcha, we use after() here because createMeetingThread
+  // returns from a longer-lived server-action context (the wrap-up
+  // upstream waits on its result before navigating). The two jobs are
+  // independent and run in parallel inside the after-block — no awaits
+  // between them.
+  after(async () => {
+    try {
+      // Dynamic imports keep the action module's cold-start lean and
+      // avoid pulling the OpenAI client into every server-action bundle.
+      const [{ generateSessionInfographic }, { generateSessionAudio }] = await Promise.all([
+        import('./brainstorm-cover'),
+        import('./brainstorm-audio'),
+      ])
+
+      // Fire both, await both with allSettled — neither blocks the other.
+      const [coverResult, audioResult] = await Promise.allSettled([
+        generateSessionInfographic(threadId),
+        generateSessionAudio(threadId),
+      ])
+
+      if (coverResult.status === 'rejected') {
+        console.error('[MeetingThreads] cover after() failed:', coverResult.reason)
+      }
+      if (audioResult.status === 'rejected') {
+        console.error('[MeetingThreads] audio after() failed:', audioResult.reason)
+      }
+    } catch (err) {
+      console.error('[MeetingThreads] after() block crashed:', err)
+    }
   })
 
   return { threadId, error: null }

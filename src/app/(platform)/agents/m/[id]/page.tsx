@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/server"
 import { redirect, notFound } from "next/navigation"
-import { getMeetingThread } from "@/actions/meeting-threads"
+import { getMeetingThread, refreshSessionAssetUrls } from "@/actions/meeting-threads"
 import { MeetingThreadView } from "./meeting-thread-view"
 import { getUserSubscription } from "@/lib/billing/subscriptions"
 import type { SubscriptionTier } from "@/lib/billing/plans"
@@ -52,11 +52,18 @@ export default async function MeetingThreadPage({ params }: MeetingThreadPagePro
         // Non-critical — gating falls back to free-tier
     }
 
+    // F2 / F3 — fetch signed URLs for cover image + audio clips. RLS on
+    // meeting_threads already approved access via getMeetingThread above,
+    // so this is purely a URL refresh.
+    const assets = await refreshSessionAssetUrls(id)
+
     return (
         <MeetingThreadView
             thread={thread}
             currentUserId={user.id}
             userTier={userTier}
+            coverImageUrl={assets.coverUrl}
+            audioClips={assets.audioClips}
         />
     )
 }

@@ -50,10 +50,21 @@ import { getPrimaryTargetForTier } from "@/lib/agents/failover"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+interface MeetingAudioClip {
+    specialistId: string
+    voice: string
+    url: string
+    durationMs: number | null
+}
+
 interface MeetingThreadViewProps {
     thread: MeetingThreadDetail
     currentUserId: string
     userTier: SubscriptionTier
+    /** F2: signed cover-image URL (null if not yet ready) */
+    coverImageUrl?: string | null
+    /** F3: signed audio-clip URLs in council order */
+    audioClips?: MeetingAudioClip[]
 }
 
 // ─── Council tier display labels ──────────────────────────────────────────────
@@ -472,11 +483,33 @@ export function MeetingThreadView({
     thread,
     currentUserId,
     userTier,
+    coverImageUrl,
+    audioClips,
 }: MeetingThreadViewProps) {
     const router = useRouter()
     const [entries, setEntries] = useState<MeetingEntryRow[]>(thread.entries)
     const [branchingEntryId, setBranchingEntryId] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
+    // F3: playlist controls
+    const [activeClipIdx, setActiveClipIdx] = useState(0)
+    const audioRef = useRef<HTMLAudioElement | null>(null)
+    const hasAudio = Array.isArray(audioClips) && audioClips.length > 0
+    const activeClip = hasAudio ? audioClips![activeClipIdx] ?? null : null
+
+    const handleClipEnded = useCallback(() => {
+        if (!hasAudio) return
+        const next = activeClipIdx + 1
+        if (next < audioClips!.length) {
+            setActiveClipIdx(next)
+            // Autoplay the next clip after it loads
+            setTimeout(() => audioRef.current?.play().catch(() => {}), 50)
+        }
+    }, [hasAudio, audioClips, activeClipIdx])
+
+    const handleSelectClip = useCallback((idx: number) => {
+        setActiveClipIdx(idx)
+        setTimeout(() => audioRef.current?.play().catch(() => {}), 50)
+    }, [])
 
     const isAuthor = thread.authorUserId === currentUserId
 
@@ -544,6 +577,88 @@ export function MeetingThreadView({
                     Back to Team
                 </Link>
             </div>
+
+            {/* F2: Generated cover image — pinned at the top, used as the
+                shareable thumbnail when the founder posts the session
+                elsewhere. Falls back gracefully when generation is still
+                pending or failed. */}
+            {coverImageUrl && (
+                <Card className="overflow-hidden border">
+                    <div className="relative w-full bg-muted/20 aspect-[16/9] max-h-[420px]">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                            src={coverImageUrl}
+                            alt={`Generated cover for: ${thread.topic}`}
+                            className="absolute inset-0 h-full w-full object-cover"
+                        />
+                        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
+                            Generated cover
+                        </span>
+                    </div>
+                </Card>
+            )}
+
+            {/* F3: Audio player — shows after audio generation completes.
+                Per-clip MP3s are stitched together via an HTML <audio>
+                playlist that auto-advances on `ended`. No ffmpeg required. */}
+            {hasAudio && activeClip && (
+                <Card className="border">
+                    <CardContent className="pt-5 space-y-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-electric-blue/10 text-electric-blue">
+                                    <BookOpen className="h-3.5 w-3.5" />
+                                </span>
+                                <h3 className="text-sm font-semibold text-foreground">Listen to this session</h3>
+                                <Badge variant="secondary" className="text-[10px]">
+                                    {audioClips!.length} {audioClips!.length === 1 ? "clip" : "clips"}
+                                </Badge>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">
+                                Now playing: clip {activeClipIdx + 1} of {audioClips!.length}
+                            </span>
+                        </div>
+
+                        <audio
+                            ref={audioRef}
+                            key={activeClip.url}
+                            src={activeClip.url}
+                            controls
+                            preload="metadata"
+                            onEnded={handleClipEnded}
+                            className="w-full"
+                        />
+
+                        <div className="flex flex-wrap gap-1.5">
+                            {audioClips!.map((clip, idx) => {
+                                const specialist = clip.specialistId ? getSpecialistById(clip.specialistId) : null
+                                const label = specialist?.name ?? clip.specialistId ?? `Clip ${idx + 1}`
+                                const isActive = idx === activeClipIdx
+                                return (
+                                    <button
+                                        key={`${clip.url}-${idx}`}
+                                        type="button"
+                                        onClick={() => handleSelectClip(idx)}
+                                        className={cn(
+                                            "px-2.5 py-1 rounded-full border text-[11px] transition-colors",
+                                            isActive
+                                                ? "bg-electric-blue text-background border-electric-blue"
+                                                : "border-border text-muted-foreground hover:border-electric-blue/50 hover:text-foreground",
+                                        )}
+                                        aria-current={isActive}
+                                    >
+                                        {label}
+                                    </button>
+                                )
+                            })}
+                        </div>
+
+                        <p className="text-[10px] text-muted-foreground">
+                            Each specialist is voiced distinctly. Tap a name to skip to their take.
+                        </p>
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Header */}
             <div className="space-y-3">
