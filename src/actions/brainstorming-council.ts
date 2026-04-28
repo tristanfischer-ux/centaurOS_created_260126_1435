@@ -267,6 +267,134 @@ import type {
     ConveneCouncilResult,
 } from "./brainstorming-council-types"
 
+// ─── Per-stage server actions (W77: Cal-first progressive reveal) ────────────
+// These granular actions let the client orchestrate the sequence:
+// Cal framing → R1 specialists one-by-one → R2 specialists → Cal closing.
+// Each action is a thin wrapper around the shared prompt/model logic above.
+
+/**
+ * W77: Return only Cal's opening framing. Called first, before any
+ * specialist calls fire. The client shows Cal's card then gates R1 on
+ * this resolving.
+ */
+export async function getCalFraming(
+    question: string,
+    specialistNames: string[],
+): Promise<{ ok: true; framing: string } | { ok: false; error: string }> {
+    if (!question?.trim()) return { ok: false, error: "Question is required" }
+    const result = await callOpenRouter({
+        model: COUNCIL_MODEL_MAP["chief-of-staff"],
+        system: "You are Cal, Chief of Staff and council host at Fractional Forge. You frame questions and introduce specialists. British English. 3–4 sentences max.",
+        prompt: getCalOpeningPrompt(question, specialistNames),
+        maxTokens: 1200,
+        temperature: 0.7,
+        timeoutMs: 60_000,
+    })
+    if (!result.ok) {
+        const fallback = `I've put your question to ${specialistNames.length} specialists — ${specialistNames.slice(0, -1).join(", ")}${specialistNames.length > 1 ? " and " : ""}${specialistNames[specialistNames.length - 1]}. They each look at it through their own lens. Read their take, then I'll close with what to do next.`
+        return { ok: true, framing: fallback }
+    }
+    return { ok: true, framing: result.text.trim() }
+}
+
+/**
+ * W77: Return a single specialist's Round 1 response.
+ * The client fires one of these per specialist after Cal's framing returns,
+ * all in parallel. Each resolves independently so cards appear one by one
+ * as the fastest model finishes first.
+ */
+export async function getSpecialistRound1Response(
+    question: string,
+    specialist: { id: string; name: string; title: string; tagline: string },
+): Promise<{ ok: true; response: SpecialistResponse } | { ok: false; error: string }> {
+    if (!question?.trim()) return { ok: false, error: "Question is required" }
+    const model = COUNCIL_MODEL_MAP[specialist.id] ?? "deepseek/deepseek-v4-flash"
+    const modelLabel = COUNCIL_MODEL_LABEL[specialist.id] ?? "DeepSeek V4-Flash"
+    const system = getSpecialistSystemPrompt(specialist.id, specialist.name, specialist.title, question)
+    const result = await callOpenRouter({
+        model,
+        system,
+        prompt: question,
+        maxTokens: 4096,
+        temperature: 0.75,
+        timeoutMs: 75_000,
+    })
+    if (!result.ok) {
+        return {
+            ok: true,
+            response: {
+                id: specialist.id,
+                name: specialist.name,
+                title: specialist.title,
+                modelLabel,
+                response: `${specialist.name} was unable to respond to this question. The model returned an error — try again in a moment.`,
+            },
+        }
+    }
+    return {
+        ok: true,
+        response: {
+            id: specialist.id,
+            name: specialist.name,
+            title: specialist.title,
+            modelLabel,
+            response: result.text.trim(),
+        },
+    }
+}
+
+/**
+ * W77: Return a single specialist's Round 2 response.
+ * Called after all R1 responses are in. Same one-by-one reveal pattern
+ * as R1 — each resolves independently.
+ */
+export async function getSpecialistRound2Response(
+    question: string,
+    specialist: { id: string; name: string; title: string },
+    ownRound1Response: string,
+    peersRound1: Array<{ name: string; response: string }>,
+): Promise<{ ok: true; id: string; round2Response: string } | { ok: false; error: string }> {
+    if (!question?.trim()) return { ok: false, error: "Question is required" }
+    const model = COUNCIL_MODEL_MAP[specialist.id] ?? "deepseek/deepseek-v4-flash"
+    const round2Prompt = buildRound2Prompt(specialist, ownRound1Response, peersRound1)
+    const result = await callOpenRouter({
+        model,
+        system: getSpecialistSystemPrompt(specialist.id, specialist.name, specialist.title, question),
+        prompt: round2Prompt,
+        maxTokens: 4096,
+        temperature: 0.72,
+        timeoutMs: 90_000,
+    })
+    if (!result.ok) return { ok: false, error: result.error ?? "Round 2 call failed" }
+    return { ok: true, id: specialist.id, round2Response: result.text.trim() }
+}
+
+/**
+ * W77: Return Cal's closing synthesis. Called after all R1 (and R2 when
+ * applicable) responses are in.
+ */
+export async function getCalClosingResponse(
+    question: string,
+    round1Responses: Array<{ name: string; response: string }>,
+    round2Responses: Array<{ name: string; response: string }>,
+): Promise<{ ok: true; closing: string } | { ok: false; error: string }> {
+    if (!question?.trim()) return { ok: false, error: "Question is required" }
+    const result = await callOpenRouter({
+        model: COUNCIL_MODEL_MAP["chief-of-staff"],
+        system: "You are Cal, Chief of Staff and council host at Fractional Forge. You synthesise the council's responses into a closing. British English. 4–6 sentences max.",
+        prompt: getCalClosingPrompt(question, round1Responses, round2Responses),
+        maxTokens: 1500,
+        temperature: 0.65,
+        timeoutMs: 60_000,
+    })
+    if (!result.ok) {
+        return { ok: true, closing: "Cal was unable to complete the synthesis. The responses above reflect the council's individual perspectives." }
+    }
+    return { ok: true, closing: result.text.trim() }
+}
+
+// ─── Legacy bulk action (kept for compatibility — not used by the view) ───────
+
 /**
  * Fire all council LLM calls and return the full session result.
  *
@@ -281,6 +409,9 @@ import type {
  * tokens on an internal thinking trace BEFORE emitting visible text.
  * At maxTokens=800 the visible response was cut at ~150 chars mid-sentence
  * ("I see" truncation). 4096 gives all specialists full headroom.
+ *
+ * @deprecated Use the per-stage actions (getCalFraming, getSpecialistRound1Response,
+ * getSpecialistRound2Response, getCalClosingResponse) for progressive reveal.
  */
 export async function conveneCouncil(
     input: ConveneCouncilInput,

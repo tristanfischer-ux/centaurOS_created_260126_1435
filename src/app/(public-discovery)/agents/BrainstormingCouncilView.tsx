@@ -33,8 +33,13 @@ import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
-import { conveneCouncil } from "@/actions/brainstorming-council"
-import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council-types"
+import {
+    getCalFraming,
+    getSpecialistRound1Response,
+    getSpecialistRound2Response,
+    getCalClosingResponse,
+} from "@/actions/brainstorming-council"
+import type { SpecialistResponse } from "@/actions/brainstorming-council-types"
 import { createMeetingThread, refreshSessionAssetUrls } from "@/actions/meeting-threads"
 import { generateSessionInfographic } from "@/actions/brainstorm-cover"
 import { generateSessionAudio } from "@/actions/brainstorm-audio"
@@ -279,10 +284,36 @@ interface BrainstormingCouncilViewProps {
 
 // ─── Council session state ───────────────────────────────────────────────────
 
+/**
+ * W77: Top-level phase (idle → pending → done | error).
+ * "pending" covers all in-flight sub-states; use councilPhase for detail.
+ */
 type SessionPhase = "idle" | "pending" | "done" | "error"
+
+/**
+ * W77: Fine-grained orchestration phase inside "pending" and at the
+ * transition to "done". Drives which sections show loading vs content.
+ *
+ * - "cal-framing"   — only Cal's call is in flight; specialist section is queued
+ * - "r1-running"    — Cal's text is shown; Round 1 specialists are in flight
+ *                     (cards arrive one-by-one as individual promises resolve)
+ * - "r2-running"    — R1 shown; Round 2 specialists are in flight
+ * - "cal-closing"   — R2 (or R1 for quick tier) shown; Cal closing is in flight
+ * - "done"          — everything populated
+ * - "idle"          — pre-submission
+ */
+type CouncilPhase =
+    | "idle"
+    | "cal-framing"
+    | "r1-running"
+    | "r2-running"
+    | "cal-closing"
+    | "done"
 
 interface CouncilSession {
     phase: SessionPhase
+    /** W77: fine-grained sub-phase for progressive reveal */
+    councilPhase: CouncilPhase
     hostOpening: string
     specialistResponses: SpecialistResponse[]
     hostClosing: string
@@ -307,6 +338,7 @@ interface CouncilSession {
 
 const EMPTY_SESSION: CouncilSession = {
     phase: "idle",
+    councilPhase: "idle",
     hostOpening: "",
     specialistResponses: [],
     hostClosing: "",
@@ -383,6 +415,15 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
     // and the button's onClick can reference it. React synthetic events
     // sometimes fail to bubble through deeply-nested form submit on first
     // interaction — dual-wiring is the belt-and-braces fix.
+    //
+    // W77: Cal-first progressive reveal — sequence is:
+    //  1. Only Cal's framing call fires; specialists are in a "queued" visual state.
+    //  2. When Cal returns, her card populates. Then all R1 specialist calls
+    //     fire in parallel — but each updates state on its own promise resolution,
+    //     so cards appear one-by-one as the fastest model finishes first.
+    //  3. After all R1 resolve: fire R2 for non-quick tiers (same one-by-one reveal).
+    //  4. After all R2 (or R1 for quick) resolve: fire Cal's closing.
+    //  5. Cal's closing resolves → phase = "done".
     const handleConvene = useCallback((e: React.FormEvent | React.MouseEvent) => {
         e.preventDefault()
         const trimmedQ = question.trim()
@@ -410,51 +451,138 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         setQuestion("")
         setShowPicker(false)
 
+        // W77: initial state — only Cal is loading; specialist section is queued.
         setSession({
             ...EMPTY_SESSION,
             phase: "pending",
+            councilPhase: "cal-framing",
             submittedQuestion: trimmedQ,
             submittedTier: tierSnapshot,
             submittedSpecialistIds: snapshotIds,
         })
 
         startTransition(async () => {
-            const result = await conveneCouncil({
-                question: trimmedQ,
-                tier: tierSnapshot,
-                specialists: specialistsForTier,
-            })
+            // ── Step 1: Cal's framing ──────────────────────────────────────
+            // W77: ONLY Cal fires here. Specialists do NOT start yet.
+            const specialistNames = specialistsForTier.map(s => s.name)
+            const calFramingResult = await getCalFraming(trimmedQ, specialistNames)
 
-            if (!result.ok) {
-                setSession({
+            if (!calFramingResult.ok) {
+                setSession(prev => ({
+                    ...prev,
                     phase: "error",
-                    hostOpening: "",
-                    specialistResponses: [],
-                    hostClosing: "",
-                    arrivedIds: new Set(),
-                    errorMessage: result.error,
-                    submittedQuestion: trimmedQ,
-                    submittedTier: tierSnapshot,
-                    submittedSpecialistIds: snapshotIds,
-                    hadRound2: false,
-                    savedThreadId: null,
-                })
+                    councilPhase: "idle",
+                    errorMessage: calFramingResult.error,
+                }))
                 return
             }
 
-            setSession({
-                phase: "done",
-                hostOpening: result.fionaOpening,
-                specialistResponses: result.specialistResponses,
-                hostClosing: result.fionaClosing,
-                arrivedIds: new Set(result.specialistResponses.map((r: SpecialistResponse) => r.id)),
-                errorMessage: "",
-                submittedQuestion: trimmedQ,
-                submittedTier: tierSnapshot,
-                submittedSpecialistIds: snapshotIds,
-                hadRound2: result.hadRound2 ?? false,
-                savedThreadId: null, // filled in after createMeetingThread returns
+            // Cal's framing is in — update her card and move to r1-running phase.
+            // W77: specialists are NOW kicked off (gated on Cal resolving).
+            setSession(prev => ({
+                ...prev,
+                hostOpening: calFramingResult.framing,
+                councilPhase: "r1-running",
+            }))
+
+            // ── Step 2: Round 1 specialists — all fire in parallel ─────────
+            // W77: each specialist's promise updates state independently on
+            // resolution. Fastest model wins; cards appear one-by-one.
+            const useRound2 = tierSnapshot !== "quick"
+            const r1Promises = specialistsForTier.map(async (sp) => {
+                const r1Result = await getSpecialistRound1Response(trimmedQ, sp)
+                const resp: SpecialistResponse = r1Result.ok
+                    ? r1Result.response
+                    : {
+                        id: sp.id,
+                        name: sp.name,
+                        title: sp.title,
+                        modelLabel: "error",
+                        response: `${sp.name} was unable to respond. Try again in a moment.`,
+                    }
+                // W77: update the specialist's card the moment its promise resolves.
+                setSession(prev => ({
+                    ...prev,
+                    specialistResponses: [...prev.specialistResponses.filter(r => r.id !== resp.id), resp],
+                    arrivedIds: new Set([...prev.arrivedIds, resp.id]),
+                }))
+                return resp
             })
+
+            const r1Responses = await Promise.all(r1Promises)
+            const successfulR1 = r1Responses.filter(r => !r.response.includes("was unable to respond"))
+
+            // ── Step 3: Round 2 (non-quick tiers) ─────────────────────────
+            let finalSpecialistResponses: SpecialistResponse[] = r1Responses
+            let hadRound2 = false
+
+            if (useRound2 && successfulR1.length >= 2) {
+                // W77: transition to r2-running phase before firing R2 calls.
+                setSession(prev => ({ ...prev, councilPhase: "r2-running" }))
+
+                const r2Promises = successfulR1.map(async (sp) => {
+                    const peers = successfulR1
+                        .filter(r => r.id !== sp.id)
+                        .map(r => ({ name: r.name, response: r.response }))
+                    const r2Result = await getSpecialistRound2Response(
+                        trimmedQ,
+                        { id: sp.id, name: sp.name, title: sp.title },
+                        sp.response,
+                        peers,
+                    )
+                    // W77: update this specialist's card with round2Response on resolve.
+                    if (r2Result.ok) {
+                        setSession(prev => ({
+                            ...prev,
+                            specialistResponses: prev.specialistResponses.map(r =>
+                                r.id === r2Result.id ? { ...r, round2Response: r2Result.round2Response } : r
+                            ),
+                        }))
+                        return { id: sp.id, round2Response: r2Result.round2Response }
+                    }
+                    return null
+                })
+
+                const r2Results = await Promise.all(r2Promises)
+                const r2Map = new Map(
+                    r2Results.filter((r): r is { id: string; round2Response: string } => r !== null)
+                        .map(r => [r.id, r.round2Response])
+                )
+                finalSpecialistResponses = r1Responses.map(r => ({
+                    ...r,
+                    round2Response: r2Map.get(r.id),
+                }))
+                hadRound2 = r2Results.some(r => r !== null)
+            }
+
+            // ── Step 4: Cal's closing synthesis ───────────────────────────
+            setSession(prev => ({ ...prev, councilPhase: "cal-closing" }))
+
+            const r2ForCal = finalSpecialistResponses
+                .filter(r => r.round2Response)
+                .map(r => ({ name: r.name, response: r.round2Response! }))
+
+            const calClosingResult = await getCalClosingResponse(
+                trimmedQ,
+                successfulR1.map(r => ({ name: r.name, response: r.response })),
+                r2ForCal,
+            )
+
+            const hostClosing = calClosingResult.ok
+                ? calClosingResult.closing
+                : "Cal was unable to complete the synthesis. The responses above reflect the council's individual perspectives."
+
+            // ── Step 5: Mark done + persist ───────────────────────────────
+            setSession(prev => ({
+                ...prev,
+                phase: "done",
+                councilPhase: "done",
+                specialistResponses: finalSpecialistResponses,
+                hostClosing,
+                hadRound2,
+                savedThreadId: null,
+            }))
+
             // Reset asset generation buttons + cached URLs for the new session
             setGraphicStatus("idle")
             setAudioStatus("idle")
@@ -475,11 +603,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     specialistName: "Cal",
                     councilPosition: "opener" as const,
                     roundNumber: 1,
-                    content: result.fionaOpening,
+                    content: calFramingResult.framing,
                     role: "specialist" as const,
                 },
                 // Round 1 specialist responses
-                ...result.specialistResponses.map((resp: SpecialistResponse) => ({
+                ...finalSpecialistResponses.map((resp: SpecialistResponse) => ({
                     specialistId: resp.id,
                     specialistName: resp.name,
                     councilPosition: "reactor" as const,
@@ -488,8 +616,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     role: "specialist" as const,
                 })),
                 // Round 2 specialist responses (only when hadRound2 and content present)
-                ...(result.hadRound2
-                    ? result.specialistResponses
+                ...(hadRound2
+                    ? finalSpecialistResponses
                         .filter((resp: SpecialistResponse) => resp.round2Response)
                         .map((resp: SpecialistResponse) => ({
                             specialistId: resp.id,
@@ -504,8 +632,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     specialistId: "chief-of-staff",
                     specialistName: "Cal",
                     councilPosition: "host-close" as const,
-                    roundNumber: result.hadRound2 ? 2 : 1,
-                    content: result.fionaClosing,
+                    roundNumber: hadRound2 ? 2 : 1,
+                    content: hostClosing,
                     role: "specialist" as const,
                 },
             ]
@@ -1348,7 +1476,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 <h2>
                     {session.phase === "idle"
                         ? "Cal frames the question"
-                        : session.phase === "pending"
+                        : session.councilPhase === "cal-framing"
                         ? "Cal is framing the question…"
                         : "Cal’s framing"}
                 </h2>
@@ -1356,6 +1484,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 <span className="bc-hint">Host &middot; runs every brainstorm</span>
             </div>
 
+            {/* W77: Cal's card shows real text as soon as cal-framing resolves,
+                even while specialist calls are still in flight. The previous
+                code only showed real text when phase==="done" (everything done). */}
             {session.phase === "idle" ? (
                 /* Pre-submission: show Cal's role / what she does */
                 <div className="bc-fiona-card">
@@ -1408,17 +1539,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         Type your question above and click &ldquo;Convene the council&rdquo; to start.
                     </p>
                 </div>
-            ) : session.phase === "pending" ? (
-                /* Loading: calls in flight — W56: animated loading state */
-                <div className="bc-fiona-empty">
-                    <div className="bc-stub-avatar bc-loading-pulse">CA</div>
-                    <p>
-                        <strong>Cal is reading your question and framing what is worth disagreeing about.</strong><br />
-                        <span className="bc-loading-pulse" style={{ fontStyle: "italic", color: "var(--bc-fg-muted)" }}>
-                            {LOADING_LINES[loadingLineIdx]}
-                        </span>
-                    </p>
-                </div>
             ) : session.phase === "error" ? (
                 /* Error state */
                 <div className="bc-fiona-empty">
@@ -1435,8 +1555,21 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         </button>
                     </p>
                 </div>
+            ) : session.councilPhase === "cal-framing" ? (
+                /* W77: Cal's call is in flight — show animated loading placeholder.
+                   Specialists are NOT running yet; this is the only loading card visible. */
+                <div className="bc-fiona-empty">
+                    <div className="bc-stub-avatar bc-loading-pulse">CA</div>
+                    <p>
+                        <strong>Cal is reading your question and framing what is worth disagreeing about.</strong><br />
+                        <span className="bc-loading-pulse" style={{ fontStyle: "italic", color: "var(--bc-fg-muted)" }}>
+                            {LOADING_LINES[loadingLineIdx]}
+                        </span>
+                    </p>
+                </div>
             ) : (
-                /* Done: show Cal's real opening */
+                /* W77: Cal has resolved — show her real framing card even while
+                   specialists are still loading (councilPhase = r1-running etc.) */
                 <div className="bc-fiona-card">
                     <div className="bc-fiona-head">
                         <div className={`bc-sp-avatar bc-av-cal`}>CA</div>
@@ -1459,7 +1592,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             ══════════════════════════════════════════════════════════════ */}
             <div className="bc-section-label">
                 <span className="bc-step">2</span>
-                <h2>The council chimes in &mdash; in parallel</h2>
+                <h2>
+                    {session.councilPhase === "cal-framing"
+                        ? "The council — queued, waiting for Cal"
+                        : session.councilPhase === "r1-running"
+                        ? "The council is chiming in…"
+                        : "The council"}
+                </h2>
                 <span className="bc-rule" />
                 <span className="bc-hint">
                     {councilMembers.length} specialist{councilMembers.length !== 1 ? "s" : ""} &middot; ~{COUNCIL_TIERS.find(t => t.id === activeTier)?.subtitle.match(/~\d+s/)?.[0] ?? "12s"} end-to-end
@@ -1503,34 +1642,40 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                     </p>
                                 </div>
                                 <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
+                                    {/* W76: removed .slice(0, 120)+&hellip; truncation — show the full working style */}
                                     <div className="bc-sig-label">{sigLabel}</div>
-                                    <div className="bc-sig-body">{specialist.workingStyle.slice(0, 120)}&hellip;</div>
+                                    <div className="bc-sig-body">{specialist.workingStyle}</div>
                                 </div>
                             </div>
                         )
                     })}
                 </div>
-            ) : session.phase === "pending" ? (
-                /* Loading: W56 animated placeholders — each one shows a pulsing avatar + cycling loading text */
+            ) : session.councilPhase === "cal-framing" ? (
+                /* W77: Cal is still framing — specialists are queued, NOT yet started.
+                   Show a static roster with a "queued" label, no pulsing animation,
+                   so the user can see who is in the council without implying they are running. */
                 <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
-                    {sessionCouncilMembers.map((specialist, i) => (
-                        <div key={i} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border)" }}>
-                            <div className={`bc-sp-avatar bc-loading-pulse ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
+                    {sessionCouncilMembers.map((specialist) => (
+                        <div key={specialist.id} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border-soft)", opacity: 0.65 }}>
+                            <div className={`bc-sp-avatar ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
                                 {specialist.name.slice(0, 2).toUpperCase()}
                             </div>
                             <h3>{specialist.name}</h3>
-                            <p style={{ fontStyle: "italic" }}>{LOADING_LINES[loadingLineIdx]}</p>
+                            <p style={{ color: "var(--bc-fg-subtle)", fontStyle: "italic", fontSize: "12px" }}>Queued — waiting for Cal to frame the question</p>
                         </div>
                     ))}
                 </div>
-            ) : session.phase === "done" && session.specialistResponses.length > 0 ? (
-                /* Done: real responses rendered */
-                <div className={`bc-council-grid${session.specialistResponses.length === 3 ? " specialists-3" : ""}`}>
-                    {session.specialistResponses.map((resp) => {
-                        const specialist = sessionCouncilMembers.find(s => s.id === resp.id)
-                        const avatarClass = getAvatarClass(resp.id)
-                        const initials = resp.name.slice(0, 2).toUpperCase()
-                        const sigLabel = getSigCloseLabel(resp.id)
+            ) : (session.phase === "pending" && (session.councilPhase === "r1-running" || session.councilPhase === "r2-running" || session.councilPhase === "cal-closing")) ||
+               (session.phase === "done" && session.specialistResponses.length > 0) ? (
+                /* W77: R1 in flight or done — show hybrid grid.
+                   Arrived specialists show real cards; others show animated loading placeholders.
+                   This creates the one-by-one progressive reveal as each promise resolves. */
+                <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
+                    {sessionCouncilMembers.map((specialist) => {
+                        const arrived = session.specialistResponses.find(r => r.id === specialist.id)
+                        const avatarClass = getAvatarClass(specialist.id)
+                        const initials = specialist.name.slice(0, 2).toUpperCase()
+                        const sigLabel = getSigCloseLabel(specialist.id)
                         const sigColorMap: Record<string, string> = {
                             "strategist":          "bc-sig-sage",
                             "finance-lead":        "bc-sig-finn",
@@ -1539,26 +1684,39 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             "chief-of-staff":      "bc-sig-cal",
                             "fundraising-advisor": "bc-sig-fiona",
                         }
-                        const sigColorClass = sigColorMap[resp.id] ?? ""
+                        const sigColorClass = sigColorMap[specialist.id] ?? ""
+
+                        if (!arrived) {
+                            // Still loading — animated placeholder
+                            return (
+                                <div key={specialist.id} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border)" }}>
+                                    <div className={`bc-sp-avatar bc-loading-pulse ${avatarClass}`} style={{ margin: "0 auto 12px" }}>
+                                        {initials}
+                                    </div>
+                                    <h3>{specialist.name}</h3>
+                                    <p style={{ fontStyle: "italic" }}>{LOADING_LINES[loadingLineIdx]}</p>
+                                </div>
+                            )
+                        }
+
+                        // Arrived — show real card
                         return (
-                            <div key={resp.id} className="bc-specialist-card">
+                            <div key={arrived.id} className="bc-specialist-card">
                                 <div className="bc-specialist-head">
                                     <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
                                     <div className="bc-sp-meta">
                                         <div className="bc-name-row">
-                                            <span className="bc-sp-name">{resp.name}</span>
+                                            <span className="bc-sp-name">{arrived.name}</span>
                                         </div>
-                                        <div className="bc-sp-role">{resp.title}</div>
+                                        <div className="bc-sp-role">{arrived.title}</div>
                                     </div>
                                 </div>
                                 <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
-                                    {resp.response}
+                                    {arrived.response}
                                 </div>
-                                {specialist && (
-                                    <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
-                                        <div className="bc-sig-label">{sigLabel}</div>
-                                    </div>
-                                )}
+                                <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
+                                    <div className="bc-sig-label">{sigLabel}</div>
+                                </div>
                             </div>
                         )
                     })}
@@ -1578,10 +1736,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
             {/* ══════════════════════════════════════════════════════════════
                 SECTION 2b — Round 2: specialists update after seeing peers
-                W50: Only rendered when hadRound2 is true (tier !== 'quick')
-                and the session is done with round2Response data present.
+                W50: Only rendered when tier !== 'quick' (2-round tiers).
+                W77: Show as soon as r2-running phase starts — each R2 card
+                appears one-by-one as its promise resolves.
             ══════════════════════════════════════════════════════════════ */}
-            {session.phase === "done" && session.hadRound2 && session.specialistResponses.some(r => r.round2Response) && (
+            {(session.councilPhase === "r2-running" || session.councilPhase === "cal-closing" || (session.phase === "done" && session.hadRound2)) && session.submittedTier !== "quick" && (
                 <>
                     <div className="bc-section-label" style={{ marginTop: "36px" }}>
                         <span className="bc-step" style={{ background: "var(--bc-blue)" }}>2b</span>
@@ -1589,43 +1748,54 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         <span className="bc-rule" />
                         <span className="bc-hint">Each specialist updated their view</span>
                     </div>
-                    <div className={`bc-council-grid${session.specialistResponses.filter(r => r.round2Response).length === 3 ? " specialists-3" : ""}`}>
-                        {session.specialistResponses
-                            .filter(r => r.round2Response)
-                            .map((resp) => {
-                                const avatarClass = getAvatarClass(resp.id)
-                                const initials = resp.name.slice(0, 2).toUpperCase()
-                                const sigColorMap: Record<string, string> = {
-                                    "strategist":          "bc-sig-sage",
-                                    "finance-lead":        "bc-sig-finn",
-                                    "sales-lead":          "bc-sig-sal",
-                                    "cto":                 "bc-sig-max",
-                                    "chief-of-staff":      "bc-sig-cal",
-                                    "fundraising-advisor": "bc-sig-fiona",
-                                }
-                                const sigColorClass = sigColorMap[resp.id] ?? ""
+                    <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
+                        {sessionCouncilMembers.map((specialist) => {
+                            const r2arrived = session.specialistResponses.find(r => r.id === specialist.id && r.round2Response)
+                            const avatarClass = getAvatarClass(specialist.id)
+                            const initials = specialist.name.slice(0, 2).toUpperCase()
+                            const sigColorMap: Record<string, string> = {
+                                "strategist":          "bc-sig-sage",
+                                "finance-lead":        "bc-sig-finn",
+                                "sales-lead":          "bc-sig-sal",
+                                "cto":                 "bc-sig-max",
+                                "chief-of-staff":      "bc-sig-cal",
+                                "fundraising-advisor": "bc-sig-fiona",
+                            }
+                            const sigColorClass = sigColorMap[specialist.id] ?? ""
+
+                            if (!r2arrived) {
                                 return (
-                                    <div key={`r2-${resp.id}`} className="bc-specialist-card" style={{ borderColor: "var(--bc-blue-dim)", background: "linear-gradient(180deg, #f0f9ff 0%, var(--bc-surface) 40%)" }}>
-                                        <div className="bc-specialist-head">
-                                            <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
-                                            <div className="bc-sp-meta">
-                                                <div className="bc-name-row">
-                                                    <span className="bc-sp-name">{resp.name}</span>
-                                                    <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", background: "var(--bc-blue-soft)", color: "var(--bc-blue)", padding: "2px 6px", borderRadius: "4px", border: "1px solid var(--bc-blue-dim)" }}>Round 2</span>
-                                                </div>
-                                                <div className="bc-sp-role">{resp.title}</div>
-                                            </div>
+                                    <div key={`r2-loading-${specialist.id}`} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-blue-dim)" }}>
+                                        <div className={`bc-sp-avatar bc-loading-pulse ${avatarClass}`} style={{ margin: "0 auto 12px" }}>
+                                            {initials}
                                         </div>
-                                        <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
-                                            {resp.round2Response}
-                                        </div>
-                                        <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
-                                            <div className="bc-sig-label">{getSigCloseLabel(resp.id)}</div>
-                                        </div>
+                                        <h3>{specialist.name}</h3>
+                                        <p style={{ fontStyle: "italic" }}>Updating after seeing peers…</p>
                                     </div>
                                 )
-                            })
-                        }
+                            }
+
+                            return (
+                                <div key={`r2-${r2arrived.id}`} className="bc-specialist-card" style={{ borderColor: "var(--bc-blue-dim)", background: "linear-gradient(180deg, #f0f9ff 0%, var(--bc-surface) 40%)" }}>
+                                    <div className="bc-specialist-head">
+                                        <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
+                                        <div className="bc-sp-meta">
+                                            <div className="bc-name-row">
+                                                <span className="bc-sp-name">{r2arrived.name}</span>
+                                                <span style={{ fontSize: "10px", fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", background: "var(--bc-blue-soft)", color: "var(--bc-blue)", padding: "2px 6px", borderRadius: "4px", border: "1px solid var(--bc-blue-dim)" }}>Round 2</span>
+                                            </div>
+                                            <div className="bc-sp-role">{r2arrived.title}</div>
+                                        </div>
+                                    </div>
+                                    <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
+                                        {r2arrived.round2Response}
+                                    </div>
+                                    <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
+                                        <div className="bc-sig-label">{getSigCloseLabel(r2arrived.id)}</div>
+                                    </div>
+                                </div>
+                            )
+                        })}
                     </div>
                 </>
             )}
@@ -1701,13 +1871,28 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         &mdash; Cal, Fractional Forge Chief of Staff. The closing synthesis appears once the council has returned.
                     </p>
                 </div>
+            ) : session.councilPhase === "cal-closing" ? (
+                /* W77: Cal's closing is now in flight — show animated loading state */
+                <div className="bc-closing-held">
+                    <div className="bc-stub-avatar bc-loading-pulse" style={{
+                        width: "48px", height: "48px", borderRadius: "100%",
+                        background: "var(--bc-brand-soft)", color: "var(--bc-brand)",
+                        display: "inline-flex", alignItems: "center", justifyContent: "center",
+                        fontWeight: 800, fontSize: "16px",
+                        marginBottom: "12px",
+                        border: "2px solid #fff",
+                        boxShadow: "0 0 0 2px var(--bc-brand-dim)",
+                    }}>CA</div>
+                    <div className="bc-label">Cal is synthesising…</div>
+                    <p className="bc-loading-pulse" style={{ fontStyle: "italic" }}>Pulling together what the council agreed, where they split, and the one thing to do this week.</p>
+                </div>
             ) : session.phase === "pending" ? (
-                /* Loading: closing held */
+                /* R1/R2 in flight — Cal closing held until specialists finish */
                 <div className="bc-closing-held">
                     <div className="bc-label">Closing synthesis &mdash; held</div>
                     <p>Cal will close once all specialists have returned.</p>
                 </div>
-            ) : session.phase === "done" && session.hostClosing ? (
+            ) : (session.phase === "done" || session.councilPhase === "done") && session.hostClosing ? (
                 /* Done: real Cal closing */
                 <div className="bc-fiona-card bc-closing">
                     <div className="bc-fiona-head">
