@@ -307,11 +307,18 @@ export function PricingContent({ isAuthed = false }: PricingContentProps = {}) {
             </div>
           </div>
 
-          {/* FAQ section */}
+          {/* FAQ section — Tristan 2026-04-28 (audit P1): "Frequently
+              Asked Questions title feels disconnected and should adopt a
+              style that relates to the main page header." Replaced the
+              centred-grey H2 with the canonical red-bar accent + bold
+              title pattern (left-aligned to match the FAQ list below). */}
           <div className="mb-8 max-w-3xl mx-auto">
-            <h2 className="text-2xl font-display font-semibold text-foreground text-center mb-8">
-              Frequently Asked Questions
-            </h2>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="h-7 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)] flex-shrink-0" />
+              <h2 className="text-2xl font-display font-bold text-foreground tracking-tight">
+                Frequently Asked Questions
+              </h2>
+            </div>
             <div className="space-y-2">
               {FAQ_ITEMS.map((faq, index) => {
                 const isExpanded = expandedFaq === index
