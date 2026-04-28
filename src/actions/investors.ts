@@ -1102,10 +1102,16 @@ async function searchInvestorsCore(
       // INSTRUMENTATION: Log the bound query length so the next dim-mismatch
       // captures whether the leak was at the embed boundary (caught here as
       // our pre-RPC assertion) or somewhere downstream we still haven't traced.
+      const errMsg = err instanceof Error ? err.message : String(err)
+      const isQuotaExhausted =
+        errMsg.includes('insufficient_quota') ||
+        errMsg.includes('exceeded your current quota') ||
+        (err != null && typeof err === 'object' && (err as Record<string, unknown>).code === 'insufficient_quota')
       console.error('[searchInvestors] Semantic search failed:', {
         err,
         queryLen: query.trim().length,
         queryPrefix: query.trim().slice(0, 40),
+        isQuotaExhausted,
       })
       // DECISION: If the query looks like a prose deck description (> 30 chars,
       // contains stage/sector/geo language, etc.), the keyword/ilike fallback
@@ -1114,7 +1120,13 @@ async function searchInvestorsCore(
       // so the client renders an amber "try again" callout instead.
       // For short, name-like queries ("Sequoia", "Index") we DO fall through to
       // ilike because it can plausibly match a firm title.
-      if (looksLikeProse(query.trim())) {
+      //
+      // EXCEPTION: insufficient_quota (OpenAI billing) is NOT a semantic-search
+      // architecture failure — it is a billing issue. Fall through to the
+      // keyword/filter path so the user still gets results filtered by
+      // stage/sector/geo even without vector ranking. Do NOT block the search
+      // entirely just because the embedding key ran out of credits.
+      if (looksLikeProse(query.trim()) && !isQuotaExhausted) {
         return {
           firms: [],
           total: 0,
@@ -1123,7 +1135,7 @@ async function searchInvestorsCore(
           failureMessage: 'Investor search is temporarily unavailable. Please try again.',
         }
       }
-      // Short / firm-name-like query: fall through to keyword path below.
+      // Short / firm-name-like query, OR quota exhausted: fall through to keyword path below.
     }
   }
 
