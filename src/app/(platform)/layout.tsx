@@ -149,7 +149,7 @@ export default async function PlatformLayout({
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} isForgeAmbassador={isForgeAmbassador} ambassadorSince={ambassadorSince} />
                         <MainContentArea>
                             <ActiveTimerBar />
-                            <main className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-24 sm:pb-8">
+                            <main className="p-4 pt-[calc(3.5rem+env(safe-area-inset-top,0px))] sm:py-6 sm:pr-6 sm:pl-5 sm:pt-6 lg:py-8 lg:pr-8 lg:pl-6 lg:pt-8 pb-28 sm:pb-8">
                                 {needsProfileRepair ? (
                                     <ProfileSetupRequired userRole={profile?.role} />
                                 ) : (
