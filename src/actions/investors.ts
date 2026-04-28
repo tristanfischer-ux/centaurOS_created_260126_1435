@@ -3177,7 +3177,7 @@ export interface InvestorDirectoryStats { // used by pre-search chart panel
   grantsCount: number
   /** Partners / key-people contacts on record (vc_pe_contacts table). Tristan
    *  2026-04-27: surface the contact count alongside investor count to
-   *  match Forge Capital's "13,076 investors / 61,995 contacts" header. */
+   *  match Forge Capital's investor + contact totals header. */
   contactsCount: number
   /** Breakdown by firm_type — donut chart */
   typeBreakdown: { name: string; value: number }[]
@@ -3237,22 +3237,26 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
   ])
 
   // ── Summary stats ──────────────────────────────────────────────────────────
-  // DECISION: Hardcoded snapshot updated 2026-04-27 (was stale at 2026-04-25
-  // values which capped headline at 8,212 — Tristan flagged the gap vs
-  // Forge Capital's 13,076). Live SQL on jyarhvinengfyrwgtskq returned:
-  //   marketplace_listings WHERE category='Finance'                     → 12,021
-  //   ditto AND attributes->>website_url IS NOT NULL & non-empty        → 10,706
-  //   vc_pe_contacts                                                    → 63,085
+  // DECISION: Hardcoded snapshot updated 2026-04-28 (closing the sync gap
+  // tracked as #112). The targeted Forge-Capital → ForgeOS push of 1,378
+  // missing IDs landed +1,319 inserts (59 firm-name updates, 0 errors).
+  // Local SQLite holds 14,395 investors; 12,011 pass the push filter
+  // (`type != 'govt_grant'` excludes 235 grants which live in `investor_grants`,
+  // and `is_investor=0` excludes 2,228 flagged non-investors). Live SQL on
+  // jyarhvinengfyrwgtskq after the push:
+  //   marketplace_listings WHERE category='Finance'                     → 13,340
+  //   ditto AND attributes->>website_url IS NOT NULL & non-empty        → 11,929
+  //   vc_pe_contacts                                                    → 74,269
   //   investor_grants                                                   → 3,042
-  // Forge Capital local has 13,076 (1,055 sync gap, ~8% — followed up in
-  // tracker #112). The "with_thesis" subset (8,331) is shown separately
-  // as the "synthesised" stat tile to be honest about pipeline progress.
+  // The remaining (14,395 - 13,340) gap is the correctly-excluded
+  // is_investor=0 + govt_grant rows. The "with_thesis" subset (8,327) is
+  // shown separately as the "synthesised" stat tile.
   const HARDCODED_STATS = {
-    total: 12021,
-    withWebsites: 10706,
+    total: 13340,
+    withWebsites: 11929,
     withPortfolio: 4253,
     grantsCount: 3042,
-    contactsCount: 63085,
+    contactsCount: 74269,
   }
 
   // ── Type breakdown ─────────────────────────────────────────────────────────
