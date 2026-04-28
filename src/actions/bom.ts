@@ -685,12 +685,20 @@ export async function expandBomParts(
       ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}`
       : oracleHint
 
-    // Include module context for material/process reasoning
+    // Include module context for material/process reasoning.
+    // L17-P1: include estimatedMassKg so the LLM can use the module mass
+    // budget as an upper bound for individual part masses. Without this, the
+    // BOM expander has no physical anchor and can output 430 kg for a
+    // nacelle fitting or 600 kg for a 9 m² solar laminate on a 38 kg wing.
     const moduleContext = modules.map((m) => {
       const diagInfo = diagnosticAnswers?.[m.id]
         ? ` | Diagnostics: ${JSON.stringify(diagnosticAnswers[m.id])}`
         : ""
-      return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${diagInfo}`
+      const massHint =
+        typeof m.estimatedMassKg === "number" && m.estimatedMassKg > 0
+          ? ` | Module total mass budget: ${m.estimatedMassKg} kg (sum of all parts in this module must not exceed this)`
+          : ""
+      return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${massHint}${diagInfo}`
     }).join("\n")
 
     // INTENT: Fetch real catalogue for purchased part cost grounding
@@ -716,7 +724,7 @@ For each part number in the skeleton, provide:
 - materialSpec: material specification (e.g. "6061-T6", "ABS CF", "AISI 304")
 - finish: surface finish (e.g. "Anodized", "As-printed", "Zinc plated")
 - tolerance: dimensional tolerance (e.g. "±0.1mm", "±0.5mm")
-- massKg: estimated mass in kg (>= 0)
+- massKg: estimated mass in kg (>= 0). CRITICAL (L17-P1): the module context below declares each module's total mass budget. No single part may exceed its parent module's total mass budget. A solar laminate sheet or nacelle fitting on a 38 kg wing module cannot be 430 kg or 600 kg — those are physically impossible. Cross-check your massKg estimate against the module mass budget before emitting it. Typical aerospace component masses: thin composite panel 0.5–5 kg; solar cell laminate (9 m²) 4–8 kg; small nacelle fitting 0.2–1 kg; BLDC motor 1–5 kg; avionics box 0.5–3 kg.
 - envelopeXMm, envelopeYMm, envelopeZMm: bounding envelope in mm (>= 0)
 - estimatedUnitCostGbp: unit cost in GBP (>= 0)
 - aiConfidence: 0-1 confidence in estimates
@@ -850,7 +858,7 @@ For each part number in the skeleton, provide:
 - materialSpec: material specification (e.g. "6061-T6", "ABS CF", "AISI 304")
 - finish: surface finish (e.g. "Anodized", "As-printed", "Zinc plated")
 - tolerance: dimensional tolerance (e.g. "±0.1mm", "±0.5mm")
-- massKg: estimated mass in kg (>= 0)
+- massKg: estimated mass in kg (>= 0). CRITICAL (L17-P1): the module context below declares each module's total mass budget. No single part may exceed its parent module's total mass budget. A solar laminate sheet or nacelle fitting on a 38 kg wing module cannot be 430 kg or 600 kg — those are physically impossible. Cross-check your massKg estimate against the module mass budget before emitting it. Typical aerospace component masses: thin composite panel 0.5–5 kg; solar cell laminate (9 m²) 4–8 kg; small nacelle fitting 0.2–1 kg; BLDC motor 1–5 kg; avionics box 0.5–3 kg.
 - envelopeXMm, envelopeYMm, envelopeZMm: bounding envelope in mm (>= 0)
 - estimatedUnitCostGbp: unit cost in GBP (>= 0)
 - aiConfidence: 0-1 confidence in estimates
@@ -1057,11 +1065,17 @@ export async function generateBomFromModules(
       ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}`
       : oracleHint
 
+    // L17-P1: include estimatedMassKg so the LLM can use the module mass
+    // budget as an upper bound for individual part masses.
     const moduleContext = modules.map((m) => {
       const diagInfo = diagnosticAnswers?.[m.id]
         ? ` | Diagnostics: ${JSON.stringify(diagnosticAnswers[m.id])}`
         : ""
-      return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${diagInfo}`
+      const massHint =
+        typeof m.estimatedMassKg === "number" && m.estimatedMassKg > 0
+          ? ` | Module total mass budget: ${m.estimatedMassKg} kg (sum of all parts in this module must not exceed this)`
+          : ""
+      return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${massHint}${diagInfo}`
     }).join("\n")
 
     const allKeyParts = modules.flatMap((m) => m.keyParts)
@@ -2104,11 +2118,17 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
     ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
     : ""
 
+  // L17-P1: include estimatedMassKg so the LLM can use the module mass
+  // budget as an upper bound for individual part masses.
   const moduleContext = modules.map((m) => {
     const diagInfo = diagnosticAnswers?.[m.id]
       ? ` | Diagnostics: ${JSON.stringify(diagnosticAnswers[m.id])}`
       : ""
-    return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${diagInfo}`
+    const massHint =
+      typeof m.estimatedMassKg === "number" && m.estimatedMassKg > 0
+        ? ` | Module total mass budget: ${m.estimatedMassKg} kg (sum of all parts in this module must not exceed this)`
+        : ""
+    return `- ${truncate(m.name, 100)}: ${truncate(m.purpose, 200)}${massHint}${diagInfo}`
   }).join("\n")
 
   const allKeyParts = modules.flatMap((m) => m.keyParts)
