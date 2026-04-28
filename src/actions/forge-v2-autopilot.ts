@@ -85,11 +85,14 @@ export interface AutopilotState {
  * Step names used by the cron orchestrator and the fire-endpoint route
  * /api/autopilot-step. Each maps 1:1 to a stage the cron can dispatch.
  *
+ * `lockBrief` is intentionally absent: locking_brief runs synchronously
+ * inline in the cron tick via lockBriefSynchronously() and never round-trips
+ * through the fire endpoint or STEP_TO_STAGE map.
+ *
  * Exported so the route handler can type-narrow request bodies.
  */
 export type AutopilotStepName =
     | "waitForChase"
-    | "lockBrief"
     | "waitForMax"
     | "waitForSizing"
     | "waitForLayout"

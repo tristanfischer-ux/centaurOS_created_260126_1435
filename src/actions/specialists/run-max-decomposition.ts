@@ -565,23 +565,59 @@ async function runMaxDecompositionInternal(
                     : emptyCanonicalSpecs()
                 const priorRevision = loadResult.ok ? loadResult.revision : 0
 
+                /**
+                 * Phase E (Block G coverage extension, 2026-04-28): helper
+                 * that upserts a single SPEC_KEYS key for a module if and
+                 * only if the value is a finite positive number. Captures
+                 * `specs` ledger by closure.
+                 */
+                const upsertIfPositive = (
+                    moduleId: string,
+                    moduleName: string,
+                    key: SpecKey,
+                    value: number | undefined,
+                    rationaleSuffix: string,
+                ): boolean => {
+                    if (
+                        typeof value !== "number" ||
+                        !Number.isFinite(value) ||
+                        value <= 0
+                    ) {
+                        return false
+                    }
+                    specs = upsertCanonicalSpec(specs, {
+                        moduleId,
+                        moduleName,
+                        key,
+                        value,
+                        source: "max_decomposition",
+                        rationale: `Max decomposition initial spec ${key} = ${value} ${rationaleSuffix}`,
+                    })
+                    return true
+                }
+
                 let writeCount = 0
                 for (const mod of modules) {
                     if (!mod.id) continue
-                    if (
-                        typeof mod.estimatedMassKg === "number" &&
-                        Number.isFinite(mod.estimatedMassKg) &&
-                        mod.estimatedMassKg > 0
-                    ) {
-                        specs = upsertCanonicalSpec(specs, {
-                            moduleId: mod.id,
-                            moduleName: mod.name,
-                            key: "massKg" as SpecKey,
-                            value: mod.estimatedMassKg,
-                            source: "max_decomposition",
-                            rationale: `Max decomposition initial spec massKg = ${mod.estimatedMassKg} for module ${mod.name}`,
-                        })
+                    // Mass: legacy field, coalesced into canonical massKg.
+                    if (upsertIfPositive(mod.id, mod.name, "massKg" as SpecKey, mod.estimatedMassKg, `for module ${mod.name}`)) {
                         writeCount += 1
+                    }
+                    // Phase E: full SPEC_KEYS shape.
+                    if (mod.specs) {
+                        const s = mod.specs
+                        if (upsertIfPositive(mod.id, mod.name, "powerW" as SpecKey, s.powerW, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "voltageV" as SpecKey, s.voltageV, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "currentA" as SpecKey, s.currentA, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "pressureBar" as SpecKey, s.pressureBar, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "flowLpm" as SpecKey, s.flowLpm, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "torqueNm" as SpecKey, s.torqueNm, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "energyKwh" as SpecKey, s.energyKwh, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "capacityWh" as SpecKey, s.capacityWh, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "enduranceHours" as SpecKey, s.enduranceHours, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "envelopeXMm" as SpecKey, s.envelopeXMm, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "envelopeYMm" as SpecKey, s.envelopeYMm, `for module ${mod.name}`)) writeCount += 1
+                        if (upsertIfPositive(mod.id, mod.name, "envelopeZMm" as SpecKey, s.envelopeZMm, `for module ${mod.name}`)) writeCount += 1
                     }
                     // Ensure the module entry exists even when no specs
                     // landed — this seeds the linkedPartIds slot so BOM merge's
@@ -736,6 +772,8 @@ function buildCadLabModule(
               keyParts: string[]
               leadWeeks: number
               estimatedMassKg?: number
+              /** Phase E (2026-04-28): forward Max's SPEC_KEYS-shaped specs. */
+              specs?: CadLabModule["specs"]
               description: string
               whyItMatters: string
               failureModes: string[]
@@ -786,6 +824,9 @@ function buildCadLabModule(
         status: "pending",
         ...(typeof expansion.estimatedMassKg === "number"
             ? { estimatedMassKg: expansion.estimatedMassKg }
+            : {}),
+        ...(expansion.specs && Object.keys(expansion.specs).length > 0
+            ? { specs: expansion.specs }
             : {}),
         ...(sk.mirrorOf ? { mirrorOf: sk.mirrorOf } : {}),
     }

@@ -423,6 +423,26 @@ export interface CadLabModule {
    *  spot breaches early. Optional for back-compat with modules decomposed
    *  before the 2026-04-20 Mass Budget UI shipped. */
   budgetMassKg?: number
+  /** Phase E (Block G coverage extension, 2026-04-28): structured numeric
+   *  specs aligned to canonical-ledger SPEC_KEYS. Optional and additive —
+   *  older modules without this field still work; the canonical_specs
+   *  ledger is the durable source of truth. Mass continues to flow
+   *  through estimatedMassKg above and is coalesced into specs.massKg
+   *  on the ledger side. */
+  specs?: {
+    powerW?: number
+    voltageV?: number
+    currentA?: number
+    pressureBar?: number
+    flowLpm?: number
+    torqueNm?: number
+    energyKwh?: number
+    capacityWh?: number
+    enduranceHours?: number
+    envelopeXMm?: number
+    envelopeYMm?: number
+    envelopeZMm?: number
+  }
   /** ID of the primary module this mirrors (e.g. right_leg mirrors left_leg) */
   mirrorOf?: string
   /** Technical description (1-2 paragraphs) */
@@ -591,6 +611,10 @@ export interface ModuleExpansionResult {
     keyParts: string[]
     leadWeeks: number
     estimatedMassKg?: number
+    /** Phase E (Block G coverage extension, 2026-04-28): structured
+     *  numeric specs aligned to canonical-ledger SPEC_KEYS. Each key
+     *  is optional; Max emits a value only when the design implies one. */
+    specs?: CadLabModule["specs"]
     description: string
     whyItMatters: string
     failureModes: string[]

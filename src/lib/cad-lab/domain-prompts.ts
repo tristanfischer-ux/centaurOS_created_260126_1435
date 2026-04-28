@@ -448,6 +448,20 @@ For the target module, provide detailed engineering information. Output STRICTLY
   "keyParts": ["Part 1 with spec", "Part 2 with spec", "Part 3"],
   "leadWeeks": 6,
   "estimatedMassKg": 0.5,
+  "specs": {
+    "powerW": 2000,
+    "voltageV": 48,
+    "currentA": 42,
+    "pressureBar": null,
+    "flowLpm": null,
+    "torqueNm": null,
+    "energyKwh": null,
+    "capacityWh": null,
+    "enduranceHours": null,
+    "envelopeXMm": 600,
+    "envelopeYMm": 400,
+    "envelopeZMm": 200
+  },
   "description": "1-2 paragraph technical description of what this module physically is, its operating principle, and key material choices.",
   "whyItMatters": "Why this module is critical to the overall system.",
   "failureModes": ["Failure mode 1", "Failure mode 2"],
@@ -473,6 +487,7 @@ RULES:
 - At least 3 keyParts with specific part names and specifications
 - leadWeeks should be realistic (1-2 for off-the-shelf, 4-8 for custom, 12+ for specialised)
 - estimatedMassKg: best estimate of this module's mass in kg, calibrated to the overall product size. A vacuum cleaner motor ≈ 0.3 kg, a phone screen ≈ 0.05 kg, an industrial pump casing ≈ 15 kg. Be specific to this product.
+- specs (Phase E — Block G coverage extension, 2026-04-28): emit a structured numeric spec object so the canonical ledger can be patched by Fang and reconciled against bill-of-materials parts. Every key is OPTIONAL — emit ONLY when the brief, the module's role in the system, the research report, or the keyParts list IMPLY a value. Do NOT invent unknowns; pass null (or omit the key) when the value is genuinely not yet determined. Units are fixed: powerW (watts), voltageV (volts), currentA (amps), pressureBar (bar), flowLpm (litres per minute), torqueNm (newton-metres), energyKwh (kilowatt-hours), capacityWh (watt-hours, for small batteries / capacitors), enduranceHours (hours of runtime / mission endurance), envelopeXMm / envelopeYMm / envelopeZMm (millimetres, the bounding box of the module). Numbers MUST be SI / decimal — never strings, never with unit suffix. Convention: powerW is the typical operating draw or rating (e.g. a 3 kilowatt motor → 3000); voltageV is operating bus voltage (e.g. 48 V battery → 48); pressureBar is operating pressure (e.g. hydraulic pump 200 bar → 200). Mass continues to flow through estimatedMassKg (legacy) — do NOT duplicate it inside specs. If the keyParts include a "2 kW brushless motor" then powerW MUST equal 2000 — the module description, BOM rows and specs object must agree at source. CONSISTENCY OVER COMPLETENESS: better to emit three keys that match the design than nine keys that argue with the description.
 - description should cover physical characteristics, operating principle, and material choices
 - failureModes: 2-4 realistic engineering failure modes
 - unknowns: 1-3 open questions that need resolution

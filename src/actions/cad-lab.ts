@@ -2302,6 +2302,39 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
         })
       }
     }
+    // Phase E (Block G coverage extension, 2026-04-28): extract Max's
+    // structured numeric specs into a SPEC_KEYS-shaped object. Each key is
+    // optional — keep only finite positive numbers (Max is told to emit
+    // null when the value is genuinely unknown; a model that emits 0 for
+    // "I don't know" would otherwise poison the canonical ledger with
+    // false-floor values). Negative values are dropped too (no module has
+    // negative power / voltage / pressure / dimension).
+    const specsRaw =
+      parsed.specs && typeof parsed.specs === "object" && parsed.specs !== null
+        ? (parsed.specs as Record<string, unknown>)
+        : undefined
+    const pickNum = (key: string): number | undefined => {
+      if (!specsRaw) return undefined
+      const v = specsRaw[key]
+      return typeof v === "number" && Number.isFinite(v) && v > 0 ? v : undefined
+    }
+    const specsBuilt: NonNullable<ModuleExpansionResult["expansion"]>["specs"] = specsRaw
+      ? {
+          ...(pickNum("powerW") !== undefined ? { powerW: pickNum("powerW") } : {}),
+          ...(pickNum("voltageV") !== undefined ? { voltageV: pickNum("voltageV") } : {}),
+          ...(pickNum("currentA") !== undefined ? { currentA: pickNum("currentA") } : {}),
+          ...(pickNum("pressureBar") !== undefined ? { pressureBar: pickNum("pressureBar") } : {}),
+          ...(pickNum("flowLpm") !== undefined ? { flowLpm: pickNum("flowLpm") } : {}),
+          ...(pickNum("torqueNm") !== undefined ? { torqueNm: pickNum("torqueNm") } : {}),
+          ...(pickNum("energyKwh") !== undefined ? { energyKwh: pickNum("energyKwh") } : {}),
+          ...(pickNum("capacityWh") !== undefined ? { capacityWh: pickNum("capacityWh") } : {}),
+          ...(pickNum("enduranceHours") !== undefined ? { enduranceHours: pickNum("enduranceHours") } : {}),
+          ...(pickNum("envelopeXMm") !== undefined ? { envelopeXMm: pickNum("envelopeXMm") } : {}),
+          ...(pickNum("envelopeYMm") !== undefined ? { envelopeYMm: pickNum("envelopeYMm") } : {}),
+          ...(pickNum("envelopeZMm") !== undefined ? { envelopeZMm: pickNum("envelopeZMm") } : {}),
+        }
+      : undefined
+    const specsHasKeys = specsBuilt && Object.keys(specsBuilt).length > 0
     return {
       success: true,
       moduleId: targetModuleId,
@@ -2310,6 +2343,7 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
         leadWeeks: typeof parsed.leadWeeks === "number" ? parsed.leadWeeks : 4,
         estimatedMassKg: typeof parsed.estimatedMassKg === "number" && parsed.estimatedMassKg > 0
           ? parsed.estimatedMassKg : undefined,
+        ...(specsHasKeys ? { specs: specsBuilt } : {}),
         description: String(parsed.description || ""),
         whyItMatters: String(parsed.whyItMatters || ""),
         failureModes: Array.isArray(parsed.failureModes) ? parsed.failureModes.map(String) : [],

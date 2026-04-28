@@ -277,7 +277,7 @@ async function runStep(
             const { runFangLayoutBackground } = await import(
                 "@/actions/specialists/run-fang-layout"
             )
-            const result = await runFangLayoutBackground(projectId, foundryId)
+            const result = await runFangLayoutBackground(projectId, foundryId, null)
             // Layout has the same skipped-outcome pattern as Sizing.
             if (
                 !result.ok &&
