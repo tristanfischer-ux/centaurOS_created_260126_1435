@@ -284,11 +284,17 @@ export function MobileNav({ foundryName, isSupplier }: MobileNavProps) {
             "fixed bottom-0 left-0 right-0 z-50 bg-card shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.1)] sm:hidden pb-safe px-safe transition-opacity duration-200",
             drawerOpen && "opacity-0 pointer-events-none"
         )}>
-            {/* Floating "+" FAB centered above the nav bar */}
+            {/* Floating "+" FAB centered above the nav bar.
+                2026-04-28: shrunk from h-12 w-12 to h-11 w-11 (44px = touch
+                target floor) and lifted from -top-6 to -top-7 so the FAB
+                visually floats above the nav row instead of overlapping the
+                two centre nav icons (Forge / Invest). On a 375px viewport
+                the prior 48px FAB covered ~24px of each adjacent slot,
+                shadowing the active nav icon when on /investors or /the-forge. */}
             <button
                 onClick={() => setIsQuickCaptureOpen(true)}
                 data-testid="mobile-fab"
-                className="absolute -top-6 inset-x-0 mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
+                className="absolute -top-7 inset-x-0 mx-auto flex items-center justify-center h-11 w-11 rounded-full bg-international-orange text-background shadow-lg hover:bg-international-orange-hover transition-colors active:scale-95"
                 aria-label="Capture an idea"
             >
                 <Plus className="h-5 w-5" />
