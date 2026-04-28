@@ -42,8 +42,8 @@ const nextConfig: NextConfig = {
       // bookmarks and in-app links don't 404
       { source: '/recruits', destination: '/agents', permanent: false },
       { source: '/recruits/:path*', destination: '/agents', permanent: false },
-      // /today removed 2026-04-25 — redirect to /investors (killer-feature default)
-      { source: '/today', destination: '/investors', permanent: false },
+      // /today: W38+W39 fix (2026-04-28) — page.tsx now renders TodayView,
+      // so the config-level redirect is removed. The route is live at /today.
       // /plan removed 2026-04-25 — Brainstorming (/agents) is the closest analogue
       { source: '/plan', destination: '/agents', permanent: false },
       { source: '/plan/:path*', destination: '/agents', permanent: false },
