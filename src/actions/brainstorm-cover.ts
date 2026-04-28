@@ -3,25 +3,26 @@
 /**
  * @file brainstorm-cover.ts
  *
- * @description F2 — generates a session cover image (infographic) for
- * each saved meeting_thread. Primary model: gpt-image-2 (OpenAI, best
- * text-in-image fidelity). Fallback: gemini-nano-banana
- * (gemini-2.5-flash-preview-05-20 native image generation via Google AI)
- * if the primary errors (rate limit, content policy, 5xx).
+ * @description Generates a session cover infographic for each saved
+ * meeting_thread. Rendering is done server-side via the route handler at
+ * /api/brainstorm-cover/[threadId] (next/og ImageResponse — deterministic
+ * JSX to PNG, no AI model involved). The route handler returns the PNG,
+ * uploads it to brainstorm-assets/<thread_id>/cover.png, and updates
+ * cover_image_url + cover_status='ready' in one pass.
  *
- * The resulting PNG lives at brainstorm-assets/<thread_id>/cover.png and
- * the row's cover_image_url + cover_status fields are updated when ready.
+ * Cost: effectively zero (next/og compute vs ~$0.12/image for gpt-image-2).
+ * Quality: crisp text, brand-faithful layout, no hallucination.
  *
- * Cost: ~$0.04–0.08 per image (gpt-image-2 medium @ 1024x1024);
- * ~$0.001 via Nano Banana fallback.
- * Logged to ai_usage_log under feature='brainstorm_cover' so /admin
- * telemetry surfaces per-foundry spend.
+ * WHY the route-handler approach:
+ *  - next/og ImageResponse must run in a route-handler or middleware context;
+ *    it cannot run inside a 'use server' action.
+ *  - The route URL is also reusable for live thumbnail rendering if we ever
+ *    want to expose it directly.
  *
  * @related
- * - BRAINSTORM-FEATURES-PLAN.md (Phase 2)
- * - supabase/migrations/20260428000000_brainstorm_session_assets.sql
- * - src/actions/meeting-threads.ts (refreshSessionAssetUrls signs the URL)
- * - src/app/(platform)/the-forge/services/image-generator.ts (Nano Banana pattern)
+ *  - src/app/api/brainstorm-cover/[threadId]/route.tsx (the actual renderer)
+ *  - supabase/migrations/20260428000000_brainstorm_session_assets.sql
+ *  - src/actions/meeting-threads.ts (after() hook that calls this)
  */
 
 import { revalidatePath } from 'next/cache'
@@ -29,121 +30,9 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isValidUUID } from '@/lib/security/sanitize'
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY
-const GOOGLE_AI_API_KEY = process.env.GOOGLE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()
-const OPENAI_IMAGE_URL = 'https://api.openai.com/v1/images/generations'
-const GOOGLE_AI_API_BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 const COVER_BUCKET = 'brainstorm-assets'
 
-// Primary: gpt-image-2 — best text-in-image rendering, low hallucination.
-// FIX E 2026-04-28: quality bumped from 'medium' to 'high' (~$0.12 per image)
-// for sharper editorial illustration output. Size stays 1024×1024 — gpt-image-2
-// does not accept 1792×1024 in the current API. The quality improvement is
-// worth the 2× cost given one image per saved session.
-const IMAGE_MODEL = 'gpt-image-2'
-const IMAGE_SIZE = '1024x1024'
-const IMAGE_QUALITY = 'high'
-
-// Fallback: Nano Banana stable (gemini-2.5-flash-preview-05-20 native image gen).
-// Fires only if gpt-image-2 throws (rate limit, content policy, 5xx).
-// Cost: ~$0.001/image. Same API pattern as image-generator.ts.
-const NANO_BANANA_FALLBACK_MODEL = 'gemini-2.5-flash-preview-05-20'
-
-// Per-image cost in USD for telemetry (high @ 1024x1024, gpt-image-2, FIX E)
-const COST_USD = 0.12
-
 type CoverStatus = 'pending' | 'generating' | 'ready' | 'failed'
-
-interface SpecialistEntry {
-    specialistName: string | null
-    councilPosition: string | null
-    content: string
-}
-
-/**
- * Strip prompt-injection vectors before interpolating user text into the
- * image prompt. Removes quote characters that could close our delimiters
- * and any line-break sequences that could be used to inject a new
- * instruction line. Caps length defensively. Caught by Gemini 2.5
- * Pro Phase 2 review (specialistName + topic were unsanitised).
- */
-function sanitiseForPrompt(input: string, maxLen: number): string {
-    return input
-        .replace(/[\r\n]+/g, ' ')
-        .replace(/[“””'`]/g, '')
-        .replace(/\s+/g, ' ')
-        .trim()
-        .slice(0, maxLen)
-}
-
-/**
- * Build an editorial hero illustration prompt from the session content.
- *
- * FIX E 2026-04-28 — Design philosophy shift:
- *   BEFORE: Gave the model a menu of 6 fixed metaphors (diverging paths,
- *     balance scale, gauge cluster…) — model always picked one of the stock
- *     options, producing generic stock-illustration results.
- *   AFTER: Pass the actual question + verbatim specialist excerpts (first
- *     200 chars each, up to 3 specialists) and ask the model to illustrate
- *     the REAL-WORLD BUSINESS SITUATION described. Explicitly forbid the
- *     stock metaphor list and generic abstractions. Brief in the style of
- *     an instruction to a human editorial illustrator.
- *
- * Style reference: New York Times opinion-page art / The Economist long-form
- * headers — flat editorial vector, coherent single scene depicting the actual
- * subject matter (not abstract geometry).
- *
- * @param topic — the founder's question
- * @param entries — specialist entries; we use first 200 chars of up to 3
- */
-function buildPrompt(topic: string, entries: SpecialistEntry[]): string {
-    const safeTopic = sanitiseForPrompt(topic, 250)
-
-    // Extract up to 3 verbatim specialist excerpts (first 200 chars each).
-    // Passing real content lets the model build a concrete scene rather than
-    // falling back to an abstract metaphor.
-    const reactors = entries.filter(
-        (e) =>
-            !e.councilPosition?.toLowerCase().includes('open') &&
-            !e.councilPosition?.toLowerCase().includes('close'),
-    )
-    const excerpts = reactors
-        .slice(0, 3)
-        .map((e) => {
-            const text = sanitiseForPrompt(e.content ?? '', 200)
-            const name = e.specialistName ? sanitiseForPrompt(e.specialistName, 30) : null
-            return name ? `${name}: ${text}` : text
-        })
-        .filter(Boolean)
-
-    // Build a brief that reads like an instruction to a human editorial illustrator.
-    // The key difference from the previous prompt: NO metaphor menu, NO “choose from”
-    // list. The model must derive the scene from the actual content.
-    const excerptBlock = excerpts.length > 0
-        ? `What the advisors are weighing: ${excerpts.join(' | ')}`
-        : ''
-
-    return [
-        'Create a single editorial illustration for this hardware-startup business discussion.',
-        `The founder is asking: ${safeTopic}.`,
-        excerptBlock,
-        '',
-        'Style: flat editorial vector illustration in the spirit of New York Times opinion-page art',
-        'or The Economist long-form header. Depict the ACTUAL REAL-WORLD SUBJECT of this discussion',
-        '— show the concrete subjects involved (e.g. for a US expansion question: a UK port and',
-        'a US port with a container ship; for a fundraising question: an investor office, a pitch',
-        'deck, a founder at a table; for a supply-chain question: factories, containers, a map).',
-        'Do NOT illustrate abstract metaphors — NO balance scales, NO diverging arrows, NO gauge',
-        'clusters, NO gears, NO neural networks, NO light bulbs, NO magnifying glasses.',
-        'Single coherent scene. Flat vector. Bright optimistic palette: International Orange',
-        '#ff4500 as the primary accent colour, off-white background (#fff7ef), slate blue and',
-        'warm stone as secondary tones. No dark backgrounds. No text in the image. No human',
-        'faces (use silhouettes if people are needed). No robots, no brain icons. No watermarks.',
-        'Generous whitespace. Optimistic, forward-looking mood.',
-    ]
-        .filter(Boolean)
-        .join(' ')
-}
 
 /**
  * Persist a status change to meeting_threads.cover_status.
@@ -162,33 +51,25 @@ async function setCoverStatus(
 }
 
 /**
- * Log the spend so /admin telemetry can see per-foundry cover-image cost.
- * @param model — the model that actually produced the image (may differ
- *   from IMAGE_MODEL when Nano Banana fallback fires)
+ * Log spend to ai_usage_log so /admin telemetry keeps working.
+ * Cost is $0 for next/og renders — recorded for completeness.
  */
 async function logUsage(
     threadId: string,
     foundryId: string,
     userId: string,
     success: boolean,
-    model: string = IMAGE_MODEL,
 ): Promise<void> {
     try {
         const admin = createAdminClient()
-        // Cost is approximate: gpt-image-2 medium ~$0.06, Nano Banana ~$0.001
-        const costUsd = success
-            ? model === NANO_BANANA_FALLBACK_MODEL
-                ? 0.001
-                : COST_USD
-            : 0
         await admin.from('ai_usage_log').insert({
             user_id: userId,
             foundry_id: foundryId,
             feature: 'brainstorm_cover',
-            model,
+            model: 'next/og',
             input_tokens: 0,
             output_tokens: 0,
-            cost_usd: costUsd,
+            cost_usd: 0,
             metadata: { thread_id: threadId, success },
         })
     } catch (err) {
@@ -197,21 +78,22 @@ async function logUsage(
 }
 
 /**
- * Generate a cover image for a meeting thread.
+ * Generate a cover infographic for a meeting thread.
  *
- * @description Call this from a Vercel after() block in saveMeetingThread
- * (or the wrap-up flow). It will:
- *  1. mark cover_status = 'generating'
- *  2. fetch topic + first entries from the DB
- *  3. call gpt-image-2 with the assembled prompt
- *  4. upload PNG to brainstorm-assets/<threadId>/cover.png
- *  5. mark cover_status = 'ready' + cover_image_url = the storage path
- *  6. log usage to ai_usage_log
+ * @description Call from a Vercel after() block in saveMeetingThread or the
+ * wrap-up flow. This function:
+ *  1. Auth-gates the call (caller must be authenticated and own the thread).
+ *  2. Atomically claims the generation slot (pending|failed → generating).
+ *  3. Calls the /api/brainstorm-cover/[threadId] route handler server-to-server,
+ *     which renders the PNG via next/og, uploads it, and updates the DB row.
+ *  4. Falls back to marking cover_status='failed' on any error.
  *
- * On any failure, marks status='failed' and returns false. Never throws.
+ * The route handler handles the actual rendering + DB write, so if the
+ * route call succeeds the row is already updated to 'ready'. This wrapper
+ * handles the atomic claim and error recovery.
  *
  * @param threadId — UUID of the meeting_thread to cover
- * @returns true on success, false on any failure (status persisted)
+ * @returns { ok: boolean; error: string | null }
  */
 export async function generateSessionInfographic(
     threadId: string,
@@ -219,51 +101,40 @@ export async function generateSessionInfographic(
     if (!isValidUUID(threadId)) {
         return { ok: false, error: 'Invalid thread id' }
     }
-    if (!OPENAI_API_KEY) {
-        console.error('[BrainstormCover] OPENAI_API_KEY missing')
-        return { ok: false, error: 'OPENAI_API_KEY not configured' }
-    }
 
-    // SECURITY: this is a `'use server'` exported action and is therefore
-    // reachable as a public RPC by any authenticated user. Without an
-    // auth check, a malicious caller could spam arbitrary threadIds and
-    // (a) leak meeting content to OpenAI, (b) bill another foundry's
-    // budget. Caught by the final-pass Gemini 2.5 Pro review (P0).
-    //
-    // Gate: caller must be authenticated AND able to SELECT the thread
-    // through their RLS-scoped client. The server-action entry path
-    // (createMeetingThread → after()) already runs in the original user
-    // context, so this passes naturally there.
+    // SECURITY: caller must be authenticated and able to SELECT the thread
+    // via RLS. Without this, any authenticated user could trigger infographic
+    // generation for arbitrary threadIds.
     const userClient = await createClient()
     const {
         data: { user },
     } = await userClient.auth.getUser()
+
     if (!user) {
         return { ok: false, error: 'Not authenticated' }
     }
+
     const { data: gateRow, error: gateErr } = await userClient
         .from('meeting_threads')
         .select('id')
         .eq('id', threadId)
         .single()
+
     if (gateErr || !gateRow) {
         return { ok: false, error: 'Not authorised' }
     }
 
     const admin = createAdminClient()
 
-    // 1. Atomically claim the generation slot — single conditional UPDATE
-    // that flips cover_status='pending'|'failed' to 'generating' and
-    // returns the row in one round-trip. If 0 rows were updated, another
-    // worker (or a previous successful run) already owns this slot.
-    // Caught by OpenRouter Gemini 2.5 Pro review of Phase 2 — TOCTOU
-    // window between SELECT and UPDATE could double-bill OpenAI.
+    // Atomically claim the generation slot. Flip cover_status from
+    // 'pending'|'failed' to 'generating' and return the row in one round-trip.
+    // If 0 rows were updated, another worker already owns this slot.
     const { data: claimed, error: claimErr } = await admin
         .from('meeting_threads')
         .update({ cover_status: 'generating' })
         .eq('id', threadId)
         .in('cover_status', ['pending', 'failed'])
-        .select('id, topic, foundry_id, author_user_id')
+        .select('id, foundry_id, author_user_id')
         .maybeSingle()
 
     if (claimErr) {
@@ -276,187 +147,80 @@ export async function generateSessionInfographic(
         return { ok: true, error: null }
     }
 
-    const thread = claimed
+    const foundryId = (claimed as { foundry_id: string }).foundry_id
+    const authorUserId = (claimed as { author_user_id: string }).author_user_id
 
-    const { data: entries } = await admin
-        .from('meeting_entries')
-        .select('specialist_name, council_position, content')
-        .eq('thread_id', threadId)
-        .eq('role', 'specialist')
-        .order('created_at', { ascending: true })
-        .limit(5)
-
-    const specialistEntries: SpecialistEntry[] = ((entries ?? []) as Array<Record<string, unknown>>).map((e) => ({
-        specialistName: (e.specialist_name as string) ?? null,
-        councilPosition: (e.council_position as string) ?? null,
-        content: (e.content as string) ?? '',
-    }))
-
-    if (specialistEntries.length === 0) {
-        // No content — mark as failed so the row reaches a terminal state
-        // instead of sitting in 'generating' forever. Caught by Gemini 2.5
-        // Pro review (Vercel after() has no built-in retry; "will retry on
-        // next save" was wishful thinking).
-        await setCoverStatus(threadId, 'failed')
-        return { ok: false, error: 'No specialist entries' }
-    }
-
-    // Already in 'generating' state from the atomic claim above.
-    const prompt = buildPrompt((thread as { topic: string }).topic, specialistEntries)
-    const foundryId = (thread as { foundry_id: string }).foundry_id
-    const authorUserId = (thread as { author_user_id: string }).author_user_id
+    const startedAt = Date.now()
 
     try {
-        const startedAt = Date.now()
+        // Call the route handler server-to-server. The route handler:
+        //  - Renders the infographic JSX via next/og
+        //  - Uploads the PNG to brainstorm-assets/<threadId>/cover.png
+        //  - Updates cover_image_url + cover_status='ready' in the DB
+        //
+        // We need to call this as an authenticated request so the route's
+        // own auth check passes. We do this by making an internal fetch
+        // with the user's cookie header forwarded.
+        //
+        // IMPORTANT: this only works in a Node.js runtime context (not edge).
+        // The 'use server' action runs on Node.js, so this is fine.
 
-        // ── Step 1: Attempt gpt-image-2 (primary) ────────────────────────
-        let pngBuffer: Buffer | null = null
-        let modelUsed = IMAGE_MODEL
+        // Determine the base URL — use VERCEL_URL in production/preview,
+        // localhost in development.
+        const baseUrl = process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : process.env.NEXT_PUBLIC_SITE_URL
+            ?? 'http://localhost:3000'
 
-        if (OPENAI_API_KEY) {
-            try {
-                const resp = await fetch(OPENAI_IMAGE_URL, {
-                    method: 'POST',
-                    headers: {
-                        Authorization: `Bearer ${OPENAI_API_KEY}`,
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({
-                        model: IMAGE_MODEL,
-                        prompt,
-                        size: IMAGE_SIZE,
-                        quality: IMAGE_QUALITY,
-                        n: 1,
-                    }),
-                    // 120s budget — gpt-image-2 medium typically returns in 15-30s
-                    signal: AbortSignal.timeout(120_000),
-                })
+        // Forward the caller's cookies so the route handler's auth check passes.
+        // In Next.js server actions the 'next/headers' cookies() helper is available.
+        const { cookies } = await import('next/headers')
+        const cookieStore = await cookies()
+        const cookieHeader = cookieStore
+            .getAll()
+            .map((c) => `${c.name}=${c.value}`)
+            .join('; ')
 
-                if (resp.ok) {
-                    const json = (await resp.json()) as {
-                        data?: Array<{ b64_json?: string; url?: string }>
-                    }
-                    const b64 = json.data?.[0]?.b64_json
-                    const directUrl = json.data?.[0]?.url
+        const coverUrl = `${baseUrl}/api/brainstorm-cover/${threadId}`
 
-                    if (b64) {
-                        pngBuffer = Buffer.from(b64, 'base64')
-                    } else if (directUrl) {
-                        // gpt-image-2 sometimes returns URL only — fetch the bytes
-                        const imgResp = await fetch(directUrl, { signal: AbortSignal.timeout(30_000) })
-                        if (imgResp.ok) {
-                            pngBuffer = Buffer.from(new Uint8Array(await imgResp.arrayBuffer()))
-                        }
-                    }
-                } else {
-                    const errBody = await resp.text().catch(() => '')
-                    console.warn('[BrainstormCover] gpt-image-2 non-ok, will try Nano Banana fallback:', {
-                        threadId,
-                        status: resp.status,
-                        body: errBody.slice(0, 300),
-                    })
-                }
-            } catch (primaryErr) {
-                console.warn('[BrainstormCover] gpt-image-2 threw, will try Nano Banana fallback:', {
-                    threadId,
-                    error: primaryErr instanceof Error ? primaryErr.message : String(primaryErr),
-                })
-            }
-        } else {
-            console.warn('[BrainstormCover] OPENAI_API_KEY missing — skipping primary, trying Nano Banana')
-        }
+        const resp = await fetch(coverUrl, {
+            method: 'GET',
+            headers: {
+                Cookie: cookieHeader,
+                Accept: 'image/png',
+            },
+            // 30-second timeout — next/og rendering is fast
+            signal: AbortSignal.timeout(30_000),
+        })
 
-        // ── Step 2: Nano Banana fallback (gemini-2.5-flash-preview-05-20) ─
-        // Fires when gpt-image-2 is unavailable, errors, or returns no image.
-        if (!pngBuffer && GOOGLE_AI_API_KEY) {
-            console.info('[BrainstormCover] Trying Nano Banana fallback:', { threadId, model: NANO_BANANA_FALLBACK_MODEL })
-            const url = `${GOOGLE_AI_API_BASE}/${NANO_BANANA_FALLBACK_MODEL}:generateContent`
-
-            const body = {
-                contents: [{ parts: [{ text: prompt }] }],
-                generationConfig: {
-                    responseModalities: ['TEXT', 'IMAGE'],
-                },
-            }
-
-            const nanoBananaResp = await fetch(url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'x-goog-api-key': GOOGLE_AI_API_KEY,
-                },
-                body: JSON.stringify(body),
-                signal: AbortSignal.timeout(90_000),
+        if (!resp.ok) {
+            const errBody = await resp.text().catch(() => '')
+            console.error('[BrainstormCover] Route handler returned non-ok:', {
+                threadId,
+                status: resp.status,
+                body: errBody.slice(0, 300),
             })
-
-            if (nanoBananaResp.ok) {
-                type GeminiPart = { text?: string; inlineData?: { mimeType: string; data: string } }
-                const nanoBananaJson = (await nanoBananaResp.json()) as {
-                    candidates?: Array<{ content?: { parts?: GeminiPart[] } }>
-                }
-                const parts = nanoBananaJson.candidates?.[0]?.content?.parts
-                const imagePart = parts?.find((p) => p.inlineData?.data)
-                if (imagePart?.inlineData?.data) {
-                    pngBuffer = Buffer.from(imagePart.inlineData.data, 'base64')
-                    modelUsed = NANO_BANANA_FALLBACK_MODEL
-                    console.info('[BrainstormCover] Nano Banana fallback succeeded:', { threadId })
-                }
-            } else {
-                const errBody = await nanoBananaResp.text().catch(() => '')
-                console.error('[BrainstormCover] Nano Banana fallback error:', {
-                    threadId,
-                    status: nanoBananaResp.status,
-                    body: errBody.slice(0, 300),
-                })
-            }
-        }
-
-        if (!pngBuffer) {
-            console.error('[BrainstormCover] Both primary (gpt-image-2) and fallback (Nano Banana) produced no image:', { threadId })
             await setCoverStatus(threadId, 'failed')
             await logUsage(threadId, foundryId, authorUserId, false)
-            return { ok: false, error: 'No image produced by any model' }
+            return { ok: false, error: `Route handler ${resp.status}: ${errBody.slice(0, 100)}` }
         }
 
-        // ── Step 3: Upload to Supabase Storage ────────────────────────────
-        const storagePath = `${threadId}/cover.png`
-        const { error: uploadErr } = await admin.storage
-            .from(COVER_BUCKET)
-            .upload(storagePath, pngBuffer, {
-                contentType: 'image/png',
-                upsert: true,
-                cacheControl: '3600',
-            })
+        // The route handler already set cover_status='ready' and cover_image_url.
+        // We just need to log and revalidate.
 
-        if (uploadErr) {
-            console.error('[BrainstormCover] Storage upload failed:', { threadId, err: uploadErr.message })
-            await setCoverStatus(threadId, 'failed')
-            await logUsage(threadId, foundryId, authorUserId, false)
-            return { ok: false, error: 'Storage upload failed' }
-        }
-
-        // We persist the storage PATH (not a signed URL) — listMeetingThreads
-        // re-signs in batch on every read so URLs never go stale.
-        await setCoverStatus(threadId, 'ready', storagePath)
-
-        // W72: revalidate /agents so the saved-session card picks up the new
-        // cover image without a manual page refresh. Addresses the
-        // question-mark placeholder that persists until the user reloads.
         try {
             revalidatePath('/agents')
         } catch {
             // revalidatePath only works inside a Next.js render context;
             // when called from a Vercel after() block it may no-op silently.
-            // Non-fatal — the user will see the image on the next natural load.
         }
 
-        await logUsage(threadId, foundryId, authorUserId, true, modelUsed)
+        await logUsage(threadId, foundryId, authorUserId, true)
 
         console.info('[BrainstormCover] Cover generated:', {
             threadId,
-            modelUsed,
+            renderer: 'next/og',
             ms: Date.now() - startedAt,
-            sizeKb: Math.round(pngBuffer.length / 1024),
         })
 
         return { ok: true, error: null }
@@ -467,4 +231,30 @@ export async function generateSessionInfographic(
         await logUsage(threadId, foundryId, authorUserId, false)
         return { ok: false, error: message }
     }
+}
+
+/**
+ * Expose a thin `regenerateMeetingCover` action so the existing "Retry"
+ * button in MeetingCard keeps working unchanged. It resets the status to
+ * 'pending' (handled by resetCoverForRetry in meeting-threads.ts) then
+ * calls generateSessionInfographic. The Retry button already calls
+ * resetCoverForRetry + generateSessionInfographic in sequence, so this
+ * named export is provided for any future callers that want a single call.
+ *
+ * @param threadId — UUID of the meeting_thread to regenerate
+ */
+export async function regenerateMeetingCover(
+    threadId: string,
+): Promise<{ ok: boolean; error: string | null }> {
+    if (!isValidUUID(threadId)) {
+        return { ok: false, error: 'Invalid thread id' }
+    }
+    // Reset status so the atomic claim in generateSessionInfographic can fire
+    const admin = createAdminClient()
+    await admin
+        .from('meeting_threads')
+        .update({ cover_status: 'pending' })
+        .eq('id', threadId)
+
+    return generateSessionInfographic(threadId)
 }
