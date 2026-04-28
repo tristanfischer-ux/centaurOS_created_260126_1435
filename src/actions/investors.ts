@@ -2087,10 +2087,17 @@ export interface FirmMatchResult {
  * Computes match scores for a set of investor firms against the current user's profile.
  *
  * @param firmIds - Array of listing IDs to score. Max 200 per call.
+ * @param similarities - Optional map of listing ID → cosine similarity from a
+ *   prior `searchInvestors` call. Without this the thesis pillar bottoms out
+ *   at 0 for free-text queries (no structured `profile.sector`), which made
+ *   composites display as ~50% even on strong semantic matches. Pass the
+ *   similarities you already received from the search response. Fixed
+ *   2026-04-27.
  * @returns Record mapping listing ID to { score, pillars }.
  */
 export async function computeMatchScores(
-  firmIds: string[]
+  firmIds: string[],
+  similarities?: Record<string, number>
 ): Promise<Record<string, FirmMatchResult>> {
   const profile = await getFoundryProfile()
   if (!profile) return {}
@@ -2111,7 +2118,8 @@ export async function computeMatchScores(
   const result: Record<string, FirmMatchResult> = {}
   for (const row of data) {
     const firm = rowToFirm(row as Record<string, unknown>)
-    const breakdown = calculateMatchScore(firm, profile)
+    const sim = similarities?.[firm.id]
+    const breakdown = calculateMatchScore(firm, profile, sim)
     result[firm.id] = { score: breakdown.total, pillars: breakdown.pillars }
   }
   return result

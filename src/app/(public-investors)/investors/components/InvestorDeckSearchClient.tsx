@@ -232,10 +232,19 @@ export function InvestorDeckSearchClient({
           toast.info('No matching investors found. Try a broader description.')
         }
         // Fire-and-forget: score all returned firms and store { score, pillars }
-        // so each card can render the 6-pillar breakdown.
+        // so each card can render the 6-pillar breakdown. Pass the cosine
+        // similarities the search already computed — without them the thesis
+        // pillar bottoms out at 0 for free-text queries (no structured
+        // profile.sector), which displays as a ~50% composite even on strong
+        // semantic matches. Fixed 2026-04-27.
         if (result.firms.length > 0) {
           const ids = result.firms.map(f => f.id)
-          computeMatchScores(ids)
+          const sims: Record<string, number> = {}
+          for (const f of result.firms) {
+            const s = (f.attributes as Record<string, unknown>)?._similarity
+            if (typeof s === 'number') sims[f.id] = s
+          }
+          computeMatchScores(ids, sims)
             .then(scores => setMatchScores(prev => ({ ...prev, ...scores })))
             .catch(() => { /* non-critical — cards show without bars */ })
         }

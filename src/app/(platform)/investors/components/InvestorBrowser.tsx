@@ -317,10 +317,17 @@ export function InvestorBrowser({
         setPage(1)
         // Clear compare selection — old IDs may not be in new results
         setCompareIds([])
-        // Compute match scores + contact counts for new firms
+        // Compute match scores + contact counts for new firms. Pass cosine
+        // similarities along so the thesis pillar reflects semantic search
+        // signal for free-text queries (fixed 2026-04-27).
         if (result.firms.length > 0) {
           const ids = result.firms.map(f => f.id)
-          computeMatchScores(ids)
+          const sims: Record<string, number> = {}
+          for (const f of result.firms) {
+            const s = (f.attributes as Record<string, unknown>)?._similarity
+            if (typeof s === 'number') sims[f.id] = s
+          }
+          computeMatchScores(ids, sims)
             .then(scores => setMatchScores(prev => ({
               ...prev,
               ...Object.fromEntries(Object.entries(scores).map(([k, v]) => [k, v.score])),
@@ -393,9 +400,16 @@ export function InvestorBrowser({
       setHasMore(result.hasMore)
       setPage(nextPage)
 
-      // Compute match scores for new firms
+      // Compute match scores for new firms. Pass cosine similarities through
+      // so the thesis pillar reflects semantic search signal (fixed 2026-04-27).
       if (newFirmIds.length > 0) {
-        computeMatchScores(newFirmIds)
+        const sims: Record<string, number> = {}
+        for (const f of result.firms) {
+          if (!newFirmIds.includes(f.id)) continue
+          const s = (f.attributes as Record<string, unknown>)?._similarity
+          if (typeof s === 'number') sims[f.id] = s
+        }
+        computeMatchScores(newFirmIds, sims)
           .then(scores => setMatchScores(prev => ({
             ...prev,
             ...Object.fromEntries(Object.entries(scores).map(([k, v]) => [k, v.score])),

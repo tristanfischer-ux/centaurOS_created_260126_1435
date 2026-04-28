@@ -97,10 +97,18 @@ const TYPICAL_RAISE: Record<string, { min: number; max: number }> = {
 
 /**
  * Calculates a deterministic 0–100 match score for an investor against a user profile.
+ *
+ * @param similarity Optional cosine similarity (0-1) from pgvector. When the
+ *   user typed a free-text query, structured fields like `profile.sector` are
+ *   often empty, leaving `sectorScore = 0` and `thesisBonus = 0` — which sets
+ *   the displayed thesis pillar to 0 even when semantic search ranked the row
+ *   highly. Passing similarity here lets the thesis pillar fall back to the
+ *   cosine signal so the user sees a meaningful match %. Fixed 2026-04-27.
  */
 export function calculateMatchScore(
   firm: InvestorFirm,
-  profile: FoundryProfile
+  profile: FoundryProfile,
+  similarity?: number
 ): MatchBreakdown {
   const attrs = firm.attributes
   const topFactors: string[] = []
@@ -225,7 +233,18 @@ export function calculateMatchScore(
 
   // ── 6-pillar breakdown (dashboard parity, Forge-Capital-Dashboard.html:1172-1237)
   //    Each pillar is 0-100. Map internal 8-factor points to the pillar scale.
-  const thesisPillar = Math.min(100, (sectorScore / 25) * 70 + (thesisBonus / 10) * 30)
+  // INTENT: Free-text queries (no structured profile.sector / profile.industry)
+  // historically left `sectorScore = 0` and `thesisBonus = 0`, dragging the
+  // thesis pillar to 0 and the composite match % to ~50% — even when pgvector
+  // had ranked the row in the top-200 by cosine similarity. Fall back to the
+  // cosine score (scaled 0-100) when the structured signal is empty so the
+  // user sees a meaningful thesis %. The MAX of the two means structured
+  // matches don't get worse — they only ever exceed the cosine fallback.
+  const structuredThesis = (sectorScore / 25) * 70 + (thesisBonus / 10) * 30
+  const cosineThesis = (typeof similarity === 'number' && similarity > 0)
+    ? Math.min(100, similarity * 100)
+    : 0
+  const thesisPillar = Math.min(100, Math.max(structuredThesis, cosineThesis))
   const stagePillar = (stageScore / 25) * 100
   const geoPillar = (geoScore / 5) * 100
   const chequePillar = (chequeScore / 15) * 100
