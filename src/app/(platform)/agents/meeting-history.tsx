@@ -19,7 +19,7 @@
  * - specialists-landing.tsx -- Parent integration
  */
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -27,19 +27,35 @@ import { Badge } from "@/components/ui/badge"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Input } from "@/components/ui/input"
 import {
-    Users,
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog"
+import {
     Calendar,
     ChevronDown,
     ChevronUp,
-    ArrowRight,
     MessageSquare,
     Search,
     GitBranch,
     ExternalLink,
+    Pin,
+    PinOff,
+    Trash2,
+    AudioLines,
+    ImageIcon,
+    Sparkles,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
-import { listMeetingThreads } from "@/actions/meeting-threads"
+import {
+    listMeetingThreads,
+    deleteMeetingThread,
+    togglePinMeetingThread,
+} from "@/actions/meeting-threads"
 import { getMeetingHistory } from "@/actions/agent-artifacts"
 import type { MeetingThreadSummary } from "@/actions/meeting-threads"
 import type { MeetingHistoryItem } from "@/actions/agent-artifacts"
@@ -73,6 +89,13 @@ function legacyToSummary(item: MeetingHistoryItem): MeetingThreadSummary {
         entryCount: item.roundCount,
         parentThreadId: null,
         createdAt: item.createdAt,
+        // F1 / F2 / F3 fields don't exist on legacy artifacts
+        isPinned: false,
+        pinnedAt: null,
+        coverImageUrl: null,
+        coverStatus: 'pending',
+        audioStatus: 'pending',
+        audioClipsCount: 0,
     }
 }
 
@@ -128,20 +151,107 @@ function FilterChips({ dateRange, onDateRange, branchedOnly, onBranchedOnly }: F
 
 interface MeetingCardProps {
     meeting: MeetingThreadSummary
+    onPinToggle: (id: string, pinned: boolean) => void
+    onRequestDelete: (m: MeetingThreadSummary) => void
+    isMutating?: boolean
 }
 
-function MeetingCard({ meeting }: MeetingCardProps) {
+function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: MeetingCardProps) {
     const hasPermalink = !meeting.id.startsWith("legacy-")
     const tierLabel = TIER_LABELS[meeting.councilTier] ?? meeting.councilTier
+    const canMutate = hasPermalink
 
     return (
         <Card
             className={cn(
-                "border rounded-xl",
+                "border rounded-xl group relative overflow-hidden",
                 "transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5",
+                meeting.isPinned && "border-international-orange/40 bg-international-orange/[0.02]",
             )}
         >
-            <CardContent className="pt-5 space-y-3">
+            {/* Cover image / placeholder strip — F2 thumbnail surface */}
+            <div className="relative h-32 w-full bg-gradient-to-br from-electric-blue/5 via-international-orange/5 to-electric-blue/5 border-b border-border">
+                {meeting.coverImageUrl && meeting.coverStatus === "ready" ? (
+                    // Use a plain <img> for signed Supabase URLs — next/image
+                    // requires the host in remotePatterns, and signed URLs
+                    // include query params next/image rejects without config.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                        src={meeting.coverImageUrl}
+                        alt={`Cover for: ${meeting.topic}`}
+                        className="absolute inset-0 h-full w-full object-cover"
+                        loading="lazy"
+                    />
+                ) : meeting.coverStatus === "generating" || meeting.coverStatus === "pending" ? (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+                        <Sparkles className="h-5 w-5 text-electric-blue/60 animate-pulse" />
+                        <span className="text-[10px] text-muted-foreground">
+                            {meeting.coverStatus === "generating"
+                                ? "Generating cover image…"
+                                : "Cover image queued"}
+                        </span>
+                    </div>
+                ) : (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
+                        <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
+                        <span className="text-[10px] text-muted-foreground/60">
+                            No cover image
+                        </span>
+                    </div>
+                )}
+
+                {/* Pin / delete affordances — surfaced on hover, always accessible via keyboard */}
+                {canMutate && (
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                        <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-7 w-7 bg-background/95 hover:bg-background shadow-sm"
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onPinToggle(meeting.id, !meeting.isPinned)
+                            }}
+                            disabled={isMutating}
+                            aria-label={meeting.isPinned ? "Unpin session" : "Pin session"}
+                            title={meeting.isPinned ? "Unpin" : "Pin to top"}
+                        >
+                            {meeting.isPinned ? (
+                                <PinOff className="h-3.5 w-3.5 text-international-orange" />
+                            ) : (
+                                <Pin className="h-3.5 w-3.5" />
+                            )}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-7 w-7 bg-background/95 hover:bg-destructive hover:text-destructive-foreground shadow-sm"
+                            onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                onRequestDelete(meeting)
+                            }}
+                            disabled={isMutating}
+                            aria-label="Delete session"
+                            title="Delete session"
+                        >
+                            <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                    </div>
+                )}
+
+                {meeting.isPinned && (
+                    <Badge
+                        variant="default"
+                        className="absolute top-2 left-2 bg-international-orange text-white text-[9px] px-1.5 py-0 gap-1"
+                    >
+                        <Pin className="h-2.5 w-2.5" />
+                        Pinned
+                    </Badge>
+                )}
+            </div>
+
+            <CardContent className="pt-4 space-y-3">
                 {/* Topic */}
                 <h4 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
                     {meeting.topic}
@@ -173,6 +283,18 @@ function MeetingCard({ meeting }: MeetingCardProps) {
                             Branch
                         </span>
                     )}
+                    {meeting.audioStatus === "ready" && meeting.audioClipsCount > 0 && (
+                        <span className="flex items-center gap-1 text-electric-blue">
+                            <AudioLines className="h-3 w-3" />
+                            Audio
+                        </span>
+                    )}
+                    {meeting.audioStatus === "generating" && (
+                        <span className="flex items-center gap-1 text-muted-foreground">
+                            <AudioLines className="h-3 w-3 animate-pulse" />
+                            Generating audio…
+                        </span>
+                    )}
                     <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
                         {tierLabel}
                     </Badge>
@@ -195,6 +317,60 @@ function MeetingCard({ meeting }: MeetingCardProps) {
     )
 }
 
+// ─── Delete Confirmation Dialog ───────────────────────────────────────────────
+
+interface DeleteSessionDialogProps {
+    meeting: MeetingThreadSummary | null
+    onConfirm: () => Promise<void>
+    onCancel: () => void
+    isDeleting: boolean
+}
+
+function DeleteSessionDialog({ meeting, onConfirm, onCancel, isDeleting }: DeleteSessionDialogProps) {
+    const open = meeting !== null
+    return (
+        <Dialog
+            open={open}
+            onOpenChange={(next) => {
+                if (!next && !isDeleting) onCancel()
+            }}
+        >
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4 text-destructive" />
+                        Delete brainstorming session?
+                    </DialogTitle>
+                    <DialogDescription>
+                        This will permanently remove the session, every specialist response,
+                        the cover image, and any audio clips. This cannot be undone.
+                    </DialogDescription>
+                </DialogHeader>
+
+                {meeting && (
+                    <div className="rounded-lg border bg-muted/30 p-3 space-y-1.5">
+                        <p className="text-sm font-semibold line-clamp-2">{meeting.topic}</p>
+                        <p className="text-xs text-muted-foreground">
+                            {format(new Date(meeting.createdAt), "MMMM d, yyyy")}
+                            {meeting.entryCount > 0 && ` · ${meeting.entryCount} responses`}
+                            {meeting.audioClipsCount > 0 && ` · ${meeting.audioClipsCount} audio clips`}
+                        </p>
+                    </div>
+                )}
+
+                <DialogFooter>
+                    <Button variant="ghost" onClick={onCancel} disabled={isDeleting}>
+                        Cancel
+                    </Button>
+                    <Button variant="destructive" onClick={onConfirm} disabled={isDeleting}>
+                        {isDeleting ? "Deleting…" : "Delete session"}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 /**
@@ -214,6 +390,71 @@ export function MeetingHistory({ initialLimit = 3 }: MeetingHistoryProps) {
     const [dateRange, setDateRange] = useState<DateRangeFilter>("all")
     const [branchedOnly, setBranchedOnly] = useState(false)
     const [isFiltering, setIsFiltering] = useState(false)
+
+    // F1: pin / delete state
+    const [mutatingId, setMutatingId] = useState<string | null>(null)
+    const [pendingDelete, setPendingDelete] = useState<MeetingThreadSummary | null>(null)
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const handlePinToggle = useCallback(
+        async (id: string, pinned: boolean) => {
+            // Optimistic update
+            setMutatingId(id)
+            setMeetings((prev) => {
+                const next = prev.map((m) =>
+                    m.id === id
+                        ? { ...m, isPinned: pinned, pinnedAt: pinned ? new Date().toISOString() : null }
+                        : m,
+                )
+                // Re-sort: pinned-first, then by pinnedAt desc, then createdAt desc
+                next.sort((a, b) => {
+                    if (a.isPinned !== b.isPinned) return a.isPinned ? -1 : 1
+                    if (a.isPinned && b.isPinned) {
+                        const ap = a.pinnedAt ?? a.createdAt
+                        const bp = b.pinnedAt ?? b.createdAt
+                        return bp.localeCompare(ap)
+                    }
+                    return b.createdAt.localeCompare(a.createdAt)
+                })
+                return next
+            })
+
+            const result = await togglePinMeetingThread(id, pinned)
+            setMutatingId(null)
+            if (!result.ok) {
+                console.error("[MeetingHistory] Pin toggle failed:", result.error)
+                // Rollback on failure
+                setMeetings((prev) =>
+                    prev.map((m) => (m.id === id ? { ...m, isPinned: !pinned } : m)),
+                )
+            }
+        },
+        [],
+    )
+
+    const handleRequestDelete = useCallback((m: MeetingThreadSummary) => {
+        setPendingDelete(m)
+    }, [])
+
+    const handleCancelDelete = useCallback(() => {
+        setPendingDelete(null)
+    }, [])
+
+    const handleConfirmDelete = useCallback(async () => {
+        if (!pendingDelete) return
+        setIsDeleting(true)
+        const result = await deleteMeetingThread(pendingDelete.id)
+        setIsDeleting(false)
+        if (result.ok) {
+            setMeetings((prev) => prev.filter((m) => m.id !== pendingDelete.id))
+            setPendingDelete(null)
+        } else {
+            console.error("[MeetingHistory] Delete failed:", result.error)
+            // Keep the dialog open so the user sees the error state; surface
+            // via console for now (the action returns sanitised errors).
+            alert(result.error ?? "Failed to delete session. Please try again.")
+        }
+    }, [pendingDelete])
 
     // Initial load — try meeting_threads first, fall back to legacy artifacts
     useEffect(() => {
@@ -265,10 +506,9 @@ export function MeetingHistory({ initialLimit = 3 }: MeetingHistoryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [search, dateRange, branchedOnly])
 
-    if (!isLoading && meetings.length === 0 && !search && dateRange === "all" && !branchedOnly) {
-        return null
-    }
-
+    // F1: always render the panel — even when empty, founders need to see
+    // the affordance ("your saved sessions show up here") so the feature
+    // is discoverable. Previously this returned null and hid the section.
     const visibleMeetings = showAll ? meetings : meetings.slice(0, initialLimit)
     const hasMore = meetings.length > initialLimit
 
@@ -279,10 +519,10 @@ export function MeetingHistory({ initialLimit = 3 }: MeetingHistoryProps) {
                 <div className="h-6 w-1 rounded-full bg-electric-blue" />
                 <div className="flex-1">
                     <h3 className="text-xs font-mono uppercase tracking-widest text-foreground font-semibold">
-                        Meeting History
+                        Saved Sessions
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                        Previous team discussions and action items
+                        Pin to keep at the top. Delete to remove a session, its responses, and any generated assets.
                     </p>
                 </div>
                 {hasMore && !search && (
@@ -341,21 +581,49 @@ export function MeetingHistory({ initialLimit = 3 }: MeetingHistoryProps) {
                 </div>
             )}
 
-            {/* Empty search state */}
+            {/* Empty state — split between "no sessions yet" and "no matches" */}
             {!isLoading && !isFiltering && meetings.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                    No meetings match your search. Try a different term or filter.
-                </p>
+                <div className="rounded-xl border border-dashed border-border bg-muted/30 px-6 py-10 text-center">
+                    {search || dateRange !== "all" || branchedOnly ? (
+                        <p className="text-sm text-muted-foreground">
+                            No saved sessions match this search. Try a different term or clear the filters.
+                        </p>
+                    ) : (
+                        <div className="space-y-2">
+                            <Sparkles className="h-6 w-6 text-electric-blue/60 mx-auto" />
+                            <p className="text-sm font-medium text-foreground">
+                                Your saved brainstorms show up here
+                            </p>
+                            <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                                Run a Quick or Full Council session above. Each session is saved automatically with a generated cover image and audio recording.
+                            </p>
+                        </div>
+                    )}
+                </div>
             )}
 
             {/* Meeting Cards */}
             {!isLoading && !isFiltering && meetings.length > 0 && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {visibleMeetings.map((meeting) => (
-                        <MeetingCard key={meeting.id} meeting={meeting} />
+                        <MeetingCard
+                            key={meeting.id}
+                            meeting={meeting}
+                            onPinToggle={handlePinToggle}
+                            onRequestDelete={handleRequestDelete}
+                            isMutating={mutatingId === meeting.id}
+                        />
                     ))}
                 </div>
             )}
+
+            {/* Delete confirmation dialog */}
+            <DeleteSessionDialog
+                meeting={pendingDelete}
+                onConfirm={handleConfirmDelete}
+                onCancel={handleCancelDelete}
+                isDeleting={isDeleting}
+            />
         </div>
     )
 }

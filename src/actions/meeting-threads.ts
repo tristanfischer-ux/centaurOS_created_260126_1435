@@ -18,6 +18,7 @@
  */
 
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
 import { sanitizeErrorMessage, isValidUUID } from '@/lib/security/sanitize'
 import type { Json } from '@/types/database.types'
@@ -322,6 +323,15 @@ export interface MeetingThreadSummary {
   entryCount: number
   parentThreadId: string | null
   createdAt: string
+  /** F1: pinned-first ordering on the saved-sessions panel */
+  isPinned: boolean
+  pinnedAt: string | null
+  /** F2: signed URL for the generated cover image (null until ready) */
+  coverImageUrl: string | null
+  coverStatus: 'pending' | 'generating' | 'ready' | 'failed'
+  /** F3: audio generation status — UI shows skeleton until ready */
+  audioStatus: 'pending' | 'generating' | 'ready' | 'failed' | 'refused_too_long'
+  audioClipsCount: number
 }
 
 export interface ListMeetingThreadsInput {
@@ -362,12 +372,17 @@ export async function listMeetingThreads(
   const offset = input.offset ?? 0
 
   // Base query — fetch threads with a count of entries via a subquery join
-  // We use a raw RPC approach: fetch threads, then fetch snippet from entries
+  // F1: pinned-first ordering, then most recent. The partial index on
+  // (foundry_id, pinned_at, created_at) WHERE is_pinned = true keeps this
+  // fast even at hundreds of saved sessions.
   let query = supabase
     .from('meeting_threads')
-    .select('id, topic, council_tier, specialist_ids, parent_thread_id, created_at', {
-      count: 'exact',
-    })
+    .select(
+      'id, topic, council_tier, specialist_ids, parent_thread_id, created_at, is_pinned, pinned_at, cover_image_url, cover_status, audio_clips, audio_status',
+      { count: 'exact' },
+    )
+    .order('is_pinned', { ascending: false })
+    .order('pinned_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false })
     .range(offset, offset + limit - 1)
 
@@ -436,6 +451,7 @@ export async function listMeetingThreads(
   const summaries: MeetingThreadSummary[] = threads.map((t) => {
     const row = t as Record<string, unknown>
     const id = row.id as string
+    const audioClips = (row.audio_clips as unknown[]) ?? []
     return {
       id,
       topic: row.topic as string,
@@ -445,6 +461,12 @@ export async function listMeetingThreads(
       entryCount: countMap.get(id) ?? 0,
       parentThreadId: (row.parent_thread_id as string) ?? null,
       createdAt: row.created_at as string,
+      isPinned: (row.is_pinned as boolean) ?? false,
+      pinnedAt: (row.pinned_at as string) ?? null,
+      coverImageUrl: (row.cover_image_url as string) ?? null,
+      coverStatus: ((row.cover_status as string) ?? 'pending') as MeetingThreadSummary['coverStatus'],
+      audioStatus: ((row.audio_status as string) ?? 'pending') as MeetingThreadSummary['audioStatus'],
+      audioClipsCount: Array.isArray(audioClips) ? audioClips.length : 0,
     }
   })
 
@@ -655,4 +677,239 @@ export async function branchMeetingThread(
   })
 
   return { threadId: newThreadId, error: null }
+}
+
+// ============================================================================
+// DELETE — F1
+// ============================================================================
+
+/**
+ * Delete a meeting thread and ALL its assets.
+ *
+ * @description Cascade-deletes the meeting_entries (FK ON DELETE CASCADE),
+ * removes the storage objects under brainstorm-assets/<thread_id>/, then
+ * the thread row itself. The RLS DELETE policy
+ * (meeting_threads_delete WHERE author_user_id = auth.uid()) gates this —
+ * a non-author seeing the same row through SELECT will not be able to
+ * delete it.
+ *
+ * Storage cleanup uses the admin client because storage RLS DELETE policy
+ * is owner-scoped: server-side asset writers run as service_role, so
+ * `owner = auth.uid()` would be false. The user's identity is verified
+ * via the row-level RLS check on the meeting_threads.delete first.
+ *
+ * @param threadId — UUID of the thread to remove
+ * @returns ok flag + error string
+ * @security Verifies author via the standard authed client BEFORE any
+ *           admin-client write happens.
+ */
+export async function deleteMeetingThread(
+  threadId: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  if (!isValidUUID(threadId)) {
+    return { ok: false, error: 'Invalid thread id' }
+  }
+
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { ok: false, error: 'Not authenticated' }
+  }
+
+  // Step 1 — verify the caller authored this thread via the authed client.
+  // RLS will hide threads they don't own; SELECT here is the access check.
+  const { data: row, error: ownErr } = await supabase
+    .from('meeting_threads')
+    .select('id, author_user_id')
+    .eq('id', threadId)
+    .single()
+
+  if (ownErr || !row) {
+    return { ok: false, error: 'Thread not found' }
+  }
+
+  if ((row as { author_user_id: string }).author_user_id !== user.id) {
+    return { ok: false, error: 'Not authorised' }
+  }
+
+  // Step 2 — clean storage. Admin client because we wrote the assets as
+  // service_role and the storage owner column doesn't match the user.
+  const admin = createAdminClient()
+  try {
+    const { data: list } = await admin.storage
+      .from('brainstorm-assets')
+      .list(threadId, { limit: 1000 })
+    const { data: audioList } = await admin.storage
+      .from('brainstorm-assets')
+      .list(`${threadId}/audio`, { limit: 1000 })
+
+    const paths: string[] = []
+    for (const file of list ?? []) {
+      paths.push(`${threadId}/${file.name}`)
+    }
+    for (const file of audioList ?? []) {
+      paths.push(`${threadId}/audio/${file.name}`)
+    }
+
+    if (paths.length > 0) {
+      const { error: removeErr } = await admin.storage
+        .from('brainstorm-assets')
+        .remove(paths)
+      if (removeErr) {
+        console.error('[MeetingThreads] Storage cleanup failed:', {
+          threadId,
+          error: removeErr.message,
+        })
+        // Non-fatal — proceed to delete the row so the user's intent
+        // (gone from their list) is honoured. Cron will sweep stragglers.
+      }
+    }
+  } catch (storageErr) {
+    console.error('[MeetingThreads] Storage cleanup threw:', {
+      threadId,
+      error: storageErr instanceof Error ? storageErr.message : 'unknown',
+    })
+  }
+
+  // Step 3 — delete the row. meeting_entries cascade via FK.
+  const { error: deleteErr } = await supabase
+    .from('meeting_threads')
+    .delete()
+    .eq('id', threadId)
+
+  if (deleteErr) {
+    console.error('[MeetingThreads] Delete failed:', {
+      threadId,
+      error: deleteErr.message,
+    })
+    return { ok: false, error: sanitizeErrorMessage(deleteErr) }
+  }
+
+  console.info('[MeetingThreads] Thread deleted:', { threadId, userId: user.id })
+  return { ok: true, error: null }
+}
+
+// ============================================================================
+// PIN / UNPIN — F1
+// ============================================================================
+
+/**
+ * Toggle the pinned state of a meeting thread.
+ *
+ * @description Pinned threads sort to the top of the saved-sessions panel.
+ * The trigger touch_meeting_thread_pinned_at handles the pinned_at
+ * timestamp server-side — we just flip the boolean.
+ *
+ * @param threadId — Thread to pin/unpin
+ * @param pinned — Desired state
+ * @returns ok flag + error
+ */
+export async function togglePinMeetingThread(
+  threadId: string,
+  pinned: boolean,
+): Promise<{ ok: boolean; error: string | null }> {
+  if (!isValidUUID(threadId)) {
+    return { ok: false, error: 'Invalid thread id' }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { ok: false, error: 'Not authenticated' }
+  }
+
+  const { error } = await supabase
+    .from('meeting_threads')
+    .update({ is_pinned: pinned })
+    .eq('id', threadId)
+    .eq('author_user_id', user.id)
+
+  if (error) {
+    console.error('[MeetingThreads] Pin toggle failed:', { threadId, pinned, error: error.message })
+    return { ok: false, error: sanitizeErrorMessage(error) }
+  }
+
+  return { ok: true, error: null }
+}
+
+// ============================================================================
+// SIGNED-URL REFRESH — F2 / F3
+// ============================================================================
+
+/**
+ * Refresh signed URLs for a thread's stored assets.
+ *
+ * @description Generated assets are stored privately. The cover_image_url
+ * column holds the most recent signed URL, but it expires; this action
+ * re-signs the storage path on demand for in-app render. Used by the
+ * SavedSessionCard and the meeting-detail page.
+ *
+ * @param threadId — Thread to fetch URLs for
+ * @returns Signed URLs (image + audio clip array) on success
+ */
+export async function refreshSessionAssetUrls(
+  threadId: string,
+): Promise<{
+  coverUrl: string | null
+  audioClips: Array<{ specialistId: string; voice: string; url: string; durationMs: number | null }>
+  error: string | null
+}> {
+  if (!isValidUUID(threadId)) {
+    return { coverUrl: null, audioClips: [], error: 'Invalid thread id' }
+  }
+
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+  if (!user) {
+    return { coverUrl: null, audioClips: [], error: 'Not authenticated' }
+  }
+
+  // RLS on meeting_threads enforces foundry isolation
+  const { data: row, error } = await supabase
+    .from('meeting_threads')
+    .select('cover_status, audio_clips')
+    .eq('id', threadId)
+    .single()
+
+  if (error || !row) {
+    return { coverUrl: null, audioClips: [], error: 'Thread not found' }
+  }
+
+  const admin = createAdminClient()
+  let coverUrl: string | null = null
+
+  if ((row as { cover_status: string }).cover_status === 'ready') {
+    const { data: signed } = await admin.storage
+      .from('brainstorm-assets')
+      .createSignedUrl(`${threadId}/cover.png`, 60 * 60 * 24) // 24h
+    coverUrl = signed?.signedUrl ?? null
+  }
+
+  const clipsRaw = ((row as { audio_clips: unknown }).audio_clips as Array<Record<string, unknown>>) ?? []
+  const refreshedClips: Array<{ specialistId: string; voice: string; url: string; durationMs: number | null }> = []
+
+  for (const clip of clipsRaw) {
+    const path = clip.path as string | undefined
+    if (!path) continue
+    const { data: signed } = await admin.storage
+      .from('brainstorm-assets')
+      .createSignedUrl(path, 60 * 60 * 24)
+    if (signed?.signedUrl) {
+      refreshedClips.push({
+        specialistId: (clip.specialist_id as string) ?? '',
+        voice: (clip.voice as string) ?? '',
+        url: signed.signedUrl,
+        durationMs: (clip.duration_ms as number) ?? null,
+      })
+    }
+  }
+
+  return { coverUrl, audioClips: refreshedClips, error: null }
 }
