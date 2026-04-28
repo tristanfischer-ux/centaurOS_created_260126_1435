@@ -373,10 +373,22 @@ export function SupplierSearchPanel({
         // pagination at this point. 24 was too low: founders flagged the
         // count looking suspiciously identical across very different queries
         // because the cap was pinning every result set at 24.
-        const result = await searchSuppliers({
-          query: searchQuery,
-          limit: 50,
-        })
+        // W41: wrap in try/catch so a server-action error surfaces as an
+        // empty state rather than a silent hang (Sarah: "does nothing").
+        let result: Awaited<ReturnType<typeof searchSuppliers>>
+        try {
+          result = await searchSuppliers({
+            query: searchQuery,
+            limit: 50,
+          })
+        } catch (err) {
+          console.error('[SupplierSearchPanel] Search failed:', err)
+          setResults([])
+          setDisplayCount(0)
+          setActiveQuery(searchQuery)
+          setExtractedQuery(null)
+          return
+        }
 
         // searchSuppliers returns SupplierCard[], but we need MarketplaceListing shape for the card.
         // Map SupplierCard → MarketplaceListing (best-effort — the card reads from .attributes anyway).
