@@ -17,8 +17,8 @@
 
 'use client'
 
-import { useState, useCallback, useTransition, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useCallback, useTransition, useEffect, useRef } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 import { InvestorSearchHero } from './InvestorSearchHero'
 import { DashboardMatchCards } from './DashboardMatchCards'
@@ -109,6 +109,10 @@ export function InvestorSearchHeroClient({
   const [brainstormHandoff, setBrainstormHandoff] =
     useState<{ topic: string; summary: string; createdAt: string } | null>(null)
   const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  // W45b: track whether we've already restored from URL on first mount
+  const restoredFromUrl = useRef(false)
 
   // FLOW: Keep state in sync if the parent re-renders with new server data.
   useEffect(() => {
@@ -123,6 +127,10 @@ export function InvestorSearchHeroClient({
     }
     setLastQuery(trimmed)
     setHasSearched(true)
+    // W45b: persist query to URL so back-nav restores the result list
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('q', trimmed)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     startTransition(async () => {
       try {
         // PERF: skip server-side LLM enrichment — cards load why-fit on click.
@@ -145,14 +153,34 @@ export function InvestorSearchHeroClient({
         toast.error('Search failed — please try again.')
       }
     })
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, router, searchParams])
 
   const handleCancel = useCallback(() => {
     setLastQuery('')
     setHasSearched(false)
     setFirms(initialFirms)
     setMatchOutputs(initialMatchOutputs ?? {})
-  }, [initialFirms, initialMatchOutputs])
+    // W45b: clear the URL query param so a fresh page load starts blank
+    const params = new URLSearchParams(searchParams.toString())
+    params.delete('q')
+    const qs = params.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false })
+  }, [initialFirms, initialMatchOutputs, pathname, router, searchParams])
+
+  // W45b: restore search state from URL on back-navigation. Fires once on
+  // mount when ?q= is present — re-runs the search with the stored query so
+  // the result list is exactly what the user saw before navigating away.
+  // Placed after runSearch so the callback reference is stable.
+  useEffect(() => {
+    if (restoredFromUrl.current) return
+    const q = searchParams.get('q')
+    if (q && q.trim().length >= 6 && !hasSearched) {
+      restoredFromUrl.current = true
+      runSearch(q.trim())
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — run once on mount only
 
   // INTENT: receive a brainstorming hand-off from the team-meeting dialog.
   // Sender lives in src/app/(platform)/agents/team-meeting-dialog.tsx —
