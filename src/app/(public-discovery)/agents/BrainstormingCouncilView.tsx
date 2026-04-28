@@ -332,9 +332,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     --bc-blue-soft: #eff6ff;
                     --bc-blue-dim: #bfdbfe;
                     --bc-success: #16a34a;
-                    --bc-opus: #7c3aed;
-                    --bc-opus-soft: #f3e8ff;
-                    --bc-opus-dim: #ddd6fe;
+                    --bc-opus: #ff4500;
+                    --bc-opus-soft: #fff4ee;
+                    --bc-opus-dim: #fed7aa;
                     --bc-shadow-xs: 0 1px 2px rgba(0,0,0,0.04);
                     --bc-shadow-sm: 0 2px 6px rgba(0,0,0,0.05);
                     --bc-shadow-md: 0 6px 16px rgba(0,0,0,0.07), 0 2px 4px rgba(0,0,0,0.04);
@@ -496,7 +496,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 }
                 /* ─── Fiona host card ─── */
                 .bc-fiona-card {
-                    background: linear-gradient(180deg, #faf5ff 0%, #ffffff 70%);
+                    background: linear-gradient(180deg, #fff4ee 0%, #ffffff 70%);
                     border: 1px solid var(--bc-opus-dim);
                     border-radius: 16px;
                     padding: 22px 26px;
@@ -517,7 +517,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 }
                 .bc-fiona-head .bc-avatar {
                     width: 56px; height: 56px; border-radius: 100%;
-                    background: linear-gradient(135deg, #f3e8ff 0%, #ddd6fe 100%);
+                    background: linear-gradient(135deg, #fff4ee 0%, #fed7aa 100%);
                     color: var(--bc-opus);
                     display: flex; align-items: center; justify-content: center;
                     font-weight: 800; font-size: 18px;
@@ -628,7 +628,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 .bc-av-sal   { background: #fee2e2; color: #7f1d1d; box-shadow: 0 0 0 2px #fecaca; }
                 .bc-av-max   { background: #f5f4f2; color: #44403c; box-shadow: 0 0 0 2px #d6d3d1; }
                 .bc-av-cal   { background: #f0fdf4; color: #14532d; box-shadow: 0 0 0 2px #bbf7d0; }
-                .bc-av-fiona { background: linear-gradient(135deg, #f3e8ff 0%, #ddd6fe 100%); color: #7c3aed; box-shadow: 0 0 0 2px #ddd6fe; }
+                .bc-av-fiona { background: linear-gradient(135deg, #fff4ee 0%, #fed7aa 100%); color: #ff4500; box-shadow: 0 0 0 2px #fed7aa; }
                 .bc-av-default { background: #f5f4f2; color: #44403c; box-shadow: 0 0 0 2px #d6d3d1; }
                 .bc-specialist-head .bc-sp-meta { flex: 1; min-width: 0; }
                 .bc-specialist-head .bc-name-row {
