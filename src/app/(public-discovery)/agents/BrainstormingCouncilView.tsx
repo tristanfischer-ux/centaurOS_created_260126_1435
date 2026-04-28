@@ -34,6 +34,7 @@ import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
 import { conveneCouncil } from "@/actions/brainstorming-council"
 import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council-types"
+import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
 
 // ─── Model tier → human-readable badge label ────────────────────────────────
 
@@ -1314,6 +1315,12 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     </p>
                 </div>
             )}
+
+            {/* F1 — Saved sessions panel. Lives inline on /agents per
+                Tristan's requirement ("see those saves on the same page"). */}
+            <div style={{ marginTop: "48px", paddingTop: "32px", borderTop: "1px solid var(--bc-border-soft)" }}>
+                <MeetingHistory initialLimit={6} />
+            </div>
         </div>
     )
 }
