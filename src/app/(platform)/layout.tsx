@@ -16,7 +16,7 @@ import { InvestorMatchPrewarmer } from "@/components/investor-match-prewarmer";
 import { Suspense } from "react";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PresenceProvider } from "@/components/PresenceProvider";
-import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider";
+import { ZoomProvider } from "@/components/ZoomProvider";
 import { MainContentArea } from "@/components/MainContentArea";
 import { ScreenContextProvider } from "@/contexts/screen-context";
 import { BackgroundOpsProvider } from "@/contexts/background-ops-context"
@@ -148,7 +148,6 @@ export default async function PlatformLayout({
                         <CommandPalette />
                         <KeyboardShortcutsDialog />
                         <KeyboardShortcuts />
-                        <MobileZoomControl />
                         <Sidebar foundryName={foundryName} foundryId={foundryId} foundryLogoUrl={foundryLogoUrl} foundryIsSandbox={foundryIsSandbox} userName={profile?.full_name || user.email || "User"} userRole={profile?.role || "Member"} isCompanyAdmin={profile?.role === "Founder" || profile?.role === "Executive" || hasAdminAccess} userFoundries={userFoundries} onboardingData={(profile?.onboarding_data as Record<string, unknown>) || undefined} isSupplier={!!(profile as unknown as Record<string, unknown>)?.is_supplier} newForgeExperienceEnabled={newForgeExperienceEnabled} newMoneyExperienceEnabled={newMoneyExperienceEnabled} newPlanExperienceEnabled={newPlanExperienceEnabled} />
                         <MainContentArea>
                             <ActiveTimerBar />

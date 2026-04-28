@@ -25,7 +25,7 @@
 
 import { Suspense } from "react"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { ZoomProvider, MobileZoomControl } from "@/components/ZoomProvider"
+import { ZoomProvider } from "@/components/ZoomProvider"
 import { ScreenContextProvider } from "@/contexts/screen-context"
 import { BrowseContextProvider } from "@/contexts/browse-context"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
@@ -108,7 +108,6 @@ export default async function PublicDiscoveryLayout({
                                 <CommandPalette />
                                 <KeyboardShortcutsDialog />
                                 <KeyboardShortcuts />
-                                <MobileZoomControl />
                                 <Sidebar
                                     foundryName={foundryName}
                                     foundryId={foundryId}

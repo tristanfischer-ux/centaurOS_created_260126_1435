@@ -36,7 +36,7 @@ import React from "react"
 import Link from "next/link"
 import { usePathname, useRouter } from "next/navigation"
 import { cn } from "@/lib/utils"
-import { LogOut, Plus, PoundSterling, Settings } from "lucide-react"
+import { LogOut, PoundSterling, Settings } from "lucide-react"
 
 import { welcomeNavItem, meNavigation } from "@/components/sidebar/data/me"
 import { supplierNavigation } from "@/components/sidebar/data/supplier-portal"
@@ -48,10 +48,8 @@ import type { SidebarNavItem } from "@/components/sidebar/data/types"
 
 import { UnreadIndicator } from "@/components/today/UnreadIndicator"
 import { FoundrySwitcher } from "@/components/FoundrySwitcher"
-import { FocusModeToggle } from "@/components/FocusModeToggle"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { FeedbackDialog } from "@/components/feedback/feedback-dialog"
-import { QuickCaptureDialog } from "@/components/smart/quick-capture-dialog"
 import { AICreditsBarLoader } from "@/components/ui/ai-credits-bar"
 import { TimeWeekBarLoader } from "@/components/ui/time-week-bar"
 import { MoneyCreditsPill } from "@/components/sidebar/MoneyCreditsPill"
@@ -62,7 +60,6 @@ import { isRouteAlpha, isRouteBeta, isRouteComingSoon, isRouteDemo } from "@/lib
 import { signOut } from "@/actions/auth"
 import { updateOnboardingData, type OnboardingData } from "@/actions/onboarding"
 import { getMyReferralInfo } from "@/actions/referrals"
-import type { SmartGoalSuggestion } from "@/actions/smart-goals"
 import {
     ForgeAmbassadorBadge,
     ForgeAmbassadorMilestoneToast,
@@ -243,7 +240,6 @@ export function Sidebar({
     const router = useRouter()
 
     const [isFeedbackOpen, setIsFeedbackOpen] = React.useState(false)
-    const [isQuickCaptureOpen, setIsQuickCaptureOpen] = React.useState(false)
     const [unreadAlertCount, setUnreadAlertCount] = React.useState(0)
 
     // INTENT: Prefetch the most-visited routes immediately so first click to
@@ -276,22 +272,6 @@ export function Sidebar({
         }, 500)
         return () => clearTimeout(t)
     }, [pathname])
-
-    const handleCaptureObjective = React.useCallback(
-        (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
-            const prefill = suggestion?.title || rawIdea
-            router.push(`/new-objectives?prefill=${encodeURIComponent(prefill)}`)
-        },
-        [router]
-    )
-
-    const handleCaptureTask = React.useCallback(
-        (rawIdea: string, suggestion?: SmartGoalSuggestion) => {
-            const prefill = suggestion?.title || rawIdea
-            router.push(`/new-tasks?prefill=${encodeURIComponent(prefill)}`)
-        },
-        [router]
-    )
 
     const handleShareReferral = React.useCallback(async () => {
         try {
@@ -335,24 +315,6 @@ export function Sidebar({
                     />
                     ForgeOS
                 </Link>
-                <div className="ml-auto flex items-center gap-0.5">
-                    <Tooltip delayDuration={200}>
-                        <TooltipTrigger asChild>
-                            <button
-                                type="button"
-                                onClick={() => setIsQuickCaptureOpen(true)}
-                                aria-label="Capture an idea"
-                                className="h-7 w-7 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-international-orange hover:bg-international-orange/10 transition-colors"
-                            >
-                                <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                            </button>
-                        </TooltipTrigger>
-                        <TooltipContent side="bottom">
-                            <p>Capture an idea</p>
-                        </TooltipContent>
-                    </Tooltip>
-                    <FocusModeToggle compact />
-                </div>
             </div>
 
             {/* ─── Scrollable nav body ────────────────────────── */}
@@ -491,12 +453,6 @@ export function Sidebar({
             </div>
 
             <FeedbackDialog open={isFeedbackOpen} onOpenChange={setIsFeedbackOpen} />
-            <QuickCaptureDialog
-                open={isQuickCaptureOpen}
-                onOpenChange={setIsQuickCaptureOpen}
-                onCreateObjective={handleCaptureObjective}
-                onCreateTask={handleCaptureTask}
-            />
 
             {/* Milestone toast — fires once per session when ambassador threshold is crossed */}
             <ForgeAmbassadorMilestoneToast since={ambassadorSince} />
