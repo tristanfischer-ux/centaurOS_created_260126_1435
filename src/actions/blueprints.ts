@@ -594,6 +594,12 @@ export async function getSuppliers(filters?: {
 }> {
   const supabase = await createClient()
 
+  // DEPRECATED (audit Fix 3, 2026-04-27): this query reads from the legacy
+  // `suppliers` table (678 rows, fabricated community_rating / used_by_count
+  // trust signals). The canonical supplier database is marketplace_listings
+  // (19,928 rows). This path is retained for the blueprints UI until it is
+  // migrated to marketplace_listings — tracked in
+  // ~/Downloads/forge-demos/SUPPLIERS-TABLE-DEPRECATION.md (planned 2026-05-01).
   let query = supabase
     .from('suppliers')
     .select('*')
