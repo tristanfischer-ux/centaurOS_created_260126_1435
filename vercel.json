@@ -21,6 +21,7 @@
     {"path": "/api/cron/vest-referral-rewards", "schedule": "0 3 * * *"},
     {"path": "/api/cron/re-embed-techniques", "schedule": "0 4 * * *"},
     {"path": "/api/cron/autopilot-tick", "schedule": "* * * * *"},
-    {"path": "/api/cron/image-render-tick", "schedule": "*/2 * * * *"}
+    {"path": "/api/cron/image-render-tick", "schedule": "*/2 * * * *"},
+    {"path": "/api/cron/cleanup-brainstorm-assets", "schedule": "30 4 * * *"}
   ]
 }

@@ -4415,6 +4415,59 @@ export type Database = {
           },
         ]
       }
+      cad_lab_design_patches: {
+        Row: {
+          applied: boolean
+          applied_at: string | null
+          cost_impact_gbp_pence: number | null
+          created_at: string
+          id: string
+          iteration: number
+          patch_hash: string
+          patch_payload: Json
+          project_id: string
+          rejection_reason: string | null
+          source: string
+          source_rank: number
+        }
+        Insert: {
+          applied?: boolean
+          applied_at?: string | null
+          cost_impact_gbp_pence?: number | null
+          created_at?: string
+          id?: string
+          iteration?: number
+          patch_hash: string
+          patch_payload: Json
+          project_id: string
+          rejection_reason?: string | null
+          source: string
+          source_rank: number
+        }
+        Update: {
+          applied?: boolean
+          applied_at?: string | null
+          cost_impact_gbp_pence?: number | null
+          created_at?: string
+          id?: string
+          iteration?: number
+          patch_hash?: string
+          patch_payload?: Json
+          project_id?: string
+          rejection_reason?: string | null
+          source?: string
+          source_rank?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cad_lab_design_patches_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cad_lab_generation_metrics: {
         Row: {
           created_at: string
@@ -4685,6 +4738,9 @@ export type Database = {
           bom_generation_state: Json | null
           brief_locked_at: string | null
           brief_locked_by: string | null
+          canonical_specs: Json
+          canonical_specs_digest: string | null
+          canonical_specs_revision: number
           checkpoints: Json | null
           concept_render_url: string | null
           created_at: string
@@ -4695,6 +4751,8 @@ export type Database = {
           diagnostic_answers: Json | null
           diagnostic_enrichment: Json | null
           dimension_sheet: Json | null
+          executive_summary: string | null
+          feasibility_verdict: Json | null
           forked_from_id: string | null
           foundry_id: string
           generated_code: string | null
@@ -4712,9 +4770,11 @@ export type Database = {
           model_id: string
           modules: Json | null
           name: string
+          oracle_findings: Json | null
           part_category_overrides: Json | null
           pipeline_stage: Database["public"]["Enums"]["pipeline_stage"]
           product_overview: string | null
+          proofread_findings: Json | null
           provider_results: Json | null
           quality_ratings: Json | null
           reference_documents: Json | null
@@ -4749,6 +4809,9 @@ export type Database = {
           bom_generation_state?: Json | null
           brief_locked_at?: string | null
           brief_locked_by?: string | null
+          canonical_specs?: Json
+          canonical_specs_digest?: string | null
+          canonical_specs_revision?: number
           checkpoints?: Json | null
           concept_render_url?: string | null
           created_at?: string
@@ -4759,6 +4822,8 @@ export type Database = {
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
           dimension_sheet?: Json | null
+          executive_summary?: string | null
+          feasibility_verdict?: Json | null
           forked_from_id?: string | null
           foundry_id: string
           generated_code?: string | null
@@ -4776,9 +4841,11 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          oracle_findings?: Json | null
           part_category_overrides?: Json | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
+          proofread_findings?: Json | null
           provider_results?: Json | null
           quality_ratings?: Json | null
           reference_documents?: Json | null
@@ -4813,6 +4880,9 @@ export type Database = {
           bom_generation_state?: Json | null
           brief_locked_at?: string | null
           brief_locked_by?: string | null
+          canonical_specs?: Json
+          canonical_specs_digest?: string | null
+          canonical_specs_revision?: number
           checkpoints?: Json | null
           concept_render_url?: string | null
           created_at?: string
@@ -4823,6 +4893,8 @@ export type Database = {
           diagnostic_answers?: Json | null
           diagnostic_enrichment?: Json | null
           dimension_sheet?: Json | null
+          executive_summary?: string | null
+          feasibility_verdict?: Json | null
           forked_from_id?: string | null
           foundry_id?: string
           generated_code?: string | null
@@ -4840,9 +4912,11 @@ export type Database = {
           model_id?: string
           modules?: Json | null
           name?: string
+          oracle_findings?: Json | null
           part_category_overrides?: Json | null
           pipeline_stage?: Database["public"]["Enums"]["pipeline_stage"]
           product_overview?: string | null
+          proofread_findings?: Json | null
           provider_results?: Json | null
           quality_ratings?: Json | null
           reference_documents?: Json | null
@@ -8273,9 +8347,11 @@ export type Database = {
           best_score_breakdown: Json | null
           id: string
           is_verified: boolean
+          matched_part_numbers: string[]
           module_ids: string[]
           notes: string | null
           project_id: string
+          project_synthesis: string | null
           ramp_role: string
           supplier_id: string
           supplier_name: string
@@ -8290,9 +8366,11 @@ export type Database = {
           best_score_breakdown?: Json | null
           id?: string
           is_verified?: boolean
+          matched_part_numbers?: string[]
           module_ids?: string[]
           notes?: string | null
           project_id: string
+          project_synthesis?: string | null
           ramp_role?: string
           supplier_id: string
           supplier_name: string
@@ -8307,9 +8385,11 @@ export type Database = {
           best_score_breakdown?: Json | null
           id?: string
           is_verified?: boolean
+          matched_part_numbers?: string[]
           module_ids?: string[]
           notes?: string | null
           project_id?: string
+          project_synthesis?: string | null
           ramp_role?: string
           supplier_id?: string
           supplier_name?: string
@@ -12611,45 +12691,63 @@ export type Database = {
       meeting_threads: {
         Row: {
           artifact_id: string | null
+          audio_clips: Json
+          audio_status: string
           author_user_id: string
           branched_from_entry_id: string | null
           citations: Json | null
           council_tier: string
+          cover_image_url: string | null
+          cover_status: string
           created_at: string
           foundry_id: string
           id: string
+          is_pinned: boolean
           outputs: Json | null
           parent_thread_id: string | null
+          pinned_at: string | null
           specialist_ids: string[]
           topic: string
           updated_at: string
         }
         Insert: {
           artifact_id?: string | null
+          audio_clips?: Json
+          audio_status?: string
           author_user_id: string
           branched_from_entry_id?: string | null
           citations?: Json | null
           council_tier?: string
+          cover_image_url?: string | null
+          cover_status?: string
           created_at?: string
           foundry_id: string
           id?: string
+          is_pinned?: boolean
           outputs?: Json | null
           parent_thread_id?: string | null
+          pinned_at?: string | null
           specialist_ids?: string[]
           topic: string
           updated_at?: string
         }
         Update: {
           artifact_id?: string | null
+          audio_clips?: Json
+          audio_status?: string
           author_user_id?: string
           branched_from_entry_id?: string | null
           citations?: Json | null
           council_tier?: string
+          cover_image_url?: string | null
+          cover_status?: string
           created_at?: string
           foundry_id?: string
           id?: string
+          is_pinned?: boolean
           outputs?: Json | null
           parent_thread_id?: string | null
+          pinned_at?: string | null
           specialist_ids?: string[]
           topic?: string
           updated_at?: string
@@ -15109,6 +15207,7 @@ export type Database = {
           ai_confidence: number | null
           ai_generated: boolean
           cad_lab_project_id: string
+          cost_justification: string | null
           created_at: string
           description: string | null
           drawing_url: string | null
@@ -15122,6 +15221,7 @@ export type Database = {
           mass_kg: number | null
           material: string | null
           material_spec: string | null
+          mpn: string | null
           name: string
           part_number: string
           process:
@@ -15137,6 +15237,7 @@ export type Database = {
           ai_confidence?: number | null
           ai_generated?: boolean
           cad_lab_project_id: string
+          cost_justification?: string | null
           created_at?: string
           description?: string | null
           drawing_url?: string | null
@@ -15150,6 +15251,7 @@ export type Database = {
           mass_kg?: number | null
           material?: string | null
           material_spec?: string | null
+          mpn?: string | null
           name: string
           part_number: string
           process?:
@@ -15165,6 +15267,7 @@ export type Database = {
           ai_confidence?: number | null
           ai_generated?: boolean
           cad_lab_project_id?: string
+          cost_justification?: string | null
           created_at?: string
           description?: string | null
           drawing_url?: string | null
@@ -15178,6 +15281,7 @@ export type Database = {
           mass_kg?: number | null
           material?: string | null
           material_spec?: string | null
+          mpn?: string | null
           name?: string
           part_number?: string
           process?:
@@ -24726,6 +24830,23 @@ export type Database = {
           success: boolean
         }[]
       }
+      apply_canonical_patch_atomic: {
+        Args: {
+          p_applied: boolean
+          p_cost_impact_pence: number
+          p_expected_revision: number
+          p_iteration: number
+          p_new_digest: string
+          p_new_specs: Json
+          p_patch_hash: string
+          p_patch_payload: Json
+          p_project_id: string
+          p_rejection_reason: string
+          p_source: string
+          p_source_rank: number
+        }
+        Returns: Json
+      }
       assign_founding_member_atomically: {
         Args: {
           p_credit_amount?: number
@@ -26916,6 +27037,7 @@ export type Database = {
         Args: { p_listing_id: string; p_user_id: string }
         Returns: boolean
       }
+      truncate_investor_portfolio_companies: { Args: never; Returns: undefined }
       unlockrows: { Args: { "": string }; Returns: number }
       update_blueprint_metrics: {
         Args: { p_blueprint_id: string }
