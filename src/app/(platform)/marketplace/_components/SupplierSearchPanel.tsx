@@ -547,66 +547,68 @@ export function SupplierSearchPanel({
         />
       )}
 
-      {/* ── Results count bar ── */}
-      <div className="flex items-center gap-3 text-xs text-muted-foreground">
-        <span>
-          {isFiltered ? (
-            <>
-              Showing{' '}
-              <span className="font-semibold text-foreground">{displayCount}</span> results for{' '}
-              <span className="italic">&ldquo;{activeQuery}&rdquo;</span>
-              {' · '}
-              <button
-                type="button"
-                onClick={handleClear}
-                className="text-international-orange hover:underline font-medium"
-              >
-                Clear search
-              </button>
-            </>
-          ) : (
-            <>
-              <span className="font-semibold text-foreground">{totalCount.toLocaleString()}</span>
-              {' suppliers in the directory'}
-              {displayCount > 0 && ` · showing ${displayCount}`}
-            </>
-          )}
-        </span>
-
-        {isPending && (
-          <span className="flex items-center gap-1 text-muted-foreground">
-            <Loader2 className="h-3 w-3 animate-spin" />
-            Searching…
-          </span>
-        )}
-      </div>
-
-      {/* ── Results list ── */}
-      {results.length === 0 && !isPending ? (
-        <div className="rounded-xl bg-muted/30 py-12 text-center text-sm text-muted-foreground">
-          <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground/40" />
-          <p className="font-medium text-foreground mb-1">No suppliers matched your search</p>
-          <p>Try different keywords, or{' '}
+      {/* ── Results count bar — only visible when a search is active ── */}
+      {isFiltered && (
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>
+            Showing{' '}
+            <span className="font-semibold text-foreground">{displayCount}</span> results for{' '}
+            <span className="italic">&ldquo;{activeQuery}&rdquo;</span>
+            {' · '}
             <button
               type="button"
               onClick={handleClear}
-              className="text-international-orange hover:underline"
+              className="text-international-orange hover:underline font-medium"
             >
-              browse all suppliers
+              Clear search
             </button>
-          </p>
+          </span>
+
+          {isPending && (
+            <span className="flex items-center gap-1 text-muted-foreground">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Searching…
+            </span>
+          )}
         </div>
-      ) : (
-        <div className="space-y-3">
-          {results.map((listing, idx) => (
-            <SupplierMatchCard
-              key={listing.id}
-              listing={listing}
-              rank={isFiltered ? idx + 1 : undefined}
-              searchQuery={activeQuery || undefined}
-            />
-          ))}
+      )}
+
+      {/* ── Pending spinner (pre-first-result) ── */}
+      {!isFiltered && isPending && (
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          Searching…
         </div>
+      )}
+
+      {/* ── Results list — only visible after a search is submitted ── */}
+      {isFiltered && (
+        results.length === 0 && !isPending ? (
+          <div className="rounded-xl bg-muted/30 py-12 text-center text-sm text-muted-foreground">
+            <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground/40" />
+            <p className="font-medium text-foreground mb-1">No suppliers matched your search</p>
+            <p>Try different keywords, or{' '}
+              <button
+                type="button"
+                onClick={handleClear}
+                className="text-international-orange hover:underline"
+              >
+                clear the search
+              </button>
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {results.map((listing, idx) => (
+              <SupplierMatchCard
+                key={listing.id}
+                listing={listing}
+                rank={idx + 1}
+                searchQuery={activeQuery || undefined}
+              />
+            ))}
+          </div>
+        )
       )}
     </div>
   )
