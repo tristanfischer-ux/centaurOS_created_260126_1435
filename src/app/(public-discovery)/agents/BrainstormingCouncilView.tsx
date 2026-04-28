@@ -530,7 +530,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 console.error("[BrainstormingCouncilView] Failed to save session:", saveErr)
             }
         })
-    }, [question, isPending, activeTier])
+    }, [question, isPending, activeTier, selectedSpecialistIds])
 
     function handleReset() {
         setSession(EMPTY_SESSION)
