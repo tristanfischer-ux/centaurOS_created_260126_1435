@@ -18,6 +18,7 @@
 
 import { useEffect, useMemo, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, ExternalLink, Loader2, ShieldCheck } from 'lucide-react'
 import {
   getSuppliersDirectoryPage,
@@ -232,6 +233,7 @@ export function SuppliersTable({ facets, initialPage }: SuppliersTableProps) {
 // ─── Row component ──────────────────────────────────────────────────────────
 
 function SupplierRow({ row }: { row: SuppliersDirectoryRow }) {
+  const router = useRouter()
   const verified = row.isVerified
   const scoreClass = row.score == null
     ? 'text-muted-foreground'
@@ -239,12 +241,25 @@ function SupplierRow({ row }: { row: SuppliersDirectoryRow }) {
     : row.score >= 40 ? 'text-warning'
     : 'text-destructive'
 
+  // W42: whole row is navigable. External-link icon stops propagation so it
+  // opens the website without also triggering row navigation.
+  const handleRowClick = (e: React.MouseEvent<HTMLTableRowElement>) => {
+    // Don't navigate when the user clicked the external-link icon
+    if ((e.target as HTMLElement).closest('a[target="_blank"]')) return
+    router.push(`/marketplace/${row.id}`)
+  }
+
   return (
-    <tr className="hover:bg-muted/20 transition-colors">
+    <tr
+      className="hover:bg-muted/20 transition-colors cursor-pointer"
+      onClick={handleRowClick}
+    >
       <td className="px-3 py-2">
         <div className="flex items-center gap-2 min-w-0">
+          {/* Name is still a Link for right-click / open-in-new-tab UX */}
           <Link
             href={`/marketplace/${row.id}`}
+            onClick={(e) => e.stopPropagation()}
             className="font-medium text-foreground hover:text-international-orange truncate"
           >
             {row.title}
