@@ -21,12 +21,18 @@ import { cadLabProjectUrl } from "@/lib/forge-routes"
 
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
 
+// DECISION: Labels use plain-English descriptions of what the engine has done so
+// far — no internal stage names, no vague "Researched" that covers anything from
+// Chase-done to Finn-done. Source of truth for friendly labels is the 12-stage
+// pipeline in src/lib/forge-narrative/stage-narratives.ts; this config maps the
+// legacy CAD Lab status enum (stored in cad_lab_projects.status) to a
+// plain-English label + badge variant that matches the spirit of the stage.
 const STAGE_CONFIG: Record<string, { label: string; variant: "default" | "secondary" | "success" | "warning" | "info" }> = {
-  draft: { label: "Draft", variant: "secondary" },
-  researched: { label: "Researched", variant: "info" },
-  interface_ready: { label: "Building", variant: "warning" },
-  generated: { label: "Generated", variant: "success" },
-  complete: { label: "Complete", variant: "success" },
+  draft: { label: "Not yet started", variant: "secondary" },
+  researched: { label: "Market researched", variant: "info" },
+  interface_ready: { label: "Architecture in progress", variant: "warning" },
+  generated: { label: "Report generating", variant: "warning" },
+  complete: { label: "Report ready", variant: "success" },
 }
 
 // INTENT: Stages past 'researched' are eligible for promotion to product
@@ -102,13 +108,19 @@ export function RecentProjectsGrid({
   )
 }
 
+// DECISION: Map legacy status to approximate completed-stage count out of 12.
+// The 12 stages are: waiting_chase, locking_brief, waiting_max, waiting_sizing,
+// waiting_layout, waiting_bom, waiting_finn, generating_illustration,
+// matching_suppliers, running_fang_reviews, proofreading, generating_pdf.
+// Legacy statuses map to the point in the pipeline where they typically stop.
 const PIPELINE_PROGRESS: Record<string, number> = {
   draft: 0,
-  researched: 1,
-  interface_ready: 2,
-  generated: 3,
-  complete: 5,
+  researched: 2,   // Chase done + brief locked
+  interface_ready: 5, // through Max + sizing + layout
+  generated: 10,  // through most stages
+  complete: 12,   // all 12 stages done
 }
+const PIPELINE_TOTAL = 12
 
 function CadLabProjectCard({ project, canPromote }: { project: CadLabProjectSummary; canPromote?: boolean }): React.ReactNode {
   const stageConfig = STAGE_CONFIG[project.status] ?? STAGE_CONFIG.draft
@@ -156,15 +168,15 @@ function CadLabProjectCard({ project, canPromote }: { project: CadLabProjectSumm
               {formatDistanceToNow(new Date(project.updatedAt), { addSuffix: true })}
             </span>
           </div>
-          {/* Pipeline progress bar */}
+          {/* Pipeline progress bar — x/12 stages */}
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-international-orange rounded-full transition-all"
-                style={{ width: `${(progress / 5) * 100}%` }}
+                style={{ width: `${(progress / PIPELINE_TOTAL) * 100}%` }}
               />
             </div>
-            <span className="text-xs text-muted-foreground tabular-nums">{progress}/5</span>
+            <span className="text-xs text-muted-foreground tabular-nums">{progress}/{PIPELINE_TOTAL} stages</span>
           </div>
           {/* Promote to Product button — only for eligible projects */}
           {canPromote && (

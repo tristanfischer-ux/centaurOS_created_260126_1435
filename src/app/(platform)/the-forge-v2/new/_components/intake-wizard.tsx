@@ -34,8 +34,8 @@
  *   - src/app/(platform)/the-forge-v2/new/page.tsx
  */
 
-import { useRouter } from "next/navigation"
-import { useState, useTransition } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
+import { useState, useEffect, useTransition } from "react"
 
 import {
     startProjectWithAutopilot,
@@ -153,8 +153,21 @@ const STEP_LABELS = [
 
 // ─── Main component ───────────────────────────────────────────────────────
 
+// INTENT: localStorage key written by BrainstormingCouncilView when the founder
+// clicks "Build this in the Forge →". Mirrors the key read by ProjectCreateView
+// at /the-forge-v2/new — both wizard variants must clear it on mount so a stale
+// payload cannot bleed into a future "+ New project" session.
+const BRAINSTORM_HANDOFF_KEY = "forge-from-brainstorm-context"
+
+interface BrainstormHandoff {
+    topic: string
+    summary: string
+    createdAt: string
+}
+
 export function IntakeWizard(): React.ReactElement {
     const router = useRouter()
+    const searchParams = useSearchParams()
     const [step, setStep] = useState(1)
     const [form, setForm] = useState<FormState>({
         subject: "",
@@ -166,6 +179,48 @@ export function IntakeWizard(): React.ReactElement {
     })
     const [submitError, setSubmitError] = useState<string | null>(null)
     const [isPending, startTransition] = useTransition()
+    const [brainstormBannerTopic, setBrainstormBannerTopic] = useState<string | null>(null)
+
+    // INTENT: receive a brainstorming hand-off from BrainstormingCouncilView.
+    // When the founder clicks "Build this in the Forge →" on the council page,
+    // it stores { topic, summary, createdAt } in localStorage and routes here
+    // with ?fromBrainstorm=1. We seed step 1 (subject) from topic + step 5
+    // (additionalContext) from the full synthesis, then clear localStorage so
+    // the payload does not bleed into a later fresh "+ New project" click.
+    useEffect(() => {
+        if (searchParams.get("fromBrainstorm") !== "1") return
+        if (typeof window === "undefined") return
+
+        const raw = window.localStorage.getItem(BRAINSTORM_HANDOFF_KEY)
+        // Always clear the key so it does not persist beyond this one load.
+        window.localStorage.removeItem(BRAINSTORM_HANDOFF_KEY)
+        if (!raw) return
+
+        try {
+            const parsed = JSON.parse(raw) as Partial<BrainstormHandoff>
+            const topic = typeof parsed.topic === "string" ? parsed.topic.trim() : ""
+            const summary = typeof parsed.summary === "string" ? parsed.summary.trim() : ""
+
+            if (!topic && !summary) return
+
+            // Step 1 subject: a brief derived from the question + "continue from here"
+            const seededSubject = topic
+                ? `From a brainstorming session on "${topic}". Continue the brief from here — add scale, constraints, and target market.`
+                : `From a brainstorming session. Continue the brief from here — add scale, constraints, and target market.`
+
+            setForm((prev) => ({
+                ...prev,
+                subject: prev.subject ? prev.subject : seededSubject,
+                // Step 5: full synthesis as additional context for Chase
+                additionalContext: prev.additionalContext ? prev.additionalContext : summary,
+            }))
+
+            setBrainstormBannerTopic(topic || "brainstorming session")
+        } catch {
+            // Corrupt payload — silently ignore, founder can type a fresh brief.
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
 
     // ─── Step validation ─────────────────────────────────────────────────
 
@@ -304,6 +359,29 @@ export function IntakeWizard(): React.ReactElement {
 
     return (
         <div className="max-w-3xl mx-auto space-y-6">
+            {/* Brainstorm handoff banner — only shown when arriving from the council */}
+            {brainstormBannerTopic && (
+                <div
+                    className="rounded-xl border border-international-orange/30 bg-international-orange/5 px-5 py-4"
+                    role="status"
+                    aria-live="polite"
+                >
+                    <div className="flex items-start gap-3">
+                        <span className="text-international-orange text-base font-bold shrink-0" aria-hidden="true">↳</span>
+                        <div>
+                            <p className="text-sm font-semibold text-foreground leading-snug mb-0.5">
+                                Continued from your brainstorming session
+                            </p>
+                            <p className="text-xs text-muted-foreground leading-relaxed">
+                                Your question and the council's synthesis are pre-filled in steps 1 and 5.
+                                Add the target scale (step 2) and market details (step 3) — those are the
+                                structured inputs the engine needs that the council didn't produce.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* Progress bar */}
             <ProgressBar currentStep={step} totalSteps={TOTAL_STEPS} />
 

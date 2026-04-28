@@ -1968,6 +1968,84 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             )}
 
             {/* ══════════════════════════════════════════════════════════════
+                Flow C — "Forge this idea" bridge CTA.
+                Rendered after the council closes (session.phase === 'done').
+                Writes the council's topic + synthesis to localStorage under
+                the same key that ProjectCreateView and IntakeWizard already
+                read — so the Forge intake wizard can pre-fill step 1 (subject)
+                and step 5 (additional context) from the brainstorm output.
+            ══════════════════════════════════════════════════════════════ */}
+            {session.phase === "done" && session.hostClosing && (
+                <div style={{
+                    marginTop: "24px",
+                    padding: "20px 24px",
+                    background: "var(--bc-brand-soft)",
+                    border: "1.5px solid var(--bc-brand-dim)",
+                    borderRadius: "14px",
+                    display: "flex",
+                    flexWrap: "wrap",
+                    gap: "16px",
+                    alignItems: "center",
+                }}>
+                    <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--bc-brand)", textTransform: "uppercase", letterSpacing: "0.09em", marginBottom: "5px" }}>
+                            Ready to build this?
+                        </div>
+                        <p style={{ margin: 0, fontSize: "13px", color: "var(--bc-fg)", lineHeight: "1.55" }}>
+                            Take the council's output straight into a Forge engineering report —
+                            the brief and context are pre-filled from this session so you just
+                            fill in the scale numbers.
+                        </p>
+                    </div>
+                    <a
+                        href="/the-forge-v2/new?fromBrainstorm=1"
+                        onClick={(e) => {
+                            // INTENT: stash the brainstorm output in localStorage before
+                            // navigating. IntakeWizard reads forge_brainstorm_handoff on
+                            // mount when ?fromBrainstorm=1 is present, pre-fills subject
+                            // (step 1) and additionalContext (step 5), then clears the key
+                            // so it does not bleed into a future "+ New project" session.
+                            if (typeof window === "undefined") return
+                            try {
+                                const payload = {
+                                    topic: session.submittedQuestion ?? "",
+                                    summary: session.hostClosing ?? "",
+                                    createdAt: new Date().toISOString(),
+                                }
+                                window.localStorage.setItem(
+                                    "forge-from-brainstorm-context",
+                                    JSON.stringify(payload),
+                                )
+                            } catch {
+                                // localStorage unavailable (private browsing, quota) —
+                                // let the navigation happen anyway; the wizard lands
+                                // empty rather than crashing.
+                            }
+                            // Allow the default <a> navigation — no e.preventDefault().
+                        }}
+                        style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "8px",
+                            background: "var(--bc-brand)",
+                            color: "#fff",
+                            textDecoration: "none",
+                            padding: "11px 22px",
+                            borderRadius: "10px",
+                            fontSize: "13.5px",
+                            fontWeight: 700,
+                            fontFamily: "inherit",
+                            boxShadow: "0 1px 0 rgba(255,69,0,0.5) inset, 0 6px 14px rgba(255,69,0,0.20)",
+                            whiteSpace: "nowrap",
+                            flexShrink: 0,
+                        }}
+                    >
+                        Build this in the Forge →
+                    </a>
+                </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════════
                 W52 — Generate graphic summary / audio transcript buttons.
                 Rendered after the council closes (session.phase === 'done').
                 Requires a saved threadId to call the generation actions.
