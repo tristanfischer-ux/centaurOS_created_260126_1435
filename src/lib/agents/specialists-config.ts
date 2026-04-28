@@ -1095,7 +1095,7 @@ export const SPECIALISTS: Specialist[] = [
             "Connecting dots between teams...",
             "Priority stack is clear — here's what matters most.",
         ],
-        modelTier: "claude",
+        modelTier: "sonnet", // Downgraded from claude (Opus 4.7) to sonnet (Sonnet 4.6) — audit Decision 3, 2026-04-27
         speculativeEnabled: true,
     },
     // ═════════════════════════════════════════════════════════════════════════════
@@ -1542,7 +1542,7 @@ export const SPECIALISTS: Specialist[] = [
             "Checking precedents and risks...",
             "Triage complete — here's what matters.",
         ],
-        modelTier: "claude",
+        modelTier: "sonnet", // Downgraded from claude (Opus 4.7) to sonnet (Sonnet 4.6) — audit Decision 3, 2026-04-27
         speculativeEnabled: true,
     },
 ]
