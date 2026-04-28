@@ -28,7 +28,7 @@
 "use client"
 
 import { useState, useRef, useTransition, useCallback, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
@@ -40,7 +40,14 @@ import {
     getCalClosingResponse,
 } from "@/actions/brainstorming-council"
 import type { SpecialistResponse } from "@/actions/brainstorming-council-types"
-import { createMeetingThread, refreshSessionAssetUrls } from "@/actions/meeting-threads"
+import {
+    createMeetingThread,
+    startMeetingThread,
+    addProgressiveMeetingEntry,
+    completeMeetingThread,
+    getInProgressThread,
+    refreshSessionAssetUrls,
+} from "@/actions/meeting-threads"
 import { generateSessionInfographic } from "@/actions/brainstorm-cover"
 import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
@@ -354,6 +361,8 @@ const EMPTY_SESSION: CouncilSession = {
 
 export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewProps) {
     const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
     const [activeTier, setActiveTier] = useState<CouncilTier>("deep")
     const [question, setQuestion] = useState("")
     const [session, setSession] = useState<CouncilSession>(EMPTY_SESSION)
@@ -405,6 +414,109 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         const newIds = getAutoSelectedIds(question, Math.min(count, ALL_SPECIALIST_IDS.length))
         setSelectedSpecialistIds(newIds)
     }, [activeTier, question, session.phase])
+
+    // ── Session recovery on mount ──────────────────────────────────────────────
+    // If the URL has ?session=<threadId>, attempt to restore the in-progress
+    // brainstorm from DB entries written progressively during the live run.
+    // Runs once on mount only.
+    useEffect(() => {
+        const threadId = searchParams.get("session")
+        if (!threadId) return
+
+        let cancelled = false
+
+        async function tryRecover() {
+            const { data, abandoned } = await getInProgressThread(threadId!)
+
+            if (cancelled) return
+
+            if (abandoned) {
+                // Thread timed out — strip the param and let the user start fresh
+                const params = new URLSearchParams(searchParams.toString())
+                params.delete("session")
+                const newUrl = params.toString() ? `${pathname}?${params}` : pathname
+                router.replace(newUrl)
+                return
+            }
+
+            if (!data) {
+                // Thread complete or not found — strip param and move on
+                const params = new URLSearchParams(searchParams.toString())
+                params.delete("session")
+                const newUrl = params.toString() ? `${pathname}?${params}` : pathname
+                router.replace(newUrl)
+                return
+            }
+
+            const { thread, entries } = data
+
+            // Reconstruct session state from persisted entries
+            const calOpeningEntry = entries.find(
+                e => e.specialistId === "chief-of-staff" && e.councilPosition === "opener"
+            )
+            const calClosingEntry = entries.find(
+                e => e.specialistId === "chief-of-staff" && e.councilPosition === "host-close"
+            )
+            const r1Entries = entries.filter(
+                e => e.specialistId !== "chief-of-staff" && e.roundNumber === 1
+            )
+            const r2Entries = entries.filter(
+                e => e.specialistId !== "chief-of-staff" && e.roundNumber === 2
+            )
+
+            // Rebuild specialistResponses from persisted entries
+            const specialistResponses: SpecialistResponse[] = r1Entries.map(e => {
+                const r2 = r2Entries.find(r => r.specialistId === e.specialistId)
+                return {
+                    id: e.specialistId ?? "",
+                    name: e.specialistName ?? "",
+                    title: "",
+                    modelLabel: "",
+                    response: e.content,
+                    round2Response: r2?.content,
+                }
+            })
+
+            const arrivedIds = new Set(specialistResponses.map(r => r.id))
+            const hadRound2 = r2Entries.length > 0
+            const tier = (thread.councilTier as CouncilTier) ?? "deep"
+
+            // Determine the in-progress phase based on what's been persisted
+            let councilPhase: CouncilPhase = "idle"
+            let sessionPhase: SessionPhase = "pending"
+            if (calClosingEntry) {
+                sessionPhase = "done"
+                councilPhase = "done"
+            } else if (calOpeningEntry && r1Entries.length > 0) {
+                councilPhase = "r1-running"
+            } else if (calOpeningEntry) {
+                councilPhase = "r1-running"
+            } else {
+                councilPhase = "cal-framing"
+            }
+
+            setSession({
+                phase: sessionPhase,
+                councilPhase,
+                hostOpening: calOpeningEntry?.content ?? "",
+                specialistResponses,
+                hostClosing: calClosingEntry?.content ?? "",
+                arrivedIds,
+                errorMessage: "",
+                submittedQuestion: thread.topic,
+                submittedTier: tier,
+                submittedSpecialistIds: thread.specialistIds,
+                hadRound2,
+                savedThreadId: sessionPhase === "done" ? threadId! : null,
+            })
+
+            setActiveTier(tier)
+        }
+
+        tryRecover()
+        return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []) // mount only — searchParams intentionally excluded
 
     const submitted = session.phase !== "idle"
     // W8: always derive council members from activeTier for the pre-session
@@ -467,6 +579,28 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         })
 
         startTransition(async () => {
+            // ── Step 0: Create the thread row immediately (progressive persistence) ──
+            // Writing now means navigation-away-then-back can recover the session
+            // from DB even while Cal and specialists are still in flight.
+            // Fire-and-forget the threadId — we need it for progressive entry writes.
+            let liveThreadId: string | null = null
+            try {
+                const startResult = await startMeetingThread({
+                    topic: trimmedQ,
+                    councilTier: tierSnapshot,
+                    specialistIds: snapshotIds,
+                })
+                if (startResult.threadId) {
+                    liveThreadId = startResult.threadId
+                    // Pin the threadId in URL so a back-nav can recover
+                    const params = new URLSearchParams(window.location.search)
+                    params.set("session", liveThreadId)
+                    router.replace(`${pathname}?${params}`)
+                }
+            } catch {
+                // Non-fatal — proceed without persistence; session still runs in memory
+            }
+
             // ── Step 1: Cal's framing ──────────────────────────────────────
             // W77: ONLY Cal fires here. Specialists do NOT start yet.
             const specialistNames = specialistsForTier.map(s => s.name)
@@ -480,6 +614,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     errorMessage: calFramingResult.error,
                 }))
                 return
+            }
+
+            // Persist Cal's opening entry
+            if (liveThreadId) {
+                addProgressiveMeetingEntry(liveThreadId, {
+                    specialistId: "chief-of-staff",
+                    specialistName: "Cal",
+                    councilPosition: "opener",
+                    roundNumber: 1,
+                    content: calFramingResult.framing,
+                    role: "specialist",
+                }).catch(err => console.error("[BrainstormingCouncilView] Cal framing entry save failed:", err))
             }
 
             // Cal's framing is in — update her card and move to r1-running phase.
@@ -511,6 +657,17 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     specialistResponses: [...prev.specialistResponses.filter(r => r.id !== resp.id), resp],
                     arrivedIds: new Set([...prev.arrivedIds, resp.id]),
                 }))
+                // Progressive persistence: write this specialist's R1 entry to DB
+                if (liveThreadId) {
+                    addProgressiveMeetingEntry(liveThreadId, {
+                        specialistId: resp.id,
+                        specialistName: resp.name,
+                        councilPosition: "reactor",
+                        roundNumber: 1,
+                        content: resp.response,
+                        role: "specialist",
+                    }).catch(err => console.error("[BrainstormingCouncilView] R1 entry save failed:", err))
+                }
                 return resp
             })
 
@@ -543,6 +700,17 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 r.id === r2Result.id ? { ...r, round2Response: r2Result.round2Response } : r
                             ),
                         }))
+                        // Progressive persistence: write this specialist's R2 entry to DB
+                        if (liveThreadId) {
+                            addProgressiveMeetingEntry(liveThreadId, {
+                                specialistId: sp.id,
+                                specialistName: sp.name,
+                                councilPosition: "reactor",
+                                roundNumber: 2,
+                                content: r2Result.round2Response,
+                                role: "specialist",
+                            }).catch(err => console.error("[BrainstormingCouncilView] R2 entry save failed:", err))
+                        }
                         return { id: sp.id, round2Response: r2Result.round2Response }
                     }
                     return null
@@ -577,6 +745,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 ? calClosingResult.closing
                 : "Cal was unable to complete the synthesis. The responses above reflect the council's individual perspectives."
 
+            // Persist Cal's closing entry before marking done
+            if (liveThreadId) {
+                await addProgressiveMeetingEntry(liveThreadId, {
+                    specialistId: "chief-of-staff",
+                    specialistName: "Cal",
+                    councilPosition: "host-close",
+                    roundNumber: hadRound2 ? 2 : 1,
+                    content: hostClosing,
+                    role: "specialist",
+                }).catch(err => console.error("[BrainstormingCouncilView] Cal closing entry save failed:", err))
+            }
+
             // ── Step 5: Mark done + persist ───────────────────────────────
             setSession(prev => ({
                 ...prev,
@@ -585,7 +765,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 specialistResponses: finalSpecialistResponses,
                 hostClosing,
                 hadRound2,
-                savedThreadId: null,
+                savedThreadId: liveThreadId,
             }))
 
             // Reset asset generation buttons + cached URLs for the new session
@@ -596,75 +776,83 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             setGeneratedAudioUrl(null)
             setGeneratedAudioClips(null)
 
-            // W1 + W6 + W7: persist the completed session so:
-            //   - createMeetingThread triggers after() which fires
-            //     generateSessionInfographic (cover image) and
-            //     generateSessionAudio in the background.
-            //   - The saved thread row appears in SavedSessionsPanel.
-            // Build entries: Cal opening, each specialist R1, R2 entries
-            // (if present), Cal closing.
-            const entries = [
-                {
-                    specialistId: "chief-of-staff",
-                    specialistName: "Cal",
-                    councilPosition: "opener" as const,
-                    roundNumber: 1,
-                    content: calFramingResult.framing,
-                    role: "specialist" as const,
-                },
-                // Round 1 specialist responses
-                ...finalSpecialistResponses.map((resp: SpecialistResponse) => ({
-                    specialistId: resp.id,
-                    specialistName: resp.name,
-                    councilPosition: "reactor" as const,
-                    roundNumber: 1,
-                    content: resp.response,
-                    role: "specialist" as const,
-                })),
-                // Round 2 specialist responses (only when hadRound2 and content present)
-                ...(hadRound2
-                    ? finalSpecialistResponses
-                        .filter((resp: SpecialistResponse) => resp.round2Response)
-                        .map((resp: SpecialistResponse) => ({
+            // W1 + W6 + W7: finalise persistence and trigger after() jobs.
+            //
+            // If we have a liveThreadId (startMeetingThread succeeded earlier),
+            // use completeMeetingThread — entries are already in DB progressively,
+            // so this just flips status to 'complete' and schedules cover/audio.
+            //
+            // Fallback: if startMeetingThread failed, call the original
+            // createMeetingThread which does the full bulk-insert in one shot.
+            try {
+                if (liveThreadId) {
+                    const completeResult = await completeMeetingThread(liveThreadId)
+                    if (completeResult.ok) {
+                        // Strip ?session= from URL now that the thread is complete
+                        const params = new URLSearchParams(window.location.search)
+                        params.delete("session")
+                        const newUrl = params.toString() ? `${pathname}?${params}` : pathname
+                        router.replace(newUrl)
+                    }
+                } else {
+                    // Fallback: no liveThreadId — bulk-insert the whole session
+                    const entries = [
+                        {
+                            specialistId: "chief-of-staff",
+                            specialistName: "Cal",
+                            councilPosition: "opener" as const,
+                            roundNumber: 1,
+                            content: calFramingResult.framing,
+                            role: "specialist" as const,
+                        },
+                        ...finalSpecialistResponses.map((resp: SpecialistResponse) => ({
                             specialistId: resp.id,
                             specialistName: resp.name,
                             councilPosition: "reactor" as const,
-                            roundNumber: 2,
-                            content: resp.round2Response!,
+                            roundNumber: 1,
+                            content: resp.response,
                             role: "specialist" as const,
-                        }))
-                    : []),
-                {
-                    specialistId: "chief-of-staff",
-                    specialistName: "Cal",
-                    councilPosition: "host-close" as const,
-                    roundNumber: hadRound2 ? 2 : 1,
-                    content: hostClosing,
-                    role: "specialist" as const,
-                },
-            ]
-
-            try {
-                const saveResult = await createMeetingThread({
-                    topic: trimmedQ,
-                    councilTier: tierSnapshot,
-                    specialistIds: specialistsForTier.map(s => s.id),
-                    entries,
-                })
-                if (saveResult?.threadId) {
-                    // W52: store threadId so the graphic/audio buttons can call
-                    // the generation actions for this specific session.
-                    setSession(prev => ({ ...prev, savedThreadId: saveResult.threadId }))
+                        })),
+                        ...(hadRound2
+                            ? finalSpecialistResponses
+                                .filter((resp: SpecialistResponse) => resp.round2Response)
+                                .map((resp: SpecialistResponse) => ({
+                                    specialistId: resp.id,
+                                    specialistName: resp.name,
+                                    councilPosition: "reactor" as const,
+                                    roundNumber: 2,
+                                    content: resp.round2Response!,
+                                    role: "specialist" as const,
+                                }))
+                            : []),
+                        {
+                            specialistId: "chief-of-staff",
+                            specialistName: "Cal",
+                            councilPosition: "host-close" as const,
+                            roundNumber: hadRound2 ? 2 : 1,
+                            content: hostClosing,
+                            role: "specialist" as const,
+                        },
+                    ]
+                    const saveResult = await createMeetingThread({
+                        topic: trimmedQ,
+                        councilTier: tierSnapshot,
+                        specialistIds: specialistsForTier.map(s => s.id),
+                        entries,
+                    })
+                    if (saveResult?.threadId) {
+                        setSession(prev => ({ ...prev, savedThreadId: saveResult.threadId }))
+                    }
                 }
                 // Bump the refresh key so MeetingHistory re-fetches.
                 setHistoryRefreshKey(k => k + 1)
             } catch (saveErr) {
                 // Non-fatal — the session content is still displayed,
                 // saving is best-effort and must never crash the UI.
-                console.error("[BrainstormingCouncilView] Failed to save session:", saveErr)
+                console.error("[BrainstormingCouncilView] Failed to finalise session:", saveErr)
             }
         })
-    }, [question, isPending, activeTier, selectedSpecialistIds])
+    }, [question, isPending, activeTier, selectedSpecialistIds, pathname, router])
 
     function handleReset() {
         setSession(EMPTY_SESSION)
@@ -675,6 +863,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         setGeneratedAudioUrl(null)
         setGeneratedAudioClips(null)
         setShowPicker(false)
+        // Strip ?session= from URL so the reset is clean
+        const params = new URLSearchParams(window.location.search)
+        if (params.has("session")) {
+            params.delete("session")
+            const newUrl = params.toString() ? `${pathname}?${params}` : pathname
+            router.replace(newUrl)
+        }
         // Return focus to the question input so the next question
         // is immediately ready to type without an extra click.
         setTimeout(() => inputRef.current?.focus(), 50)
@@ -687,7 +882,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 .bc-page {
                     max-width: 1200px;
                     margin: 0 auto;
-                    padding: 28px 32px 80px;
+                    padding: 28px 0 80px;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
                     --bc-fg: #292524;
                     --bc-fg-muted: #78716c;
@@ -1304,7 +1499,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     .bc-tier-picker { grid-template-columns: repeat(3, 1fr); }
                 }
                 @media (max-width: 780px) {
-                    .bc-page { padding: 18px 16px 60px; }
+                    .bc-page { padding: 18px 0 60px; }
                     .bc-tier-picker { grid-template-columns: repeat(2, 1fr); }
                     .bc-council-grid { grid-template-columns: 1fr; }
                     .bc-council-grid.specialists-3 { grid-template-columns: 1fr; }

@@ -57,6 +57,8 @@ import {
     listMeetingThreads,
     deleteMeetingThread,
     togglePinMeetingThread,
+    resetAudioForRetry,
+    resetCoverForRetry,
 } from "@/actions/meeting-threads"
 import { generateSessionInfographic } from "@/actions/brainstorm-cover"
 import { generateSessionAudio } from "@/actions/brainstorm-audio"
@@ -106,6 +108,7 @@ function legacyToSummary(item: MeetingHistoryItem): MeetingThreadSummary {
         coverStatus: 'pending',
         audioStatus: 'pending',
         audioClipsCount: 0,
+        sessionStatus: 'complete',
     }
 }
 
@@ -173,26 +176,37 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
     const [isRetryingCover, setIsRetryingCover] = useState(false)
     const [isRetryingAudio, setIsRetryingAudio] = useState(false)
 
-    // W36: retry cover image generation when stuck in generating/pending (Sarah)
+    // W36 / FIX A: retry cover image generation.
+    // Resets cover_status to 'pending' first so the atomic claim in
+    // generateSessionInfographic can fire (it only claims 'pending'|'failed').
+    // Sessions stuck in 'generating' (Vercel container killed) need the reset.
     async function handleRetryCover(e: React.MouseEvent) {
         e.preventDefault()
         e.stopPropagation()
         if (isRetryingCover) return
         setIsRetryingCover(true)
         try {
+            await resetCoverForRetry(meeting.id)
             await generateSessionInfographic(meeting.id)
         } finally {
             setIsRetryingCover(false)
         }
     }
 
-    // W35: retry audio generation when stuck in generating/pending (Sarah)
+    // W35 / FIX A: retry audio generation.
+    // Resets audio_status to 'pending' AND clears audio_url + audio_clips
+    // before re-invoking generateSessionAudio so the Gemini TTS path
+    // (shipped 2026-04-28 in commit 11e55d7c) can claim the slot. Sessions
+    // created before 17:30 that never got successful audio land here with
+    // status='generating' (container killed) or status='failed' — both
+    // need the reset so the atomic claim gate opens.
     async function handleRetryAudio(e: React.MouseEvent) {
         e.preventDefault()
         e.stopPropagation()
         if (isRetryingAudio) return
         setIsRetryingAudio(true)
         try {
+            await resetAudioForRetry(meeting.id)
             await generateSessionAudio(meeting.id)
         } finally {
             setIsRetryingAudio(false)
@@ -220,15 +234,17 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                         className="absolute inset-0 h-full w-full object-cover"
                         loading="lazy"
                     />
-                ) : meeting.coverStatus === "generating" || meeting.coverStatus === "pending" ? (
+                ) : meeting.coverStatus === "generating" || meeting.coverStatus === "pending" || meeting.coverStatus === "failed" ? (
                     <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-                        <Sparkles className="h-5 w-5 text-electric-blue/60 animate-pulse" />
+                        <Sparkles className={cn("h-5 w-5 text-electric-blue/60", meeting.coverStatus !== "failed" && "animate-pulse")} />
                         <span className="text-[10px] text-muted-foreground">
                             {meeting.coverStatus === "generating"
                                 ? "Generating cover image…"
-                                : "Cover image queued"}
+                                : meeting.coverStatus === "failed"
+                                    ? "Cover generation failed"
+                                    : "Cover image queued"}
                         </span>
-                        {/* W36: retry button for stuck cover generation (Sarah) */}
+                        {/* FIX A: show Retry for any non-ready cover state (including failed) */}
                         {canMutate && (
                             <button
                                 type="button"
@@ -345,11 +361,11 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                             Audio
                         </span>
                     )}
-                    {meeting.audioStatus === "generating" && (
+                    {(meeting.audioStatus === "generating" || meeting.audioStatus === "failed" || meeting.audioStatus === "pending") && (
                         <span className="flex items-center gap-1 text-muted-foreground">
-                            <AudioLines className="h-3 w-3 animate-pulse" />
-                            Generating audio…
-                            {/* W35: retry button for stuck audio generation (Sarah) */}
+                            <AudioLines className={cn("h-3 w-3", meeting.audioStatus === "generating" && "animate-pulse")} />
+                            {meeting.audioStatus === "generating" ? "Generating audio…" : meeting.audioStatus === "failed" ? "Audio failed" : "Audio queued"}
+                            {/* FIX A: show Retry for any non-ready, non-refused audio state */}
                             {canMutate && (
                                 <button
                                     type="button"
@@ -553,16 +569,19 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshKey])
 
-    // W72 fix: poll every 5 s while any card has cover_status pending/generating.
-    // revalidatePath('/agents') silently no-ops when called from a Vercel after()
-    // block, so the card stays stuck on "Generating cover image…" until the user
-    // reloads. This effect detects the in-flight state and refetches until the
-    // card transitions to ready or failed.
+    // W72 fix: poll every 5 s while any card has cover_status or audio_status
+    // pending/generating. revalidatePath('/agents') silently no-ops when called
+    // from a Vercel after() block, so cards stay stuck until the user reloads.
+    // FIX A/B: also polls so signed cover URLs appear as soon as generation
+    // completes, and so audio status updates surface without a manual refresh.
     useEffect(() => {
         const hasPendingCover = meetings.some(
             (m) => m.coverStatus === 'pending' || m.coverStatus === 'generating',
         )
-        if (!hasPendingCover) return
+        const hasPendingAudio = meetings.some(
+            (m) => m.audioStatus === 'pending' || m.audioStatus === 'generating',
+        )
+        if (!hasPendingCover && !hasPendingAudio) return
 
         const intervalId = setInterval(async () => {
             try {

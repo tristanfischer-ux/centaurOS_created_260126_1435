@@ -65,6 +65,7 @@ export interface MeetingThreadRow {
   branchedFromEntryId: string | null
   createdAt: string
   updatedAt: string
+  status: 'in_progress' | 'complete' | 'failed'
 }
 
 export interface MeetingEntryRow {
@@ -106,6 +107,7 @@ function rowToThreadRow(row: Record<string, unknown>): MeetingThreadRow {
     branchedFromEntryId: (row.branched_from_entry_id as string) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    status: ((row.status as string) ?? 'complete') as 'in_progress' | 'complete' | 'failed',
   }
 }
 
@@ -122,6 +124,232 @@ function rowToEntryRow(row: Record<string, unknown>): MeetingEntryRow {
     role: (row.role as 'specialist' | 'founder') ?? 'specialist',
     createdAt: row.created_at as string,
   }
+}
+
+// ============================================================================
+// PROGRESSIVE PERSISTENCE — start / add-entry / complete
+// ============================================================================
+
+/**
+ * Write a meeting_threads row immediately when the user clicks "Convene the
+ * council", with status='in_progress'. Returns the threadId so the view can
+ * pin it in URL search params for recovery after navigation.
+ *
+ * @security AUTH + foundry isolation enforced. foundry_id derived server-side.
+ */
+export async function startMeetingThread(input: {
+  topic: string
+  councilTier: string
+  specialistIds: string[]
+}): Promise<{ threadId: string | null; error: string | null }> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { threadId: null, error: 'Not authenticated' }
+
+  const foundryId = await getFoundryIdCached()
+  if (!foundryId) return { threadId: null, error: 'No active foundry' }
+
+  if (!input.topic?.trim()) return { threadId: null, error: 'Topic is required' }
+
+  const { data: row, error } = await supabase
+    .from('meeting_threads')
+    .insert({
+      foundry_id: foundryId,
+      author_user_id: user.id,
+      topic: input.topic.trim(),
+      council_tier: input.councilTier,
+      specialist_ids: input.specialistIds,
+      outputs: null,
+      citations: [] as unknown as Json,
+      status: 'in_progress',
+    })
+    .select('id')
+    .single()
+
+  if (error || !row) {
+    console.error('[MeetingThreads] startMeetingThread failed:', { error: error?.message })
+    return { threadId: null, error: sanitizeErrorMessage(error ?? new Error('Insert failed')) }
+  }
+
+  console.info('[MeetingThreads] Session started:', { threadId: (row as { id: string }).id })
+  return { threadId: (row as { id: string }).id, error: null }
+}
+
+/**
+ * Insert a single meeting_entry row as it arrives during a live brainstorm.
+ * Called progressively — once for Cal's framing, once per specialist, etc.
+ * Fire-and-forget acceptable; navigation recovery reads these rows on remount.
+ *
+ * @security No extra auth check — the thread RLS INSERT policy enforces
+ *           that only the author's foundry can insert entries.
+ */
+export async function addProgressiveMeetingEntry(
+  threadId: string,
+  entry: MeetingEntryInput,
+): Promise<{ entryId: string | null; error: string | null }> {
+  if (!isValidUUID(threadId)) return { entryId: null, error: 'Invalid thread id' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { entryId: null, error: 'Not authenticated' }
+
+  const { data: row, error } = await supabase
+    .from('meeting_entries')
+    .insert({
+      thread_id: threadId,
+      specialist_id: entry.specialistId ?? null,
+      specialist_name: entry.specialistName ?? null,
+      council_position: entry.councilPosition ?? null,
+      arrival_ms: entry.arrivalMs ?? null,
+      round_number: entry.roundNumber,
+      content: entry.content,
+      role: entry.role,
+    })
+    .select('id')
+    .single()
+
+  if (error || !row) {
+    console.error('[MeetingThreads] addProgressiveMeetingEntry failed:', {
+      threadId,
+      error: error?.message,
+    })
+    return { entryId: null, error: sanitizeErrorMessage(error ?? new Error('Insert failed')) }
+  }
+
+  return { entryId: (row as { id: string }).id, error: null }
+}
+
+/**
+ * Mark an in-progress meeting thread as complete and write its structured
+ * outputs. Idempotent — if the thread is already 'complete', updates outputs.
+ * Called at wrap-up instead of createMeetingThread for sessions that used
+ * startMeetingThread (progressive persistence).
+ *
+ * Also schedules cover-image and audio generation via after().
+ *
+ * @security AUTH + foundry isolation enforced via RLS on UPDATE.
+ */
+export async function completeMeetingThread(
+  threadId: string,
+  outputs?: Record<string, unknown>,
+): Promise<{ ok: boolean; error: string | null }> {
+  if (!isValidUUID(threadId)) return { ok: false, error: 'Invalid thread id' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('meeting_threads')
+    .update({
+      status: 'complete',
+      outputs: (outputs ?? null) as unknown as Json,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', threadId)
+    .eq('author_user_id', user.id)
+
+  if (error) {
+    console.error('[MeetingThreads] completeMeetingThread failed:', { threadId, error: error.message })
+    return { ok: false, error: sanitizeErrorMessage(error) }
+  }
+
+  console.info('[MeetingThreads] Session completed:', { threadId })
+
+  // Schedule cover image + audio generation (same pattern as createMeetingThread).
+  after(async () => {
+    try {
+      const [{ generateSessionInfographic }, { generateSessionAudio }] = await Promise.all([
+        import('./brainstorm-cover'),
+        import('./brainstorm-audio'),
+      ])
+      const [coverResult, audioResult] = await Promise.allSettled([
+        generateSessionInfographic(threadId),
+        generateSessionAudio(threadId),
+      ])
+      if (coverResult.status === 'rejected') {
+        console.error('[MeetingThreads] cover after() failed:', coverResult.reason)
+      }
+      if (audioResult.status === 'rejected') {
+        console.error('[MeetingThreads] audio after() failed:', audioResult.reason)
+      }
+    } catch (err) {
+      console.error('[MeetingThreads] after() block crashed:', err)
+    }
+  })
+
+  return { ok: true, error: null }
+}
+
+/**
+ * Fetch an in-progress thread with all entries so far, for recovery on remount.
+ * Returns null if the thread does not exist, is not in_progress, or is
+ * older than 10 minutes (treated as abandoned — caller should start fresh).
+ *
+ * @security RLS enforces foundry isolation.
+ */
+export async function getInProgressThread(
+  threadId: string,
+): Promise<{
+  data: { thread: MeetingThreadRow; entries: MeetingEntryRow[] } | null
+  abandoned: boolean
+  error: string | null
+}> {
+  if (!isValidUUID(threadId)) return { data: null, abandoned: false, error: 'Invalid thread id' }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { data: null, abandoned: false, error: 'Not authenticated' }
+
+  const { data: threadRow, error } = await supabase
+    .from('meeting_threads')
+    .select('*')
+    .eq('id', threadId)
+    .single()
+
+  if (error || !threadRow) {
+    return { data: null, abandoned: false, error: 'Thread not found' }
+  }
+
+  const row = threadRow as unknown as Record<string, unknown>
+  const status = (row.status as string) ?? 'complete'
+
+  if (status === 'complete') {
+    // Already done — caller should redirect to saved view.
+    return { data: null, abandoned: false, error: 'Thread already complete' }
+  }
+
+  if (status === 'failed') {
+    return { data: null, abandoned: true, error: null }
+  }
+
+  // in_progress — check age
+  const updatedAt = new Date(row.updated_at as string)
+  const ageMs = Date.now() - updatedAt.getTime()
+  const TEN_MINUTES_MS = 10 * 60 * 1000
+
+  if (ageMs > TEN_MINUTES_MS) {
+    // Mark as failed so future mounts don't bother
+    await supabase
+      .from('meeting_threads')
+      .update({ status: 'failed' })
+      .eq('id', threadId)
+    return { data: null, abandoned: true, error: null }
+  }
+
+  // Load entries
+  const { data: entryRows } = await supabase
+    .from('meeting_entries')
+    .select('*')
+    .eq('thread_id', threadId)
+    .order('created_at', { ascending: true })
+
+  const thread = rowToThreadRow(row)
+  const entries = ((entryRows ?? []) as unknown[]).map((r) =>
+    rowToEntryRow(r as Record<string, unknown>),
+  )
+
+  return { data: { thread, entries }, abandoned: false, error: null }
 }
 
 // ============================================================================
@@ -381,6 +609,9 @@ export interface MeetingThreadSummary {
   /** F3: audio generation status — UI shows skeleton until ready */
   audioStatus: 'pending' | 'generating' | 'ready' | 'failed' | 'refused_too_long'
   audioClipsCount: number
+  /** Session lifecycle status — in_progress sessions are filtered from the history
+   *  panel by default; they only appear when explicitly requested. */
+  sessionStatus: 'in_progress' | 'complete' | 'failed'
 }
 
 export interface ListMeetingThreadsInput {
@@ -392,6 +623,8 @@ export interface ListMeetingThreadsInput {
   branchedOnly?: boolean
   limit?: number
   offset?: number
+  /** When true, include in_progress threads in results (default: false — excludes them) */
+  includeInProgress?: boolean
 }
 
 /**
@@ -427,7 +660,7 @@ export async function listMeetingThreads(
   let query = supabase
     .from('meeting_threads')
     .select(
-      'id, topic, council_tier, specialist_ids, parent_thread_id, created_at, is_pinned, pinned_at, cover_image_url, cover_status, audio_clips, audio_status',
+      'id, topic, council_tier, specialist_ids, parent_thread_id, created_at, is_pinned, pinned_at, cover_image_url, cover_status, audio_clips, audio_status, status',
       { count: 'exact' },
     )
     .order('is_pinned', { ascending: false })
@@ -444,6 +677,12 @@ export async function listMeetingThreads(
     const since = new Date()
     since.setDate(since.getDate() - 30)
     query = query.gte('created_at', since.toISOString())
+  }
+
+  // Exclude in_progress rows by default — they are half-baked sessions not
+  // ready for the saved-sessions panel. Only include them when explicitly requested.
+  if (!input.includeInProgress) {
+    query = query.neq('status', 'in_progress')
   }
 
   // Branched-only filter
@@ -497,6 +736,34 @@ export async function listMeetingThreads(
     countMap.set(tid, (countMap.get(tid) ?? 0) + 1)
   }
 
+  // FIX B: sign cover URLs in batch for all threads with cover_status='ready'.
+  // listMeetingThreads previously returned the raw storage path (e.g.
+  // "uuid/cover.png") which the browser cannot fetch directly — only a signed
+  // URL works. We batch-create signed URLs here so every card gets a usable URL
+  // on the first render, not just when the polling loop fires.
+  const admin = createAdminClient()
+  const signedCoverMap = new Map<string, string>()
+  const readyThreadIds = threads
+    .filter((t) => (t as Record<string, unknown>).cover_status === 'ready')
+    .map((t) => (t as Record<string, unknown>).id as string)
+
+  if (readyThreadIds.length > 0) {
+    const signResults = await Promise.allSettled(
+      readyThreadIds.map(async (tid) => {
+        const { data } = await admin.storage
+          .from('brainstorm-assets')
+          .createSignedUrl(`${tid}/cover.png`, 60 * 60 * 24) // 24h
+        if (data?.signedUrl) signedCoverMap.set(tid, data.signedUrl)
+      }),
+    )
+    // Log any sign failures but don't abort — other cards still render.
+    for (const r of signResults) {
+      if (r.status === 'rejected') {
+        console.warn('[MeetingThreads] Failed to sign a cover URL:', r.reason)
+      }
+    }
+  }
+
   const summaries: MeetingThreadSummary[] = threads.map((t) => {
     const row = t as Record<string, unknown>
     const id = row.id as string
@@ -512,10 +779,13 @@ export async function listMeetingThreads(
       createdAt: row.created_at as string,
       isPinned: (row.is_pinned as boolean) ?? false,
       pinnedAt: (row.pinned_at as string) ?? null,
-      coverImageUrl: (row.cover_image_url as string) ?? null,
+      // Return the signed URL when status=ready, null otherwise. The polling
+      // loop re-calls listMeetingThreads which re-signs on each call.
+      coverImageUrl: signedCoverMap.get(id) ?? null,
       coverStatus: ((row.cover_status as string) ?? 'pending') as MeetingThreadSummary['coverStatus'],
       audioStatus: ((row.audio_status as string) ?? 'pending') as MeetingThreadSummary['audioStatus'],
       audioClipsCount: Array.isArray(audioClips) ? audioClips.length : 0,
+      sessionStatus: ((row.status as string) ?? 'complete') as MeetingThreadSummary['sessionStatus'],
     }
   })
 
@@ -880,6 +1150,88 @@ export async function togglePinMeetingThread(
 
   if (error) {
     console.error('[MeetingThreads] Pin toggle failed:', { threadId, pinned, error: error.message })
+    return { ok: false, error: sanitizeErrorMessage(error) }
+  }
+
+  return { ok: true, error: null }
+}
+
+// ============================================================================
+// ASSET RETRY — FIX A / FIX B
+// ============================================================================
+
+/**
+ * Reset audio_status to 'pending' so generateSessionAudio can re-claim it.
+ *
+ * @description The atomic claim in generateSessionAudio only fires when
+ * audio_status is 'pending' or 'failed'. Sessions stuck in 'generating'
+ * (Vercel container killed mid-TTS) or 'failed' need this reset before
+ * the retry can proceed.
+ *
+ * Also clears audio_url and audio_clips so stale partial data does not
+ * confuse the player.
+ *
+ * @security Caller must be the thread author (enforced via author_user_id).
+ */
+export async function resetAudioForRetry(
+  threadId: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  if (!isValidUUID(threadId)) {
+    return { ok: false, error: 'Invalid thread id' }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('meeting_threads')
+    .update({
+      audio_status: 'pending',
+      audio_url: null,
+      audio_clips: [] as unknown as Json,
+    })
+    .eq('id', threadId)
+    .eq('author_user_id', user.id)
+
+  if (error) {
+    console.error('[MeetingThreads] resetAudioForRetry failed:', { threadId, error: error.message })
+    return { ok: false, error: sanitizeErrorMessage(error) }
+  }
+
+  return { ok: true, error: null }
+}
+
+/**
+ * Reset cover_status to 'pending' so generateSessionInfographic can re-claim it.
+ *
+ * @description Mirrors resetAudioForRetry for cover images. Clears
+ * cover_image_url so the card does not flash a stale image.
+ *
+ * @security Caller must be the thread author (enforced via author_user_id).
+ */
+export async function resetCoverForRetry(
+  threadId: string,
+): Promise<{ ok: boolean; error: string | null }> {
+  if (!isValidUUID(threadId)) {
+    return { ok: false, error: 'Invalid thread id' }
+  }
+
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { ok: false, error: 'Not authenticated' }
+
+  const { error } = await supabase
+    .from('meeting_threads')
+    .update({
+      cover_status: 'pending',
+      cover_image_url: null,
+    })
+    .eq('id', threadId)
+    .eq('author_user_id', user.id)
+
+  if (error) {
+    console.error('[MeetingThreads] resetCoverForRetry failed:', { threadId, error: error.message })
     return { ok: false, error: sanitizeErrorMessage(error) }
   }
 

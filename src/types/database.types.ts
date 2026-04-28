@@ -12797,6 +12797,7 @@ export type Database = {
           parent_thread_id: string | null
           pinned_at: string | null
           specialist_ids: string[]
+          status: string
           topic: string
           updated_at: string
         }
@@ -12819,6 +12820,7 @@ export type Database = {
           parent_thread_id?: string | null
           pinned_at?: string | null
           specialist_ids?: string[]
+          status?: string
           topic: string
           updated_at?: string
         }
@@ -12841,6 +12843,7 @@ export type Database = {
           parent_thread_id?: string | null
           pinned_at?: string | null
           specialist_ids?: string[]
+          status?: string
           topic?: string
           updated_at?: string
         }

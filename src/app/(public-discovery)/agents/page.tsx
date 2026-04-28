@@ -26,6 +26,7 @@
 
 import type { Metadata } from "next"
 import { redirect } from "next/navigation"
+import { Suspense } from "react"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { getAgentWorkflows, getAgentCustomPrompts } from "@/actions/agent-workflows"
@@ -116,5 +117,11 @@ export default async function PublicAgentsPage() {
     // in scope so they can be threaded in when the Council form is wired to
     // saveMeetingThread (meeting-threads.ts).
     void savedWorkflows; void savedCustomPrompts; void userTier; void brainstormsUsedThisMonth
-    return <BrainstormingCouncilView userId={authedUser.id} />
+    // Suspense boundary required because BrainstormingCouncilView uses
+    // useSearchParams() for session recovery (?session=<threadId>).
+    return (
+        <Suspense fallback={null}>
+            <BrainstormingCouncilView userId={authedUser.id} />
+        </Suspense>
+    )
 }
