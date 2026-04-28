@@ -1,0 +1,227 @@
+{
+  "_fixture": "infeasible_BESS",
+  "_gate": 3,
+  "_type": "deterministic",
+  "_description": "Gate 3 regression fixture — three sizing scenarios in one BESS project. Covers the full outcome matrix: PASS, INFEASIBLE-but-emitted (P0), and INFEASIBLE-and-empty (WARN).",
+  "_triggers": "Gate 3 — sizing_feasibility check",
+  "_created": "2026-04-28",
+  "_reference": "BESS v7 Loop 8 failure — Tristan flagged solver declared INFEASIBLE but the PDF showed a complete dimensional layout with rack counts, misleading the founder. Gate 3 was created specifically to catch this pattern.",
+
+  "scenarios": [
+    {
+      "id": "scenario-feasible",
+      "description": "Happy path — solver declares feasible, module_dimensions populated. Gate 3 should PASS.",
+      "dimension_sheet": {
+        "feasible": true,
+        "rules_domain": "battery_energy_storage",
+        "rules_version": "bess-v1",
+        "envelope": {
+          "kind": "container_40ft_iso",
+          "label": "40ft ISO container",
+          "interior_w_mm": 2340,
+          "interior_d_mm": 12030,
+          "interior_h_mm": 2690,
+          "interior_floor_m2": 28.15,
+          "interior_volume_m3": 75.72
+        },
+        "target": { "kwh": 500, "kw": 100 },
+        "floor_budget_m2": 23.5,
+        "module_dimensions": {
+          "module-battery-racks": {
+            "w_mm": 600,
+            "d_mm": 1000,
+            "h_mm": 2200,
+            "floor_m2": 0.6,
+            "mount": "floor",
+            "scaled_by": "target_kWh",
+            "count_hint": "16 racks at 32 kWh each = 512 kWh usable"
+          },
+          "module-pcs-inverter": {
+            "w_mm": 800,
+            "d_mm": 800,
+            "h_mm": 2000,
+            "floor_m2": 0.64,
+            "mount": "floor",
+            "scaled_by": "target_kW",
+            "count_hint": "2 inverter units at 50 kW each = 100 kW AC"
+          },
+          "module-hvac": {
+            "w_mm": 2340,
+            "d_mm": 400,
+            "h_mm": 400,
+            "floor_m2": 0.0,
+            "mount": "ceiling",
+            "scaled_by": "thermal_load_kW",
+            "count_hint": "1 rooftop HVAC unit",
+            "requirement": { "label": "Cooling capacity", "value": 12, "unit": "kW" }
+          }
+        },
+        "unmatched_module_ids": [],
+        "unmatched_slot_ids": [],
+        "conflicts": [],
+        "recommendations": [],
+        "notes": ["target provenance: kwh=brief-text, kw=brief-text", "envelope: 40ft ISO container (from brief text)"],
+        "iterations": [
+          {
+            "iter": 1,
+            "used_floor_m2": 13.1,
+            "remaining_floor_m2": 10.4,
+            "utilization_pct": 55.7,
+            "allocations": { "battery_racks": 9.6, "pcs_inverter": 1.28, "hvac": 0.0 },
+            "feasible": true
+          }
+        ],
+        "generated_at": "2026-04-28T10:00:00.000Z"
+      },
+      "expected_verdict": "PASS",
+      "expected_severity": null,
+      "expected_actual": "FEASIBLE",
+      "expected_remediation_fired": false
+    },
+
+    {
+      "id": "scenario-infeasible-but-emitted",
+      "description": "BESS v7 failure pattern — solver declares feasible=false but module_dimensions is still populated with a full layout. Gate 3 must FAIL with severity P0.",
+      "dimension_sheet": {
+        "feasible": false,
+        "rules_domain": "battery_energy_storage",
+        "rules_version": "bess-v1",
+        "envelope": {
+          "kind": "container_40ft_iso",
+          "label": "40ft ISO container",
+          "interior_w_mm": 2340,
+          "interior_d_mm": 12030,
+          "interior_h_mm": 2690,
+          "interior_floor_m2": 28.15,
+          "interior_volume_m3": 75.72
+        },
+        "target": { "kwh": 3500, "kw": 1500 },
+        "floor_budget_m2": 23.5,
+        "module_dimensions": {
+          "module-battery-racks": {
+            "w_mm": 600,
+            "d_mm": 1000,
+            "h_mm": 2200,
+            "floor_m2": 0.6,
+            "mount": "floor",
+            "scaled_by": "target_kWh",
+            "count_hint": "110 racks at 32 kWh each = 3520 kWh (EXCEEDS ENVELOPE — 66m2 required, 23.5m2 available)"
+          },
+          "module-pcs-inverter": {
+            "w_mm": 800,
+            "d_mm": 800,
+            "h_mm": 2000,
+            "floor_m2": 0.64,
+            "mount": "floor",
+            "scaled_by": "target_kW",
+            "count_hint": "30 inverter units at 50 kW each = 1500 kW AC"
+          }
+        },
+        "unmatched_module_ids": [],
+        "unmatched_slot_ids": ["hvac", "dc_distribution", "controls"],
+        "conflicts": [
+          "SPATIAL INFEASIBLE — battery racks require 66.0m2 floor area but envelope only provides 23.5m2. Target 3500 kWh cannot fit in a single 40ft ISO container. Minimum envelope for this target: 3x40ft ISO or 1x53ft HC with a revised rack layout.",
+          "BRIEF UNRESOLVED — target 1500 kW AC requires 30 PCS inverter units but only 6 can fit within the available floor budget."
+        ],
+        "recommendations": [
+          "Reduce target to 500 kWh / 100 kW to fit a single 40ft ISO container.",
+          "Alternatively, specify a 3x40ft ISO or 53ft HC envelope to accommodate the 3500 kWh target.",
+          "If the site has space constraints, consider a split-architecture: 7x500 kWh containers federated under a single power conversion system."
+        ],
+        "notes": [
+          "target provenance: kwh=brief-text, kw=brief-text",
+          "envelope: 40ft ISO container (library default — brief did not specify)",
+          "WARN: solver produced module_dimensions despite INFEASIBLE verdict — dimensions are for a layout that CANNOT fit in the declared envelope."
+        ],
+        "iterations": [
+          {
+            "iter": 1,
+            "used_floor_m2": 66.0,
+            "remaining_floor_m2": -42.5,
+            "utilization_pct": 280.9,
+            "allocations": { "battery_racks": 66.0, "pcs_inverter": 19.2 },
+            "feasible": false,
+            "conflict_summary": "overflow: 66.0m2 required > 23.5m2 available"
+          }
+        ],
+        "generated_at": "2026-04-28T10:05:00.000Z"
+      },
+      "expected_verdict": "FAIL",
+      "expected_severity": "P0",
+      "expected_actual_contains": "INFEASIBLE-but-emitted",
+      "expected_remediation_fired": true,
+      "expected_remediation_target_stage_attempt_1": "waiting_sizing",
+      "expected_remediation_target_stage_attempt_2": "waiting_max",
+      "_note": "This is the exact BESS v7 pattern. The engine returned feasible=false but still populated module_dimensions — the layout the PDF rendered as valid was physically impossible."
+    },
+
+    {
+      "id": "scenario-infeasible-and-empty",
+      "description": "Clean solver failure — feasible=false AND module_dimensions is empty. Gate 3 records WARN (not P0) because there is no misleading output.",
+      "dimension_sheet": {
+        "feasible": false,
+        "rules_domain": "battery_energy_storage",
+        "rules_version": "bess-v1",
+        "envelope": {
+          "kind": "container_40ft_iso",
+          "label": "40ft ISO container",
+          "interior_w_mm": 2340,
+          "interior_d_mm": 12030,
+          "interior_h_mm": 2690,
+          "interior_floor_m2": 28.15,
+          "interior_volume_m3": 75.72
+        },
+        "target": { "kwh": 3500, "kw": 1500 },
+        "floor_budget_m2": 23.5,
+        "module_dimensions": {},
+        "unmatched_module_ids": [],
+        "unmatched_slot_ids": ["battery_racks", "pcs_inverter", "hvac", "dc_distribution", "controls"],
+        "conflicts": [
+          "SPATIAL INFEASIBLE — target 3500 kWh requires approximately 66m2 floor area but envelope provides only 23.5m2. No configuration was emitted.",
+          "DOMAIN CEILING EXCEEDED — 1500 kW AC exceeds the maximum feasible power density for a single 40ft ISO BESS unit."
+        ],
+        "recommendations": [
+          "Specify a larger envelope: 3x40ft ISO federation or a warehouse-bay deployment.",
+          "Reduce target to 500 kWh / 100 kW to fit a single 40ft ISO container.",
+          "Consider phased deployment: multiple 500 kWh units commissioned over 24 months."
+        ],
+        "notes": [
+          "target provenance: kwh=brief-text, kw=brief-text",
+          "envelope: 40ft ISO container (library default)",
+          "Solver aborted after detecting spatial infeasibility — no module dimensions emitted."
+        ],
+        "iterations": [
+          {
+            "iter": 1,
+            "used_floor_m2": 66.0,
+            "remaining_floor_m2": -42.5,
+            "utilization_pct": 280.9,
+            "allocations": {},
+            "feasible": false,
+            "conflict_summary": "abort: spatial overflow detected before allocation"
+          }
+        ],
+        "generated_at": "2026-04-28T10:10:00.000Z"
+      },
+      "expected_verdict": "WARN",
+      "expected_severity": "P1",
+      "expected_actual_contains": "INFEASIBLE (no module dimensions emitted)",
+      "expected_remediation_fired": true,
+      "expected_remediation_target_stage_attempt_1": "waiting_sizing",
+      "expected_remediation_target_stage_attempt_2": "waiting_max"
+    }
+  ],
+
+  "summary": {
+    "scenario_count": 3,
+    "scenarios_that_block_gate": 2,
+    "p0_count": 1,
+    "p1_warn_count": 1,
+    "pass_count": 1,
+    "fixture_coverage": [
+      "PASS — feasible=true, module_dimensions populated",
+      "FAIL P0 — feasible=false, module_dimensions populated (INFEASIBLE-but-emitted)",
+      "WARN P1 — feasible=false, module_dimensions empty (INFEASIBLE-and-empty)"
+    ]
+  }
+}
