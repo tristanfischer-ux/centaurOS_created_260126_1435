@@ -27,13 +27,14 @@
 
 "use client"
 
-import { useState, useRef, useTransition } from "react"
+import { useState, useRef, useTransition, useCallback } from "react"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
 import { conveneCouncil } from "@/actions/brainstorming-council"
 import type { CouncilResult, SpecialistResponse } from "@/actions/brainstorming-council-types"
+import { createMeetingThread } from "@/actions/meeting-threads"
 import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
 
 // ─── Model tier → human-readable badge label ────────────────────────────────
@@ -240,6 +241,13 @@ interface CouncilSession {
     specialistResponses: SpecialistResponse[]
     fionaClosing: string
     errorMessage: string
+    /** The question that was submitted — captured at submit time to prevent
+     *  stale-closure context leaks when the user edits the input mid-flight. */
+    submittedQuestion: string
+    /** The tier that was active when the session was submitted. Stored here
+     *  so the council grid renders the correct specialist count even if the
+     *  user changes the tier while the session is pending / done. */
+    submittedTier: CouncilTier
 }
 
 const EMPTY_SESSION: CouncilSession = {
@@ -248,6 +256,8 @@ const EMPTY_SESSION: CouncilSession = {
     specialistResponses: [],
     fionaClosing: "",
     errorMessage: "",
+    submittedQuestion: "",
+    submittedTier: "deep",
 }
 
 export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewProps) {
@@ -256,30 +266,64 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
     const [session, setSession] = useState<CouncilSession>(EMPTY_SESSION)
     const [isPending, startTransition] = useTransition()
     const inputRef = useRef<HTMLInputElement>(null)
+    // W7: bump this counter after each successful session save to trigger
+    // MeetingHistory to re-fetch its list.
+    const [historyRefreshKey, setHistoryRefreshKey] = useState(0)
 
     const submitted = session.phase !== "idle"
+    // W8: always derive council members from activeTier for the pre-session
+    // roster view. After submission, the rendered result grid uses
+    // session.submittedTier so changing the picker mid-session doesn't
+    // swap the specialist cards under live content.
     const councilMembers = getCouncilMembers(activeTier)
+    // The members that correspond to the in-flight or completed session.
+    const sessionCouncilMembers = getCouncilMembers(session.submittedTier)
 
-    function handleConvene(e: React.FormEvent) {
+    // W10: extracted to a named, stable callback so both the form onSubmit
+    // and the button's onClick can reference it. React synthetic events
+    // sometimes fail to bubble through deeply-nested form submit on first
+    // interaction — dual-wiring is the belt-and-braces fix.
+    const handleConvene = useCallback((e: React.FormEvent | React.MouseEvent) => {
         e.preventDefault()
-        if (!question.trim()) {
+        const trimmedQ = question.trim()
+        if (!trimmedQ) {
             inputRef.current?.focus()
             return
         }
-        // Reset to pending before firing
-        setSession({ ...EMPTY_SESSION, phase: "pending" })
+        if (isPending) return // already in flight
 
-        const specialistsForTier = councilMembers.map(s => ({
+        // W2: capture the tier and specialists at the exact moment of
+        // submission so they are locked for this session's lifecycle.
+        // Previously `activeTier` was read inside the async transition
+        // which meant a user changing the tier selector while the LLM
+        // calls were in flight could silently alter the specialist list
+        // mid-call.
+        const tierSnapshot: CouncilTier = activeTier
+        const specialistsForTier = getCouncilMembers(tierSnapshot).map(s => ({
             id: s.id,
             name: s.name,
             title: s.title,
             tagline: s.tagline,
         }))
 
+        // W2: clear the question input immediately on submit so the user
+        // cannot accidentally re-send the previous question by hitting
+        // submit a second time without typing new text. This also prevents
+        // the stale-question context leak where the input value from
+        // question N would silently ride along into question N+1.
+        setQuestion("")
+
+        setSession({
+            ...EMPTY_SESSION,
+            phase: "pending",
+            submittedQuestion: trimmedQ,
+            submittedTier: tierSnapshot,
+        })
+
         startTransition(async () => {
             const result = await conveneCouncil({
-                question: question.trim(),
-                tier: activeTier,
+                question: trimmedQ,
+                tier: tierSnapshot,
                 specialists: specialistsForTier,
             })
 
@@ -290,6 +334,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     specialistResponses: [],
                     fionaClosing: "",
                     errorMessage: result.error,
+                    submittedQuestion: trimmedQ,
+                    submittedTier: tierSnapshot,
                 })
                 return
             }
@@ -300,12 +346,65 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 specialistResponses: result.specialistResponses,
                 fionaClosing: result.fionaClosing,
                 errorMessage: "",
+                submittedQuestion: trimmedQ,
+                submittedTier: tierSnapshot,
             })
+
+            // W1 + W6 + W7: persist the completed session so:
+            //   - createMeetingThread triggers after() which fires
+            //     generateSessionInfographic (cover image) and
+            //     generateSessionAudio in the background.
+            //   - The saved thread row appears in SavedSessionsPanel.
+            // Build entries: Fiona opening, each specialist, Fiona closing.
+            const entries = [
+                {
+                    specialistId: "fundraising-advisor",
+                    specialistName: "Fiona",
+                    councilPosition: "opener" as const,
+                    roundNumber: 1,
+                    content: result.fionaOpening,
+                    role: "specialist" as const,
+                },
+                ...result.specialistResponses.map((resp: SpecialistResponse) => ({
+                    specialistId: resp.id,
+                    specialistName: resp.name,
+                    councilPosition: "reactor" as const,
+                    roundNumber: 1,
+                    content: resp.response,
+                    role: "specialist" as const,
+                })),
+                {
+                    specialistId: "fundraising-advisor",
+                    specialistName: "Fiona",
+                    councilPosition: "host-close" as const,
+                    roundNumber: 1,
+                    content: result.fionaClosing,
+                    role: "specialist" as const,
+                },
+            ]
+
+            try {
+                await createMeetingThread({
+                    topic: trimmedQ,
+                    councilTier: tierSnapshot,
+                    specialistIds: specialistsForTier.map(s => s.id),
+                    entries,
+                })
+                // Bump the refresh key so MeetingHistory re-fetches.
+                setHistoryRefreshKey(k => k + 1)
+            } catch (saveErr) {
+                // Non-fatal — the session content is still displayed,
+                // saving is best-effort and must never crash the UI.
+                console.error("[BrainstormingCouncilView] Failed to save session:", saveErr)
+            }
         })
-    }
+    }, [question, isPending, activeTier])
 
     function handleReset() {
         setSession(EMPTY_SESSION)
+        // Return focus to the question input so the next question
+        // is immediately ready to type without an extra click.
+        setTimeout(() => inputRef.current?.focus(), 50)
     }
 
     return (
@@ -918,9 +1017,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     aria-label="Your question for the council"
                     autoComplete="off"
                 />
+                {/* W10: dual-wire onClick + form onSubmit so the button fires
+                    even when React's synthetic event bubbling stalls on first
+                    interaction (observed in agent-browser walkthrough). */}
                 <button
                     className="bc-convene"
                     type="submit"
+                    onClick={handleConvene}
                     disabled={isPending}
                     style={isPending ? { opacity: 0.6, cursor: "wait" } : undefined}
                 >
@@ -1113,8 +1216,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 </div>
             ) : session.phase === "pending" ? (
                 /* Loading: show shimmer placeholders while calls are in flight */
-                <div className={`bc-council-grid${councilMembers.length === 3 ? " specialists-3" : ""}`}>
-                    {councilMembers.map((specialist, idx) => (
+                <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
+                    {sessionCouncilMembers.map((specialist, idx) => (
                         <div key={idx} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border)" }}>
                             <div className={`bc-sp-avatar ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
                                 {specialist.name.slice(0, 2).toUpperCase()}
@@ -1128,7 +1231,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 /* Done: real responses rendered */
                 <div className={`bc-council-grid${session.specialistResponses.length === 3 ? " specialists-3" : ""}`}>
                     {session.specialistResponses.map((resp) => {
-                        const specialist = councilMembers.find(s => s.id === resp.id)
+                        const specialist = sessionCouncilMembers.find(s => s.id === resp.id)
                         const avatarClass = getAvatarClass(resp.id)
                         const initials = resp.name.slice(0, 2).toUpperCase()
                         const sigLabel = getSigCloseLabel(resp.id)
@@ -1178,8 +1281,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 </div>
             ) : (
                 /* Error or empty — show placeholder grid */
-                <div className={`bc-council-grid${councilMembers.length === 3 ? " specialists-3" : ""}`}>
-                    {councilMembers.map((_, idx) => (
+                <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
+                    {sessionCouncilMembers.map((_, idx) => (
                         <div key={idx} className="bc-empty-card">
                             <div className="bc-empty-icon">&middot;</div>
                             <h3>No response</h3>
@@ -1319,7 +1422,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             {/* F1 — Saved sessions panel. Lives inline on /agents per
                 Tristan's requirement ("see those saves on the same page"). */}
             <div style={{ marginTop: "48px", paddingTop: "32px", borderTop: "1px solid var(--bc-border-soft)" }}>
-                <MeetingHistory initialLimit={6} />
+                {/* W7: historyRefreshKey increments after each successful session
+                    save so MeetingHistory re-fetches and shows the new entry. */}
+                <MeetingHistory initialLimit={6} refreshKey={historyRefreshKey} />
             </div>
         </div>
     )

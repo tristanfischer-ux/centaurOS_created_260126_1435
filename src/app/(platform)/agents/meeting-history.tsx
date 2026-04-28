@@ -67,6 +67,12 @@ type DateRangeFilter = "all" | "week" | "month"
 interface MeetingHistoryProps {
     /** Max meetings to show initially (before "View All") */
     initialLimit?: number
+    /**
+     * W7: Increment this key to trigger a re-fetch of the sessions list.
+     * BrainstormingCouncilView bumps it after each successful session save
+     * so the new session appears in the panel without a page refresh.
+     */
+    refreshKey?: number
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -380,7 +386,7 @@ function DeleteSessionDialog({ meeting, onConfirm, onCancel, isDeleting }: Delet
  * meetings (old). Renders compact cards with search, date filter chips, and
  * "Branched only" toggle. Each card links to /agents/m/<id> for persistent access.
  */
-export function MeetingHistory({ initialLimit = 3 }: MeetingHistoryProps) {
+export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHistoryProps) {
     const [meetings, setMeetings] = useState<MeetingThreadSummary[]>([])
     const [isLoading, setIsLoading] = useState(true)
     const [showAll, setShowAll] = useState(false)
@@ -456,7 +462,8 @@ export function MeetingHistory({ initialLimit = 3 }: MeetingHistoryProps) {
         }
     }, [pendingDelete])
 
-    // Initial load — try meeting_threads first, fall back to legacy artifacts
+    // Initial load + W7 refresh — re-fires when refreshKey increments
+    // (bumped by BrainstormingCouncilView after each successful session save).
     useEffect(() => {
         async function fetchMeetings(): Promise<void> {
             setIsLoading(true)
@@ -478,7 +485,8 @@ export function MeetingHistory({ initialLimit = 3 }: MeetingHistoryProps) {
             }
         }
         fetchMeetings()
-    }, [])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [refreshKey])
 
     // Re-fetch when filters change (uses the server-side filter)
     useEffect(() => {

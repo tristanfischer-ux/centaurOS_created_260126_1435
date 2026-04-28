@@ -152,6 +152,7 @@ import type {
     CouncilResult,
     CouncilError,
     ConveneCouncilInput,
+    ConveneCouncilResult,
 } from "./brainstorming-council-types"
 
 /**
