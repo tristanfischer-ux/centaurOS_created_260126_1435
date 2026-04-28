@@ -553,6 +553,31 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshKey])
 
+    // W72 fix: poll every 5 s while any card has cover_status pending/generating.
+    // revalidatePath('/agents') silently no-ops when called from a Vercel after()
+    // block, so the card stays stuck on "Generating cover image…" until the user
+    // reloads. This effect detects the in-flight state and refetches until the
+    // card transitions to ready or failed.
+    useEffect(() => {
+        const hasPendingCover = meetings.some(
+            (m) => m.coverStatus === 'pending' || m.coverStatus === 'generating',
+        )
+        if (!hasPendingCover) return
+
+        const intervalId = setInterval(async () => {
+            try {
+                const result = await listMeetingThreads({ limit: 50 })
+                if (!result.error && result.data.length > 0) {
+                    setMeetings(result.data)
+                }
+            } catch {
+                // Non-critical — next tick will retry.
+            }
+        }, 5_000)
+
+        return () => clearInterval(intervalId)
+    }, [meetings])
+
     // Re-fetch when filters change (uses the server-side filter)
     useEffect(() => {
         if (isLoading) return // skip the initial load

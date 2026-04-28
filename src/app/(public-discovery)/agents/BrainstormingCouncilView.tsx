@@ -44,6 +44,7 @@ import { createMeetingThread, refreshSessionAssetUrls } from "@/actions/meeting-
 import { generateSessionInfographic } from "@/actions/brainstorm-cover"
 import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import { MeetingHistory } from "@/app/(platform)/agents/meeting-history"
+import { typography } from "@/lib/design-system"
 
 // ─── Council tier definitions (Quick / Full / Deep / Strategy) ───────────────
 
@@ -1317,11 +1318,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
             {/* Tristan 2026-04-27: removed Home › Brainstorming breadcrumb +
                 added the red-bar accent to the title so this page matches the
-                canonical My Profile page-header pattern. */}
+                canonical My Profile page-header pattern.
+                2026-04-28: swapped inline styles to canonical typography classes
+                so the header matches Investor Match / Suppliers / My Profile. */}
             <div className="bc-page-head" style={{ marginBottom: "16px" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "4px" }}>
-                    <div style={{ height: "32px", width: "6px", background: "#ff4500", borderRadius: "9999px", boxShadow: "0 0 10px rgba(255,69,0,0.5)" }} />
-                    <h1 style={{ margin: 0 }}>Brainstorming Council</h1>
+                <div className={typography.pageHeader} style={{ marginBottom: "4px" }}>
+                    <div className={typography.pageHeaderAccent} />
+                    <h1 className={typography.h1}>Brainstorming Council</h1>
                 </div>
                 <p style={{ paddingLeft: "18px" }}>You ask one question. Cal frames it, {activeTier === "quick" ? "two specialists chime in" : activeTier === "full" ? "three specialists chime in" : activeTier === "deep" ? "four specialists chime in from different perspectives" : activeTier === "strategy" ? "five specialists chime in from different perspectives" : "all twelve specialists weigh in"} in parallel, and Cal closes with what they agreed on, where they disagreed, and the one thing to do this week.</p>
             </div>

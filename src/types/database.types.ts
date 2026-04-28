@@ -4730,6 +4730,7 @@ export type Database = {
       cad_lab_projects: {
         Row: {
           accepted_risks: Json | null
+          additional_context: string | null
           ai_cost_estimates: Json | null
           archived_at: string | null
           autopilot_state: Json | null
@@ -4754,8 +4755,10 @@ export type Database = {
           executive_summary: string | null
           feasibility_verdict: Json | null
           forked_from_id: string | null
+          founder_raw_brief: string
           foundry_id: string
           generated_code: string | null
+          geography: string[] | null
           hero_bounding_boxes: Json | null
           id: string
           illustration_style: string
@@ -4767,6 +4770,7 @@ export type Database = {
           interface_contracts: Json | null
           interface_definition: string | null
           interior_overview_url: string | null
+          market_segment: string | null
           model_id: string
           modules: Json | null
           name: string
@@ -4788,10 +4792,12 @@ export type Database = {
           shipped_by: string | null
           spatial_plan: Json | null
           stage: string
+          startup_stage: string | null
           status: string
           subject: string
           system_illustration_url: string | null
           target_launch_date: string | null
+          target_scale: Json | null
           target_unit_cost_gbp: number | null
           thumbnail_svg: string | null
           unified_code: string | null
@@ -4801,6 +4807,7 @@ export type Database = {
         }
         Insert: {
           accepted_risks?: Json | null
+          additional_context?: string | null
           ai_cost_estimates?: Json | null
           archived_at?: string | null
           autopilot_state?: Json | null
@@ -4825,8 +4832,10 @@ export type Database = {
           executive_summary?: string | null
           feasibility_verdict?: Json | null
           forked_from_id?: string | null
+          founder_raw_brief: string
           foundry_id: string
           generated_code?: string | null
+          geography?: string[] | null
           hero_bounding_boxes?: Json | null
           id?: string
           illustration_style?: string
@@ -4838,6 +4847,7 @@ export type Database = {
           interface_contracts?: Json | null
           interface_definition?: string | null
           interior_overview_url?: string | null
+          market_segment?: string | null
           model_id?: string
           modules?: Json | null
           name?: string
@@ -4859,10 +4869,12 @@ export type Database = {
           shipped_by?: string | null
           spatial_plan?: Json | null
           stage?: string
+          startup_stage?: string | null
           status?: string
           subject: string
           system_illustration_url?: string | null
           target_launch_date?: string | null
+          target_scale?: Json | null
           target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
@@ -4872,6 +4884,7 @@ export type Database = {
         }
         Update: {
           accepted_risks?: Json | null
+          additional_context?: string | null
           ai_cost_estimates?: Json | null
           archived_at?: string | null
           autopilot_state?: Json | null
@@ -4896,8 +4909,10 @@ export type Database = {
           executive_summary?: string | null
           feasibility_verdict?: Json | null
           forked_from_id?: string | null
+          founder_raw_brief?: string
           foundry_id?: string
           generated_code?: string | null
+          geography?: string[] | null
           hero_bounding_boxes?: Json | null
           id?: string
           illustration_style?: string
@@ -4909,6 +4924,7 @@ export type Database = {
           interface_contracts?: Json | null
           interface_definition?: string | null
           interior_overview_url?: string | null
+          market_segment?: string | null
           model_id?: string
           modules?: Json | null
           name?: string
@@ -4930,10 +4946,12 @@ export type Database = {
           shipped_by?: string | null
           spatial_plan?: Json | null
           stage?: string
+          startup_stage?: string | null
           status?: string
           subject?: string
           system_illustration_url?: string | null
           target_launch_date?: string | null
+          target_scale?: Json | null
           target_unit_cost_gbp?: number | null
           thumbnail_svg?: string | null
           unified_code?: string | null
@@ -6348,6 +6366,7 @@ export type Database = {
           created_at: string | null
           design_rules: Json
           dimensional_constraints: Json | null
+          embedding: string | null
           engineering_tags: string[]
           id: string
           industry_domain: string
@@ -6373,6 +6392,7 @@ export type Database = {
           created_at?: string | null
           design_rules?: Json
           dimensional_constraints?: Json | null
+          embedding?: string | null
           engineering_tags?: string[]
           id?: string
           industry_domain: string
@@ -6398,6 +6418,7 @@ export type Database = {
           created_at?: string | null
           design_rules?: Json
           dimensional_constraints?: Json | null
+          embedding?: string | null
           engineering_tags?: string[]
           id?: string
           industry_domain?: string
@@ -9346,6 +9367,71 @@ export type Database = {
             columns: ["foundry_id"]
             isOneToOne: false
             referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      gate_verdicts: {
+        Row: {
+          attempt: number
+          created_at: string
+          deterministic_result: Json | null
+          failure_details: string | null
+          gate_id: number
+          id: string
+          model_votes: Json | null
+          pipeline_run_iteration: number
+          project_id: string
+          remediation_context_injected: string | null
+          remediation_fired: boolean
+          remediation_target_stage: string | null
+          severity: string | null
+          uncertainty_marker_required: boolean
+          uncertainty_marker_text: string | null
+          verdict: string
+        }
+        Insert: {
+          attempt: number
+          created_at?: string
+          deterministic_result?: Json | null
+          failure_details?: string | null
+          gate_id: number
+          id?: string
+          model_votes?: Json | null
+          pipeline_run_iteration?: number
+          project_id: string
+          remediation_context_injected?: string | null
+          remediation_fired?: boolean
+          remediation_target_stage?: string | null
+          severity?: string | null
+          uncertainty_marker_required?: boolean
+          uncertainty_marker_text?: string | null
+          verdict: string
+        }
+        Update: {
+          attempt?: number
+          created_at?: string
+          deterministic_result?: Json | null
+          failure_details?: string | null
+          gate_id?: number
+          id?: string
+          model_votes?: Json | null
+          pipeline_run_iteration?: number
+          project_id?: string
+          remediation_context_injected?: string | null
+          remediation_fired?: boolean
+          remediation_target_stage?: string | null
+          severity?: string | null
+          uncertainty_marker_required?: boolean
+          uncertainty_marker_text?: string | null
+          verdict?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "gate_verdicts_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -12557,6 +12643,7 @@ export type Database = {
           elastic_modulus_gpa: number | null
           electrical_resistivity_ohm_m: number | null
           elongation_percent: number | null
+          embedding: string | null
           fatigue_strength_mpa: number | null
           hardness_scale: string | null
           hardness_value: number | null
@@ -12588,6 +12675,7 @@ export type Database = {
           elastic_modulus_gpa?: number | null
           electrical_resistivity_ohm_m?: number | null
           elongation_percent?: number | null
+          embedding?: string | null
           fatigue_strength_mpa?: number | null
           hardness_scale?: string | null
           hardness_value?: number | null
@@ -12619,6 +12707,7 @@ export type Database = {
           elastic_modulus_gpa?: number | null
           electrical_resistivity_ohm_m?: number | null
           elongation_percent?: number | null
+          embedding?: string | null
           fatigue_strength_mpa?: number | null
           hardness_scale?: string | null
           hardness_value?: number | null
@@ -12693,6 +12782,7 @@ export type Database = {
           artifact_id: string | null
           audio_clips: Json
           audio_status: string
+          audio_url: string | null
           author_user_id: string
           branched_from_entry_id: string | null
           citations: Json | null
@@ -12714,6 +12804,7 @@ export type Database = {
           artifact_id?: string | null
           audio_clips?: Json
           audio_status?: string
+          audio_url?: string | null
           author_user_id: string
           branched_from_entry_id?: string | null
           citations?: Json | null
@@ -12735,6 +12826,7 @@ export type Database = {
           artifact_id?: string | null
           audio_clips?: Json
           audio_status?: string
+          audio_url?: string | null
           author_user_id?: string
           branched_from_entry_id?: string | null
           citations?: Json | null
@@ -15730,6 +15822,35 @@ export type Database = {
             columns: ["triggered_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipeline_stage_locks: {
+        Row: {
+          locked_at: string
+          locked_by: string
+          project_id: string
+          stage: string
+        }
+        Insert: {
+          locked_at?: string
+          locked_by: string
+          project_id: string
+          stage: string
+        }
+        Update: {
+          locked_at?: string
+          locked_by?: string
+          project_id?: string
+          stage?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stage_locks_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "cad_lab_projects"
             referencedColumns: ["id"]
           },
         ]
@@ -21315,6 +21436,7 @@ export type Database = {
           batch_max: number | null
           batch_min: number | null
           created_at: string
+          embedding: string | null
           equipment: string[] | null
           evidence_url: string | null
           id: string
@@ -21330,6 +21452,7 @@ export type Database = {
           batch_max?: number | null
           batch_min?: number | null
           created_at?: string
+          embedding?: string | null
           equipment?: string[] | null
           evidence_url?: string | null
           id?: string
@@ -21345,6 +21468,7 @@ export type Database = {
           batch_max?: number | null
           batch_min?: number | null
           created_at?: string
+          embedding?: string | null
           equipment?: string[] | null
           evidence_url?: string | null
           id?: string
@@ -21378,6 +21502,7 @@ export type Database = {
           cert_code: string
           cert_label: string
           created_at: string
+          embedding: string | null
           evidence_url: string | null
           expires_at: string | null
           id: string
@@ -21392,6 +21517,7 @@ export type Database = {
           cert_code: string
           cert_label: string
           created_at?: string
+          embedding?: string | null
           evidence_url?: string | null
           expires_at?: string | null
           id?: string
@@ -21406,6 +21532,7 @@ export type Database = {
           cert_code?: string
           cert_label?: string
           created_at?: string
+          embedding?: string | null
           evidence_url?: string | null
           expires_at?: string | null
           id?: string
