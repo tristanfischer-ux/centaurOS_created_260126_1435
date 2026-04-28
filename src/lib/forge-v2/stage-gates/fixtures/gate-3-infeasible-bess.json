@@ -1,0 +1,18 @@
+{
+  "_fixture": "gate-3-infeasible-bess",
+  "_description": "Gate 3 (deterministic) — solver feasibility failure. Fang sizing solver returns status INFEASIBLE but emits a configuration anyway.",
+  "_triggers": "Gate 3",
+  "_status": "placeholder — Gate 3 sub-agent fills in the real fixture shape",
+  "sizing_result": {
+    "solver_status": "INFEASIBLE",
+    "configuration": {
+      "cell_count": 14400,
+      "pack_voltage_v": 1200,
+      "pack_capacity_kwh": 1500
+    },
+    "solver_message": "Constraint violation: pack voltage exceeds site grid connection limit of 400V AC"
+  },
+  "expected_gate_result": "FAIL",
+  "expected_severity": "P0",
+  "notes": "solver_status === 'INFEASIBLE' AND configuration is non-null is the exact INFEASIBLE-but-emitted pattern that Loop 8 caught. Gate 3 blocks on this."
+}

@@ -1,0 +1,16 @@
+{
+  "_fixture": "gate-1-brief-scope",
+  "_description": "Gate 1 (LLM vote) — brief scope alignment failure. Founder writes '1.5 MW battery' but Chase extracts '100 kW'.",
+  "_triggers": "Gate 1",
+  "_status": "placeholder — Gate 1 sub-agent fills in the real fixture shape",
+  "founder_raw_brief": "We need a 1.5 MW grid-scale battery storage system for a UK solar farm. Target cost below £2M installed.",
+  "chase_extracted_spec": {
+    "capacity_kw": 100,
+    "capacity_kwh": 200,
+    "chemistry": "LFP",
+    "installation_type": "containerised"
+  },
+  "expected_gate_result": "FAIL",
+  "expected_severity": "P0",
+  "notes": "Numeric unit confusion: 1.5 MW vs 100 kW is a 15× magnitude error. Gate 1 must catch this before any downstream work runs."
+}

@@ -69,6 +69,11 @@ import {
     FIRE_TIMEOUT_MS,
     MAX_PROJECTS_PER_TICK,
 } from "@/lib/forge-v2/stage-config"
+// Quality Gates v2.0 — flag-gated (ENABLE_QUALITY_GATES=false by default)
+// Phase 2 sub-agents fill in STAGE_GATE_MAP entries; until they do, this is
+// a no-op even when the flag is true.
+import { runGate, markUncertainty } from "@/lib/forge-v2/stage-gates/runner"
+import { STAGE_GATE_MAP } from "@/lib/forge-v2/stage-gates/registry"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -256,6 +261,57 @@ async function tickOnce(request: Request): Promise<TickResult> {
             .maybeSingle()
 
         if (trackingRow?.status === "done") {
+            // ── Quality Gate hook (flag-gated, default off) ──────────────
+            // Runs AFTER the stage is done, BEFORE advancing to the next
+            // stage. No-op when ENABLE_QUALITY_GATES !== 'true'.
+            // DECISION: gates are async / fire-and-forget relative to the
+            // autopilot advance — they write to gate_verdicts but do not
+            // block the tick's HTTP response. A FAIL verdict leaves
+            // autopilot_state.stage where it is (no advance), so the next
+            // tick re-evaluates whether to advance or re-fire.
+            if (process.env.ENABLE_QUALITY_GATES === "true") {
+                const gateForThisStage = STAGE_GATE_MAP[stage as AutopilotStage]
+                if (gateForThisStage) {
+                    // Read current pipeline_run_iteration from autopilot_state
+                    // (falls back to 1 for projects that pre-date this field)
+                    const pipelineIteration =
+                        (state as AutopilotState & { pipeline_run_iteration?: number })
+                            .pipeline_run_iteration ?? 1
+
+                    const gateResult = await runGate(
+                        gateForThisStage,
+                        project.id,
+                        stage,
+                        pipelineIteration,
+                    )
+
+                    if (gateResult.verdict === "FAIL" && gateResult.attempts_remaining > 0) {
+                        // Re-fire upstream stage with failure context on next tick.
+                        // Don't advance autopilot_state.stage — leave it at the
+                        // current stage so the cron re-fires the gate next tick.
+                        details.push({
+                            projectId: project.id,
+                            stage,
+                            action: "skip_running" as TickAction,
+                            ok: false,
+                            reason: `gate_${gateForThisStage.gateId} FAIL attempt=${gateResult.fail_count}/${2 - gateResult.attempts_remaining + gateResult.fail_count} — remediation pending`,
+                        })
+                        skipped++
+                        continue
+                    }
+
+                    if (gateResult.verdict === "FAIL" && gateResult.attempts_remaining === 0) {
+                        // Exhausted attempts — allow advance but stamp uncertainty marker
+                        await markUncertainty(project.id, gateForThisStage, gateResult)
+                        console.warn(
+                            `[autopilot-tick] gate_${gateForThisStage.gateId} FAIL after max attempts ` +
+                                `project=${project.id} — advancing with uncertainty marker`,
+                        )
+                    }
+                }
+            }
+            // ── end Quality Gate hook ────────────────────────────────────
+
             if (config.nextStage === "done") {
                 await markDone(project.id, stage)
                 details.push({

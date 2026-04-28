@@ -1,0 +1,23 @@
+{
+  "_fixture": "gate-2-module-parts",
+  "_description": "Gate 2 (deterministic) — module key-parts completeness failure. Max produces 'Thermal Management' module with key_parts: [].",
+  "_triggers": "Gate 2",
+  "_status": "placeholder — Gate 2 sub-agent fills in the real fixture shape",
+  "modules": [
+    {
+      "id": "module-thermal",
+      "name": "Thermal Management System",
+      "key_parts": []
+    },
+    {
+      "id": "module-bms",
+      "name": "Battery Management System",
+      "key_parts": [
+        { "name": "BMS controller", "quantity": 1, "unit": "each" }
+      ]
+    }
+  ],
+  "expected_gate_result": "FAIL",
+  "expected_severity": "P1",
+  "notes": "modules.every(m => m.key_parts.length > 0) must be false to trigger this fixture. Thermal Management has empty key_parts."
+}

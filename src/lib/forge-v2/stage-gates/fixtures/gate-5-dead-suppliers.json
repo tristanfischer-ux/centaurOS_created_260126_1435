@@ -1,0 +1,33 @@
+{
+  "_fixture": "gate-5-dead-suppliers",
+  "_description": "Gate 5 (deterministic) — supplier liveness failure. Supplier shortlist contains 404s and blog pages. Also tests <3 suppliers per BOM row.",
+  "_triggers": "Gate 5",
+  "_status": "placeholder — Gate 5 sub-agent fills in the real fixture shape",
+  "bom_rows": [
+    {
+      "part_name": "LFP prismatic cell 100Ah",
+      "suppliers": [
+        { "name": "CATL", "url": "https://www.catl.com/en/products/cell/", "status": null },
+        { "name": "EVE Energy", "url": "https://www.evebattery.com/en/products/", "status": null }
+      ],
+      "supplier_count": 2
+    },
+    {
+      "part_name": "BMS controller 16S",
+      "suppliers": [
+        { "name": "Orion BMS", "url": "https://www.orionbms.com/products/orion-bms-2/", "status": null },
+        { "name": "Phantom BMS", "url": "https://phantom-battery-management-nonexistent.com/bms-16s", "status": null },
+        { "name": "TI BMS Blog", "url": "https://e2e.ti.com/blogs_/b/analogedge/posts/battery-management", "status": null }
+      ],
+      "supplier_count": 3
+    }
+  ],
+  "expected_failures": [
+    "LFP prismatic cell 100Ah: only 2 suppliers, expected ≥3",
+    "BMS controller 16S: phantom-battery-management-nonexistent.com returns 404",
+    "BMS controller 16S: ti.com URL resolves to blog post, not a manufacturer product page"
+  ],
+  "expected_gate_result": "FAIL",
+  "expected_severity": "P1",
+  "notes": "Gate 5 must: (1) HEAD/GET each URL with p-limit chunked Promise.allSettled, (2) check ≥3 suppliers per BOM row, (3) flag blog posts and marketplace product pages as invalid. Exception classes for proprietary-only items are allowed."
+}

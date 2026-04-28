@@ -1,0 +1,24 @@
+{
+  "_fixture": "gate-6-hallucinated-standards",
+  "_description": "Gate 6 (deterministic) — standards hallucination failure. Chase cites 'UL 9540' but only 'UL 9540A' exists in the design_standards table.",
+  "_triggers": "Gate 6",
+  "_status": "placeholder — Gate 6 sub-agent fills in the real fixture shape",
+  "chase_cited_standards": [
+    "UL 9540",
+    "IEC 62619",
+    "BS EN 50604-1",
+    "ASHRAE 15"
+  ],
+  "design_standards_table_entries": [
+    { "code": "UL 9540A", "title": "Test Method for Evaluating Thermal Runaway Fire Propagation in Battery Energy Storage Systems" },
+    { "code": "IEC 62619", "title": "Secondary lithium cells and batteries for use in industrial applications" },
+    { "code": "BS EN 50604-1", "title": "Secondary lithium batteries for light EV applications" }
+  ],
+  "expected_failures": [
+    "UL 9540: not in design_standards table. Closest match: UL 9540A. Likely hallucinated.",
+    "ASHRAE 15: not in design_standards table. Status: verify manually (table may not have ASHRAE coverage)."
+  ],
+  "expected_gate_result": "FAIL",
+  "expected_severity": "P1",
+  "notes": "Gate 6 must distinguish: (1) 'in table but wrong code' → hard flag, (2) 'not in table' → soft flag with 'verify' note (table may have gaps). Never conflate 'not in our table' with 'does not exist'."
+}

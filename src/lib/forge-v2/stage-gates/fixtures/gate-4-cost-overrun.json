@@ -1,0 +1,19 @@
+{
+  "_fixture": "gate-4-cost-overrun",
+  "_description": "Gate 4 (hybrid, v2.1) — cost realism failure. Founder target £80k, BOM rolls up to £305k (3.8× over).",
+  "_triggers": "Gate 4",
+  "_status": "placeholder — Gate 4 sub-agent fills in (v2.1, deferred from v2.0)",
+  "brief_target_cost_gbp": 80000,
+  "bom_total_gbp": 305000,
+  "ratio": 3.8125,
+  "finn_narrative": "The cost waterfall shows materials at £245k and assembly at £60k, resulting in a total of £305k.",
+  "oracle_benchmark": {
+    "product_category": "compact-electronics-enclosure",
+    "uk_low_gbp": 65000,
+    "uk_high_gbp": 95000,
+    "confidence": "high"
+  },
+  "expected_gate_result": "FAIL",
+  "expected_severity": "P1",
+  "notes": "Gate 4 is HYBRID. Deterministic check: bom_total > brief_target * 1.5 → hard block. LLM secondary is NOT called when deterministic fails. Target rewriting is PROHIBITED — escalate to uncertainty marker instead."
+}
