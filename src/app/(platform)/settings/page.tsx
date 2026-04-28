@@ -6,24 +6,19 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { SignOutCard } from './sign-out-card'
-import { RestartSetupWizardCard } from '@/components/onboarding/restart-setup-wizard-card'
-import { ClearDemoDataButton } from '@/components/settings/clear-demo-data-button'
 import {
     User,
     ArrowRight,
-    Bell,
     Shield,
-    Mail,
-    FileSpreadsheet,
+    CreditCard,
     Trash2,
 } from 'lucide-react'
 
 /**
  * Account Settings Page (default settings landing)
  *
- * @description Overview of the user's account with quick links to profile,
- * notification preferences, and sign-out. This is the first thing users see
- * when they click Settings.
+ * @description Overview of the user's account with quick links to billing
+ * and privacy. Post-pivot simplified — no teams, no integrations, no demo data.
  */
 export default async function SettingsPage() {
     const supabase = await createClient()
@@ -75,20 +70,20 @@ export default async function SettingsPage() {
                 </CardContent>
             </Card>
 
-            {/* Quick links */}
-            <div className="grid gap-4 grid-cols-1 md:grid-cols-3">
+            {/* Quick links — Billing & Usage + Privacy & Data */}
+            <div className="grid gap-4 grid-cols-1 md:grid-cols-2">
                 <Link href="/settings/billing" className="block">
                     <Card className="h-full hover:shadow-md transition-shadow">
                         <CardHeader className="pb-2">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 rounded-lg bg-international-orange-light text-international-orange">
-                                    <Mail className="h-5 w-5" />
+                                    <CreditCard className="h-5 w-5" />
                                 </div>
                                 <CardTitle className="text-base">Billing & Usage</CardTitle>
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <CardDescription>Manage your subscription, view AI usage, and upgrade your plan.</CardDescription>
+                            <CardDescription>Manage your subscription, view smart assist usage, and upgrade your plan.</CardDescription>
                         </CardContent>
                     </Card>
                 </Link>
@@ -104,54 +99,11 @@ export default async function SettingsPage() {
                             </div>
                         </CardHeader>
                         <CardContent>
-                            <CardDescription>Exercise your GDPR rights: access, export, or delete your data.</CardDescription>
-                        </CardContent>
-                    </Card>
-                </Link>
-
-                <Link href="/settings/integrations" className="block">
-                    <Card className="h-full hover:shadow-md transition-shadow">
-                        <CardHeader className="pb-2">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 rounded-lg bg-success/10 text-success">
-                                    <FileSpreadsheet className="h-5 w-5" />
-                                </div>
-                                <CardTitle className="text-base">Integrations</CardTitle>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <CardDescription>Sync tasks and objectives to Google Sheets for your whole team.</CardDescription>
+                            <CardDescription>Exercise your rights under United Kingdom and European Union data law: access, export, or delete your personal data.</CardDescription>
                         </CardContent>
                     </Card>
                 </Link>
             </div>
-
-            {/* Setup wizard restart */}
-            <ClearDemoDataButton />
-            <RestartSetupWizardCard />
-
-            {/* Notification preferences teaser */}
-            <Card>
-                <CardHeader>
-                    <div className="flex items-center gap-2">
-                        <Bell className="h-5 w-5 text-international-orange" />
-                        <CardTitle>Notifications</CardTitle>
-                    </div>
-                    <CardDescription>
-                        Configure how and when you receive notifications from ForgeOS.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <div className="flex flex-col items-center justify-center py-4 text-center rounded-lg bg-muted/30">
-                        <Bell className="h-8 w-8 text-muted-foreground mb-3" />
-                        <p className="text-sm font-medium text-foreground">Coming soon</p>
-                        <p className="text-xs text-muted-foreground mt-1 max-w-sm">
-                            Granular notification controls are being built. You'll be able to configure
-                            email, in-app, and Telegram notification preferences here.
-                        </p>
-                    </div>
-                </CardContent>
-            </Card>
 
             {/* Sign out */}
             <SignOutCard />

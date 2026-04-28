@@ -214,21 +214,13 @@ const ROUTE_DESCRIPTIONS: Record<string, { title: string; summary: string }> = {
     title: "The Forge — Templates",
     summary: "The user is browsing design templates — pre-built starting points for common products.",
   },
-  "/settings/company": {
-    title: "Company Settings",
-    summary: "The user is configuring company-level settings — foundry name, logo, and organizational details.",
-  },
   "/settings/billing": {
     title: "Billing Settings",
     summary: "The user is managing billing — subscription plan, payment methods, and invoices.",
   },
-  "/settings/intelligence": {
-    title: "AI Intelligence Settings",
-    summary: "The user is configuring AI intelligence preferences — model selection, specialist behavior, and data permissions.",
-  },
-  "/settings/help": {
-    title: "Help & Support",
-    summary: "The user is viewing help and support resources — documentation, FAQs, and contact options.",
+  "/settings/privacy": {
+    title: "Privacy & Data",
+    summary: "The user is managing their personal data rights — access, export, or deletion under United Kingdom and European Union law.",
   },
   "/provider-portal/pricing": {
     title: "Provider Portal — Pricing",
