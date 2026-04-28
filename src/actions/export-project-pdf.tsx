@@ -4652,7 +4652,7 @@ async function exportProjectPdfInternal(
             }
         } | null)?.designBrief ?? null
 
-        const regulatory: Regulatory[] = Array.isArray(designBrief?.regulatory)
+        const regulatoryFromBrief: Regulatory[] = Array.isArray(designBrief?.regulatory)
             ? designBrief!.regulatory!
                   .filter((r) => r && typeof r.code === "string")
                   .map((r) => ({
@@ -4682,6 +4682,79 @@ async function exportProjectPdfInternal(
                               : undefined,
                   }))
             : []
+
+        // Fix 4 (audit Fix 4, 2026-04-27): re-fetch design_standards at render time
+        // and merge any database standards not already in the brief's regulatory array.
+        //
+        // Prior behaviour: the regulatory section was populated only from what Max
+        // wrote into designBrief.regulatory during decomposition — no re-query of the
+        // 252-row design_standards table at PDF render time. This caused the
+        // "bibliography-style regulatory" pattern (all rows "not-started", generic
+        // summaries) flagged in every loop critique.
+        //
+        // New behaviour: detect the domain from project subject + module names, query
+        // design_standards for matching rows (up to 20), and merge any standard codes
+        // not already present in regulatoryFromBrief as additional rows with
+        // status="not-started" (an explicit signal they need assessment, not a gap).
+        //
+        // This is additive — existing brief rows are preserved and shown first.
+        let regulatory: Regulatory[] = regulatoryFromBrief
+        try {
+            const { detectIndustryDomain } = await import(
+                "@/lib/cad-lab/industry-domains"
+            )
+            const projectSubjectStr = typeof project.subject === "string" ? project.subject : ""
+            const modulesRawSubjects = Array.isArray(project.modules)
+                ? (project.modules as Array<{ name?: string; purpose?: string }>)
+                      .map((m) => `${m.name ?? ""} ${m.purpose ?? ""}`)
+                      .join(" ")
+                : ""
+            const domainDetectText = `${projectSubjectStr} ${modulesRawSubjects}`.trim()
+            const industryDomain = detectIndustryDomain(domainDetectText)
+
+            const { data: dsRows } = await admin
+                .from("design_standards")
+                .select("standard_code, standard_name, issuing_body, summary")
+                .eq("industry_domain", industryDomain)
+                .is("superseded_by", null)
+                .limit(20)
+
+            if (dsRows && dsRows.length > 0) {
+                const existingCodes = new Set(
+                    regulatoryFromBrief.map((r) => r.code.toUpperCase()),
+                )
+                const dbStandards: Regulatory[] = dsRows
+                    .filter((s) => {
+                        const code = String(s.standard_code ?? "").toUpperCase()
+                        return code.length > 0 && !existingCodes.has(code)
+                    })
+                    .map((s) => ({
+                        code: String(s.standard_code ?? ""),
+                        name: String(s.standard_name ?? ""),
+                        status: "not-started" as const,
+                        summary: String(s.summary ?? ""),
+                        applicability: "Applies to this product domain — applicability assessment required",
+                        designImpact: undefined,
+                        evidenceRequired: undefined,
+                        ownerRole: undefined,
+                        gapAction: undefined,
+                    }))
+                if (dbStandards.length > 0) {
+                    // Brief rows first (higher fidelity — Max has assessed them);
+                    // database rows after as "needs assessment" entries.
+                    regulatory = [...regulatoryFromBrief, ...dbStandards]
+                    console.info(
+                        `[export-pdf:fix4] design_standards augmentation: domain=${industryDomain} brief_rows=${regulatoryFromBrief.length} db_added=${dbStandards.length}`,
+                    )
+                }
+            }
+        } catch (dsErr) {
+            // Non-fatal — regulatory array falls back to brief-only rows
+            console.warn(
+                "[export-pdf:fix4] design_standards re-fetch failed (non-fatal):",
+                dsErr instanceof Error ? dsErr.message : dsErr,
+            )
+        }
 
         // Modules → PdfModule (with all the richness).
         const moduleNameById = new Map<string, string>()
