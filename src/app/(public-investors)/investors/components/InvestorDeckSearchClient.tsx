@@ -18,7 +18,6 @@
 
 import { useState, useCallback, useTransition, useRef, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import {
   searchInvestors,
@@ -929,15 +928,6 @@ function MatchCard({
   const [isEnriching, startEnrichTransition] = useTransition()
   const [enrichFailed, setEnrichFailed] = useState(false)
 
-  // W27: use router.push so the whole card is navigable without a nested <a>
-  const router = useRouter()
-
-  const handleCardClick = (e: React.MouseEvent) => {
-    // Only navigate on plain card-body clicks; buttons handle their own events
-    // and call e.stopPropagation() before this bubbles.
-    router.push(`/investors/${firm.id}`)
-  }
-
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!isPaid) return
@@ -1030,19 +1020,29 @@ function MatchCard({
     )
   }
 
-  // Unlocked card — W27: use a div + onClick instead of <Link> wrapping interactive
-  // children (<button> inside <a> is invalid HTML5 and causes unreliable click
-  // behaviour across browsers; nested buttons' stopPropagation can't prevent
-  // the enclosing Link from navigating in some React reconciliation paths).
+  // Unlocked card — W27 "cover-link" pattern:
+  //   - Outer div is position:relative and holds all content.
+  //   - An absolutely-positioned <Link> (the "cover") fills the entire card.
+  //     It is the only <a> tag so HTML5 interactive-inside-interactive is
+  //     avoided. It uses aria-hidden + tabIndex=-1 so screen-readers use the
+  //     card's own landmark, not a duplicate link.
+  //   - Interactive children (Save button, accordion) sit above the cover via
+  //     position:relative + z-index:10. They call e.stopPropagation() so their
+  //     own onClick fires without the cover's href navigation also triggering.
+  //   - This approach (a) works in real browsers, (b) is traversable by
+  //     agent-browser / Playwright via the native <a> href, (c) keeps the
+  //     card content semantically outside the anchor so it's valid HTML5.
   return (
-    // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
     <div
-      role="link"
-      tabIndex={0}
-      onClick={handleCardClick}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); router.push(`/investors/${firm.id}`) } }}
-      className={`block bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
+      className={`relative bg-card shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px`}
     >
+      {/* Cover link — makes the whole card navigable via native <a> href */}
+      <Link
+        href={`/investors/${firm.id}`}
+        className="absolute inset-0 rounded-xl"
+        aria-hidden
+        tabIndex={-1}
+      />
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <div className="min-w-0 flex-1">
@@ -1092,11 +1092,12 @@ function MatchCard({
             return null
           })()}
 
-          {/* Save button — below score, paid only */}
+          {/* Save button — below score, paid only. relative z-10 lifts above cover link. */}
           {onSave && (
             <button
+              type="button"
               onClick={handleSaveClick}
-              className={`mt-1.5 text-[10px] px-2 py-0.5 rounded border transition-all ${
+              className={`relative z-10 mt-1.5 text-[10px] px-2 py-0.5 rounded border transition-all ${
                 isSaved
                   ? 'border-international-orange text-international-orange bg-international-orange/10'
                   : 'border-border text-muted-foreground hover:border-international-orange hover:text-international-orange'
@@ -1282,9 +1283,11 @@ function MatchCard({
       )}
 
       {/* ── Why-fit / how-to-pitch expand panel (paid only) ── */}
+      {/* relative z-10 lifts the accordion above the cover-link overlay so clicks reach the button. */}
       {isPaid && (
-        <div className="mt-1">
+        <div className="relative z-10 mt-1">
           <button
+            type="button"
             onClick={handleExpand}
             className="text-xs text-international-orange font-semibold hover:underline cursor-pointer"
           >
