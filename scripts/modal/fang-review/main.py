@@ -55,6 +55,16 @@ from typing import Any
 
 import modal
 
+# fastapi is not installed in the modal CLI's local venv (it IS installed in
+# the Modal container image via pip_install above). This try/except lets
+# `modal deploy` import the file without error. At container startup, the
+# real fastapi.Request class is resolved and FastAPI correctly treats `request`
+# as an injection target (not a query parameter).
+try:
+    from fastapi import Request as _FastAPIRequest
+except ImportError:  # pragma: no cover — only hits at deploy-time parse
+    _FastAPIRequest = None  # type: ignore[assignment,misc]
+
 
 # ──────────────────────────────────────────────────────────────────────
 # Modal app + image
@@ -123,7 +133,7 @@ def _describe_tool_call(tool_name: str, tool_input: dict) -> str:
     # min_containers kept at 0 — Fang fires per-module, bursty, OK to cold-start.
 )
 @modal.fastapi_endpoint(method="POST")
-def run_fang_review(payload: dict, request) -> dict:  # noqa: D401
+def run_fang_review(payload: dict, request: _FastAPIRequest) -> dict:  # noqa: D401
     """
     HTTP entrypoint for Vercel TS wrapper.
 
