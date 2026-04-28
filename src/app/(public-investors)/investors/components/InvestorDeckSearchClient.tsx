@@ -34,6 +34,7 @@ import {
   type FirmMatchResult,
 } from '@/actions/investors'
 import { Loader2 } from 'lucide-react'
+import { extractDocumentText } from '@/actions/extract-document-text'
 import { InvestorStatsCharts } from './InvestorStatsCharts'
 import { MatchPillarBars } from '@/app/(platform)/investors/components/MatchPillarBars'
 import type { InvestorDirectoryStats } from '@/actions/investors'
@@ -723,6 +724,31 @@ function PastePanel({
   isPending,
   isPaid,
 }: PastePanelProps) {
+  const [isExtracting, setIsExtracting] = useState(false)
+
+  const handleFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setIsExtracting(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const result = await extractDocumentText(formData)
+      if ('success' in result && result.success) {
+        setQuery(result.text.slice(0, 2000))
+        toast.success(`Text extracted from ${result.fileName}`)
+      } else {
+        toast.error(('error' in result && result.error) ? result.error : 'Could not extract text from file')
+      }
+    } catch {
+      toast.error('Failed to extract text from file')
+    } finally {
+      setIsExtracting(false)
+      // Reset so the same file can be re-selected if needed
+      e.target.value = ''
+    }
+  }, [setQuery])
+
   return (
     <div className="bg-card rounded-xl p-7 mb-7 shadow-sm">
       {/* Header */}
@@ -782,8 +808,18 @@ function PastePanel({
       {/* Actions row */}
       <div className="flex items-center justify-between mt-3.5 gap-4 flex-wrap">
         <label className="inline-flex items-center gap-2 text-sm text-muted-foreground px-3 py-2 border border-dashed border-input rounded-lg cursor-pointer hover:border-international-orange hover:text-international-orange transition-all">
-          📎 or upload .pdf .pptx .docx
-          <input type="file" accept=".pdf,.pptx,.docx" className="hidden" />
+          {isExtracting ? (
+            <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Extracting…</>
+          ) : (
+            '📎 or upload .pdf .pptx .docx'
+          )}
+          <input
+            type="file"
+            accept=".pdf,.pptx,.docx"
+            className="hidden"
+            onChange={handleFileChange}
+            disabled={isExtracting}
+          />
         </label>
         <button
           onClick={onFindInvestors}
