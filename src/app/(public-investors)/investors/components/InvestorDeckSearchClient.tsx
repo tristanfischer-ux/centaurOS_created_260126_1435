@@ -17,6 +17,7 @@
 'use client'
 
 import { useState, useCallback, useTransition, useRef, useMemo, useEffect } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import {
@@ -189,6 +190,11 @@ export function InvestorDeckSearchClient({
   const [searchFailureMessage, setSearchFailureMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  // W45b: URL persistence for back-nav restore
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const restoredFromUrl = useRef(false)
 
   // Forge Capital top-matches pagination state. Resets to page 0 on every
   // new search so the founder always sees their best matches first.
@@ -204,6 +210,13 @@ export function InvestorDeckSearchClient({
 
   // ── Search ────────────────────────────────────────────────────────────────
 
+  // W45b: restore search from URL on back-nav. Placed before runSearch def
+  // so the effect can reference the stable callback after mount.
+  // NOTE: effect is defined here but useEffect runs after all hooks —
+  // runSearch is assigned before effects fire, so this is safe. We use
+  // a separate useEffect below after runSearch is defined.
+  const runSearchRef = useRef<((q: string) => void) | null>(null)
+
   const runSearch = useCallback((q: string) => {
     const trimmed = q.trim()
     if (trimmed.length < 10) {
@@ -213,6 +226,10 @@ export function InvestorDeckSearchClient({
     setLastQuery(trimmed)
     setHasSearched(true)
     setSearchFailureMessage(null)
+    // W45b: mirror query to URL so back-nav restores it
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('q', trimmed)
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     startTransition(async () => {
       try {
         const result = await searchInvestors({
@@ -268,7 +285,25 @@ export function InvestorDeckSearchClient({
         toast.error('Search failed — please try again.')
       }
     })
-  }, [])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pathname, router, searchParams])
+
+  // W45b: sync runSearch ref so the restoration effect below can call it
+  runSearchRef.current = runSearch
+
+  // W45b: on mount, restore search state if ?q= is present in the URL
+  // (happens when user presses Back from /investors/[id]).
+  useEffect(() => {
+    if (restoredFromUrl.current) return
+    const q = searchParams.get('q')
+    if (q && q.trim().length >= 10) {
+      restoredFromUrl.current = true
+      setQuery(q.trim())
+      if (textareaRef.current) textareaRef.current.value = q.trim()
+      runSearchRef.current?.(q.trim())
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // intentionally empty — run once on mount only
 
   const handleChipClick = (chipText: string) => {
     // Extract the quoted example from the chip label

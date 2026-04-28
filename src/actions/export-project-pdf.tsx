@@ -4984,17 +4984,25 @@ async function exportProjectPdfInternal(
         const certificationsById = new Map<string, string[] | null>()
         const descriptionById = new Map<string, string | null>()
         if (supplierIds.length > 0) {
-            const { data: globals } = await admin
-                .from("suppliers")
-                .select("id, company_info")
-                .in("id", supplierIds)
-            if (globals) {
-                for (const g of globals) {
-                    const info = g.company_info as { hq?: unknown } | null
-                    const hq = info && typeof info.hq === "string" ? info.hq : null
-                    hqById.set(g.id as string, hq)
-                }
-            }
+            // Fix 3 (audit Fix 3, 2026-04-27): DEPRECATED — the 678-row `suppliers`
+            // legacy table has fabricated trust signals (used_by_count,
+            // community_rating, verification_status) and is not linked to
+            // marketplace_listings by FK. The supplier IDs in
+            // forge_supplier_shortlist are marketplace_listings.id values, so the
+            // suppliers table join typically returns 0 rows. The country/HQ
+            // fallback below (marketplace_listings.country) provides equivalent
+            // information from the real canonical database.
+            //
+            // The suppliers table query is intentionally removed here. The
+            // hqById map is populated entirely from marketplace_listings.country
+            // in the block below. If a migration to delete the legacy suppliers
+            // table is run (planned 2026-05-15), this comment can be removed.
+            //
+            // DEPRECATED CALL (do not restore):
+            // const { data: globals } = await admin
+            //     .from("suppliers")
+            //     .select("id, company_info")
+            //     .in("id", supplierIds)
             // V1.1 FIX (2026-04-25, per Tristan supply-chain critique): the PDF
             // was previously rendering only company name + HQ + score. The
             // marketplace_listings table holds far richer data (founded year,
@@ -5105,9 +5113,14 @@ async function exportProjectPdfInternal(
             admin
                 .from("process_capabilities")
                 .select("id", { count: "exact", head: true }),
+            // Fix 3 (audit Fix 3, 2026-04-27): replaced legacy `suppliers` table
+            // count (678 fabricated rows) with marketplace_listings Products/Services
+            // count (19,928 real manufacturer rows). This is the canonical supplier
+            // database used by the autopilot pipeline.
             admin
-                .from("suppliers")
-                .select("id", { count: "exact", head: true }),
+                .from("marketplace_listings")
+                .select("id", { count: "exact", head: true })
+                .in("category", ["Products", "Services"]),
             admin
                 .from("marketplace_listings")
                 .select("id", { count: "exact", head: true }),
