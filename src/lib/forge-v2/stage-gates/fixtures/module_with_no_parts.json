@@ -1,0 +1,47 @@
+{
+  "_fixture": "module_with_no_parts",
+  "_description": "Gate 2 regression fixture. Contains 3 modules: one valid, one with empty key_parts, one with a placeholder value. Gate 2 should report 2 failing modules.",
+  "_expected_verdict": "FAIL",
+  "_expected_severity": "P1",
+  "_expected_failing_module_ids": ["thermal-management", "power-electronics"],
+  "modules": [
+    {
+      "id": "battery-cells",
+      "name": "Battery Cell Pack",
+      "purpose": "Stores electrochemical energy and delivers DC power at nominal voltage",
+      "inputs": ["charging current", "thermal management coolant"],
+      "outputs": ["DC bus voltage", "state-of-charge telemetry"],
+      "keyParts": [
+        "21700 lithium-iron-phosphate cylindrical cells (16S2P configuration)",
+        "nickel cell interconnect strips",
+        "cell-level fusing wire"
+      ],
+      "leadWeeks": 12,
+      "leadTimeSource": "ai-estimate"
+    },
+    {
+      "id": "thermal-management",
+      "name": "Thermal Management System",
+      "purpose": "Maintains battery cell temperature within safe operating range",
+      "inputs": ["ambient temperature", "cell heat output"],
+      "outputs": ["coolant flow", "temperature telemetry"],
+      "keyParts": [],
+      "leadWeeks": 8,
+      "leadTimeSource": "ai-estimate",
+      "_fixture_note": "FAILING: keyParts is empty — Gate 2 rule 1 (≥1 key part required)"
+    },
+    {
+      "id": "power-electronics",
+      "name": "Power Electronics Module",
+      "purpose": "Converts and conditions DC power from cells to inverter input",
+      "inputs": ["raw DC from cells", "control signals"],
+      "outputs": ["conditioned DC bus", "fault telemetry"],
+      "keyParts": [
+        "None declared"
+      ],
+      "leadWeeks": 10,
+      "leadTimeSource": "ai-estimate",
+      "_fixture_note": "FAILING: key part is literal 'None declared' — Gate 2 rule 3 (no placeholder values)"
+    }
+  ]
+}
