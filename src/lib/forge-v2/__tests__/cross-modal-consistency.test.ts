@@ -8,14 +8,15 @@
  * Test matrix:
  *   (1) module 5-vessels-vs-BOM-3-vessels:           BLOCKER fires (40% short)
  *   (2) module 5-vessels-vs-BOM-5-vessels:           OK (0% divergence)
- *   (3) module 5-vessels-vs-BOM-7-vessels:           BLOCKER fires (29% over)
+ *   (3) module 5-vessels-vs-BOM-7-vessels:           OK (BOM over keyParts is normal — Loop 26 fix)
  *   (4) cost rollup divergence >1%:                  BLOCKER fires
  *   (5) cost rollup divergence exactly at 1%:        no BLOCKER (boundary)
  *   (6) cost rollup divergence <1%:                  OK
  *   (7) missing module_id mapping (no BOM rows):     WARNING not BLOCKER
  *   (8) module with no keyParts declared:            WARNING not BLOCKER
  *   (9) illustration URL present:                    WARNING (skipped) not BLOCKER
- *  (10) Fang layout count divergence >10%:           BLOCKER fires
+ *  (10) Fang layout SHORTER than keyParts by >10%:   BLOCKER fires
+ * (10b) Fang layout LONGER than keyParts:            OK (Loop 26 fix — one-sided)
  *  (11) Fang layout count divergence ≤10%:           OK
  *  (12) passed flag reflects blockers correctly
  *  (13) multiple modules — only divergent modules fire BLOCKER
@@ -76,17 +77,13 @@ describe("runCrossModalCheck — module_part_count axis", () => {
         expect(verdict.blockers.filter((b) => b.axis === "module_part_count")).toHaveLength(0)
     })
 
-    it("(3) 5 keyParts vs 7 BOM rows → BLOCKER fires (over too, ~29% divergence)", () => {
+    it("(3) 5 keyParts vs 7 BOM rows → OK (BOM over keyParts is normal — keyParts is curated, BOM is exhaustive)", () => {
         const verdict = runCrossModalCheck(
             makeInput({ bomPartCountByModuleId: { "mod-pv": 7 } }),
         )
-        expect(verdict.passed).toBe(false)
-        const blocker = verdict.blockers.find((b) => b.axis === "module_part_count")
-        expect(blocker).toBeDefined()
-        expect(blocker?.expected).toBe(5)
-        expect(blocker?.actual).toBe(7)
-        // |7-5|/7 = 2/7 ≈ 28.6% > 10%
-        expect(blocker?.divergence_pct).toBeGreaterThan(0.1)
+        // One-sided gate: BOM longer than keyParts is normal procurement detail,
+        // not a divergence. Only BOM-shorter-than-keyParts should fire.
+        expect(verdict.blockers.filter((b) => b.axis === "module_part_count")).toHaveLength(0)
     })
 
     it("(7) module has keyParts but no BOM rows → WARNING not BLOCKER", () => {
@@ -184,17 +181,26 @@ describe("runCrossModalCheck — system_cost_rollup axis", () => {
 })
 
 describe("runCrossModalCheck — fang_layout_count axis", () => {
-    it("(10) Fang layout count divergence >10% → BLOCKER fires", () => {
+    it("(10) Fang layout SHORTER than keyParts by >10% → BLOCKER fires", () => {
         const verdict = runCrossModalCheck(
             makeInput({
-                fangLayoutPlacementsByModuleId: { "mod-pv": 6 }, // 5 keyParts vs 6 placements → ~17%
+                fangLayoutPlacementsByModuleId: { "mod-pv": 3 }, // 5 keyParts vs 3 placements → 40% short
             }),
         )
         const blocker = verdict.blockers.find((b) => b.axis === "fang_layout_count")
         expect(blocker).toBeDefined()
         expect(blocker?.module_id).toBe("mod-pv")
         expect(blocker?.expected).toBe(5)
-        expect(blocker?.actual).toBe(6)
+        expect(blocker?.actual).toBe(3)
+    })
+
+    it("(10b) Fang layout LONGER than keyParts → OK (sub-assemblies / fasteners legitimately exceed curated keyParts)", () => {
+        const verdict = runCrossModalCheck(
+            makeInput({
+                fangLayoutPlacementsByModuleId: { "mod-pv": 6 }, // 5 keyParts vs 6 placements
+            }),
+        )
+        expect(verdict.blockers.filter((b) => b.axis === "fang_layout_count")).toHaveLength(0)
     })
 
     it("(11) Fang layout count divergence ≤10% → OK", () => {

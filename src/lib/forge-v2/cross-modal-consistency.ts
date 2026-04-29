@@ -130,13 +130,19 @@ export interface CrossModalVerdict {
 /**
  * Divergence threshold for per-module part count checks.
  *
- * A module whose BOM row count differs from its keyParts[] count by more
- * than this fraction is a BLOCKER. Examples:
+ * A module whose BOM row count is SHORTER than its keyParts[] count by more
+ * than this fraction is a BLOCKER. The check is one-sided: BOM longer than
+ * keyParts is normal — keyParts is a curated summary of headline parts,
+ * BOM master is the exhaustive procurement list (fasteners, gaskets, cable,
+ * sub-assemblies). BOM shorter than keyParts means a headline part has no
+ * procurement row, which IS the failure mode this gate exists to catch.
+ *
+ * Examples (assume threshold = 10%):
  *   - 5 keyParts, 3 BOM rows → 40% short → BLOCKER
- *   - 5 keyParts, 7 BOM rows → 40% over  → BLOCKER
+ *   - 5 keyParts, 4 BOM rows → 20% short → BLOCKER
  *   - 5 keyParts, 5 BOM rows → 0%        → OK
- *   - 5 keyParts, 6 BOM rows → 20% over  → BLOCKER (20% > 10%)
- *   - 5 keyParts, 4 BOM rows → 20% short → BLOCKER (20% > 10%)
+ *   - 5 keyParts, 6 BOM rows → 20% over  → OK (BOM is exhaustive, this is normal)
+ *   - 5 keyParts, 7 BOM rows → 40% over  → OK (BOM is exhaustive, this is normal)
  */
 const MODULE_PART_COUNT_BLOCKER_THRESHOLD = 0.1
 
@@ -153,7 +159,11 @@ const SYSTEM_COST_ROLLUP_BLOCKER_THRESHOLD = 0.01
 /**
  * Divergence threshold for Fang layout placement count checks.
  *
- * Uses the same 10% threshold as the module part count check.
+ * Uses the same 10% threshold as the module part count check, and the same
+ * one-sided semantics: a Fang layout with FEWER placements than keyParts is
+ * a BLOCKER (a headline part has no spatial placement). MORE placements
+ * than keyParts is OK — Fang may legitimately add fasteners, brackets, or
+ * sub-assembly placements that the curated keyParts list omits.
  */
 const FANG_LAYOUT_COUNT_BLOCKER_THRESHOLD = 0.1
 
@@ -208,7 +218,11 @@ export function runCrossModalCheck(input: CrossModalInput): CrossModalVerdict {
         }
 
         const divergencePct = computeDivergencePct(keyPartsCount, bomCount)
-        if (divergencePct > MODULE_PART_COUNT_BLOCKER_THRESHOLD) {
+        // INTENT: one-sided check. BOM longer than keyParts is normal — keyParts
+        // is curated, BOM is exhaustive (fasteners, gaskets, sub-assemblies).
+        // Only fire when BOM is SHORTER than keyParts by more than the threshold,
+        // i.e. a headline part has no procurement row.
+        if (bomCount < keyPartsCount && divergencePct > MODULE_PART_COUNT_BLOCKER_THRESHOLD) {
             blockers.push({
                 module_id: moduleId,
                 axis: "module_part_count",
@@ -217,9 +231,9 @@ export function runCrossModalCheck(input: CrossModalInput): CrossModalVerdict {
                 divergence_pct: divergencePct,
                 explanation:
                     `Module "${moduleName}" declares ${keyPartsCount} part class${keyPartsCount !== 1 ? "es" : ""} ` +
-                    `in keyParts[] but the BOM master has ${bomCount} row${bomCount !== 1 ? "s" : ""} ` +
+                    `in keyParts[] but the BOM master has only ${bomCount} row${bomCount !== 1 ? "s" : ""} ` +
                     `for source_module_id="${moduleId}" ` +
-                    `— divergence ${(divergencePct * 100).toFixed(0)}% exceeds the ${(MODULE_PART_COUNT_BLOCKER_THRESHOLD * 100).toFixed(0)}% threshold.`,
+                    `— shortfall ${(divergencePct * 100).toFixed(0)}% exceeds the ${(MODULE_PART_COUNT_BLOCKER_THRESHOLD * 100).toFixed(0)}% threshold.`,
             })
         }
     }
@@ -244,7 +258,9 @@ export function runCrossModalCheck(input: CrossModalInput): CrossModalVerdict {
             }
 
             const divergencePct = computeDivergencePct(keyPartsCount, layoutCount)
-            if (divergencePct > FANG_LAYOUT_COUNT_BLOCKER_THRESHOLD) {
+            // INTENT: one-sided. More placements than keyParts is fine; fewer
+            // means a headline part wasn't placed in the layout.
+            if (layoutCount < keyPartsCount && divergencePct > FANG_LAYOUT_COUNT_BLOCKER_THRESHOLD) {
                 blockers.push({
                     module_id: moduleId,
                     axis: "fang_layout_count",
@@ -253,8 +269,8 @@ export function runCrossModalCheck(input: CrossModalInput): CrossModalVerdict {
                     divergence_pct: divergencePct,
                     explanation:
                         `Module "${moduleName}" has ${keyPartsCount} keyPart${keyPartsCount !== 1 ? "s" : ""} ` +
-                        `but Fang's spatial layout shows ${layoutCount} placement${layoutCount !== 1 ? "s" : ""} ` +
-                        `— divergence ${(divergencePct * 100).toFixed(0)}% exceeds the ${(FANG_LAYOUT_COUNT_BLOCKER_THRESHOLD * 100).toFixed(0)}% threshold.`,
+                        `but Fang's spatial layout shows only ${layoutCount} placement${layoutCount !== 1 ? "s" : ""} ` +
+                        `— shortfall ${(divergencePct * 100).toFixed(0)}% exceeds the ${(FANG_LAYOUT_COUNT_BLOCKER_THRESHOLD * 100).toFixed(0)}% threshold.`,
                 })
             }
         }
