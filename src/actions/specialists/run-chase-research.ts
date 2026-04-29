@@ -545,6 +545,30 @@ async function runChaseResearchInternal(
             // 8. Done. Record token counts from the structured-brief
             //    extraction (the inner runCadLabResearch doesn't surface
             //    them). cost_gbp_pence stays null — see header.
+            //
+            //    INSTRUMENTATION (Gate 6 — Loop 22/23 — 2026-04-29):
+            //    Gate 6 fails on attempt 1 AND attempt 2 in 100% of demos.
+            //    We need to pick between three hypotheses:
+            //      (1) override never reaches Chase — compiled_research_prompt
+            //          will show whether the remediation block was prepended.
+            //      (2) schema mismatch (Chase emits `standard` not `code`) —
+            //          raw_extraction_output will show the exact JSON shape.
+            //      (3) override asks for verified standards but provides no
+            //          allowlist — raw_extraction_output will show empty
+            //          regulatory[].
+            //    Persist always (not only on remediation runs) — we need the
+            //    baseline run output to compare against remediation runs.
+            //    Truncate to 50 KB each to stay within reasonable JSONB size.
+            const compiledResearchPromptTrunc = descriptionToUse.length > 50000
+                ? descriptionToUse.slice(0, 50000) + "\n[TRUNCATED]"
+                : descriptionToUse
+            if (descriptionToUse.length > 50000) {
+                console.warn(
+                    "[run-chase-research] compiled_research_prompt truncated from",
+                    descriptionToUse.length,
+                    "to 50000 chars for pipeline_runs.input_ref storage",
+                )
+            }
             await completePipelineRun(runId, {
                 input_tokens: extraction.tokensIn,
                 output_tokens: extraction.tokensOut,
@@ -552,6 +576,17 @@ async function runChaseResearchInternal(
                     typeof researchResult.modelUsed === "string"
                         ? researchResult.modelUsed
                         : null,
+                input_ref: {
+                    source: "project.subject",
+                    charCount: description.length,
+                    // Audit trail: record whether this was a gate-remediation re-fire
+                    ...(gateChaseRemediationCtx
+                        ? { gate_remediation: true, gate_context_chars: gateChaseRemediationCtx.length }
+                        : {}),
+                    // INSTRUMENTATION: full compiled prompt (description + any
+                    // remediation block) so we can verify hypothesis (1).
+                    compiled_research_prompt: compiledResearchPromptTrunc,
+                },
                 output_ref: {
                     table: "cad_lab_projects",
                     column: "research",
@@ -566,6 +601,12 @@ async function runChaseResearchInternal(
                     // the original failure message for trend analysis.
                     ...(retried
                         ? { retried: true, firstErrorMessage }
+                        : {}),
+                    // INSTRUMENTATION: raw extraction LLM output so we can
+                    // verify hypotheses (2) and (3) — schema shape + empty
+                    // regulatory[]. Undefined when extraction threw (non-fatal).
+                    ...(extraction.rawLlmText !== undefined
+                        ? { raw_extraction_output: extraction.rawLlmText }
                         : {}),
                 },
             })
@@ -710,6 +751,8 @@ interface ExtractionResult {
     brief: Partial<CadLabDesignBrief> | null
     tokensIn: number
     tokensOut: number
+    /** Raw LLM text before JSON parsing — captured for Gate 6 instrumentation. */
+    rawLlmText?: string
 }
 
 /**
@@ -941,6 +984,13 @@ async function callExtractionWithPrompts(
             )
             return { ok: false, brief: null, tokensIn: 0, tokensOut: 0 }
         }
+        // INSTRUMENTATION (Gate 6): capture raw text before parsing so the
+        // pipeline_runs row can store it for post-run diagnosis. Truncated
+        // to 50 KB to stay within reasonable JSONB size.
+        const rawLlmText = result.text.length > 50000
+            ? result.text.slice(0, 50000) + "\n[TRUNCATED]"
+            : result.text
+
         const parsed = tryParseBriefJson(result.text)
         if (!parsed) {
             console.warn(
@@ -992,6 +1042,7 @@ async function callExtractionWithPrompts(
             brief: parsed,
             tokensIn: result.inputTokens,
             tokensOut: result.outputTokens,
+            rawLlmText,
         }
     }
     return callExtractionViaAnthropic(systemPrompt, userPrompt, 0, 0)
@@ -1024,6 +1075,10 @@ async function callExtractionViaAnthropic(
             120_000,
             1, // maxRetries — fail fast; extraction is a nice-to-have
         )
+        // INSTRUMENTATION (Gate 6): capture raw Sonnet text for diagnosis.
+        const rawLlmText = text.length > 50000
+            ? text.slice(0, 50000) + "\n[TRUNCATED]"
+            : text
         const parsed = tryParseBriefJson(text)
         if (!parsed) {
             console.warn(
@@ -1034,6 +1089,7 @@ async function callExtractionViaAnthropic(
                 brief: null,
                 tokensIn: priorTokensIn + tokensIn,
                 tokensOut: priorTokensOut + tokensOut,
+                rawLlmText,
             }
         }
         return {
@@ -1041,6 +1097,7 @@ async function callExtractionViaAnthropic(
             brief: parsed,
             tokensIn: priorTokensIn + tokensIn,
             tokensOut: priorTokensOut + tokensOut,
+            rawLlmText,
         }
     } catch (err) {
         console.warn(
