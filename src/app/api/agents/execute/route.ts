@@ -197,8 +197,8 @@ export async function POST(request: Request) {
         const body = await request.json()
         prompt = body.prompt
         input = body.input ?? ""
-        providerId = body.providerId ?? "anthropic"
-        modelId = body.modelId ?? "claude-sonnet-4-6"
+        providerId = body.providerId ?? "deepseek"
+        modelId = body.modelId ?? "deepseek-chat"
         modality = body.modality ?? "text"
         threadId = body.threadId ?? undefined
         customSystemPromptSuffix =
@@ -1395,7 +1395,7 @@ async function handleTextStreaming(
             // non-retryable — once we've emitted to the client, cascading
             // would produce incoherent output.
             let hasStartedStreaming = false
-            let lastTargetForLog: ProviderTarget = chain[0] ?? { providerId: "anthropic" as const, modelId: "unknown" }
+            let lastTargetForLog: ProviderTarget = chain[0] ?? { providerId: "deepseek" as const, modelId: "deepseek-chat" }
 
             try {
                 await withFailover(chain, async (target) => {

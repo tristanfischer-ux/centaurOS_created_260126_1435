@@ -73,15 +73,16 @@ export interface ProviderTarget {
  * contract.
  */
 export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
+    // 2026-04-29: Anthropic credits running low — route claude-tier through
+    // non-Anthropic providers. DeepSeek V4-Pro for synthesis-heavy work (Sage,
+    // Cal, Fiona, Leo), Gemini 3.1 Pro as second choice.
     claude: [
-        { providerId: "anthropic", modelId: "claude-opus-4-7" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "together", modelId: "deepseek-ai/DeepSeek-V4-Pro" },
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     sonnet: [
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
@@ -102,58 +103,48 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     ],
     "qwen-local": [
         { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
-        // No fallbacks — local-only for privacy
     ],
     deepseek: [
         { providerId: "deepseek", modelId: "deepseek-v4-flash" },
-        // Fallback: 4 specialists switched to deepseek 2026-04-07
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "google", modelId: "gemini-2.5-flash" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "openai", modelId: "gpt-5.4" },
     ],
     google: [
         { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
+        { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     openai: [
         { providerId: "openai", modelId: "gpt-5.4" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
-        { providerId: "deepseek", modelId: "deepseek-chat" },
-    ],
-    // Benchmark-validated swap 2026-04-25 — Mia (growth-marketer)
-    haiku: [
-        { providerId: "anthropic", modelId: "claude-haiku-4-5-20251001" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "google", modelId: "gemini-2.5-flash" },
+    ],
+    // 2026-04-29: Mia — swap from Haiku to Gemini 2.5 Flash (no Anthropic)
+    haiku: [
+        { providerId: "google", modelId: "gemini-2.5-flash" },
+        { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
-    // Benchmark-validated swap 2026-04-25 — Sal (sales-lead)
+    // Sal (sales-lead) — gpt-4.1-mini primary, no Anthropic fallback
     "gpt-mini": [
         { providerId: "openai", modelId: "gpt-4.1-mini" },
         { providerId: "openai", modelId: "gpt-5.4" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
     ],
-    // Benchmark-validated swap 2026-04-25 — Fang (vp-manufacturing)
-    // Routes Qwen 3 235B via DashScope first (publisher), Together as backup (Qwen 3.5 397B)
+    // Fang (vp-manufacturing) — Qwen 3 235B, no Anthropic fallback
     "qwen-235b": [
         { providerId: "qwen", modelId: "qwen3-235b-a22b" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
-    // Benchmark-validated swap 2026-04-25 — Finn (finance-lead)
-    // V4-Pro reasoning via Together; falls back to V4 (chat) on DeepSeek direct.
+    // Finn (finance-lead) — V4-Pro reasoning, no Anthropic fallback
     "deepseek-v4-pro": [
         { providerId: "together", modelId: "deepseek-ai/DeepSeek-V4-Pro" },
         { providerId: "deepseek", modelId: "deepseek-reasoner" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
-        { providerId: "anthropic", modelId: "claude-opus-4-7" },
-        { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
     ],
 }
 
