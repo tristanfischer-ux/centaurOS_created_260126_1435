@@ -210,6 +210,13 @@ export interface InvestorSearchResult {
    */
   failureMessage?: string
   /**
+   * True when the OpenAI embedding key has hit its quota and semantic ranking
+   * is unavailable. Results are still returned via keyword/filter fallback, but
+   * the UI should surface an amber warning so the user knows result quality is
+   * reduced. Distinct from semanticFailed (which means no results at all).
+   */
+  degradedMode?: boolean
+  /**
    * Phase A.5 telemetry: id of the row written to `search_query_log` for
    * this call. The UI threads this id into click handlers so that
    * `recordSearchClick` can attach click events to the originating query.
@@ -901,6 +908,10 @@ async function searchInvestorsCore(
   // zero results — a false "no matches". Flag set in the catch block below tells
   // the keyword path to skip the ilike and return the full directory instead.
   let quotaExhaustedProseFallback = false
+  // Set to true when the OpenAI key hits quota and we fall through to the
+  // keyword path. Results are still returned but semantic ranking is gone.
+  // Propagated to the UI so an amber degraded-mode banner is rendered.
+  let embeddingQuotaExhausted = false
 
   if (query && query.trim().length > 5) {
     try {
@@ -1276,6 +1287,11 @@ async function searchInvestorsCore(
       if (isQuotaExhausted && looksLikeProse(query.trim())) {
         quotaExhaustedProseFallback = true
       }
+      // Any quota exhaustion event degrades the search quality — flag regardless
+      // of whether the prose fallback path fires so the UI can warn the user.
+      if (isQuotaExhausted) {
+        embeddingQuotaExhausted = true
+      }
     }
   }
 
@@ -1444,7 +1460,15 @@ async function searchInvestorsCore(
   const total = count ?? 0
   const hasMore = from + (data ?? []).length < total
 
-  return { firms: await attachContactStatuses(firms), total, hasMore }
+  return {
+    firms: await attachContactStatuses(firms),
+    total,
+    hasMore,
+    ...(embeddingQuotaExhausted && {
+      degradedMode: true,
+      failureMessage: 'Search quality is reduced — semantic ranking is temporarily unavailable. Results below use keyword matching only. We\'re working on restoring full search.',
+    }),
+  }
 }
 
 // ---------------------------------------------------------------------------

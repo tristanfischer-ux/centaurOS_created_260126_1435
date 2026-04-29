@@ -52,6 +52,13 @@ export interface SupplierSearchResult {
    * failed (telemetry is fail-open).
    */
   searchQueryLogId?: string
+  /**
+   * True when the OpenAI embedding key has hit its quota and semantic ranking
+   * is unavailable. Results are still returned via keyword/FTS fallback, but
+   * the UI should surface an amber warning so the user knows result quality is
+   * reduced.
+   */
+  degradedMode?: boolean
 }
 
 export interface SupplierCard {
@@ -133,6 +140,11 @@ async function searchSuppliersCore(
   const supabase = await createClient()
   const limit = Math.min(filters.limit || 24, 100)
   const offset = filters.offset || 0
+  // Set to true when the OpenAI embedding key hits quota during the semantic
+  // path. Results still flow through the keyword fallback but semantic ranking
+  // is unavailable. Propagated to the return value so the UI can surface an
+  // amber degraded-mode banner.
+  let embeddingQuotaExhausted = false
 
   // SECURITY: Rate limit supplier search to prevent bulk data extraction
   const { data: { user } } = await supabase.auth.getUser()
@@ -421,7 +433,15 @@ async function searchSuppliersCore(
         _telemetry: { vectorHitCount: _vectorHitCount, ftsHitCount: ftsById.size },
       }
     } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      const isQuotaExhausted =
+        errMsg.includes('insufficient_quota') ||
+        errMsg.includes('exceeded your current quota') ||
+        (err != null && typeof err === 'object' && (err as Record<string, unknown>).code === 'insufficient_quota')
       console.error('Semantic search failed, falling back to keyword:', err)
+      if (isQuotaExhausted) {
+        embeddingQuotaExhausted = true
+      }
       // Fall through to keyword search
     }
   }
@@ -531,6 +551,7 @@ async function searchSuppliersCore(
             results: paginated,
             total: ftsKwResults.length,
             searchMode: 'keyword',
+            ...(embeddingQuotaExhausted && { degradedMode: true }),
           }
         }
       }
@@ -603,6 +624,7 @@ async function searchSuppliersCore(
     results,
     total: results.length,
     searchMode: filters.query ? 'keyword' : 'browse',
+    ...(embeddingQuotaExhausted && { degradedMode: true }),
   }
 }
 

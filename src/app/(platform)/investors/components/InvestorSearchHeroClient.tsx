@@ -19,6 +19,7 @@
 
 import { useState, useCallback, useTransition, useEffect, useRef } from 'react'
 import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { InvestorSearchHero } from './InvestorSearchHero'
 import { DashboardMatchCards } from './DashboardMatchCards'
@@ -105,6 +106,7 @@ export function InvestorSearchHeroClient({
   const [lastQuery, setLastQuery] = useState<string>('')
   const [hasSearched, setHasSearched] = useState<boolean>(false)
   const [isPending, startTransition] = useTransition()
+  const [degradedMode, setDegradedMode] = useState(false)
   const [searchedAcrossTotal, setSearchedAcrossTotal] = useState<number>(8264)
   const [brainstormHandoff, setBrainstormHandoff] =
     useState<{ topic: string; summary: string; createdAt: string } | null>(null)
@@ -143,6 +145,7 @@ export function InvestorSearchHeroClient({
         })
         setFirms(result.firms)
         setMatchOutputs(result.matchOutputs ?? {})
+        setDegradedMode(result.degradedMode ?? false)
         if (result.resolvedTier) setTier(result.resolvedTier as ResolvedTier)
         setSearchedAcrossTotal(Math.max(result.total, 8264))
         if (result.firms.length === 0) {
@@ -339,6 +342,16 @@ export function InvestorSearchHeroClient({
         isSearching={isPending}
         companyContext={companyContext}
       />
+
+      {/* Degraded-mode banner — shown when OpenAI quota is exhausted */}
+      {degradedMode && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-md px-4 py-3 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+          <p className="text-sm">
+            Search quality is reduced — semantic ranking is temporarily unavailable. Results below use keyword matching only. We&rsquo;re working on restoring full search.
+          </p>
+        </div>
+      )}
 
       {brainstormHandoff && (
         <div

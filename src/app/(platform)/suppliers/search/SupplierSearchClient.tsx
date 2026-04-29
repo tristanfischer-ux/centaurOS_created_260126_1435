@@ -12,7 +12,7 @@
 
 import { useState, useTransition, useCallback } from 'react'
 import Link from 'next/link'
-import { ChevronDown, Filter } from 'lucide-react'
+import { AlertTriangle, ChevronDown, Filter } from 'lucide-react'
 import { searchSuppliers } from '@/actions/suppliers'
 import type { SupplierCard, SupplierSearchResult } from '@/actions/suppliers'
 import { recordSearchClick } from '@/actions/search-click'
@@ -55,6 +55,9 @@ export function SupplierSearchClient({
   // Phase A.5 — id of the most recent `search_query_log` row, used to key
   // click events back to the originating query via `recordSearchClick`.
   const [searchQueryLogId, setSearchQueryLogId] = useState<string | null>(null)
+  // True when the OpenAI embedding key has hit its quota and semantic ranking
+  // is unavailable. Results are still returned via keyword fallback.
+  const [degradedMode, setDegradedMode] = useState(false)
 
   // Compute stats from current results
   const stats = useCallback(() => {
@@ -85,6 +88,7 @@ export function SupplierSearchClient({
       setResults(data.results)
       setTotal(data.total)
       setSearchMode(data.searchMode)
+      setDegradedMode(data.degradedMode ?? false)
       setSearchQueryLogId(data.searchQueryLogId ?? null)
     })
   }, [query, category, country, certifications, sortBy])
@@ -106,6 +110,7 @@ export function SupplierSearchClient({
       setResults(data.results)
       setTotal(data.total)
       setSearchMode(data.searchMode)
+      setDegradedMode(data.degradedMode ?? false)
       setSearchQueryLogId(data.searchQueryLogId ?? null)
     })
   }, [query, country, certifications, sortBy])
@@ -133,6 +138,7 @@ export function SupplierSearchClient({
       setResults(prev => [...prev, ...data.results])
       setTotal(data.total)
       setSearchMode(data.searchMode)
+      setDegradedMode(data.degradedMode ?? false)
       // Replace the current query-log id with the latest page so newly
       // appended cards key clicks to the right log row.
       setSearchQueryLogId(data.searchQueryLogId ?? null)
@@ -143,6 +149,15 @@ export function SupplierSearchClient({
 
   return (
     <div className="space-y-6">
+      {/* Degraded-mode banner — shown when OpenAI quota is exhausted */}
+      {degradedMode && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-md px-4 py-3 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+          <p className="text-sm">
+            Search quality is reduced — semantic ranking is temporarily unavailable. Results below use keyword matching only. We&rsquo;re working on restoring full search.
+          </p>
+        </div>
+      )}
       {/* Stats panel — collapsible */}
       {showStats && (
         <div className="rounded-lg border border-border bg-card p-4 sm:p-6">

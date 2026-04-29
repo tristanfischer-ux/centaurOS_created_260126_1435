@@ -30,7 +30,8 @@ import { InvestorDetailDialog } from './InvestorDetailDialog'
 import { searchInvestors, addToShortlist, removeFromShortlist, computeMatchScores, getContactCounts } from '@/actions/investors'
 import { getInvestorIntelBatch } from '@/actions/investor-intel'
 import type { InvestorIntel } from '@/actions/investor-intel'
-import { Search, X, RefreshCw, Building2, LayoutGrid, List, Kanban, MapPin } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Search, X, RefreshCw, Building2, LayoutGrid, List, Kanban, MapPin, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { InvestorFirm, ShortlistStage, InvestorTierAccess } from '@/actions/investors'
@@ -189,6 +190,9 @@ export function InvestorBrowser({
   const [isPending, startTransition] = useTransition()
   const [isLoadingMore, setIsLoadingMore] = useState(false)
   const loadingMoreRef = useRef(false)
+  // True when the OpenAI embedding key has hit its quota and semantic ranking
+  // is unavailable. Results are still returned but quality is reduced.
+  const [degradedMode, setDegradedMode] = useState(false)
 
   // Compare state
   const [compareIds, setCompareIds] = useState<string[]>([])
@@ -315,6 +319,7 @@ export function InvestorBrowser({
         setTotal(result.total)
         setHasMore(result.hasMore)
         setPage(1)
+        setDegradedMode(result.degradedMode ?? false)
         // Clear compare selection — old IDs may not be in new results
         setCompareIds([])
         // Compute match scores + contact counts for new firms. Pass cosine
@@ -508,6 +513,15 @@ export function InvestorBrowser({
 
   return (
     <div className={cn("space-y-6", compareIds.length > 0 && "pb-16")}>
+      {/* Degraded-mode banner — shown when OpenAI quota is exhausted */}
+      {degradedMode && (
+        <div className="bg-amber-50 border border-amber-300 text-amber-900 rounded-md px-4 py-3 flex items-start gap-3">
+          <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0 text-amber-600" />
+          <p className="text-sm">
+            Search quality is reduced — semantic ranking is temporarily unavailable. Results below use keyword matching only. We&rsquo;re working on restoring full search.
+          </p>
+        </div>
+      )}
       {/* Filter bar */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 flex-wrap">
         {/* Firm type chips */}
