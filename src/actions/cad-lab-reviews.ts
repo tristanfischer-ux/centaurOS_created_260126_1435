@@ -335,7 +335,7 @@ ${reviewContext}${assemblyNotesInstructions}`
         // need. Per-call cost ≈ £0.04 vs ≈ £0.10 on Sonnet vs ≈ £0.50 on
         // the original Opus. Default route stays "anthropic" until this
         // is verified end-to-end on a single project.
-        const reviewRoute = process.env.FANG_REVIEW_VIA ?? "anthropic"
+        const reviewRoute = process.env.FANG_REVIEW_VIA ?? "openrouter"
         const calculationsPerformedOR: ReviewCalculation[] = []
         if (reviewRoute === "openrouter") {
             const { callOpenRouter } = await import("@/lib/ai/openrouter")
@@ -553,7 +553,7 @@ const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
 // ─── Quick Verdict (Phase 1 of two-phase review) ────────────────────
 
-const QUICK_VERDICT_MODEL = "claude-sonnet-4-6"
+const QUICK_VERDICT_MODEL = "deepseek/deepseek-v4-flash"
 const QUICK_VERDICT_MAX_TOKENS = 256
 
 export interface QuickVerdictResult {
@@ -622,42 +622,19 @@ ${reviewContext}
 VERDICT: PASS | WARN | FAIL
 SUMMARY: <one sentence explaining the verdict>`
 
-        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-        if (!apiKey) {
-            return { error: "Anthropic API key not configured" }
+        const { callOpenRouter } = await import("@/lib/ai/openrouter")
+        const orResult = await callOpenRouter({
+            model: QUICK_VERDICT_MODEL,
+            system: systemPrompt,
+            prompt: `Quick verdict on module "${targetModule.name}" — PASS, WARN, or FAIL?`,
+            maxTokens: QUICK_VERDICT_MAX_TOKENS,
+            timeoutMs: 30_000,
+        })
+        if (!orResult.ok) {
+            return { error: `Quick verdict failed: ${orResult.error}` }
         }
 
-        const Anthropic = (await import("@anthropic-ai/sdk")).default
-        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
-        // function limit. SDK default is 10min + 2 retries, which in a
-        // tool loop can silently blow past the ceiling and return 504 with
-        // no actionable error. 240s + no retries lets us fail fast and
-        // surface the real cause. See forgeos-rules.md R4/R5.
-        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
-// and uses exponential backoff between attempts. With 4 autopilot chains
-// running in parallel and ~9 modules each, the blast hits org-level
-// rate limits; without retries the call fails immediately and the review
-// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
-// transient rate-limit spikes while keeping per-call wall-clock under
-// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
-// where every Fang review failed with "Too many requests" before maxRetries
-// was raised. Total worst-case retry latency: ~30s, still inside timeout.
-const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
-
-        const response = await await withLlmPermit("anthropic", QUICK_VERDICT_MODEL, () => client.messages.create({
-            model: QUICK_VERDICT_MODEL,
-            max_tokens: QUICK_VERDICT_MAX_TOKENS,
-            system: systemPrompt,
-            messages: [{
-                role: "user",
-                content: `Quick verdict on module "${targetModule.name}" — PASS, WARN, or FAIL?`,
-            }],
-        }))
-
-        const text = response.content
-            .filter(b => b.type === "text")
-            .map(b => b.type === "text" ? b.text : "")
-            .join("")
+        const text = orResult.text
 
         // Parse verdict
         const verdictMatch = text.match(/VERDICT:\s*(PASS|WARN|FAIL)/i)
