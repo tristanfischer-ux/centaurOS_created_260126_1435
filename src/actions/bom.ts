@@ -73,6 +73,10 @@ import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 import { renderOracleHint } from "@/lib/cost/oracle-benchmarks"
 import { callOpenRouter, CHEAP_STRUCTURED_MODEL } from "@/lib/ai/openrouter"
 import { embedText } from "@/lib/search/semantic-search"
+import {
+  checkBomContainerClassConsistency,
+  expectedContainerSizeToken,
+} from "@/lib/forge-v2/envelope-classification"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -490,6 +494,7 @@ async function skeletonBomInternal(
   modules: CadLabModule[],
   designBrief?: CadLabDesignBrief,
   diagnosticAnswers?: DiagnosticAnswers,
+  briefedEnvelopeKind?: import("@/lib/sizing/types").Envelope["kind"],
 ): Promise<BomSkeletonResult> {
   if (!modules.length) {
     return { success: false, error: "No modules to generate BOM from", parts: [], bomLines: [] }
@@ -561,6 +566,9 @@ When the same physical part appears N times because of a port/starboard or left/
 CRITICAL — PURCHASED-PART MANUFACTURER PART NUMBERS (Loop 5 P2):
 Every row with isPurchased=true must carry either an MPN candidate ("Texas Instruments BQ40Z80RHBR") or an explicit "placeholder — RFQ pending" marker. Do NOT emit purchased rows with only generic descriptions ("Lithium Iron Phosphate Cell Pack 12.8V") because they look procurement-ready but aren't. If you don't have a credible MPN candidate for a purchased item, set mpn="placeholder — RFQ pending".
 
+CRITICAL — MODULE IDs (Item 6, council-verified fix):
+Each module is shown as "## Module: <name> (id: <ID>)". The sourceModuleId field for every part MUST be the exact id string from that header — character for character, no abbreviation, no paraphrase, no invention. For example, if the module header says "(id: ground_station)", every part from that module must have "sourceModuleId": "ground_station". Using "gcs", "ground-station", "GroundControlStation", or any other form will silently exclude the entire module from the bill of materials. Every module in the list MUST have at least one part — do not skip any module.
+
 Process types: cnc, injection_molding, sheet_metal, 3d_print_fdm, 3d_print_sla, 3d_print_sls, casting, forging, machining, purchased_cots, other
 
 Respond with ONLY valid JSON:
@@ -569,7 +577,7 @@ Respond with ONLY valid JSON:
     {
       "partNumber": "string",
       "name": "string",
-      "sourceModuleId": "string (module id)",
+      "sourceModuleId": "string (EXACT module id from the (id: X) header — do not invent or abbreviate)",
       "process": "enum value",
       "isPurchased": boolean,
       "parentPartNumber": "string | null (assembly this belongs to)",
@@ -583,11 +591,38 @@ Respond with ONLY valid JSON:
   ]
 }`
 
+  // ── Loop 25 Item 4 — Container-class prompt constraint ───────────
+  // If the brief specifies a container envelope kind, inject a hard constraint
+  // into the system prompt so the LLM cannot silently default to a different
+  // container size. This is the preventive layer; the deterministic post-check
+  // in runBomMergeStage is the blocking layer.
+  //
+  // The constraint is intentionally verbose: the LLM needs the specific size
+  // token ("40ft") and the kind string ("container_40ft_iso") so it cannot
+  // rationalise that a "20ft container" is "close enough".
+  const containerConstraintLine: string = (() => {
+    if (!briefedEnvelopeKind) return ""
+    const expectedSize = expectedContainerSizeToken(briefedEnvelopeKind)
+    if (!expectedSize) return ""
+    return (
+      `\n\nCRITICAL — CONTAINER CLASS (Loop 25 Item 4, hard constraint):\n` +
+      `The briefed physical envelope is "${briefedEnvelopeKind}" (${expectedSize} ISO container). ` +
+      `ANY structural shell part, enclosure, housing, or container in the BOM MUST reference ` +
+      `a ${expectedSize} container — NEVER a different size (e.g. do NOT use "20ft container", ` +
+      `"20-foot container", "Used 20ft shipping container", or any other container size that is ` +
+      `not ${expectedSize}). The founder selected a ${expectedSize} container for a specific ` +
+      `reason; silently substituting a smaller or larger container is a P0 engineering error. ` +
+      `If you are uncertain about the container size, default to ${expectedSize}.`
+    )
+  })()
+
+  const systemPromptWithConstraints = systemPrompt + containerConstraintLine
+
   const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
 
   const orResult = await callOpenRouter({
     model: BOM_MODEL,
-    system: systemPrompt,
+    system: systemPromptWithConstraints,
     prompt: userPrompt,
     maxTokens: BOM_MAX_TOKENS,
     timeoutMs: 120_000,
@@ -1847,12 +1882,21 @@ async function loadBomGenerationState(
   subject: string
   designBrief?: CadLabDesignBrief
   diagnosticAnswers?: DiagnosticAnswers
+  /**
+   * dimension_sheet.envelope.kind from the sizing engine (Fang).
+   *
+   * Used by the container-class cross-check in `runBomMergeStage` to detect
+   * BOM parts that reference the wrong container size. For example: brief says
+   * 40ft ISO container, BOM LLM priced "Used 20ft container" in Module 3.1.
+   * Null when Fang sizing has not run yet or the project has no container envelope.
+   */
+  briefedEnvelopeKind?: import("@/lib/sizing/types").Envelope["kind"]
 } | null> {
   const admin = createAdminClient()
   const { data: project, error } = await admin
     .from("cad_lab_projects")
     .select(
-      "foundry_id, subject, modules, research, diagnostic_answers, bom_generation_state",
+      "foundry_id, subject, modules, research, diagnostic_answers, bom_generation_state, dimension_sheet",
     )
     .eq("id", projectId)
     .maybeSingle()
@@ -1875,6 +1919,23 @@ async function loadBomGenerationState(
     bom_generation_state?: unknown
   }).bom_generation_state
   const state = (stateRaw ?? null) as BomGenerationState | null
+
+  // Extract the briefed envelope kind from the dimension_sheet (set by Fang).
+  // This is the canonical envelope the founder specified in the brief.
+  // Used by the container-class cross-check at merge time.
+  const dimensionSheetRaw = (project as unknown as { dimension_sheet?: unknown }).dimension_sheet
+  const briefedEnvelopeKind = (
+    dimensionSheetRaw &&
+    typeof dimensionSheetRaw === "object" &&
+    dimensionSheetRaw !== null &&
+    "envelope" in dimensionSheetRaw &&
+    typeof (dimensionSheetRaw as { envelope?: unknown }).envelope === "object" &&
+    (dimensionSheetRaw as { envelope?: unknown }).envelope !== null &&
+    "kind" in ((dimensionSheetRaw as { envelope: object }).envelope as object)
+  )
+    ? ((dimensionSheetRaw as { envelope: { kind: unknown } }).envelope.kind as import("@/lib/sizing/types").Envelope["kind"])
+    : undefined
+
   return {
     foundryId: project.foundry_id,
     state,
@@ -1882,6 +1943,7 @@ async function loadBomGenerationState(
     subject: project.subject,
     designBrief: research?.designBrief,
     diagnosticAnswers: diagRaw ?? undefined,
+    briefedEnvelopeKind,
   }
 }
 
@@ -2030,6 +2092,7 @@ export async function runBomSkeletonStage(projectId: string): Promise<void> {
       modules,
       designBrief,
       diagnosticAnswers,
+      loaded.briefedEnvelopeKind,
     )
   } catch (err) {
     const msg = err instanceof Error ? err.message : "skeleton threw"
@@ -2380,6 +2443,99 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
     return
   }
 
+  // ── Item 6 — per-module BOM coverage reconciliation guard ──────────
+  //
+  // The BOM skeleton LLM (DeepSeek V4-Flash) can hallucinate sourceModuleId
+  // values that don't match the module IDs produced by Max's decomposition.
+  // When this happens, parts are inserted with wrong (or invented) module IDs
+  // and the module silently disappears from the BOM — no error, no count drop.
+  // The existing BOM_PROPAGATION_FAILED guard above only catches the total-empty
+  // case (0 parts from N modules). This guard catches the partial case
+  // (parts exist but a specific module has 0 coverage).
+  //
+  // Evidence: HAPS project — ground_station (GCS, £558,000, 4,500kg) had 0 BOM
+  // parts because the skeleton LLM used IDs like "fuselage_empennage",
+  // "avionics_flight_control", "sensor_payload_module" etc. — its own namespace
+  // — rather than the IDs from the decomposition JSONB ("airframe_structure",
+  // "avionics_and_flight_control", "ground_station"). All 9 modules were
+  // uncovered simultaneously; the GCS was just the highest-value casualty.
+  //
+  // FIX: Two-layer defence:
+  //   (1) Prompt hardening in skeletonBomInternal (enforces exact IDs at generation time).
+  //   (2) This guard (catches residual hallucinations that survive prompt hardening).
+  //
+  // This guard also checks for "orphaned" parts — parts whose sourceModuleId
+  // doesn't match any known module ID, which is the inverse symptom of the
+  // same root cause.
+  //
+  // Severity: WARN-only. A hard-fail here would strand the pipeline_run in
+  // 'running' with no recovery path on every soft mismatch. The existing
+  // BOM_PROPAGATION_FAILED guard hard-fails the catastrophic case. This guard
+  // produces actionable console.warn lines that Vercel logs surface as diagnostics.
+  // Council consensus (GPT-5.5, Gemini 3.1 Pro, DeepSeek V4-Pro, Mistral Large,
+  // Kimi K2.6, Grok-3 — 2026-04-29): WARN on per-module gaps, already-existing
+  // FAIL on zero-total.
+  {
+    const knownModuleIds = new Set<string>(
+      loaded.modules
+        .map((m) => (typeof m.id === "string" ? m.id : null))
+        .filter((id): id is string => id !== null && id.length > 0),
+    )
+
+    // Covered modules: at least one validated part has sourceModuleId matching a known module id.
+    const coveredModuleIds = new Set<string>()
+    // Orphaned parts: sourceModuleId is set but doesn't match any known module id.
+    const orphanedSourceIds = new Set<string>()
+    for (const p of validatedParts) {
+      const sid = p.sourceModuleId
+      if (typeof sid === "string" && sid.length > 0) {
+        if (knownModuleIds.has(sid)) {
+          coveredModuleIds.add(sid)
+        } else {
+          orphanedSourceIds.add(sid)
+        }
+      }
+    }
+
+    const uncoveredModules = loaded.modules.filter(
+      (m) => typeof m.id === "string" && m.id.length > 0 && !coveredModuleIds.has(m.id),
+    )
+
+    if (uncoveredModules.length > 0) {
+      const moduleList = uncoveredModules
+        .map((m) => `"${m.name}" (id: ${m.id}, keyParts: ${m.keyParts?.length ?? 0})`)
+        .join(", ")
+      console.warn(
+        `[bom-distributed:merge] MODULE_COVERAGE_GAP: ` +
+        `${uncoveredModules.length} of ${loaded.modules.length} modules have zero BOM coverage — ` +
+        `${moduleList}. ` +
+        `This typically means the BOM skeleton LLM used incorrect sourceModuleId values (hallucinated IDs). ` +
+        `Prompt hardening was applied in skeletonBomInternal (Item 6) — if this warning persists, ` +
+        `the LLM is still not following the exact-ID instruction.`,
+      )
+    }
+
+    if (orphanedSourceIds.size > 0) {
+      const orphanedCount = validatedParts.filter(
+        (p) => typeof p.sourceModuleId === "string" && orphanedSourceIds.has(p.sourceModuleId),
+      ).length
+      const sampleOrphaned = [...orphanedSourceIds].slice(0, 5).join(", ")
+      console.warn(
+        `[bom-distributed:merge] ORPHANED_PARTS: ` +
+        `${orphanedCount} parts reference unknown sourceModuleId values not in the decomposition: ` +
+        `[${sampleOrphaned}]. ` +
+        `These parts will still be inserted but cannot be attributed to a module in the BOM viewer or PDF.`,
+      )
+    }
+
+    if (uncoveredModules.length === 0 && orphanedSourceIds.size === 0) {
+      console.log(
+        `[bom-distributed:merge] MODULE_COVERAGE_OK: all ${loaded.modules.length} modules ` +
+        `have at least one BOM part with a matching sourceModuleId.`,
+      )
+    }
+  }
+
   // Duplicate check — skeleton already guards, defence in depth.
   const partNumbers = new Set<string>()
   for (const p of validatedParts) {
@@ -2439,6 +2595,63 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
     console.warn(countCheckResult.logLine)
   } else {
     console.log(`[bom-distributed:merge] count-check PASS: project=${projectId}`)
+  }
+
+  // ── Loop 25 Item 4 — Container-class cross-check ─────────────────
+  //
+  // Problem (council 4/6 flags, 2026-04-29): the brief declares a 40ft ISO
+  // container envelope, but the BOM generator priced "Used 20ft container" in
+  // Module 3.1 (Desalination project). Six pressure vessels at 7,200 mm each
+  // require over 21 metres — only feasible in a 40ft container. The mismatch
+  // was never caught because loadBomGenerationState did not load dimension_sheet.
+  //
+  // Fix: (a) loadBomGenerationState now selects dimension_sheet and extracts
+  //          briefedEnvelopeKind (above).
+  //      (b) This deterministic hard-block fires here at merge time, after all
+  //          parts are assembled, before the pipeline_run is stamped done.
+  //          The block is ONLY for container-class contradictions — non-container
+  //          envelopes (warehouse_bay, room, outdoor_pad, etc.) pass through.
+  //
+  // ANTI-CHEAT RULE: This check must NEVER be replaced with an LLM call.
+  // Detection is deterministic regex (proximity-aware, with strong/weak anchors
+  // and a mechanical-length blocklist). Council recommendation: hard-block, not
+  // warn. A warned mismatch advances to PDF and ships a wrong product to the founder.
+  //
+  // Council: GPT-5.5, Gemini 3.1 Pro, DeepSeek V4-Pro, Mistral Large,
+  //          Kimi K2.6, Grok-3 — 2026-04-29 — all 6 voted hard-block.
+  if (loaded.briefedEnvelopeKind && expectedContainerSizeToken(loaded.briefedEnvelopeKind)) {
+    const containerCheck = checkBomContainerClassConsistency(
+      validatedParts.map((p) => ({
+        partNumber: p.partNumber,
+        name: p.name,
+        description: p.description,
+        moduleId: p.sourceModuleId,
+      })),
+      loaded.briefedEnvelopeKind,
+    )
+    if (!containerCheck.consistent) {
+      const conflictSummary = containerCheck.conflicts
+        .map(
+          (c) =>
+            `Part ${c.partNumber} ("${c.partName}", module ${c.moduleId ?? "unknown"}): ` +
+            `detected "${c.detectedSize}" container (phrase: "${c.matchedPhrase}") ` +
+            `but briefed envelope is ${c.expectedSize} (${c.briefedEnvelopeKind})`,
+        )
+        .join("; ")
+      const errorMsg =
+        `CONTAINER_CLASS_MISMATCH: BOM contains ${containerCheck.conflicts.length} part(s) ` +
+        `that reference a container size inconsistent with the briefed envelope ` +
+        `(${loaded.briefedEnvelopeKind}). ${conflictSummary}. ` +
+        `Re-run BOM generation — the briefed container class has been injected into ` +
+        `the skeleton prompt to prevent recurrence.`
+      console.error(`[bom-distributed:merge] ${errorMsg}`)
+      await recordBomStageFailure(projectId, state, "CONTAINER_CLASS_MISMATCH", errorMsg)
+      return
+    }
+    console.log(
+      `[bom-distributed:merge] container-class check PASS: ` +
+      `envelope=${loaded.briefedEnvelopeKind} project=${projectId}`,
+    )
   }
 
   // ── Loop 24 Fix 5 — cost-provenance enrichment ───────────────────

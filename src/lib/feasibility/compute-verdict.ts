@@ -33,7 +33,7 @@
  */
 
 export type VerdictStatus = "green" | "amber" | "red"
-export type VerdictAxis = "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "cross_modal_consistency"
+export type VerdictAxis = "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency"
 export type VerdictSeverity = "blocker" | "warning"
 
 export interface VerdictFail {
@@ -143,6 +143,30 @@ export interface VerdictInput {
         moduleName: string
         issues: Array<{ severity: string; message: string }>
     }> | null
+    /**
+     * Fang review coverage: total modules vs successfully reviewed modules.
+     *
+     * Fix 1 — Loop 26 P0: Fang module-coverage fail-closed.
+     * When a module has no successful Fang review (failed, timed out,
+     * MODULE_NO_PARTS, or simply never dispatched), it must not silently
+     * pass the feasibility gate. This input lets the verdict check that
+     * every module in the decomposition received a successful review.
+     *
+     * When any module is unreviewed, the verdict emits a BLOCKER on the
+     * fang_review_coverage axis. Until a safety-criticality classification
+     * exists, ALL unreviewed modules block — the 6-way frontier council
+     * (GPT-5.5, Gemini 3.1 Pro, DeepSeek V4-Pro, Mistral Large, Kimi K2.6,
+     * Grok-3) unanimously agreed this is the only safe default.
+     */
+    fangModuleCoverage?: {
+        totalModules: number
+        reviewedModuleIds: string[]
+        unreviewedModules: Array<{
+            moduleId: string
+            moduleName: string
+            reason: string
+        }>
+    } | null
 }
 
 /** UK 44-tonne articulated lorry legal payload, in kilograms. Beyond this,
@@ -186,7 +210,7 @@ export function computeFeasibilityVerdict(
         })
     }
 
-    // ── Cost ─────────────────────────────────────────────────────────
+    // ── Cost (type-aware) ─────────────────────────────────────────────
     //
     // Fix 1 — Loop 25 P0: unified cost source.
     // When canonicalUnitCostGbp is supplied (the de-duplicated BOM
@@ -194,32 +218,116 @@ export function computeFeasibilityVerdict(
     // PDF stat tile reads, so the verdict evidence and the cover tile
     // always agree. Fall back to aiCostEstimates + parts sum only when
     // the canonical value is absent (legacy / re-run paths).
-    const costCeiling = numberOrNull(input.briefConstraints?.["unitCostCeilingGbp"])
+    //
+    // Item 8 — council-designed type-aware comparison.
+    // Finn currently outputs only per-unit manufacturing cost (totalPerUnit).
+    // The feasibility gate MUST only compare this against a ceiling whose
+    // type is "unit-manufacturing-cost". Comparing Finn's per-unit output
+    // against an installed-capex or annual-opex ceiling is a type mismatch
+    // that produces false verdicts — blockers that don't reflect reality or
+    // passes that hide genuine problems.
+    //
+    // Strategy:
+    //   1. Prefer the typed `costCeilings` array when present.
+    //   2. Fall back to the scalar `unitCostCeilingGbp` with an implicit type
+    //      of "unit-manufacturing-cost" (backward compat for pre-Item-8 rows).
+    //   3. For each "unit-manufacturing-cost" ceiling: compare against Finn.
+    //   4. For each other ceiling type: emit a warning that the constraint
+    //      is present but unverifiable (Finn does not yet produce that perspective).
+    //
+    // The "cost_type_mismatch" axis in fails[] signals that a ceiling exists
+    // but cannot be checked — it does NOT create a pass or a numeric fail.
     const totalCostGbp =
         input.canonicalUnitCostGbp != null && input.canonicalUnitCostGbp > 0
             ? input.canonicalUnitCostGbp
             : computeTotalCost(input.parts, input.aiCostEstimates)
-    // Only treat cost as checked when both the ceiling and the total are
-    // meaningful numbers — if either is null/zero there is nothing to
-    // compare and a "no violations" result is vacuously true.
-    if (costCeiling !== null && costCeiling > 0 && totalCostGbp !== null && totalCostGbp > 0) {
-        checkedConstraints.push("cost")
-        const overFactor = totalCostGbp / costCeiling
-        if (overFactor > 1.5) {
-            fails.push({
-                axis: "cost",
-                severity: "blocker",
-                summary: `Estimated unit cost is ${overFactor.toFixed(1)}× the brief ceiling.`,
-                evidence:
-                    `£${formatGbp(totalCostGbp)} estimated vs £${formatGbp(costCeiling)} ceiling — ` +
-                    `over by £${formatGbp(totalCostGbp - costCeiling)}.`,
+
+    // Build the list of ceilings to evaluate. Prefer the typed array; fall
+    // back to the scalar as a "unit-manufacturing-cost" entry.
+    type CeilingEntry = { gbp: number; type: string; source: string }
+    const ceilingEntries: CeilingEntry[] = []
+
+    const rawCostCeilings = input.briefConstraints?.["costCeilings"]
+    if (Array.isArray(rawCostCeilings) && rawCostCeilings.length > 0) {
+        for (const c of rawCostCeilings) {
+            if (c && typeof c === "object") {
+                const obj = c as { gbp?: unknown; type?: unknown; source?: unknown }
+                const gbp = numberOrNull(obj.gbp)
+                const type =
+                    typeof obj.type === "string" ? obj.type : "unit-manufacturing-cost"
+                const source =
+                    typeof obj.source === "string" ? obj.source : "(brief)"
+                if (gbp !== null && gbp > 0) {
+                    ceilingEntries.push({ gbp, type, source })
+                }
+            }
+        }
+    }
+
+    // Backward compat: if no typed costCeilings array, use scalar.
+    if (ceilingEntries.length === 0) {
+        const scalar = numberOrNull(input.briefConstraints?.["unitCostCeilingGbp"])
+        if (scalar !== null && scalar > 0) {
+            ceilingEntries.push({
+                gbp: scalar,
+                type: "unit-manufacturing-cost",
+                source: "(brief, pre-typed)",
             })
-        } else if (overFactor > 1.0) {
+        }
+    }
+
+    for (const ceiling of ceilingEntries) {
+        if (ceiling.type === "unit-manufacturing-cost") {
+            // ── Like-for-like comparison: Finn's per-unit cost vs brief ceiling ──
+            // Only treat cost as checked when both the ceiling and the total are
+            // meaningful numbers — if either is null/zero the result is vacuous.
+            if (totalCostGbp !== null && totalCostGbp > 0) {
+                checkedConstraints.push("cost")
+                const overFactor = totalCostGbp / ceiling.gbp
+                if (overFactor > 1.5) {
+                    fails.push({
+                        axis: "cost",
+                        severity: "blocker",
+                        summary: `Estimated unit manufacturing cost is ${overFactor.toFixed(1)}× the brief ceiling.`,
+                        evidence:
+                            `£${formatGbp(totalCostGbp)} estimated vs £${formatGbp(ceiling.gbp)} unit cost ceiling — ` +
+                            `over by £${formatGbp(totalCostGbp - ceiling.gbp)}. Brief source: "${ceiling.source}".`,
+                    })
+                } else if (overFactor > 1.0) {
+                    fails.push({
+                        axis: "cost",
+                        severity: "warning",
+                        summary: "Estimated unit manufacturing cost exceeds the brief ceiling.",
+                        evidence:
+                            `£${formatGbp(totalCostGbp)} vs £${formatGbp(ceiling.gbp)} ceiling (over by ${((overFactor - 1) * 100).toFixed(0)}%). Brief source: "${ceiling.source}".`,
+                    })
+                }
+            }
+        } else {
+            // ── Type mismatch: ceiling exists but Finn cannot evaluate it yet ──
+            // Finn currently only produces per-unit manufacturing cost. Installed
+            // capex, annual opex, and project budget require additional Finn
+            // perspectives that are not yet emitted. Rather than compare
+            // apples-with-oranges and produce a false verdict, flag the ceiling
+            // as present-but-unverifiable.
+            //
+            // This is a WARNING (not a blocker) — the design may still be fine;
+            // we simply cannot confirm it without the matching cost perspective.
+            const typeLabel: Record<string, string> = {
+                "installed-capex": "installed capital expenditure",
+                "annual-opex": "annual operating expenditure",
+                "project-budget": "total project budget",
+            }
+            const label = typeLabel[ceiling.type] ?? ceiling.type
+            checkedConstraints.push("cost_type_mismatch")
             fails.push({
-                axis: "cost",
+                axis: "cost_type_mismatch",
                 severity: "warning",
-                summary: "Estimated unit cost exceeds the brief ceiling.",
-                evidence: `£${formatGbp(totalCostGbp)} vs £${formatGbp(costCeiling)} (over by ${((overFactor - 1) * 100).toFixed(0)}%).`,
+                summary: `Brief specifies ${label} ceiling of £${formatGbp(ceiling.gbp)}, but only per-unit manufacturing cost was estimated by Finn.`,
+                evidence:
+                    `The brief states: "${ceiling.source}". Finn currently outputs per-unit manufacturing cost only. ` +
+                    `To verify this constraint, Finn would need to estimate ${label} — a future capability. ` +
+                    `This is NOT a pass or fail on the constraint; it is unverifiable with current data.`,
             })
         }
     }
@@ -392,6 +500,41 @@ export function computeFeasibilityVerdict(
         }
     }
 
+    // ── Fang review coverage (module-level completeness) ─────────────
+    //
+    // Fix 1 — Loop 26 P0: fail-closed on skipped module reviews.
+    //
+    // Every module in the decomposition must receive a successful Fang
+    // review. Modules with failed, timed-out, or missing reviews are
+    // listed as unreviewed. Any unreviewed module produces a BLOCKER —
+    // the system cannot declare a design feasible when safety-critical
+    // modules were never reviewed, and no safety-criticality
+    // classification exists yet to distinguish critical from non-critical.
+    if (input.fangModuleCoverage && input.fangModuleCoverage.totalModules > 0) {
+        checkedConstraints.push("fang_review_coverage")
+        const { totalModules, reviewedModuleIds, unreviewedModules } = input.fangModuleCoverage
+        if (unreviewedModules.length > 0) {
+            const moduleList = unreviewedModules
+                .slice(0, 5)
+                .map((m) => `${m.moduleName} (${m.reason})`)
+                .join("; ")
+            const remaining = unreviewedModules.length > 5
+                ? ` and ${unreviewedModules.length - 5} more`
+                : ""
+            fails.push({
+                axis: "fang_review_coverage",
+                severity: "blocker",
+                summary:
+                    `${unreviewedModules.length} of ${totalModules} module${totalModules === 1 ? "" : "s"} did not receive a successful engineering review.`,
+                evidence:
+                    `Modules without a successful review: ${moduleList}${remaining}. ` +
+                    `${reviewedModuleIds.length} of ${totalModules} modules were reviewed successfully. ` +
+                    "A design cannot be declared feasible when modules have not been reviewed — " +
+                    "the missing reviews may conceal critical manufacturing, safety, or cost issues.",
+            })
+        }
+    }
+
     // ── Supplier coverage ───────────────────────────────────────────
     if (input.bomRowCount > 0) {
         // A BOM with at least one row is a real coverage check.
@@ -431,12 +574,17 @@ export function computeFeasibilityVerdict(
     if (sizingFeasible === false && sizingRecs.length > 0) {
         tradeoffs.push(...sizingRecs.slice(0, 4))
     }
-    if (
-        fails.some((f) => f.axis === "cost" && f.severity === "blocker") &&
-        costCeiling !== null
-    ) {
+    if (fails.some((f) => f.axis === "cost" && f.severity === "blocker")) {
+        // Reconstruct the ceiling value from the first blocker's evidence string
+        // so the tradeoff suggestion can name the ceiling.
+        const unitCostCeiling = ceilingEntries.find(
+            (c) => c.type === "unit-manufacturing-cost",
+        )
+        const ceilingNote = unitCostCeiling
+            ? ` the £${formatGbp(unitCostCeiling.gbp)} ceiling —`
+            : ""
         tradeoffs.push(
-            `Revisit the £${formatGbp(costCeiling)} ceiling — for the declared scope, an independent cost benchmark suggests a higher floor; either the brief target needs adjusting, or scope must be cut.`,
+            `Revisit${ceilingNote} for the declared scope, an independent cost benchmark suggests a higher floor; either the brief target needs adjusting, or scope must be cut.`,
         )
     }
     if (fails.some((f) => f.axis === "transport" && f.severity === "blocker")) {

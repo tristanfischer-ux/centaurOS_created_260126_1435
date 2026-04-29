@@ -4707,6 +4707,7 @@ export type Database = {
           accepted_risks: Json | null
           additional_context: string | null
           ai_cost_estimates: Json | null
+          cost_reconciliation: Json | null
           archived_at: string | null
           autopilot_state: Json | null
           batch_started_at: string | null
@@ -4786,6 +4787,7 @@ export type Database = {
           accepted_risks?: Json | null
           additional_context?: string | null
           ai_cost_estimates?: Json | null
+          cost_reconciliation?: Json | null
           archived_at?: string | null
           autopilot_state?: Json | null
           batch_started_at?: string | null
@@ -4865,6 +4867,7 @@ export type Database = {
           accepted_risks?: Json | null
           additional_context?: string | null
           ai_cost_estimates?: Json | null
+          cost_reconciliation?: Json | null
           archived_at?: string | null
           autopilot_state?: Json | null
           batch_started_at?: string | null

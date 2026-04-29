@@ -11,7 +11,10 @@
  * without a database query.
  */
 
-import { extractCostCeilingFromProse } from '../brief-cost-ceiling-extractor'
+import {
+    extractCostCeilingFromProse,
+    extractAllCostCeilingsFromProse,
+} from '../brief-cost-ceiling-extractor'
 
 // ---------------------------------------------------------------------------
 // Demo brief texts — verbatim from cad_lab_projects.founder_raw_brief
@@ -37,33 +40,150 @@ const VERTICAL_FARM_BRIEF =
 // ---------------------------------------------------------------------------
 
 describe('extractCostCeilingFromProse — five demo briefs', () => {
-    it('BESS — extracts 180,000 from "Target installed capital cost under 180,000 pounds"', () => {
+    it('BESS — extracts 180,000 from "Target installed capital cost under 180,000 pounds" and classifies as installed-capex [Item 8]', () => {
         const result = extractCostCeilingFromProse(BESS_BRIEF)
         expect(result).not.toBeNull()
         expect(result!.gbp).toBe(180_000)
+        // "installed capital cost" should classify as installed-capex, NOT
+        // unit-manufacturing-cost. Comparing this against Finn's per-unit
+        // output would be a type mismatch.
+        expect(result!.ceilingType).toBe('installed-capex')
     })
 
-    it('Vertical Farm — extracts 150,000 from "Target installed capital cost under 150,000 pounds"', () => {
+    it('Vertical Farm — extracts 150,000 and classifies as installed-capex [Item 8]', () => {
         const result = extractCostCeilingFromProse(VERTICAL_FARM_BRIEF)
         expect(result).not.toBeNull()
         expect(result!.gbp).toBe(150_000)
+        expect(result!.ceilingType).toBe('installed-capex')
     })
 
-    it('Desalination — extracts 350,000 from "Target installed capital cost under 350,000 pounds" [Loop 25 Fix 4 NEW]', () => {
+    it('Desalination — extracts 350,000 and classifies as installed-capex [Item 8]', () => {
         const result = extractCostCeilingFromProse(DESALINATION_BRIEF)
         expect(result).not.toBeNull()
         expect(result!.gbp).toBe(350_000)
+        expect(result!.ceilingType).toBe('installed-capex')
     })
 
-    it('HAPS — extracts 2,500,000 from "Target system unit cost under 2.5 million pounds" [Loop 25 Fix 4 NEW]', () => {
+    it('HAPS — extracts 2,500,000 from "Target system unit cost under 2.5 million pounds" and classifies as unit-manufacturing-cost [Item 8]', () => {
         const result = extractCostCeilingFromProse(HAPS_BRIEF)
         expect(result).not.toBeNull()
         expect(result!.gbp).toBe(2_500_000)
+        // "system unit cost" is explicitly a per-unit manufacturing cost.
+        expect(result!.ceilingType).toBe('unit-manufacturing-cost')
     })
 
     it('Hedgerow — returns non-null (bill of materials ~£155)', () => {
         const result = extractCostCeilingFromProse(HEDGEROW_BRIEF)
         expect(result).not.toBeNull()
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Item 8: ceiling type classification
+// ---------------------------------------------------------------------------
+
+describe('extractCostCeilingFromProse — ceiling type classification [Item 8]', () => {
+    it('classifies "installed capital cost" as installed-capex', () => {
+        const result = extractCostCeilingFromProse(
+            'Target installed capital cost under £150,000.',
+        )
+        expect(result).not.toBeNull()
+        expect(result!.ceilingType).toBe('installed-capex')
+    })
+
+    it('classifies "unit cost" as unit-manufacturing-cost', () => {
+        const result = extractCostCeilingFromProse(
+            'Target unit cost under £50,000 per system.',
+        )
+        expect(result).not.toBeNull()
+        expect(result!.ceilingType).toBe('unit-manufacturing-cost')
+    })
+
+    it('classifies "system unit cost" as unit-manufacturing-cost', () => {
+        const result = extractCostCeilingFromProse(
+            'Target system unit cost under 2.5 million pounds.',
+        )
+        expect(result).not.toBeNull()
+        expect(result!.ceilingType).toBe('unit-manufacturing-cost')
+    })
+
+    it('classifies "annual opex" as annual-opex', () => {
+        const result = extractCostCeilingFromProse(
+            'Annual opex under £20,000 per year.',
+        )
+        expect(result).not.toBeNull()
+        expect(result!.ceilingType).toBe('annual-opex')
+    })
+
+    it('classifies "annual operating cost" as annual-opex', () => {
+        const result = extractCostCeilingFromProse(
+            'Target annual operating cost below £30,000.',
+        )
+        expect(result).not.toBeNull()
+        expect(result!.ceilingType).toBe('annual-opex')
+    })
+
+    it('classifies "project budget" as project-budget', () => {
+        const result = extractCostCeilingFromProse(
+            'Total project budget under £500,000 for phase one.',
+        )
+        expect(result).not.toBeNull()
+        expect(result!.ceilingType).toBe('project-budget')
+    })
+
+    it('defaults generic "target ... under £X" to unit-manufacturing-cost', () => {
+        // No specific type qualifier — backward-compatible default.
+        const result = extractCostCeilingFromProse(
+            'Target under £100,000 for this system.',
+        )
+        expect(result).not.toBeNull()
+        expect(result!.ceilingType).toBe('unit-manufacturing-cost')
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Item 8: extractAllCostCeilingsFromProse — multiple ceiling extraction
+// ---------------------------------------------------------------------------
+
+describe('extractAllCostCeilingsFromProse — multiple ceilings [Item 8]', () => {
+    it('returns empty array for text with no costs', () => {
+        const result = extractAllCostCeilingsFromProse('A solar wildlife monitor.')
+        expect(result).toHaveLength(0)
+    })
+
+    it('extracts distinct types when brief has multiple ceilings', () => {
+        const text =
+            'Target system unit cost under £2.5 million. ' +
+            'Target installed capital cost under £3.5 million. ' +
+            'Annual opex target under £50,000.'
+        const result = extractAllCostCeilingsFromProse(text)
+        // Should find all three distinct ceiling types.
+        const types = result.map((r) => r.ceilingType)
+        expect(types).toContain('unit-manufacturing-cost')
+        expect(types).toContain('installed-capex')
+        expect(types).toContain('annual-opex')
+    })
+
+    it('deduplicates when the same type appears twice — keeps first occurrence', () => {
+        const text =
+            'Unit cost under £100,000. ' +
+            'Build cost should not exceed £120,000.'
+        const result = extractAllCostCeilingsFromProse(text)
+        const unitCostEntries = result.filter(
+            (r) => r.ceilingType === 'unit-manufacturing-cost',
+        )
+        // Both phrases map to unit-manufacturing-cost; only the first is kept.
+        expect(unitCostEntries).toHaveLength(1)
+        expect(unitCostEntries[0].gbp).toBe(100_000)
+    })
+
+    it('returns a single entry for a single-ceiling brief', () => {
+        const result = extractAllCostCeilingsFromProse(
+            'Target installed capital cost under £180,000 pounds.',
+        )
+        expect(result).toHaveLength(1)
+        expect(result[0].ceilingType).toBe('installed-capex')
+        expect(result[0].gbp).toBe(180_000)
     })
 })
 

@@ -73,9 +73,13 @@ import type {
     CadLabDesignBrief,
     CadLabResearchResult,
 } from "@/lib/cad-lab-types"
+import { triageRegulatoryMatrix } from "@/lib/regulatory-triage"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
-import { extractCostCeilingFromProse } from "@/lib/brief-cost-ceiling-extractor"
+import {
+    extractCostCeilingFromProse,
+    extractAllCostCeilingsFromProse,
+} from "@/lib/brief-cost-ceiling-extractor"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -535,6 +539,41 @@ async function runChaseResearchInternal(
                 },
                 regulatory:
                     extraction.brief?.regulatory || priorDesignBrief?.regulatory,
+            }
+
+            // Item 2 (council 2026-04-29): regulatory triage — post-Chase pass.
+            //
+            // Chase always emits "not-started" for every standard. This triage
+            // step runs BEFORE persistence and differentiates the matrix using:
+            //   (a) applicability regime tags — marks domain-specific standards
+            //       "not-applicable" when the product is clearly outside scope
+            //       (e.g. ENA G99 grid-connection on a bird feeder)
+            //   (b) Converts the legacy "not-started" sentinel to the new taxonomy
+            //       value "in-scope-not-started" for applicable standards
+            //
+            // Fang-based "design-impact-identified" elevation cannot fire here
+            // because Fang runs AFTER Chase. That elevation happens at PDF-export
+            // time in export-project-pdf.tsx → triageWithFangFindings().
+            //
+            // Markets are read from the brief constraints (Chase may populate
+            // them during extraction); fall back to ["GB"] when absent so UK
+            // projects get sensible defaults.
+            if (Array.isArray(mergedDesignBrief.regulatory) && mergedDesignBrief.regulatory.length > 0) {
+                const markets = Array.isArray(mergedDesignBrief.constraints?.markets)
+                    ? mergedDesignBrief.constraints!.markets!
+                    : ["GB"]
+                const triageResult = triageRegulatoryMatrix(
+                    mergedDesignBrief.regulatory,
+                    descriptionToUse,
+                    markets,
+                    [], // Fang findings not yet available at Chase time
+                )
+                console.log(
+                    `[run-chase-research] regulatory triage complete: ${triageResult.triageSummary}`,
+                    triageResult.matrixUndifferentiated
+                        ? "(matrix undifferentiated — all standards equally staged)"
+                        : "(matrix differentiated)",
+                )
             }
 
             // Loop 24 P1 Fix 3: structured log so we can audit the final
@@ -1259,6 +1298,10 @@ function tryParseBriefJson(
  * `reportText` as a deterministic fallback. Emits a structured log line for
  * every brief parse so we can audit which briefs the extractor reaches.
  *
+ * Item 8 (2026-04-29): also populates `costCeilings` (typed array) alongside
+ * the scalar `unitCostCeilingGbp` (kept for backward compat). The typed array
+ * is what the feasibility gate uses to compare like-with-like.
+ *
  * @param raw        - The parsed JSON object from the LLM extraction.
  * @param reportText - Optional raw report text to scan when the LLM misses
  *                     the cost ceiling.
@@ -1286,18 +1329,43 @@ function normaliseBriefShape(
         const c = raw.constraints as Record<string, unknown>
         const constraints: NonNullable<CadLabDesignBrief["constraints"]> = {}
         if (typeof c.unitCostCeilingGbp === "number" && Number.isFinite(c.unitCostCeilingGbp)) {
+            // LLM gave us a number. Treat it as unit-manufacturing-cost (the
+            // only type Chase's prompt currently asks for explicitly).
             constraints.unitCostCeilingGbp = c.unitCostCeilingGbp
+            constraints.costCeilings = [
+                {
+                    type: "unit-manufacturing-cost",
+                    gbp: c.unitCostCeilingGbp,
+                    source: "LLM JSON constraints.unitCostCeilingGbp",
+                },
+            ]
             console.log(
-                `[brief-parse] cost_ceiling extracted: gbp=${c.unitCostCeilingGbp} source="LLM JSON constraints.unitCostCeilingGbp"`,
+                `[brief-parse] cost_ceiling extracted: gbp=${c.unitCostCeilingGbp} type=unit-manufacturing-cost source="LLM JSON"`,
             )
         } else if (reportText) {
-            // Loop 24 P1 Fix 3: LLM returned null/missing for unitCostCeilingGbp.
-            // Try deterministic regex extraction from the report prose.
-            const proseHit = extractCostCeilingFromProse(reportText)
-            if (proseHit) {
-                constraints.unitCostCeilingGbp = proseHit.gbp
+            // Loop 24 P1 Fix 3 + Item 8: LLM returned null/missing.
+            // Use extractAllCostCeilingsFromProse to capture every ceiling
+            // in the brief text, with types — not just the first hit.
+            const allHits = extractAllCostCeilingsFromProse(reportText)
+            if (allHits.length > 0) {
+                constraints.costCeilings = allHits.map((h) => ({
+                    type: h.ceilingType,
+                    gbp: h.gbp,
+                    source: h.source,
+                }))
+                // Backward compat: expose the first unit-manufacturing-cost
+                // value (or the first hit of any type if none matched) as
+                // the scalar field so older callers are not broken.
+                const unitHit =
+                    allHits.find((h) => h.ceilingType === "unit-manufacturing-cost") ??
+                    allHits[0]
+                constraints.unitCostCeilingGbp = unitHit.gbp
                 console.log(
-                    `[brief-parse] cost_ceiling extracted via prose fallback: gbp=${proseHit.gbp} source="${proseHit.source}"`,
+                    `[brief-parse] cost_ceiling extracted via prose fallback: ` +
+                        allHits
+                            .map((h) => `gbp=${h.gbp} type=${h.ceilingType}`)
+                            .join(", ") +
+                        ` sources="${allHits.map((h) => h.source).join("; ")}"`,
                 )
             } else {
                 console.warn(
@@ -1328,11 +1396,25 @@ function normaliseBriefShape(
         }
     } else if (reportText) {
         // No constraints block at all in the JSON. Still run prose extraction.
-        const proseHit = extractCostCeilingFromProse(reportText)
-        if (proseHit) {
-            brief.constraints = { unitCostCeilingGbp: proseHit.gbp }
+        const allHits = extractAllCostCeilingsFromProse(reportText)
+        if (allHits.length > 0) {
+            const costCeilings = allHits.map((h) => ({
+                type: h.ceilingType,
+                gbp: h.gbp,
+                source: h.source,
+            }))
+            const unitHit =
+                allHits.find((h) => h.ceilingType === "unit-manufacturing-cost") ??
+                allHits[0]
+            brief.constraints = {
+                costCeilings,
+                unitCostCeilingGbp: unitHit.gbp,
+            }
             console.log(
-                `[brief-parse] cost_ceiling extracted via prose fallback (no constraints block): gbp=${proseHit.gbp} source="${proseHit.source}"`,
+                `[brief-parse] cost_ceiling extracted via prose fallback (no constraints block): ` +
+                    allHits
+                        .map((h) => `gbp=${h.gbp} type=${h.ceilingType}`)
+                        .join(", "),
             )
         } else {
             console.warn(

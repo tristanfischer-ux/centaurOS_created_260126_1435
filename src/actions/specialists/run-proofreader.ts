@@ -311,6 +311,79 @@ export async function runProofreaderBackground(
         }
     }
 
+    // Fix 1 — Loop 26 P0: Fang review coverage (module-level completeness).
+    //
+    // Compare the full module manifest against modules that received a
+    // successful review. Only modules whose ID appears as a key in the
+    // reviews JSONB with at least one non-empty review round count as
+    // "reviewed". Everything else is "unreviewed" with a reason.
+    //
+    // Council consensus (6/6 frontier models, 2026-04-29): block on ALL
+    // unreviewed modules until a safety-criticality classification exists.
+    const allModuleIds = modules
+        .map((m) => typeof m.id === "string" ? m.id : null)
+        .filter((id): id is string => id !== null)
+    const reviewsObj = (reviews && typeof reviews === "object")
+        ? reviews as Record<string, unknown>
+        : {}
+    const reviewedModuleIds: string[] = []
+    const unreviewedModules: Array<{ moduleId: string; moduleName: string; reason: string }> = []
+    for (const mod of modules) {
+        const moduleId = typeof mod.id === "string" ? mod.id : null
+        if (!moduleId) continue
+        const moduleName = typeof mod.name === "string" ? mod.name : moduleId
+        const reviewData = reviewsObj[moduleId]
+        const reviewRounds = Array.isArray(reviewData)
+            ? reviewData
+            : reviewData && typeof reviewData === "object"
+                ? [reviewData]
+                : []
+        const hasSuccessfulReview = reviewRounds.some((round) => {
+            if (!round || typeof round !== "object") return false
+            const r = round as Record<string, unknown>
+            // Council fix — item 1 (6/6, 2026-04-29): explicitly reject
+            // REVIEW_SKIPPED tombstones. These are written by run-fang-review
+            // when a module hits an early-exit error (no parts, review failed,
+            // internal error). A tombstone has `_reviewSkipped: true` and must
+            // never count as a successful review — its purpose is to make the
+            // module visible to the feasibility gate as "explicitly skipped".
+            if (r["_reviewSkipped"] === true) return false
+            const issues = r.issues
+            const verdict = r.verdict
+            // A successful review has either issues or a non-empty verdict.
+            // An empty-issues review with a verdict is accepted (pass verdict
+            // means Fang found no manufacturing concerns after a thorough check).
+            return (Array.isArray(issues) && issues.length > 0) ||
+                   (typeof verdict === "string" && verdict.length > 0)
+        })
+        if (hasSuccessfulReview) {
+            reviewedModuleIds.push(moduleId)
+        } else {
+            // Determine the most informative reason for the feasibility gate.
+            // Council fix — item 1 (6/6, 2026-04-29): surface tombstone reason
+            // so the feasibility exception page gives actionable context.
+            let reason = "no review was attempted"
+            if (reviewRounds.length > 0) {
+                const tombstoneRound = reviewRounds.find(
+                    (r) => r && typeof r === "object" &&
+                        (r as Record<string, unknown>)["_reviewSkipped"] === true,
+                )
+                if (tombstoneRound) {
+                    const skipReason = (tombstoneRound as Record<string, unknown>)["_skipReason"]
+                    reason = typeof skipReason === "string" && skipReason.length > 0
+                        ? `review was skipped: ${skipReason}`
+                        : "review was skipped"
+                } else {
+                    reason = "review returned empty (no issues, no verdict)"
+                }
+            }
+            unreviewedModules.push({ moduleId, moduleName, reason })
+        }
+    }
+    const fangModuleCoverage = allModuleIds.length > 0
+        ? { totalModules: allModuleIds.length, reviewedModuleIds, unreviewedModules }
+        : null
+
     // Cross-modal consistency gate (council R1 P1 — Loop 24 evidence).
     //
     // Runs BEFORE computeFeasibilityVerdict so its blockers can be injected
@@ -423,6 +496,7 @@ export async function runProofreaderBackground(
         canonicalUnitCostGbp: canonicalUnitCostGbp > 0 ? canonicalUnitCostGbp : null,
         // Fix 3: Fang CRITICAL findings escalated to feasibility verdict blockers.
         fangModuleReviews: fangModuleReviews.length > 0 ? fangModuleReviews : null,
+        fangModuleCoverage,
     })
 
     // Merge cross-modal blockers into the verdict.

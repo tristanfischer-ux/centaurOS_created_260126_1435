@@ -82,7 +82,97 @@ function isUnvalidatedModule(
     return reviews.length === 0 || reviews.every((r) => r.issues.length === 0)
 }
 
+// ─── Verdict coverage tests ───────────────────────────────────────────────
+
+import { computeFeasibilityVerdict, type VerdictInput } from "@/lib/feasibility/compute-verdict"
+
+function makeVerdictInput(overrides?: Partial<VerdictInput>): VerdictInput {
+    return {
+        dimensionSheet: null,
+        briefConstraints: null,
+        parts: [],
+        aiCostEstimates: null,
+        shortlistCount: 0,
+        bomRowCount: 0,
+        ...overrides,
+    }
+}
+
 // ─── Tests ─────────────────────────────────────────────────────────────────
+
+describe("Fang review coverage — Loop 26 P0 (feasibility gate)", () => {
+    it("all modules reviewed => no fang_review_coverage fail", () => {
+        const input = makeVerdictInput({
+            fangModuleCoverage: {
+                totalModules: 3,
+                reviewedModuleIds: ["m1", "m2", "m3"],
+                unreviewedModules: [],
+            },
+        })
+        const verdict = computeFeasibilityVerdict(input)
+        const coverageFails = verdict.fails.filter((f) => f.axis === "fang_review_coverage")
+        expect(coverageFails).toHaveLength(0)
+        expect(verdict.checkedConstraints).toContain("fang_review_coverage")
+    })
+
+    it("one unreviewed module => blocker fail on fang_review_coverage", () => {
+        const input = makeVerdictInput({
+            fangModuleCoverage: {
+                totalModules: 4,
+                reviewedModuleIds: ["m1", "m2", "m3"],
+                unreviewedModules: [
+                    { moduleId: "m4", moduleName: "Avionics Suite", reason: "no review was attempted" },
+                ],
+            },
+        })
+        const verdict = computeFeasibilityVerdict(input)
+        const coverageFails = verdict.fails.filter((f) => f.axis === "fang_review_coverage")
+        expect(coverageFails).toHaveLength(1)
+        expect(coverageFails[0].severity).toBe("blocker")
+        expect(coverageFails[0].summary).toContain("1 of 4")
+        expect(coverageFails[0].evidence).toContain("Avionics Suite")
+        expect(verdict.status).toBe("red")
+    })
+
+    it("multiple unreviewed modules => single blocker with all module names", () => {
+        const input = makeVerdictInput({
+            fangModuleCoverage: {
+                totalModules: 5,
+                reviewedModuleIds: ["m1", "m2"],
+                unreviewedModules: [
+                    { moduleId: "m3", moduleName: "Wireless", reason: "no review was attempted" },
+                    { moduleId: "m4", moduleName: "Electrical", reason: "review returned empty (no issues, no verdict)" },
+                    { moduleId: "m5", moduleName: "Thermal", reason: "no review was attempted" },
+                ],
+            },
+        })
+        const verdict = computeFeasibilityVerdict(input)
+        const coverageFails = verdict.fails.filter((f) => f.axis === "fang_review_coverage")
+        expect(coverageFails).toHaveLength(1)
+        expect(coverageFails[0].summary).toContain("3 of 5")
+        expect(verdict.status).toBe("red")
+    })
+
+    it("null fangModuleCoverage => no coverage check (backward compat)", () => {
+        const input = makeVerdictInput({ fangModuleCoverage: null })
+        const verdict = computeFeasibilityVerdict(input)
+        expect(verdict.checkedConstraints).not.toContain("fang_review_coverage")
+        const coverageFails = verdict.fails.filter((f) => f.axis === "fang_review_coverage")
+        expect(coverageFails).toHaveLength(0)
+    })
+
+    it("zero totalModules => no coverage check", () => {
+        const input = makeVerdictInput({
+            fangModuleCoverage: {
+                totalModules: 0,
+                reviewedModuleIds: [],
+                unreviewedModules: [],
+            },
+        })
+        const verdict = computeFeasibilityVerdict(input)
+        expect(verdict.checkedConstraints).not.toContain("fang_review_coverage")
+    })
+})
 
 describe("Fang review completeness — Loop 24 P0", () => {
     /**

@@ -71,6 +71,7 @@ import {
     startPipelineRun,
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
+import { runCostReconciliation } from "@/actions/specialists/run-cost-reconciliation"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -511,6 +512,28 @@ async function runFinnCostInternal(
                     modulesInProject: modules.length,
                 },
             })
+
+            // 8. Post-Finn cost reconciliation (Item 7 fix).
+            //    Compares Finn's canonical total against the BOM-derived
+            //    total, supplier quotes, and the brief's cost ceiling.
+            //    This MUST NOT block the pipeline even if it throws —
+            //    reconciliation failure is a diagnostic concern, not a
+            //    pipeline blocker. The result is persisted to
+            //    cad_lab_projects.cost_reconciliation for the PDF and UI.
+            try {
+                const reconcileResult = await runCostReconciliation(projectId, foundryId)
+                if (!reconcileResult.ok) {
+                    console.warn(
+                        `[run-finn-cost] Cost reconciliation failed (non-blocking): ${reconcileResult.error}`,
+                    )
+                }
+            } catch (reconcileErr) {
+                // Swallow — reconciliation must never break the Finn pipeline.
+                console.warn(
+                    "[run-finn-cost] Cost reconciliation threw (non-blocking):",
+                    reconcileErr instanceof Error ? reconcileErr.message : reconcileErr,
+                )
+            }
 
             return {
                 ok: true,

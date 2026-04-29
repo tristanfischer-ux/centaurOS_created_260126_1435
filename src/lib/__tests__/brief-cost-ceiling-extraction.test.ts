@@ -2,13 +2,14 @@ import { extractCostCeilingFromProse } from "@/lib/brief-cost-ceiling-extractor"
 
 describe("extractCostCeilingFromProse", () => {
     // Happy-path — pound symbol
-    it("extracts £150,000 with commas", () => {
+    it("extracts £150,000 with commas and classifies as installed-capex [Item 8]", () => {
         const result = extractCostCeilingFromProse(
             "target installed capital cost under £150,000",
         )
         expect(result).not.toBeNull()
         expect(result!.gbp).toBe(150_000)
         expect(result!.source).toContain("150,000")
+        expect(result!.ceilingType).toBe("installed-capex")
     })
 
     it("extracts £150000 without commas", () => {

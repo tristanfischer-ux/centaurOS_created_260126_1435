@@ -46,20 +46,59 @@ export interface CadLabDesignBrief {
   regulatory?: CadLabDesignBriefRegulatoryItem[]
 }
 
+/**
+ * The four cost ceiling types the engine can distinguish.
+ *
+ * "unit-manufacturing-cost" is the only type directly comparable to Finn's
+ * totalPerUnit roll-up. All other types require a future Finn perspective
+ * before the feasibility gate can evaluate them.
+ */
+export type CostCeilingType =
+    | "unit-manufacturing-cost"
+    | "installed-capex"
+    | "annual-opex"
+    | "project-budget"
+
+/**
+ * A single typed cost ceiling extracted from the brief.
+ * Stored alongside its source phrase so mismatches can be surfaced clearly
+ * in the feasibility exception page.
+ */
+export interface CostCeiling {
+    /** The cost basis this ceiling refers to. */
+    type: CostCeilingType
+    /** Parsed GBP value (whole pounds, positive). */
+    gbp: number
+    /** The verbatim phrase from the brief that produced this value. */
+    source: string
+}
+
 /** Structured programme constraints — declared in the brief, honoured downstream. */
 export interface CadLabDesignBriefConstraints {
-  /** Max allowed unit cost in GBP. */
-  unitCostCeilingGbp?: number
-  /** ISO date of target first ship. */
-  firstShipDate?: string
-  /** Max allowed total mass in kg. */
-  maxMassKg?: number
-  /** Initial production batch size (units). */
-  batchSize?: number
-  /** ISO country codes or short market names. */
-  markets?: string[]
-  /** Where the product will be manufactured. */
-  productionRegion?: string
+    /**
+     * @deprecated Use `costCeilings` instead. Retained for backward
+     * compatibility with existing rows parsed before Item 8 (2026-04-29).
+     * When `costCeilings` is present, this field is redundant. New code
+     * should read `costCeilings`, not this scalar.
+     */
+    unitCostCeilingGbp?: number
+    /**
+     * All cost ceilings extracted from the brief, each with its type.
+     * Replaces the scalar `unitCostCeilingGbp` for type-aware comparison.
+     * The feasibility gate compares each entry only against the corresponding
+     * Finn cost perspective — never against a mismatched perspective.
+     */
+    costCeilings?: CostCeiling[]
+    /** ISO date of target first ship. */
+    firstShipDate?: string
+    /** Max allowed total mass in kg. */
+    maxMassKg?: number
+    /** Initial production batch size (units). */
+    batchSize?: number
+    /** ISO country codes or short market names. */
+    markets?: string[]
+    /** Where the product will be manufactured. */
+    productionRegion?: string
 }
 
 /** Per-project regulatory posture row.
@@ -78,8 +117,26 @@ export interface CadLabDesignBriefRegulatoryItem {
   name: string
   /** One-line summary of what this standard covers for this project. */
   summary: string
-  /** Status against this standard. */
-  status: "met" | "in-progress" | "not-started"
+  /** Status against this standard.
+   *
+   * Triage statuses (item 2, council 2026-04-29):
+   *   "not-applicable"       — standard does not apply to this product class or jurisdiction
+   *   "in-scope-not-started" — standard applies; no design work recorded yet
+   *   "design-impact-identified" — Fang or Chase found a design constraint that directly links
+   *                            to this standard (e.g. thermal runaway → BS EN IEC 62619)
+   *   "evidence-captured"   — downstream manual state: test cert / declaration obtained
+   *
+   * Legacy statuses preserved for back-compat:
+   *   "met" | "in-progress" | "not-started"
+   */
+  status:
+    | "met"
+    | "in-progress"
+    | "not-started"
+    | "not-applicable"
+    | "in-scope-not-started"
+    | "design-impact-identified"
+    | "evidence-captured"
   /** Loop 3 P4: scope of applicability for this specific project — e.g.
    *  "AC interface and battery system safety scope", "modified container
    *  invalidates structural certification", or "informational only". */
