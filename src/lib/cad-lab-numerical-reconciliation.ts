@@ -107,9 +107,18 @@ const ENERGY_DENSITY_WH_PER_KG_BY_CHEMISTRY: Record<string, [number, number]> = 
     LCO: [180, 240],
 }
 
+/**
+ * Standard engineering sign convention: (actual − target) / target × 100.
+ *   Positive  → actual exceeds target (over)
+ *   Negative  → actual is below target (under)
+ * `a` = actual / claimed value, `b` = reference / target value.
+ * Falls back to symmetric |max| denominator only when b is zero.
+ * Loop 26 P4 fix: previously used max(|a|,|b|) which gave an unsigned
+ * magnitude and made large divergences ambiguous in direction.
+ */
 function pctDiff(a: number, b: number): number {
     if (a === 0 && b === 0) return 0
-    const denom = Math.max(Math.abs(a), Math.abs(b))
+    const denom = b !== 0 ? Math.abs(b) : Math.abs(a)
     if (denom === 0) return 0
     return ((a - b) / denom) * 100
 }

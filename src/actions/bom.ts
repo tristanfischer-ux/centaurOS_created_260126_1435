@@ -435,7 +435,13 @@ async function fetchMarketplaceSupplierContextForBom(
 
     if (!semantic || semantic.length === 0) return ""
 
-    const ids = semantic.map((r: { id: string }) => r.id)
+    // Filter Finance/People/AI rows before extracting IDs so they don't
+    // waste slots in the match_count=20 budget. The RPC (v1) has no
+    // category-filter param — apply it at the result level. Defence-in-depth:
+    // the marketplace_listings fetch below also filters by category.
+    const ids = semantic
+      .filter((r: { id: string; category: string }) => r.category === "Products" || r.category === "Services")
+      .map((r: { id: string }) => r.id)
     const { data: listings } = await admin
       .from("marketplace_listings")
       .select("id, title, subcategory, specialties, materials, description, process_capabilities, certifications, key_equipment, lead_time, production_capacity, country_iso, iso_14001, verification_tier, data_quality_score")

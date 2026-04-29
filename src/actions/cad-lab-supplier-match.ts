@@ -881,8 +881,19 @@ export async function matchCadLabModuleSuppliers(
       })
 
       if (mlSemantic) {
+        // Filter Finance/People/AI rows at the semantic-score stage so they
+        // don't waste slots in the match_count=50 budget. The RPC has no
+        // category-filter param (v1), so we apply it here. This means only
+        // Products and Services rows populate semanticScores and candidateIds,
+        // preventing VC funds from outranking manufacturers on semantic score
+        // alone. (The rawListings fetch below also filters by category — this
+        // is defence-in-depth at the score-map level.)
+        // Loop 26 P6: Finance rows were filling top-50 semantic slots and
+        // displacing real manufacturers from candidateIds entirely.
         for (const ml of mlSemantic) {
-          semanticScores.set(ml.id, ml.similarity as number)
+          if (ml.category === "Products" || ml.category === "Services") {
+            semanticScores.set(ml.id, ml.similarity as number)
+          }
         }
       }
     }
