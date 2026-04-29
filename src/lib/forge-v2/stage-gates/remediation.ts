@@ -224,3 +224,93 @@ export function buildRemediationPromptBlock(
         "",
     ].join("\n")
 }
+
+// ── buildMaxTopologyOverrideBlock ────────────────────────────────────────────
+
+/**
+ * Build the topology-override prompt block prepended to Max's system prompt
+ * when a topology-level sizing failure has triggered a redecomposition.
+ *
+ * This is a more structured variant of `buildRemediationPromptBlock` for the
+ * specific case where Fang's sizing solver determined that the current module
+ * decomposition cannot physically fit inside the briefed envelope — not because
+ * of envelope-class mismatch (handled by DELIVER_AND_PUSHBACK) but because the
+ * module architecture itself requires structural changes (splitting a rack into
+ * two separate modules, externalising a power conversion skid, adding an
+ * auxiliary cooling module, etc.).
+ *
+ * The JSON context string is the `_waitingMaxContext` payload built in
+ * `run-fang-sizing.ts::Guard 3`:
+ *   {
+ *     reason: "fang_sizing_topology_overflow",
+ *     recommended_module_changes: [{ kind, reason, into_count? }],
+ *     fang_solver_summary: string,
+ *     constraints_to_preserve: Record<string, number>,
+ *     envelope: { kind, label } | null,
+ *   }
+ *
+ * @param contextString - JSON string of the topology-overflow remediation context
+ * @returns A formatted multi-line string ready to prepend to Max's research report
+ */
+export function buildMaxTopologyOverrideBlock(contextString: string): string {
+    let parsed: {
+        reason?: string
+        recommended_module_changes?: Array<{ kind: string; reason: string; into_count?: number }>
+        fang_solver_summary?: string
+        constraints_to_preserve?: Record<string, number>
+        envelope?: { kind: string; label: string } | null
+    } = {}
+    try {
+        parsed = JSON.parse(contextString) as typeof parsed
+    } catch {
+        // Fallback: treat as plain text if JSON parse fails
+        return buildRemediationPromptBlock(3, contextString)
+    }
+
+    const lines: string[] = [
+        "[REMEDIATION OVERRIDE — PREVIOUS DECOMPOSITION FAILED SIZING]",
+        "Your previous decomposition produced modules that did not fit in the briefed envelope.",
+        "",
+    ]
+
+    if (parsed.fang_solver_summary) {
+        lines.push(`Solver summary: ${parsed.fang_solver_summary}`)
+        lines.push("")
+    }
+
+    if (parsed.recommended_module_changes && parsed.recommended_module_changes.length > 0) {
+        lines.push("Recommended changes:")
+        for (const change of parsed.recommended_module_changes) {
+            if (change.kind === "split" && change.into_count) {
+                lines.push(`  - Split into ${change.into_count} separate modules: ${change.reason}`)
+            } else if (change.kind === "externalise") {
+                lines.push(`  - Externalise as a separate module: ${change.reason}`)
+            } else {
+                lines.push(`  - ${change.kind}: ${change.reason}`)
+            }
+        }
+        lines.push("")
+    }
+
+    if (parsed.constraints_to_preserve && Object.keys(parsed.constraints_to_preserve).length > 0) {
+        const constraintStr = Object.entries(parsed.constraints_to_preserve)
+            .map(([k, v]) => `${k}: ${v}`)
+            .join(", ")
+        lines.push(`Constraints to preserve: ${constraintStr}`)
+        lines.push("")
+    }
+
+    if (parsed.envelope) {
+        lines.push(`Target envelope: ${parsed.envelope.label} (${parsed.envelope.kind})`)
+        lines.push("")
+    }
+
+    lines.push(
+        "For this re-decomposition: produce a DIFFERENT module breakdown that addresses the changes above.",
+        "Do NOT regenerate the same modules.",
+        "Do NOT preserve the same module count without explanation.",
+        "",
+    )
+
+    return lines.join("\n")
+}

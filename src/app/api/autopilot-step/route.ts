@@ -257,6 +257,36 @@ async function runStep(
                 : { ok: false, error: result.error ?? "Max failed" }
         }
 
+        case "waitForMaxRedecomposition": {
+            // Gates Council R1 P1 (2026-04-29): Max is re-fired after Fang sizing
+            // Guard 3 detected a topology-level overflow. The remediation context
+            // is already stashed at gate_remediation_context.waiting_max by
+            // triggerRemediation (called in the waitForSizing branch above).
+            // runMaxDecompositionBackground reads + clears it via
+            // consumeRemediationContext at the start of its prompt-building step,
+            // prepending the structured override block that tells Max what
+            // structural change to make.
+            //
+            // The trigger string is deliberately "auto.brief-lock" (the same as
+            // first-pass) so the pipeline_runs record looks identical to a normal
+            // Max run — the remediation context in the prompt is the signal.
+            const { runMaxDecompositionBackground } = await import(
+                "@/actions/specialists/run-max-decomposition"
+            )
+            const result = await runMaxDecompositionBackground(
+                projectId,
+                foundryId,
+                null,
+            )
+            if (!result.ok) {
+                return { ok: false, error: result.error ?? "Max redecomposition failed" }
+            }
+            console.log(
+                `[autopilot-step] waitForMaxRedecomposition: Max redecomposition succeeded for project=${projectId} (${result.moduleCount} modules)`,
+            )
+            return { ok: true }
+        }
+
         case "waitForSizing": {
             const { runFangSizingBackground } = await import(
                 "@/actions/specialists/run-fang-sizing"
@@ -290,6 +320,63 @@ async function runStep(
                     `[autopilot-step] sizing complete with class-drift pushback for project=${projectId} — advancing`,
                 )
                 return { ok: true }
+            }
+            // NEEDS_MAX_REDECOMPOSITION (Gates Council R1 P1):
+            // Guard 3 in run-fang-sizing.ts fired — the solver's
+            // recommendations contain a topology-level structural change
+            // (split into 2 modules, externalise a skid, etc.). Re-sizing
+            // the same module layout is futile; Max must redecompose with
+            // the solver's structural guidance as a hard override.
+            //
+            // The remediation context is stashed by triggerRemediation into
+            // gate_remediation_context.waiting_max so the next Max run picks
+            // it up via consumeRemediationContext. The autopilot stage is set
+            // to 'waiting_max_redecomposition' (TRANSITIONAL — not terminal).
+            // After Max produces a new decomposition the pipeline continues
+            // from waiting_sizing → waiting_layout → … normally.
+            if (
+                !result.ok &&
+                "errorCode" in result &&
+                result.errorCode === "NEEDS_MAX_REDECOMPOSITION"
+            ) {
+                const waitingMaxContext =
+                    (result as unknown as { _waitingMaxContext?: string })._waitingMaxContext ?? null
+                if (waitingMaxContext) {
+                    const { triggerRemediation } = await import(
+                        "@/lib/forge-v2/stage-gates/remediation"
+                    )
+                    const remResult = await triggerRemediation(
+                        projectId,
+                        "waiting_max_redecomposition",
+                        waitingMaxContext,
+                    )
+                    if (!remResult.ok) {
+                        console.error(
+                            `[autopilot-step] NEEDS_MAX_REDECOMPOSITION: triggerRemediation failed for project=${projectId}:`,
+                            remResult.error,
+                        )
+                        return {
+                            ok: false,
+                            error:
+                                `Max redecomposition remediation trigger failed: ${remResult.error ?? "unknown"}. ` +
+                                `Original sizing error: ${result.error ?? "topology overflow"}`,
+                        }
+                    }
+                    console.log(
+                        `[autopilot-step] NEEDS_MAX_REDECOMPOSITION: remediation triggered for project=${projectId} — stage reset to waiting_max_redecomposition`,
+                    )
+                    // triggerRemediation already reset autopilot_state.stage via the
+                    // apply_gate_remediation PG function. The cron will pick up
+                    // waiting_max_redecomposition on the next tick and fire Max.
+                    // Return ok:true so the cron tick marks this sizing run done.
+                    return { ok: true }
+                }
+                // Fallback: no context stashed — still fail the step so the
+                // founder sees it rather than silently advancing with bad topology.
+                console.error(
+                    `[autopilot-step] NEEDS_MAX_REDECOMPOSITION: no _waitingMaxContext in result for project=${projectId}`,
+                )
+                return { ok: false, error: result.error ?? "Topology overflow: Max redecomposition required but context missing" }
             }
             return result.ok
                 ? { ok: true }

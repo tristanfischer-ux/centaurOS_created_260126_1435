@@ -69,6 +69,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import {
     consumeRemediationContext,
     buildRemediationPromptBlock,
+    buildMaxTopologyOverrideBlock,
 } from "@/lib/forge-v2/stage-gates/remediation"
 import {
     emptyCanonicalSpecs,
@@ -287,9 +288,36 @@ async function runMaxDecompositionInternal(
         //     SAFETY: The `consumeRemediationContext` call returns null if no context
         //     exists. When null, `reportToUse` is identical to `report`. Projects
         //     without remediation context behave exactly as before this change.
-        const remediationCtx = await consumeRemediationContext(projectId, "waiting_max")
+        // Read remediation context from the standard "waiting_max" key first.
+        // When this run was triggered by a topology-overflow from Fang sizing
+        // (stage = "waiting_max_redecomposition"), the context was stashed at
+        // "waiting_max_redecomposition" by triggerRemediation. Check both keys
+        // so the prompt override is applied regardless of which path triggered
+        // the redecomposition.
+        const remediationCtx =
+            (await consumeRemediationContext(projectId, "waiting_max")) ??
+            (await consumeRemediationContext(projectId, "waiting_max_redecomposition"))
+
+        // When the remediation context comes from a topology-overflow (fang_sizing_topology_overflow),
+        // use gate ID 3 (topology gate) in the override block heading; otherwise use gate 2 (the
+        // existing convention for brief-mismatch remediations that re-fired Max).
+        const remediationGateId = (() => {
+            if (!remediationCtx) return 2
+            try {
+                const parsed = JSON.parse(remediationCtx) as { reason?: string }
+                return parsed.reason === "fang_sizing_topology_overflow" ? 3 : 2
+            } catch {
+                return 2
+            }
+        })()
+
+        // Build the override prompt block. For topology overrides (gate 3) we use a
+        // more specific heading so Max understands this is a structural architecture
+        // constraint, not just a sizing refinement.
         const reportToUse = remediationCtx
-            ? buildRemediationPromptBlock(2, remediationCtx) + report
+            ? (remediationGateId === 3
+                ? buildMaxTopologyOverrideBlock(remediationCtx)
+                : buildRemediationPromptBlock(2, remediationCtx)) + report
             : report
 
         // 3. Pre-flight tier budget check.

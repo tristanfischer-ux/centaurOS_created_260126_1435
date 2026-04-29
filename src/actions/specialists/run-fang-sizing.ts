@@ -62,6 +62,48 @@ import {
     getEnvelopeClassificationTag,
 } from "@/lib/forge-v2/envelope-classification"
 
+// ─── Topology recommendation detector ─────────────────────────────────────────
+
+/**
+ * Keywords that indicate a topology-level structural change in a solver
+ * recommendation — i.e. the module decomposition itself must change, not just
+ * the sizing of the existing modules.
+ *
+ * Match is case-insensitive. Matches any recommendation string that contains
+ * at least one of these patterns.
+ *
+ * Exclusion note: "split" alone can appear in non-topology contexts
+ * (e.g. "split the cost across two cells") so we require it to be followed
+ * by module/rack/battery/unit/enclosure/system context OR appear alongside
+ * other topology signals. The regex captures the most unambiguous forms.
+ *
+ * Council R1 P1 framing: "split battery rack into 2 modules", "externalise
+ * PCS skid as separate module", "add an auxiliary cooling module". These
+ * recommendation texts come from the solver's `recommendations` array in the
+ * DimensionSheet and are written by the domain rules libraries.
+ */
+const TOPOLOGY_CHANGE_RE =
+    /\b(?:split\s+(?:into|battery|rack|module|unit|enclosure|system|the)|decompose|additional\s+module|externalise|externalize|split\s+into\s+\d+\s+(?:units?|modules?)|auxiliary\s+(?:subsystem|module|cooling|thermal|skid)|separate\s+module|separate\s+skid|new\s+module)\b/i
+
+/**
+ * Returns true when ANY recommendation in the array contains a topology-level
+ * structural change — i.e. the solver is saying "the current module layout
+ * won't work; you need a different number or arrangement of modules".
+ *
+ * ANTI-CHEAT: deterministic regex, no LLM involvement.
+ */
+export function hasTopologyRecommendation(recommendations: readonly string[]): boolean {
+    return recommendations.some((r) => TOPOLOGY_CHANGE_RE.test(r))
+}
+
+/**
+ * Extract the first topology-level recommendation for use in the remediation
+ * context block. Returns null if no topology recommendation is found.
+ */
+export function findTopologyRecommendations(recommendations: readonly string[]): string[] {
+    return recommendations.filter((r) => TOPOLOGY_CHANGE_RE.test(r))
+}
+
 // ─── Subject-text heuristic (fallback when Max didn't populate industryDomain) ───
 
 /**
@@ -157,9 +199,17 @@ export interface RunFangSizingError {
      *   with class-fence fields. Pipeline should advance normally; the PDF will
      *   render the trade-off callout from closest_feasible_alternate.
      *
+     * NEEDS_MAX_REDECOMPOSITION — solver recommendations contain a topology-level
+     *   change (split module into N units, externalise a skid as a separate module,
+     *   add an auxiliary subsystem). The current module layout cannot be salvaged
+     *   by re-sizing alone. Max must produce a NEW decomposition with the solver's
+     *   structural guidance as a hard override constraint. Pipeline sets
+     *   autopilot_state.stage = 'waiting_max_redecomposition' (TRANSITIONAL, not
+     *   terminal). After Max re-decomposes the pipeline continues normally.
+     *
      * All other codes are transient errors that may be retried.
      */
-    errorCode?: string | "SOLVER_ERROR" | "DELIVER_AND_PUSHBACK"
+    errorCode?: string | "SOLVER_ERROR" | "DELIVER_AND_PUSHBACK" | "NEEDS_MAX_REDECOMPOSITION"
     runId?: string
 }
 
@@ -528,7 +578,101 @@ async function runFangSizingInternal(
                 }
             }
 
-            // Same envelope variant — safe to retry with the alternate envelope.
+            // ── Guard 3 — topology overflow check ───────────────────────────
+            //
+            // Same envelope variant confirmed — but before committing to a
+            // re-size retry, check whether the solver's recommendations signal
+            // a TOPOLOGY-LEVEL structural change. If they do, re-sizing the same
+            // module layout is futile: the issue is the decomposition itself, not
+            // the sizes.
+            //
+            // Council R1 P1 framing (gates-council 2026-04-29): "when the gate's
+            // remediation requires topology change (split into 2×40ft, externalise
+            // PCS skid), Max needs to redecompose, not Fang."
+            //
+            // When topology recommendations are found, we:
+            //   1. Persist the existing (infeasible) dimension_sheet with a note.
+            //   2. Build a structured remediation context for Max.
+            //   3. Return NEEDS_MAX_REDECOMPOSITION — route handler sets
+            //      autopilot_state.stage = 'waiting_max_redecomposition'.
+            //
+            // ANTI-CHEAT: topology detection is a deterministic regex on the
+            // solver's own text — never an LLM call.
+            const topologyRecs = findTopologyRecommendations(prevSheet.recommendations ?? [])
+            if (topologyRecs.length > 0) {
+                const primaryCapacityEntry = Object.entries(prevSheet.target ?? {}).find(
+                    ([, v]) => typeof v === "number",
+                )
+                const constraintsToPreserve: Record<string, number> = {}
+                if (primaryCapacityEntry) {
+                    constraintsToPreserve[primaryCapacityEntry[0]] = primaryCapacityEntry[1] as number
+                }
+
+                const moduleChanges: Array<{ kind: string; reason: string; into_count?: number }> =
+                    topologyRecs.map((rec) => {
+                        const splitCountMatch = rec.match(/split\s+(?:into\s+)?(\d+)/i)
+                        if (splitCountMatch) {
+                            return {
+                                kind: "split",
+                                reason: rec,
+                                into_count: parseInt(splitCountMatch[1], 10),
+                            }
+                        }
+                        if (/externalise|externalize/i.test(rec)) {
+                            return { kind: "externalise", reason: rec }
+                        }
+                        return { kind: "restructure", reason: rec }
+                    })
+
+                const waitingMaxContext = JSON.stringify({
+                    reason: "fang_sizing_topology_overflow",
+                    recommended_module_changes: moduleChanges,
+                    fang_solver_summary:
+                        `The previous module decomposition produced a design that cannot fit ` +
+                        `within the briefed ${prevSheet.envelope?.label ?? "envelope"} ` +
+                        `due to structural topology constraints (not envelope-class mismatch). ` +
+                        `The solver's analysis: ${topologyRecs.join("; ")}`,
+                    constraints_to_preserve: constraintsToPreserve,
+                    envelope: prevSheet.envelope
+                        ? { kind: prevSheet.envelope.kind, label: prevSheet.envelope.label }
+                        : null,
+                })
+
+                // Persist the sheet with a note so the audit trail is intact.
+                const annotatedSheet = {
+                    ...prevSheet,
+                    notes: [
+                        ...(prevSheet.notes ?? []),
+                        `TOPOLOGY_OVERFLOW: solver detected ${topologyRecs.length} topology-level change recommendation(s). Max redecomposition triggered.`,
+                    ],
+                }
+                await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        dimension_sheet: annotatedSheet as unknown as Database["public"]["Tables"]["cad_lab_projects"]["Row"]["dimension_sheet"],
+                    } as Database["public"]["Tables"]["cad_lab_projects"]["Update"])
+                    .eq("id", projectId)
+
+                console.log("[fang-sizing] NEEDS_MAX_REDECOMPOSITION: topology overflow detected", {
+                    projectId,
+                    topologyRecCount: topologyRecs.length,
+                    topologyRecs,
+                    envelopeKind: prevSheet.envelope?.kind,
+                })
+
+                return {
+                    ok: false,
+                    error:
+                        `Solver detected ${topologyRecs.length} topology-level recommendation(s) that require Max to redecompose: ` +
+                        topologyRecs.join("; "),
+                    errorCode: "NEEDS_MAX_REDECOMPOSITION",
+                    runId: "",
+                    _waitingMaxContext: waitingMaxContext,
+                } as RunFangSizingError & { _waitingMaxContext: string }
+            }
+
+            // Same envelope variant AND no topology change — safe to retry with
+            // the alternate envelope.
             remediationEnvelopeOverride = alternate.envelope
             console.log("[fang-sizing] remediation same-variant override applied:", {
                 fromEnvelope: prevSheet.envelope?.kind ?? "(none)",
