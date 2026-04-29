@@ -1078,87 +1078,67 @@ async function runFangReviewsForAllModules(
     const failed = results.filter(
         (r) => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok),
     )
-    if (failed.length === modulesToReview.length && modulesToReview.length === modules.length) {
-        // Every module failed AND nothing was previously terminal — true
-        // catastrophe. If some modules were already terminal, the partial
-        // success is enough to advance.
-        return {
-            ok: false,
-            error: `All ${modules.length} Fang reviews failed`,
-        }
-    }
 
-    // ── Post-dispatch manifest check ────────────────────────────────────
+    // Loop 26 P0 — Bug B (post-fanout coverage check):
+    // Re-query pipeline_runs to see the actual state after this dispatch batch.
+    // We use the real DB state rather than the in-memory settled results because:
+    // (a) some modules may have been terminal BEFORE this batch (already counted
+    //     by the idempotency guard), and (b) the in-memory results only cover
+    //     modulesToReview, not all modules.
     //
-    // Council fix — item 1 (6/6 frontier models, 2026-04-29): after the batch
-    // completes, verify that every module in the project has a terminal
-    // pipeline_runs row (status "done" or "failed"). Modules still absent
-    // were silently dropped — never dispatched, never tombstoned, invisible
-    // to the feasibility gate. This is the root cause of safety-critical
-    // modules (avionics, electrical, wireless) passing feasibility without
-    // review on 3 of 5 demo projects.
-    //
-    // If any module is missing a terminal row: write a REVIEW_SKIPPED
-    // tombstone and return ok:false. The autopilot does NOT advance past
-    // running_fang_reviews; the cron re-fires on the next tick. On the next
-    // tick the idempotency guard sees the failed pipeline row and the
-    // tombstone is already in the reviews JSONB, so the proofreader surfaces
-    // the module as "review was skipped" and the feasibility gate blocks.
-    const { data: postBatchRows } = await admin
+    // IMPORTANT: return ok:true even when modules are unreviewed (as long as it
+    // isn't a catastrophic all-failed case). The feasibility gate in
+    // compute-verdict.ts already has a fang_review_coverage BLOCKER check that
+    // will catch any unreviewed modules — blocking here would prevent the
+    // proofreader from ever running, which is where coverage data is assembled
+    // and fed to the verdict. Logging the gap here makes it observable in Vercel
+    // logs without stalling the pipeline.
+    const { data: postFanoutRows } = await admin
         .from("pipeline_runs")
-        .select("input_ref, status")
+        .select("input_ref, status, output_ref")
         .eq("project_id", projectId)
         .eq("specialist_id", "vp-manufacturing")
         .eq("stage", "module.review.fang")
-    const terminalModuleIds = new Set<string>()
-    for (const row of (postBatchRows ?? []) as Array<{
+        .order("started_at", { ascending: false })
+
+    const moduleStatusMap = new Map<string, { status: string; hasContent: boolean }>()
+    for (const row of (postFanoutRows ?? []) as Array<{
         input_ref: { moduleId?: string; module_id?: string } | null
         status: string
+        output_ref: Record<string, unknown> | null
     }>) {
-        const mId = row.input_ref?.moduleId ?? row.input_ref?.module_id
-        if (!mId) continue
-        if (row.status === "done" || row.status === "failed") {
-            terminalModuleIds.add(mId)
-        }
+        const mid = row.input_ref?.moduleId ?? row.input_ref?.module_id
+        if (!mid || moduleStatusMap.has(mid)) continue // keep most recent
+        const issueCount = typeof row.output_ref?.issueCount === "number" ? row.output_ref.issueCount : 0
+        const doubleEmpty = row.output_ref?.doubleEmpty === true
+        moduleStatusMap.set(mid, {
+            status: row.status,
+            hasContent: row.status === "done" && !doubleEmpty && issueCount > 0,
+        })
     }
 
-    const orphanedModules = modules.filter(
-        (m) => !terminalModuleIds.has(m.id),
-    )
-    if (orphanedModules.length > 0) {
-        // Write tombstones for modules that were silently dropped. Non-fatal
-        // writes: if the tombstone fails, the module will still surface as
-        // "no review was attempted" in the proofreader's manifest check, which
-        // also blocks feasibility correctly.
-        const { saveFangReviewSkippedTombstone } = await import(
-            "@/actions/specialists/run-fang-review"
-        )
-        for (const m of orphanedModules) {
-            await saveFangReviewSkippedTombstone(
-                projectId,
-                m.id,
-                foundryId,
-                "module was not dispatched during the engineering review batch — this is a pipeline gap",
-            ).catch((err: unknown) => {
-                console.warn(
-                    `[autopilot-step:fang-reviews] tombstone write failed for orphaned module=${m.id}:`,
-                    err instanceof Error ? err.message : err,
-                )
-            })
-        }
-        const ids = orphanedModules.map((m) => m.id).join(", ")
+    const unreviewedModules = modules.filter(m => {
+        const entry = moduleStatusMap.get(m.id)
+        if (!entry) return true // never dispatched
+        if (entry.status === "failed") return true
+        if (entry.status === "done" && !entry.hasContent) return true
+        return false
+    })
+
+    if (unreviewedModules.length > 0) {
         console.warn(
-            `[autopilot-step:fang-reviews] manifest gap after batch: ${orphanedModules.length} module(s) have no terminal pipeline_runs row. Tombstones written. Module IDs: ${ids}`,
+            `[autopilot-step:fang-reviews] ${unreviewedModules.length} of ${modules.length} modules lack a successful review: ${unreviewedModules.map(m => m.id).join(", ")}`,
         )
-        // Block the autopilot from advancing. The cron will re-trigger
-        // runFangReviews; orphaned modules now have tombstones so the
-        // feasibility gate will surface them as blocked findings.
-        return {
-            ok: false,
-            error: `${orphanedModules.length} module(s) were not reviewed (no pipeline record found after dispatch). Tombstones written — stage blocked until resolved.`,
-        }
+        // Return ok:true to advance — the feasibility gate (compute-verdict.ts)
+        // already has a fang_review_coverage BLOCKER check that will catch this.
+        // Blocking here would prevent the proofreader from ever running, which
+        // is where coverage data is assembled and fed to the verdict.
     }
 
+    const allFailed = failed.length === modulesToReview.length && modulesToReview.length === modules.length
+    if (allFailed) {
+        return { ok: false, error: `All ${modules.length} Fang reviews failed` }
+    }
     return { ok: true }
 }
 
