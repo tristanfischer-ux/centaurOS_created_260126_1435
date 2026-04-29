@@ -511,16 +511,20 @@ function CompanyBackgroundSection({
                         </span>
                     </FieldRow>
                 )}
-                {hasValue(address) && !hasValue(locationStr) && (
-                    <FieldRow label="Address">
-                        <span className="text-sm text-foreground">{String(address)}</span>
-                    </FieldRow>
-                )}
-                {hasValue(address) && hasValue(locationStr) && String(address) !== locationStr && (
-                    <FieldRow label="Registered address">
-                        <span className="text-sm text-foreground">{String(address)}</span>
-                    </FieldRow>
-                )}
+                {hasValue(address) && (() => {
+                    const addrStr = String(address)
+                    // Suppress the address if it's just a city/country variant (no street
+                    // number or road name) and we already have a city+country location string.
+                    // A real street address will contain a digit or be long enough to include
+                    // a road name. Pure "City, Country" variants are not worth showing.
+                    const isStreetLevel = /\d/.test(addrStr) || addrStr.length > 50
+                    if (!isStreetLevel && hasValue(locationStr)) return null
+                    return (
+                        <FieldRow label={hasValue(locationStr) ? "Registered address" : "Address"}>
+                            <span className="text-sm text-foreground">{addrStr}</span>
+                        </FieldRow>
+                    )
+                })()}
                 {hasValue(employeeCountExact) && (
                     <FieldRow label="Employees">
                         <span className="text-sm text-foreground flex items-center gap-1.5">

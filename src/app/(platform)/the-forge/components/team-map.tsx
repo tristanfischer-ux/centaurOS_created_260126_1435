@@ -102,6 +102,22 @@ export function TeamMap({
       city: null,
       company_size: null,
       contact_email: null,
+      lead_time: null,
+      minimum_order: null,
+      production_capacity: null,
+      quality_systems: null,
+      products: null,
+      specialties: null,
+      address: null,
+      website_url: null,
+      founded_year: null,
+      employee_count_exact: null,
+      data_quality_score: null,
+      iso_14001: null,
+      carbon_disclosed: null,
+      key_people: null,
+      latitude: null,
+      longitude: null,
     }
   }, [])
 

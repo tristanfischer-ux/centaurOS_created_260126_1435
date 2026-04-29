@@ -211,11 +211,35 @@ export function safeParseAttributes(attributes: unknown): Record<string, any> {
  * @returns Normalized string[]
  */
 export function safeStringArray(value: unknown): string[] {
-  if (Array.isArray(value)) return value.map(String)
+  if (Array.isArray(value)) {
+    // Each element may itself be a JSON-encoded array (doubly-encoded DB rows).
+    // Flatten those down to a single flat string array.
+    const result: string[] = []
+    for (const item of value) {
+      if (typeof item === 'string') {
+        const trimmed = item.trim()
+        if (trimmed.startsWith('[')) {
+          try {
+            const inner = JSON.parse(trimmed)
+            if (Array.isArray(inner)) {
+              result.push(...inner.map(String))
+              continue
+            }
+          } catch {
+            /* not JSON — fall through to push as-is */
+          }
+        }
+        result.push(trimmed)
+      } else {
+        result.push(String(item))
+      }
+    }
+    return result
+  }
   if (typeof value === 'string') {
     try {
       const parsed = JSON.parse(value)
-      if (Array.isArray(parsed)) return parsed.map(String)
+      if (Array.isArray(parsed)) return safeStringArray(parsed)
     } catch {
       /* not JSON */
     }
