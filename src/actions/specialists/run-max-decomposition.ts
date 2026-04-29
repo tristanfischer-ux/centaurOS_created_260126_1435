@@ -67,6 +67,10 @@ import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
+    consumeRemediationContext,
+    buildRemediationPromptBlock,
+} from "@/lib/forge-v2/stage-gates/remediation"
+import {
     emptyCanonicalSpecs,
     loadCanonicalSpecs,
     saveCanonicalSpecs,
@@ -262,6 +266,32 @@ async function runMaxDecompositionInternal(
             }
         }
 
+        // 2b. Gate remediation context — consume and prepend to research report.
+        //
+        //     When the cron handler triggers a remediation re-fire (after Gate 2
+        //     or Gate 3 FAIL), it stashes a structured failure-context block at
+        //     cad_lab_projects.gate_remediation_context["waiting_max"]. We read
+        //     and clear it here (consume-once semantics) so that:
+        //       - The failure context is visible to skeletonDecompose / expandModuleDetail
+        //         via the researchReport argument without modifying cad-lab.ts internals.
+        //       - Subsequent regen iterations (new pipeline_run_iteration) don't
+        //         accidentally inherit stale remediation from a prior iteration.
+        //
+        //     DECISION: inject into the research report (not a separate argument)
+        //     because skeletonDecompose's public interface doesn't have a separate
+        //     systemPromptOverride parameter. Prepending as a clearly-labelled block
+        //     at the top of the report is the safest pattern — the LLM reads the
+        //     document top-to-bottom and will apply the constraint before processing
+        //     the research content. The block instructs Max to apply it silently.
+        //
+        //     SAFETY: The `consumeRemediationContext` call returns null if no context
+        //     exists. When null, `reportToUse` is identical to `report`. Projects
+        //     without remediation context behave exactly as before this change.
+        const remediationCtx = await consumeRemediationContext(projectId, "waiting_max")
+        const reportToUse = remediationCtx
+            ? buildRemediationPromptBlock(2, remediationCtx) + report
+            : report
+
         // 3. Pre-flight tier budget check.
         //    The inner skeletonDecompose / expandModuleDetail actions ALSO
         //    call enforceCadLabLimit(user.id, …) which re-checks this. That
@@ -348,7 +378,7 @@ async function runMaxDecompositionInternal(
             >[2]
             const skeletonResult = await skeletonDecompose(
                 description,
-                report,
+                reportToUse, // gate remediation context prepended when present (see step 2b)
                 modelId,
                 undefined, // domainHint
                 undefined, // documentContext
@@ -408,7 +438,7 @@ async function runMaxDecompositionInternal(
                         skeletonModules,
                         sk.id,
                         description,
-                        report,
+                        reportToUse, // gate remediation context prepended when present
                         modelId,
                         undefined, // domainHint
                         undefined, // consistencyBrief — primaries don't need one
@@ -458,7 +488,7 @@ async function runMaxDecompositionInternal(
                               skeletonModules,
                               sk.id,
                               description,
-                              report,
+                              reportToUse, // gate remediation context prepended when present
                               modelId,
                               undefined, // domainHint
                               consistencyBrief,

@@ -41,6 +41,10 @@ import {
 } from "@/actions/pipeline-runs"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import {
+    consumeRemediationContext,
+    buildRemediationPromptBlock,
+} from "@/lib/forge-v2/stage-gates/remediation"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 import {
     inferTargetsFromBrief,
@@ -326,6 +330,41 @@ async function runFangSizingInternal(
     const briefEnvelope =
         overrides?.envelope ?? inferEnvelopeFromBriefText(briefTextHaystack) ?? undefined
 
+    // 2c. Gate remediation context — consume and record for audit.
+    //
+    //     When Gate 3 FAILs on a previous attempt and the cron handler
+    //     triggers remediation, it stashes a structured context string at
+    //     cad_lab_projects.gate_remediation_context["waiting_sizing"].
+    //
+    //     For Fang sizing specifically, the context carries the Gate 3
+    //     failure summary (conflicts, recommendations, failure pattern) and
+    //     a REMEDIATION REQUEST block instructing the solver to relax
+    //     constraints or use the next-larger envelope.
+    //
+    //     DECISION: The sizing engine is deterministic — it cannot read
+    //     narrative remediation instructions. The auto-adjust loop in step 4
+    //     already handles constraint relaxation via `decideAutoAdjustment`.
+    //     So the remediation context's main value here is:
+    //       (a) Audit trail: recorded in pipeline_runs.input_ref so the
+    //           handover log shows "this run was a gate-remediation re-fire".
+    //       (b) Context clearing: the consume-once semantics ensure the
+    //           context doesn't persist to a 3rd run if attempt 2 escalates
+    //           to Max re-decompose (which targets waiting_max, not waiting_sizing).
+    //
+    //     SAFETY: returns null when no remediation context exists. Projects
+    //     without gate remediation behave exactly as before this change.
+    const gateSizingRemediationCtx = await consumeRemediationContext(
+        projectId,
+        "waiting_sizing",
+    )
+    if (gateSizingRemediationCtx) {
+        console.info(
+            `[run-fang-sizing] gate remediation re-fire detected for project=${projectId}. ` +
+            `Context length: ${gateSizingRemediationCtx.length} chars. ` +
+            `Auto-adjust loop will attempt constraint relaxation.`,
+        )
+    }
+
     // 3. Open pipeline_run row.
     let runId = ""
     try {
@@ -340,6 +379,10 @@ async function runFangSizingInternal(
                 industryDomain,
                 targets,
                 envelopeKind: overrides?.envelope?.kind ?? "default",
+                // Audit trail: record whether this was a gate-remediation re-fire
+                ...(gateSizingRemediationCtx
+                    ? { gate_remediation: true, gate_context_chars: gateSizingRemediationCtx.length }
+                    : {}),
             },
         })
         runId = started.runId

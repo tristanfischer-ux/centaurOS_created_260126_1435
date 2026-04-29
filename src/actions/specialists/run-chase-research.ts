@@ -57,6 +57,10 @@
 import { runCadLabResearch } from "@/actions/cad-lab"
 import { saveCadLabResearch } from "@/actions/cad-lab-projects"
 import {
+    consumeRemediationContext,
+    buildRemediationPromptBlock,
+} from "@/lib/forge-v2/stage-gates/remediation"
+import {
     completePipelineRun,
     failPipelineRun,
     loadLatestRunForStage,
@@ -276,6 +280,30 @@ async function runChaseResearchInternal(
         const priorDesignBrief = priorResearch?.designBrief
         const priorAssumptionNotes = priorResearch?.assumptionNotes
 
+        // 2b. Gate remediation context — consume and prepend to description.
+        //
+        //     When Gate 6 (standards hallucination) or Gate 1 (brief scope)
+        //     FAILs and triggers a remediation re-fire targeting waiting_chase,
+        //     the cron handler stashes a structured failure-context block at
+        //     cad_lab_projects.gate_remediation_context["waiting_chase"].
+        //
+        //     We consume it here (read + clear, consume-once semantics) and
+        //     prepend it to the description passed to runCadLabResearch so
+        //     Chase's synthesis step sees the constraint before generating
+        //     the report. This is the same pattern as Max (step 2b in
+        //     run-max-decomposition.ts) — inject via the input text, not a
+        //     separate interface parameter that doesn't exist yet.
+        //
+        //     SAFETY: returns null when no remediation context exists. Projects
+        //     without gate remediation behave exactly as before this change.
+        const gateChaseRemediationCtx = await consumeRemediationContext(
+            projectId,
+            "waiting_chase",
+        )
+        const descriptionToUse = gateChaseRemediationCtx
+            ? buildRemediationPromptBlock(6, gateChaseRemediationCtx) + "\n\nProduct concept: " + description
+            : description
+
         // 3. Pre-flight tier budget check. Mirrors Max's pattern exactly —
         //    inner runCadLabResearch calls enforceCadLabLimit too; this
         //    outer one lets us return a clean BUDGET_CAPPED errorCode
@@ -326,6 +354,10 @@ async function runChaseResearchInternal(
                 input_ref: {
                     source: "project.subject",
                     charCount: description.length,
+                    // Audit trail: record whether this was a gate-remediation re-fire
+                    ...(gateChaseRemediationCtx
+                        ? { gate_remediation: true, gate_context_chars: gateChaseRemediationCtx.length }
+                        : {}),
                 },
             })
             runId = started.runId
@@ -363,7 +395,7 @@ async function runChaseResearchInternal(
             //    without papering over hard errors (budget cap, auth,
             //    validation) that retry can't fix.
             const researchResult: CadLabResearchResult =
-                await runResearchWithOneRetry(description, {
+                await runResearchWithOneRetry(descriptionToUse, { // gate remediation context prepended when present (step 2b)
                     priorDesignBrief,
                     priorAssumptionNotes,
                     onRetry: (firstErr) => {

@@ -74,6 +74,7 @@ import {
 // a no-op even when the flag is true.
 import { runGate, markUncertainty } from "@/lib/forge-v2/stage-gates/runner"
 import { STAGE_GATE_MAP } from "@/lib/forge-v2/stage-gates/registry"
+import { triggerRemediation } from "@/lib/forge-v2/stage-gates/remediation"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -90,6 +91,7 @@ type TickAction =
     | "synchronous_ok"
     | "synchronous_fail"
     | "terminal_fail"
+    | "gate_remediation"
 
 interface TickDetail {
     projectId: string
@@ -286,17 +288,78 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     )
 
                     if (gateResult.verdict === "FAIL" && gateResult.attempts_remaining > 0) {
-                        // Re-fire upstream stage with failure context on next tick.
-                        // Don't advance autopilot_state.stage — leave it at the
-                        // current stage so the cron re-fires the gate next tick.
-                        details.push({
-                            projectId: project.id,
-                            stage,
-                            action: "skip_running" as TickAction,
-                            ok: false,
-                            reason: `gate_${gateForThisStage.gateId} FAIL attempt=${gateResult.fail_count}/${2 - gateResult.attempts_remaining + gateResult.fail_count} — remediation pending`,
-                        })
-                        skipped++
+                        // ── Gate Iteration Loop — re-fire upstream specialist ──
+                        //
+                        // The verdict row persisted by runGate() carries
+                        // `remediation_target_stage` + `remediation_context_injected`
+                        // when the gate implementation populated them (Gates 2 and 3
+                        // always do; Gates 5 and 6 will follow). When both are present,
+                        // we trigger the full remediation sequence:
+                        //   1. Stash context at gate_remediation_context.<targetStage>
+                        //   2. Supersede stale pipeline_runs for targetStage
+                        //   3. Reset autopilot_state.stage to targetStage
+                        // The next cron tick sees the reset stage and re-fires the
+                        // specialist. The specialist reads + clears gate_remediation_context
+                        // at the top of its prompt-building step.
+                        //
+                        // When the gate did NOT populate remediation fields (e.g. a WARN
+                        // verdict surfaced with no context, or the gate implementation is
+                        // not yet fully wired), we fall back to the original skip_running
+                        // behaviour — leave the autopilot at the current stage and let
+                        // the next tick re-evaluate. This preserves backward compatibility
+                        // for projects mid-pipeline.
+
+                        const verdictRow = gateResult.verdict_row
+                        const remediationTargetStage = verdictRow?.remediation_target_stage ?? null
+                        const remediationContext = verdictRow?.remediation_context_injected ?? null
+
+                        if (remediationTargetStage && remediationContext) {
+                            // Full remediation path — stash, supersede, reset stage.
+                            const remResult = await triggerRemediation(
+                                project.id,
+                                remediationTargetStage,
+                                remediationContext,
+                                verdictRow?.id,
+                            )
+
+                            if (remResult.ok) {
+                                details.push({
+                                    projectId: project.id,
+                                    stage,
+                                    action: "gate_remediation" as TickAction,
+                                    ok: true,
+                                    reason: `gate_${gateForThisStage.gateId} FAIL attempt=${gateResult.fail_count} → remediation fired, stage reset to ${remediationTargetStage}`,
+                                })
+                                // Count as a fire (we triggered a re-run) not a skip.
+                                fired++
+                            } else {
+                                // Remediation failed — fall back to skip_running so the
+                                // next tick re-tries. Log the error for visibility.
+                                console.error(
+                                    `[autopilot-tick] gate_${gateForThisStage.gateId} remediation failed for project=${project.id}:`,
+                                    remResult.error,
+                                )
+                                details.push({
+                                    projectId: project.id,
+                                    stage,
+                                    action: "skip_running" as TickAction,
+                                    ok: false,
+                                    reason: `gate_${gateForThisStage.gateId} FAIL — remediation trigger failed: ${remResult.error}`,
+                                })
+                                skipped++
+                            }
+                        } else {
+                            // Gate did not populate remediation fields — old skip_running
+                            // behaviour. Leave stage unchanged; next tick re-evaluates.
+                            details.push({
+                                projectId: project.id,
+                                stage,
+                                action: "skip_running" as TickAction,
+                                ok: false,
+                                reason: `gate_${gateForThisStage.gateId} FAIL attempt=${gateResult.fail_count}/${2 - gateResult.attempts_remaining + gateResult.fail_count} — no remediation context (gate not fully wired)`,
+                            })
+                            skipped++
+                        }
                         continue
                     }
 

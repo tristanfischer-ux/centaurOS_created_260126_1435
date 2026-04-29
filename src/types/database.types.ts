@@ -4757,6 +4757,7 @@ export type Database = {
           forked_from_id: string | null
           founder_raw_brief: string
           foundry_id: string
+          gate_remediation_context: Json | null
           generated_code: string | null
           geography: string[] | null
           hero_bounding_boxes: Json | null
@@ -4834,6 +4835,7 @@ export type Database = {
           forked_from_id?: string | null
           founder_raw_brief: string
           foundry_id: string
+          gate_remediation_context?: Json | null
           generated_code?: string | null
           geography?: string[] | null
           hero_bounding_boxes?: Json | null
@@ -4911,6 +4913,7 @@ export type Database = {
           forked_from_id?: string | null
           founder_raw_brief?: string
           foundry_id?: string
+          gate_remediation_context?: Json | null
           generated_code?: string | null
           geography?: string[] | null
           hero_bounding_boxes?: Json | null
@@ -12216,6 +12219,48 @@ export type Database = {
             isOneToOne: true
             referencedRelation: "hypotheses"
             referencedColumns: ["id"]
+          },
+        ]
+      }
+      marketplace_listing_pages: {
+        Row: {
+          id: string
+          listing_id: string
+          page_text: string
+          scraped_at: string
+          search_vector: unknown
+          url: string
+        }
+        Insert: {
+          id?: string
+          listing_id: string
+          page_text: string
+          scraped_at?: string
+          search_vector?: unknown
+          url: string
+        }
+        Update: {
+          id?: string
+          listing_id?: string
+          page_text?: string
+          scraped_at?: string
+          search_vector?: unknown
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "marketplace_listing_pages_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "marketplace_listing_pages_listing_id_fkey"
+            columns: ["listing_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
           },
         ]
       }
@@ -26130,6 +26175,15 @@ export type Database = {
           title: string
         }[]
       }
+      match_listings_pages_fts: {
+        Args: { p_category?: string; p_limit?: number; p_query: string }
+        Returns: {
+          best_page_url: string
+          best_rank: number
+          listing_id: string
+          page_count: number
+        }[]
+      }
       match_manufacturing_techniques: {
         Args: {
           match_count?: number
@@ -27168,6 +27222,10 @@ export type Database = {
         Returns: boolean
       }
       truncate_investor_portfolio_companies: { Args: never; Returns: undefined }
+      truncate_marketplace_listing_pages_for_finance: {
+        Args: never
+        Returns: undefined
+      }
       unlockrows: { Args: { "": string }; Returns: number }
       update_blueprint_metrics: {
         Args: { p_blueprint_id: string }

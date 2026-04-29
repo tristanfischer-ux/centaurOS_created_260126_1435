@@ -23,6 +23,7 @@ import { after } from "next/server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
+import { consumeRemediationContext } from "@/lib/forge-v2/stage-gates/remediation"
 import {
     matchCadLabModuleSuppliers,
     type CadLabModuleInput,
@@ -287,6 +288,23 @@ async function matchSuppliersForProjectInternal(
                 errorCode: "NO_MODULES",
             }
         }
+
+        // Gate remediation context — consume for audit (supplier-match is deterministic).
+        //
+        // When Gate 5 (supplier liveness) FAILs and the cron handler triggers
+        // remediation targeting matching_suppliers, it stashes context at
+        // cad_lab_projects.gate_remediation_context["matching_suppliers"].
+        //
+        // The supplier-match scorer is deterministic (embedding + cosine similarity)
+        // so it cannot read narrative remediation instructions. The value here is:
+        //   (a) Context clearing: consume-once semantics prevent stale context
+        //       from persisting to subsequent regen iterations.
+        //   (b) Audit trail: the consumption log shows this was a gate re-fire.
+        //
+        // A future enhancement: parse the dead URLs from the context and add
+        // them to the scorer's block-list so they don't appear in the re-run
+        // shortlist. That requires extending the scorer interface — deferred.
+        await consumeRemediationContext(projectId, "matching_suppliers")
 
         const diagnostics = (project.diagnostic_answers as DiagnosticAnswers | null) ?? {}
 
