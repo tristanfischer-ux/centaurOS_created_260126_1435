@@ -4771,6 +4771,7 @@ export type Database = {
           interface_contracts: Json | null
           interface_definition: string | null
           interior_overview_url: string | null
+          is_demo_public: boolean
           market_segment: string | null
           model_id: string
           modules: Json | null
@@ -4849,6 +4850,7 @@ export type Database = {
           interface_contracts?: Json | null
           interface_definition?: string | null
           interior_overview_url?: string | null
+          is_demo_public?: boolean
           market_segment?: string | null
           model_id?: string
           modules?: Json | null
@@ -4927,6 +4929,7 @@ export type Database = {
           interface_contracts?: Json | null
           interface_definition?: string | null
           interior_overview_url?: string | null
+          is_demo_public?: boolean
           market_segment?: string | null
           model_id?: string
           modules?: Json | null
