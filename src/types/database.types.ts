@@ -25022,6 +25022,15 @@ export type Database = {
         }
         Returns: Json
       }
+      apply_gate_remediation: {
+        Args: {
+          p_context_json: string
+          p_project_id: string
+          p_target_stage: string
+          p_verdict_id?: string
+        }
+        Returns: string
+      }
       assign_founding_member_atomically: {
         Args: {
           p_credit_amount?: number
@@ -25276,6 +25285,10 @@ export type Database = {
       extract_mentioned_user_ids: {
         Args: { foundry_id_param: string; message_text: string }
         Returns: string[]
+      }
+      gate_stash_remediation_context: {
+        Args: { p_context: string; p_project_id: string; p_stage: string }
+        Returns: undefined
       }
       generate_gap_recommendations: {
         Args: { p_foundry_id: string }
@@ -27222,6 +27235,10 @@ export type Database = {
         Returns: boolean
       }
       truncate_investor_portfolio_companies: { Args: never; Returns: undefined }
+      truncate_marketplace_listing_pages_for_category: {
+        Args: { p_category: string }
+        Returns: undefined
+      }
       truncate_marketplace_listing_pages_for_finance: {
         Args: never
         Returns: undefined
