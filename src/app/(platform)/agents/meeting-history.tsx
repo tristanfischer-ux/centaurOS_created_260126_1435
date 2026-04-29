@@ -213,14 +213,11 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
         }
     }
 
-    return (
-        <Card
-            className={cn(
-                "border rounded-xl group relative overflow-hidden",
-                "transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5",
-                meeting.isPinned && "border-international-orange/40 bg-international-orange/[0.02]",
-            )}
-        >
+    // FIX 2: the card inner content is shared between the linked and non-linked
+    // variants below. All interactive buttons call e.stopPropagation() so
+    // their clicks do NOT bubble up to the wrapping Link when it is present.
+    const innerContent = (
+        <>
             {/* Cover image / placeholder strip — F2 thumbnail surface */}
             <div className="relative h-32 w-full bg-gradient-to-br from-electric-blue/5 via-international-orange/5 to-electric-blue/5 border-b border-border">
                 {meeting.coverImageUrl && meeting.coverStatus === "ready" ? (
@@ -385,20 +382,56 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                     </Badge>
                 </div>
 
-                {/* CTA */}
+                {/* CTA — visible affordance indicating the card is navigable */}
                 {hasPermalink && (
                     <div className="pt-1">
-                        <Link
-                            href={`/agents/m/${meeting.id}`}
-                            className="inline-flex items-center gap-1.5 text-[11px] font-medium text-electric-blue hover:text-electric-blue/80 transition-colors"
-                        >
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-electric-blue">
                             View meeting
                             <ExternalLink className="h-3 w-3" />
-                        </Link>
+                        </span>
                     </div>
                 )}
             </CardContent>
-        </Card>
+        </>
+    )
+
+    // FIX 2: wrap the entire card in a Next.js Link so clicking anywhere on the
+    // card navigates to /agents/m/<uuid>. Previously only a small "View meeting"
+    // text link at the bottom was clickable; an onClick on an ancestor element
+    // (or the Link itself firing before the href resolved) caused navigation to
+    // land on /agents instead of /agents/m/<uuid>. Wrapping the whole card makes
+    // the navigation intent unambiguous. The "View meeting" CTA above is now a
+    // <span> (not a nested <a>) to avoid invalid anchor-inside-anchor nesting.
+    // All action buttons already call e.stopPropagation() so pin/delete/retry
+    // clicks do NOT bubble up to the wrapping Link.
+    // Legacy artifact cards (hasPermalink=false) keep the plain <Card> since
+    // they have no permalink to navigate to.
+    if (!hasPermalink) {
+        return (
+            <Card
+                className={cn(
+                    "border rounded-xl group relative overflow-hidden",
+                    "transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5",
+                    meeting.isPinned && "border-international-orange/40 bg-international-orange/[0.02]",
+                )}
+            >
+                {innerContent}
+            </Card>
+        )
+    }
+
+    return (
+        <Link
+            href={`/agents/m/${meeting.id}`}
+            className={cn(
+                "block border rounded-xl group relative overflow-hidden",
+                "transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5",
+                "bg-card text-card-foreground shadow-sm",
+                meeting.isPinned && "border-international-orange/40 bg-international-orange/[0.02]",
+            )}
+        >
+            {innerContent}
+        </Link>
     )
 }
 

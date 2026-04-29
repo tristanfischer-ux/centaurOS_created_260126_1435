@@ -681,8 +681,11 @@ export async function listMeetingThreads(
 
   // Exclude in_progress rows by default — they are half-baked sessions not
   // ready for the saved-sessions panel. Only include them when explicitly requested.
+  // GOTCHA: .neq('status', 'in_progress') was unreliable in PostgREST when the
+  // column has a default value of 'complete' — rows with 'in_progress' were still
+  // returned. Use a positive whitelist via .in() which is unambiguous.
   if (!input.includeInProgress) {
-    query = query.neq('status', 'in_progress')
+    query = query.in('status', ['complete', 'failed'])
   }
 
   // Branched-only filter

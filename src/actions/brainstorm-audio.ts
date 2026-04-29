@@ -418,13 +418,24 @@ export async function generateSessionAudio(
 
     const admin = createAdminClient()
 
-    // Atomic claim — flip audio_status from 'pending'|'failed' to 'generating'
-    // in one round-trip to prevent concurrent double-generation.
+    // Atomic claim — flip audio_status to 'generating' in one round-trip
+    // to prevent concurrent double-generation.
+    //
+    // ZOMBIE RECOVERY: also claim rows already in 'generating' whose
+    // updated_at is more than 5 minutes ago — these are containers that were
+    // killed mid-TTS (Vercel 300s cap) and left the row stuck. The user's
+    // Retry handler (resetAudioForRetry) flips those back to 'pending' first,
+    // so the normal 'pending'|'failed' branch handles the Retry path. This
+    // OR branch additionally self-heals any zombies that bypass Retry (e.g.
+    // completeMeetingThread's own after() block re-entering after a container
+    // restart).
     const { data: claimed, error: claimErr } = await admin
         .from('meeting_threads')
-        .update({ audio_status: 'generating' })
+        .update({ audio_status: 'generating', updated_at: new Date().toISOString() })
         .eq('id', threadId)
-        .in('audio_status', ['pending', 'failed'])
+        .or(
+            `audio_status.in.(pending,failed),and(audio_status.eq.generating,updated_at.lt.${new Date(Date.now() - 5 * 60 * 1000).toISOString()})`,
+        )
         .select('id, foundry_id, author_user_id')
         .maybeSingle()
 
@@ -434,7 +445,7 @@ export async function generateSessionAudio(
     }
 
     if (!claimed) {
-        // Already generating, ready, refused, or RLS-hidden — no-op.
+        // Already generating (and recently touched), ready, refused, or RLS-hidden — no-op.
         return { ok: true, charCount: 0, error: null }
     }
 

@@ -215,9 +215,10 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                     backgroundColor: CHARCOAL,
                     paddingLeft: 48,
                     paddingRight: 48,
-                    paddingTop: 20,
-                    paddingBottom: 20,
+                    paddingTop: 22,
+                    paddingBottom: 22,
                     borderLeft: `6px solid ${ORANGE}`,
+                    flexShrink: 0,
                 }}
             >
                 <span
@@ -244,7 +245,7 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                 </span>
             </div>
 
-            {/* ── Main body ── */}
+            {/* ── Main body — flex:1 fills all space between header and footer ── */}
             <div
                 style={{
                     flex: 1,
@@ -252,63 +253,66 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                     flexDirection: 'column',
                     paddingLeft: 54,
                     paddingRight: 54,
-                    paddingTop: 40,
-                    paddingBottom: 0,
+                    paddingTop: 36,
+                    paddingBottom: 36,
                     gap: 0,
+                    justifyContent: 'space-between',
                 }}
             >
-                {/* Question */}
-                <div
-                    style={{
-                        fontSize: 38,
-                        fontWeight: 700,
-                        color: CHARCOAL,
-                        fontFamily: 'Georgia, "Times New Roman", serif',
-                        lineHeight: 1.25,
-                        marginBottom: 24,
-                        maxWidth: 1400,
-                    }}
-                >
-                    {displayTopic}
-                </div>
-
-                {/* Divider */}
-                <div
-                    style={{
-                        width: '100%',
-                        height: 1,
-                        backgroundColor: DIVIDER,
-                        marginBottom: 22,
-                    }}
-                />
-
-                {/* Cal's opening framing */}
-                {calOpen && (
+                {/* Top section: question + cal framing */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+                    {/* Question — larger font so it anchors the visual hierarchy */}
                     <div
                         style={{
-                            fontSize: 18,
-                            fontStyle: 'italic',
-                            color: STONE,
-                            lineHeight: 1.5,
-                            marginBottom: 30,
-                            paddingLeft: 20,
-                            borderLeft: `3px solid ${ORANGE}`,
-                            maxWidth: 1300,
+                            fontSize: 44,
+                            fontWeight: 700,
+                            color: CHARCOAL,
+                            fontFamily: 'Georgia, "Times New Roman", serif',
+                            lineHeight: 1.2,
+                            marginBottom: 20,
+                            maxWidth: 1400,
                         }}
                     >
-                        {calOpen}
+                        {displayTopic}
                     </div>
-                )}
 
-                {/* Specialist cards */}
+                    {/* Divider */}
+                    <div
+                        style={{
+                            width: '100%',
+                            height: 1,
+                            backgroundColor: DIVIDER,
+                            marginBottom: 18,
+                            flexShrink: 0,
+                        }}
+                    />
+
+                    {/* Cal's opening framing */}
+                    {calOpen && (
+                        <div
+                            style={{
+                                fontSize: 20,
+                                fontStyle: 'italic',
+                                color: STONE,
+                                lineHeight: 1.5,
+                                paddingLeft: 20,
+                                borderLeft: `3px solid ${ORANGE}`,
+                                maxWidth: 1300,
+                            }}
+                        >
+                            {calOpen}
+                        </div>
+                    )}
+                </div>
+
+                {/* Middle section: specialist cards */}
                 {specialists.length > 0 && (
                     <div
                         style={{
                             display: 'flex',
                             flexDirection: 'row',
-                            gap: 16,
+                            gap: 18,
                             flexWrap: 'nowrap',
-                            marginBottom: 28,
                         }}
                     >
                         {specialists.map((sp, idx) => (
@@ -320,8 +324,8 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                                     flexDirection: 'column',
                                     backgroundColor: '#ffffff',
                                     borderRadius: 12,
-                                    padding: 20,
-                                    gap: 10,
+                                    padding: 24,
+                                    gap: 12,
                                     minWidth: 0,
                                     border: `1px solid ${DIVIDER}`,
                                 }}
@@ -332,20 +336,20 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                                         display: 'flex',
                                         flexDirection: 'row',
                                         alignItems: 'center',
-                                        gap: 12,
+                                        gap: 14,
                                     }}
                                 >
                                     <div
                                         style={{
-                                            width: 40,
-                                            height: 40,
-                                            borderRadius: 20,
+                                            width: 44,
+                                            height: 44,
+                                            borderRadius: 22,
                                             backgroundColor: sp.colour,
                                             display: 'flex',
                                             alignItems: 'center',
                                             justifyContent: 'center',
                                             color: '#ffffff',
-                                            fontSize: 14,
+                                            fontSize: 15,
                                             fontWeight: 700,
                                             flexShrink: 0,
                                         }}
@@ -356,13 +360,13 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                                         style={{
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            gap: 2,
+                                            gap: 3,
                                             minWidth: 0,
                                         }}
                                     >
                                         <span
                                             style={{
-                                                fontSize: 15,
+                                                fontSize: 16,
                                                 fontWeight: 700,
                                                 color: CHARCOAL,
                                                 borderBottom: `2px solid ${ORANGE}`,
@@ -393,12 +397,12 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                                     }}
                                 />
 
-                                {/* Take */}
+                                {/* Take — larger body text so it fills the card */}
                                 <span
                                     style={{
-                                        fontSize: 13,
+                                        fontSize: 15,
                                         color: CHARCOAL,
-                                        lineHeight: 1.5,
+                                        lineHeight: 1.55,
                                     }}
                                 >
                                     {sp.take}
@@ -408,126 +412,132 @@ function buildInfographic({ topic, tier, content, specialistCount }: Infographic
                     </div>
                 )}
 
-                {/* Council split row */}
-                {(agreedOn || disagreedOn) && (
-                    <div
-                        style={{
-                            display: 'flex',
-                            flexDirection: 'row',
-                            gap: 40,
-                            marginBottom: 16,
-                        }}
-                    >
-                        {agreedOn && (
-                            <div
-                                style={{
-                                    flex: 1,
-                                    display: 'flex',
-                                    flexDirection: 'row',
-                                    gap: 10,
-                                    alignItems: 'flex-start',
-                                }}
-                            >
-                                <span
+                {/* Bottom section: agreed/disputed + this-week */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                    {/* Council split row */}
+                    {(agreedOn || disagreedOn) && (
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'row',
+                                gap: 40,
+                            }}
+                        >
+                            {agreedOn && (
+                                <div
                                     style={{
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        color: '#22c55e',
-                                        textTransform: 'uppercase',
-                                        letterSpacing: 1.5,
-                                        flexShrink: 0,
-                                        marginTop: 2,
+                                        flex: 1,
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        gap: 12,
+                                        alignItems: 'flex-start',
                                     }}
                                 >
-                                    AGREED ON:
-                                </span>
-                                <span style={{ fontSize: 13, color: CHARCOAL, lineHeight: 1.4 }}>
-                                    {agreedOn}
-                                </span>
-                            </div>
-                        )}
-                        {disagreedOn && (
-                            <div
-                                style={{
-                                    flex: 1,
-                                    display: 'flex',
-                                    flexDirection: 'row',
-                                    gap: 10,
-                                    alignItems: 'flex-start',
-                                }}
-                            >
-                                <span
+                                    <span
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            color: '#22c55e',
+                                            textTransform: 'uppercase',
+                                            letterSpacing: 1.5,
+                                            flexShrink: 0,
+                                            marginTop: 2,
+                                        }}
+                                    >
+                                        AGREED ON:
+                                    </span>
+                                    <span style={{ fontSize: 14, color: CHARCOAL, lineHeight: 1.4 }}>
+                                        {agreedOn}
+                                    </span>
+                                </div>
+                            )}
+                            {disagreedOn && (
+                                <div
                                     style={{
-                                        fontSize: 11,
-                                        fontWeight: 700,
-                                        color: ORANGE,
-                                        textTransform: 'uppercase',
-                                        letterSpacing: 1.5,
-                                        flexShrink: 0,
-                                        marginTop: 2,
+                                        flex: 1,
+                                        display: 'flex',
+                                        flexDirection: 'row',
+                                        gap: 12,
+                                        alignItems: 'flex-start',
                                     }}
                                 >
-                                    DISPUTED:
-                                </span>
-                                <span style={{ fontSize: 13, color: CHARCOAL, lineHeight: 1.4 }}>
-                                    {disagreedOn}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                )}
+                                    <span
+                                        style={{
+                                            fontSize: 12,
+                                            fontWeight: 700,
+                                            color: ORANGE,
+                                            textTransform: 'uppercase',
+                                            letterSpacing: 1.5,
+                                            flexShrink: 0,
+                                            marginTop: 2,
+                                        }}
+                                    >
+                                        DISPUTED:
+                                    </span>
+                                    <span style={{ fontSize: 14, color: CHARCOAL, lineHeight: 1.4 }}>
+                                        {disagreedOn}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {/* This-week row — pinned to the bottom of the body */}
+                    {thisWeek && (
+                        <div
+                            style={{
+                                display: 'flex',
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                gap: 12,
+                                backgroundColor: `${ORANGE}12`,
+                                borderRadius: 8,
+                                paddingLeft: 20,
+                                paddingRight: 20,
+                                paddingTop: 14,
+                                paddingBottom: 14,
+                            }}
+                        >
+                            <span
+                                style={{
+                                    fontSize: 12,
+                                    fontWeight: 700,
+                                    color: ORANGE,
+                                    textTransform: 'uppercase',
+                                    letterSpacing: 1.5,
+                                    flexShrink: 0,
+                                }}
+                            >
+                                THIS WEEK:
+                            </span>
+                            <span style={{ fontSize: 14, color: CHARCOAL, lineHeight: 1.3 }}>
+                                {thisWeek}
+                            </span>
+                        </div>
+                    )}
+                </div>
             </div>
 
-            {/* ── Action footer ── */}
+            {/* ── Footer band ── */}
             <div
                 style={{
                     display: 'flex',
                     flexDirection: 'row',
                     alignItems: 'center',
-                    justifyContent: 'space-between',
-                    backgroundColor: `${ORANGE}18`,
-                    borderTop: `1px solid ${ORANGE}30`,
+                    justifyContent: 'flex-end',
+                    backgroundColor: CHARCOAL,
                     paddingLeft: 54,
                     paddingRight: 54,
                     paddingTop: 14,
                     paddingBottom: 14,
-                    gap: 24,
+                    flexShrink: 0,
                 }}
             >
-                <div
-                    style={{
-                        display: 'flex',
-                        flexDirection: 'row',
-                        alignItems: 'center',
-                        gap: 10,
-                        flex: 1,
-                        minWidth: 0,
-                    }}
-                >
-                    <span
-                        style={{
-                            fontSize: 11,
-                            fontWeight: 700,
-                            color: ORANGE,
-                            textTransform: 'uppercase',
-                            letterSpacing: 1.5,
-                            flexShrink: 0,
-                        }}
-                    >
-                        THIS WEEK:
-                    </span>
-                    {thisWeek && (
-                        <span style={{ fontSize: 13, color: CHARCOAL, lineHeight: 1.3 }}>
-                            {thisWeek}
-                        </span>
-                    )}
-                </div>
                 <span
                     style={{
                         fontSize: 12,
                         fontWeight: 600,
                         color: STONE,
-                        flexShrink: 0,
                     }}
                 >
                     ForgeOS · Fractional Forge
