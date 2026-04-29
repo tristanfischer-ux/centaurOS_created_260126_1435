@@ -6199,11 +6199,14 @@ async function exportProjectPdfInternal(
         // marketplace_listings have matching industry tags. If fewer than
         // 10, the shortlist was drawn from a thin directory and the PDF
         // should tell the founder.
+        // Loop 26 D1/D4: detectedDomain is also passed to RegulatorySection
+        // so it can escalate the mandatory-section placeholder to red for
+        // safety-critical domains (potable water, medical, aerospace, etc.).
         const SUPPLIER_COVERAGE_THRESHOLD = 10
+        const subjectForDomain = typeof project.subject === "string" ? project.subject : ""
+        const detectedDomain = detectIndustryDomain(subjectForDomain)
         let supplierDirectoryCoverageNote: string | null = null
         {
-            const subjectForDomain = typeof project.subject === "string" ? project.subject : ""
-            const detectedDomain = detectIndustryDomain(subjectForDomain)
             if (detectedDomain && detectedDomain !== "general") {
                 // Query marketplace_listings with an ilike on the
                 // industries JSONB array. The column stores an array of
@@ -6576,6 +6579,7 @@ async function exportProjectPdfInternal(
                 }
             })(),
             suppliers,
+            supplierDirectoryCoverageNote,
             auditLog,
             dimensionSheet: (project.dimension_sheet ?? null) as PdfInput["dimensionSheet"],
             spatialPlan: (project.spatial_plan ?? null) as PdfInput["spatialPlan"],
@@ -6825,6 +6829,10 @@ async function exportProjectPdfInternal(
             // (Chase-time keyword pass + Fang-findings elevation). Triggers the
             // warning banner in RegulatorySection.
             regulatoryUndifferentiated: regulatoryMatrixUndifferentiated,
+            // Loop 26 D1/D4: pass detected domain to RegulatorySection so it can
+            // choose the correct urgency colour and copy for the mandatory-section
+            // placeholder when regulatory[] is empty.
+            detectedDomain,
         }
 
         try {
