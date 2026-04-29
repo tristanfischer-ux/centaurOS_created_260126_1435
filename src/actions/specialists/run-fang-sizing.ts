@@ -61,48 +61,10 @@ import {
     areSameEnvelopeVariant,
     getEnvelopeClassificationTag,
 } from "@/lib/forge-v2/envelope-classification"
-
-// ─── Topology recommendation detector ─────────────────────────────────────────
-
-/**
- * Keywords that indicate a topology-level structural change in a solver
- * recommendation — i.e. the module decomposition itself must change, not just
- * the sizing of the existing modules.
- *
- * Match is case-insensitive. Matches any recommendation string that contains
- * at least one of these patterns.
- *
- * Exclusion note: "split" alone can appear in non-topology contexts
- * (e.g. "split the cost across two cells") so we require it to be followed
- * by module/rack/battery/unit/enclosure/system context OR appear alongside
- * other topology signals. The regex captures the most unambiguous forms.
- *
- * Council R1 P1 framing: "split battery rack into 2 modules", "externalise
- * PCS skid as separate module", "add an auxiliary cooling module". These
- * recommendation texts come from the solver's `recommendations` array in the
- * DimensionSheet and are written by the domain rules libraries.
- */
-const TOPOLOGY_CHANGE_RE =
-    /\b(?:split\s+(?:into|battery|rack|module|unit|enclosure|system|the)|decompose|additional\s+module|externalise|externalize|split\s+into\s+\d+\s+(?:units?|modules?)|auxiliary\s+(?:subsystem|module|cooling|thermal|skid)|separate\s+module|separate\s+skid|new\s+module)\b/i
-
-/**
- * Returns true when ANY recommendation in the array contains a topology-level
- * structural change — i.e. the solver is saying "the current module layout
- * won't work; you need a different number or arrangement of modules".
- *
- * ANTI-CHEAT: deterministic regex, no LLM involvement.
- */
-export function hasTopologyRecommendation(recommendations: readonly string[]): boolean {
-    return recommendations.some((r) => TOPOLOGY_CHANGE_RE.test(r))
-}
-
-/**
- * Extract the first topology-level recommendation for use in the remediation
- * context block. Returns null if no topology recommendation is found.
- */
-export function findTopologyRecommendations(recommendations: readonly string[]): string[] {
-    return recommendations.filter((r) => TOPOLOGY_CHANGE_RE.test(r))
-}
+import {
+    hasTopologyRecommendation,
+    findTopologyRecommendations,
+} from "@/lib/forge-v2/topology-detection"
 
 // ─── Subject-text heuristic (fallback when Max didn't populate industryDomain) ───
 

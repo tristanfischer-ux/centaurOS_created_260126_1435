@@ -16,7 +16,7 @@
  */
 
 import type { RunFangSizingReturn } from "@/actions/specialists/run-fang-sizing"
-import { hasTopologyRecommendation, findTopologyRecommendations } from "@/actions/specialists/run-fang-sizing"
+import { hasTopologyRecommendation, findTopologyRecommendations } from "@/lib/forge-v2/topology-detection"
 import { buildMaxTopologyOverrideBlock, buildRemediationPromptBlock } from "@/lib/forge-v2/stage-gates/remediation"
 
 // ─── 1. Topology keyword detection ──────────────────────────────────────────
