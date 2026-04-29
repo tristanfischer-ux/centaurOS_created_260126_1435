@@ -79,7 +79,7 @@ export function WorkshopSectionIntro(): React.ReactElement {
                                     </p>
                                 </div>
                             </div>
-                            <Link href="/the-forge/new">
+                            <Link href="/the-forge-v2/new">
                                 <Button className="bg-international-orange hover:bg-international-orange-hover gap-2 min-w-[160px]">
                                     <Plus className="h-4 w-4" />
                                     Create a Concept
@@ -99,7 +99,7 @@ export function WorkshopSectionIntro(): React.ReactElement {
                     {FORGE_SHOWCASE.map((item) => {
                         const Icon = item.icon
                         return (
-                            <Link key={item.name} href="/the-forge">
+                            <Link key={item.name} href="/the-forge-v2">
                                 <Card className="group h-full hover:shadow-lg hover:-translate-y-0.5 transition-all cursor-pointer border">
                                     <CardContent className="pt-6">
                                         <div className="flex items-start justify-between mb-3">
@@ -126,7 +126,7 @@ export function WorkshopSectionIntro(): React.ReactElement {
 
             {/* The Forge Spotlight */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <Link href="/the-forge" className="block group">
+                <Link href="/the-forge-v2" className="block group">
                     <Card className="border border-dashed border-electric-blue/20 hover:border-electric-blue/40 hover:shadow-md hover:-translate-y-0.5 transition-all bg-gradient-to-br from-background to-electric-blue/[0.02]">
                         <CardContent className="pt-5 pb-4 flex items-center gap-4">
                             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-electric-blue/10 shrink-0 group-hover:bg-electric-blue/20 transition-colors">

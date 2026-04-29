@@ -251,7 +251,7 @@ export function Sidebar({
             "/new-tasks",
             "/new-objectives",
             "/team",
-            "/the-forge",
+            "/the-forge-v2",
             "/strategy",
             "/my-profile",
             "/updates",

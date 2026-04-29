@@ -659,7 +659,7 @@ function FullTaskViewComponent({ open, onOpenChange, task, members, currentUserI
                                         const tid = task.metadata && typeof task.metadata === 'object' && !Array.isArray(task.metadata) ? (task.metadata as Record<string, unknown>).source_thread_id : null
                                         return typeof tid === 'string' ? (
                                             <Link
-                                                href={`/the-forge?thread=${tid}`}
+                                                href={`/the-forge-v2?thread=${tid}`}
                                                 className="inline-flex items-center gap-1 text-xs text-international-orange hover:underline mt-1"
                                             >
                                                 <Flame className="h-3 w-3" />

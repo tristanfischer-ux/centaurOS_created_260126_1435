@@ -79,7 +79,7 @@ const allNavHrefs = new Set([
     "/my-profile", "/knowledge", "/google-apps", "/whats-new",
     "/strategy", "/new-objectives", "/time", "/reports",
     "/cash-burn", "/cash-burn/cash-out", "/cash-burn/cash-in", "/cash-burn/pnl", "/investors", "/fundraise",
-    "/the-forge", "/team", "/retainers", "/agents", "/agents/artifacts", "/browse", "/learn",
+    "/the-forge-v2", "/the-forge", "/team", "/retainers", "/agents", "/agents/artifacts", "/browse", "/learn",
     "/recruits", "/guild", "/apprenticeship", "/marketplace", "/marketplace/quotes", "/marketplace-orders",
     "/settings",
 ])
@@ -150,7 +150,7 @@ const cashBurnNavigation = [
 
 // Drawer — Workshop section
 const workshopMoreNavigation = [
-    { name: "The Forge", href: "/the-forge", icon: Hammer },
+    { name: "The Forge", href: "/the-forge-v2", icon: Hammer },
     { name: "Team", href: "/team", icon: Users },
     { name: "Retainers", href: "/retainers", icon: Handshake },
     { name: "Specialists", href: "/agents", icon: UsersRound },

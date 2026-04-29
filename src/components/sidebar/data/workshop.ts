@@ -6,23 +6,25 @@ import type { SidebarNavItem } from './types'
 /**
  * WORKSHOP section — Forge routing.
  *
- * The Forge entry is flag-aware: when `new_forge_experience` is true the
- * link routes to /the-forge-v2 (Phase 1 rebuild); otherwise to legacy
- * /the-forge. DEFAULT IS OFF to preserve the original experience — users
- * opt in per-profile when ready. CAD Lab remains at /the-forge/cad-lab
- * regardless.
+ * The Forge entry unconditionally routes to /the-forge-v2, the canonical
+ * V2 narrative-pipeline experience. The V1 legacy surface (/the-forge)
+ * issues its own redirect to /the-forge-v2, so both paths converge.
  *
- * Rollback 2026-04-20: unconditional cutover to /the-forge-v2 reverted
- * because the V2 experience had unaddressed issues in production. Per-user
- * opt-in via new_forge_experience flag is the safer path.
+ * The `newForgeExperience` flag parameter is retained for API compatibility
+ * (Sidebar.tsx still passes it) but no longer gates the href — V2 is the
+ * only entry point for all users.
+ *
+ * History:
+ * - Rollback 2026-04-20: unconditional cutover reverted (V2 had issues).
+ * - Reinstated 2026-04-29 (loop-25): V2 is now the canonical surface;
+ *   V1 must not be reachable for any user including production foundries.
  */
 
 // Hidden during pivot focus (2026-04-24): Products, Browse, Team.
 // Moved to Brainstorming 2026-04-24: Specialists (renamed "Brainstorm"), Outputs.
 // Moved to Marketplace + renamed "Manufacturing Techniques" 2026-04-24: Inspiration.
-export function getWorkshopNavigation(newForgeExperience: boolean = false): SidebarNavItem[] {
-  const forgeHref = newForgeExperience ? '/the-forge-v2' : '/the-forge'
+export function getWorkshopNavigation(_newForgeExperience: boolean = false): SidebarNavItem[] {
   return [
-    { name: 'The Forge', href: forgeHref, icon: Hammer, tooltip: 'Explore materials, manufacturing approaches, and find suppliers' },
+    { name: 'The Forge', href: '/the-forge-v2', icon: Hammer, tooltip: 'Explore materials, manufacturing approaches, and find suppliers' },
   ]
 }

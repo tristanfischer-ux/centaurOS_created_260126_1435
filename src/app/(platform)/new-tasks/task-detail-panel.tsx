@@ -487,7 +487,7 @@ export function TaskDetailPanel({ task, onClose, onEdit, members = [] }: TaskDet
           </h2>
           {task.metadata?.source_thread_id && (
             <Link
-              href={`/the-forge?thread=${task.metadata.source_thread_id}`}
+              href={`/the-forge-v2?thread=${task.metadata.source_thread_id}`}
               className="inline-flex items-center gap-1 text-[11px] text-international-orange hover:underline mt-0.5"
             >
               <Flame className="h-3 w-3" />

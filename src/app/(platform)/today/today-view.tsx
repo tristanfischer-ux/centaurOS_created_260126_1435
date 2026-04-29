@@ -1288,7 +1288,7 @@ function ForgeCostTile({ signals }: { signals: TodaySignal[] }): React.ReactElem
     const topForge = signals.find(s => s.section === 'forge')
     return (
         <Link
-            href="/the-forge"
+            href="/the-forge-v2"
             className="block rounded-xl border bg-background p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all"
         >
             <div className="flex items-center justify-between mb-2">
@@ -1702,7 +1702,7 @@ function ForgeSignalCard({ forgeSignals }: { forgeSignals: TodaySignal[] }): Rea
     return (
         <SignalCard
             source="forge"
-            href="/the-forge"
+            href="/the-forge-v2"
             body={
                 forgeSignals.length === 0
                     ? <>No active Forge signals<br />Builds populate here as events land</>
@@ -2051,7 +2051,7 @@ function ErrorBranchApprentice(): React.ReactElement {
                     <Link href="/objectives"><Target className="h-3.5 w-3.5" /> Start your training</Link>
                 </Button>
                 <Button variant="outline" size="sm" asChild className="gap-1.5">
-                    <Link href="/the-forge"><Waypoints className="h-3.5 w-3.5" /> Explore the toolkit</Link>
+                    <Link href="/the-forge-v2"><Waypoints className="h-3.5 w-3.5" /> Explore the toolkit</Link>
                 </Button>
             </div>
         </>

@@ -130,7 +130,7 @@ export function ObjectiveDetailPanel({ objective, onClose, onTaskSelect, onEdit 
           </h2>
           {objective.metadata?.source_thread_id && (
             <Link
-              href={`/the-forge?thread=${objective.metadata.source_thread_id}`}
+              href={`/the-forge-v2?thread=${objective.metadata.source_thread_id}`}
               className="inline-flex items-center gap-1 text-[11px] text-international-orange hover:underline mt-0.5"
             >
               <Flame className="h-3 w-3" />

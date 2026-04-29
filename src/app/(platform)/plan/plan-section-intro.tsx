@@ -184,7 +184,7 @@ export function PlanSectionIntro(): React.ReactElement {
 
             {/* The Forge Discovery — surface the most impressive feature */}
             <div className="px-4 sm:px-6 lg:px-8 pt-6">
-                <Link href="/the-forge" className="block group">
+                <Link href="/the-forge-v2" className="block group">
                     <Card className="border border-dashed border-electric-blue/20 hover:border-electric-blue/40 hover:shadow-md hover:-translate-y-0.5 transition-all bg-gradient-to-br from-background to-electric-blue/[0.02]">
                         <CardContent className="pt-5 pb-4 flex items-center gap-4">
                             <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-electric-blue/10 shrink-0 group-hover:bg-electric-blue/20 transition-colors">
