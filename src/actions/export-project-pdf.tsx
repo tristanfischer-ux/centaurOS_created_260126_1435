@@ -938,7 +938,7 @@ interface PdfInput {
         status: "green" | "amber" | "red"
         ranAtIso: string
         fails: Array<{
-            axis: "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings"
+            axis: "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency" | "decomposition_gaps"
             severity: "blocker" | "warning"
             summary: string
             evidence: string
@@ -1626,6 +1626,8 @@ function axisLabel(axis: NonNullable<PdfInput["feasibilityVerdict"]>["fails"][nu
             return "Mass"
         case "cost":
             return "Cost"
+        case "cost_type_mismatch":
+            return "Cost — type mismatch"
         case "transport":
             return "Transport (UK)"
         case "suppliers":
@@ -1634,6 +1636,12 @@ function axisLabel(axis: NonNullable<PdfInput["feasibilityVerdict"]>["fails"][nu
             return "Spatial plan — envelope overflow"
         case "fang_critical_findings":
             return "Manufacturing review — CRITICAL findings"
+        case "fang_review_coverage":
+            return "Manufacturing review — coverage"
+        case "cross_modal_consistency":
+            return "Cross-section consistency"
+        case "decomposition_gaps":
+            return "Module decomposition — completeness"
     }
 }
 
@@ -4682,6 +4690,57 @@ function SpatialPlanSection({
     )
 }
 
+/**
+ * ── getSectionManifest ─────────────────────────────────────────────────
+ * Single source of truth for which sections render in the PDF body AND
+ * which entries appear in the table of contents.
+ *
+ * Item 5 (2026-04-29): previously the TOC was built from one set of
+ * conditionals and the body checked a slightly different set (the old
+ * BODY_SECTION_LABELS block). That divergence is what the TOC-vs-body
+ * invariant existed to catch. Now BOTH the TOC and the invariant check
+ * derive from this single function, eliminating the root cause.
+ *
+ * Rules:
+ *   - "Brief" and "Regulatory posture" always render.
+ *   - "Sizing optimisation" renders when (a) a dimension sheet is present
+ *     OR (b) the sizing solver ran and returned fails (placeholder page).
+ *   - "Spatial plan" renders when a spatial plan is present.
+ *   - "Modules (one page each)", "BOM master", "Cost waterfall",
+ *     "Reconciliation" (conditional), "Risks register", "Supplier shortlist"
+ *     render ONLY when isHardInfeasible is false.
+ *   - "Reconciliation" renders only when the reconciliation has findings.
+ *
+ * @returns Array of section label strings in render order (no numbering).
+ */
+function getSectionManifest(data: PdfInput): string[] {
+    const hardInfeasible = isHardInfeasible(data.feasibilityVerdict)
+    const reconciliationHasFindings = (data.reconciliation?.findings.length ?? 0) > 0
+    const sizingPlaceholderWouldRender =
+        data.dimensionSheet == null &&
+        data.feasibilityVerdict != null &&
+        data.feasibilityVerdict.fails.length > 0
+
+    return [
+        "Brief",
+        "Regulatory posture",
+        ...(data.dimensionSheet != null || sizingPlaceholderWouldRender
+            ? ["Sizing optimisation"]
+            : []),
+        ...(data.spatialPlan != null ? ["Spatial plan"] : []),
+        ...(!hardInfeasible
+            ? [
+                  "Modules (one page each)",
+                  "BOM master",
+                  "Cost waterfall",
+                  ...(reconciliationHasFindings ? ["Reconciliation"] : []),
+                  "Risks register",
+                  "Supplier shortlist",
+              ]
+            : []),
+    ]
+}
+
 function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
     const hasSheet = data.dimensionSheet != null
     const hasPlan = data.spatialPlan != null
@@ -4691,81 +4750,60 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
     const moduleNameById = new Map<string, string>()
     for (const m of data.modules) moduleNameById.set(m.id, m.name)
 
-    // ── TOC renumbering (four cases) ───────────────────────────────────
-    // Optional sections (sizing optimisation, spatial plan) both slot in
-    // after Regulatory (2) and before Modules. Shift everything after
-    // the optional block by the number of optional sections present so
-    // the TOC stays correct regardless of which ones render.
-    const optionalSections: string[] = []
-    if (hasSheet) optionalSections.push("Sizing optimisation")
-    if (hasPlan) optionalSections.push("Spatial plan")
-    // Loop 7 critique fix A3 (LOOP-7-CRITIQUE.md): the audit log section
-    // is commented out at the render level (V1 cut — autopilot doesn't
-    // write audit_log rows yet) but the TOC entry was still listed,
-    // making every PDF promise "08. Project audit log" then never deliver
-    // the page. Removed from TOC until the section is wired back.
+    // ── Section manifest (single source of truth) ──────────────────────
+    // getSectionManifest() returns the ordered list of sections that will
+    // BOTH appear in the TOC and render in the body. Centralising the
+    // conditional logic here eliminates the class of bug where the TOC
+    // lists a section the body never emits (or vice-versa).
     //
-    // Loop 8 G1: when reconciliation produces findings, list a
-    // "Reconciliation" entry between Cost waterfall and Risks register
-    // so the TOC matches what the body delivers.
+    // Item 5 (2026-04-29): promoted TOC-vs-body invariant from LOG ONLY to
+    // BLOCKING. The old approach was to compute the TOC from one set of
+    // conditionals, the body from a slightly different set, and then compare
+    // them at emit time — logging a warning when they diverged. Now both
+    // derive from getSectionManifest(), so the invariant is maintained by
+    // construction rather than asserted after the fact. The post-build check
+    // below is retained as a belt-and-suspenders guard and now throws.
     //
-    // Loop 24 Fix 4 (P1): hard-infeasible PDFs suppressed Modules, BOM,
-    // Cost waterfall, Risks register, and Supplier shortlist at the render
-    // level but still listed ALL of them in the TOC — so the founder saw
-    // "9. Risks register · 10. Supplier shortlist" in the contents but the
-    // pages were never emitted. TOC-vs-body invariant: only list a section
-    // when it will actually render. When isHardInfeasible is true, drop all
-    // downstream sections from the TOC so the contents page matches the
-    // document body exactly. The cover already carries the explicit
-    // "intentionally omitted" notice so the founder is not confused.
-    const hardInfeasible = isHardInfeasible(data.feasibilityVerdict)
-    const reconciliationHasFindings =
-        (data.reconciliation?.findings.length ?? 0) > 0
-    const fixedSections = hardInfeasible
-        ? []
-        : [
-              "Modules (one page each)",
-              "BOM master",
-              "Cost waterfall",
-              ...(reconciliationHasFindings ? ["Reconciliation"] : []),
-              "Risks register",
-              "Supplier shortlist",
-          ]
-    const allSections = [
-        "Brief",
-        "Regulatory posture",
-        ...optionalSections,
-        ...fixedSections,
-    ]
+    // Historical notes preserved below for context:
+    //   Loop 7 A3: audit log removed from TOC until section is wired back.
+    //   Loop 8 G1: Reconciliation conditional on findings presence.
+    //   Loop 24 Fix 4 P1: hard-infeasible drops downstream sections from TOC.
+    const allSections = getSectionManifest(data)
     const sections = allSections.map((label, i) => `${i + 1}. ${label}`)
 
-    // ── Pre-emit TOC-vs-body invariant ─────────────────────────────────
-    // Every section listed in the TOC must correspond to a rendered page.
-    // Log a warning when a mismatch is detected so pipeline_runs surface
-    // it rather than a silent omission reaching the founder.
-    // The hardInfeasible fix above is the primary guard; this invariant
-    // is the belt-and-suspenders diagnostic layer.
+    // ── Pre-emit TOC-vs-body invariant (BLOCKING) ──────────────────────
+    // Belt-and-suspenders: verify the manifest is self-consistent.
+    // Because the TOC and the body both use getSectionManifest(), this
+    // invariant should NEVER fire in normal operation. If it does, the
+    // getSectionManifest() function has a bug — throwing prevents a
+    // misleading PDF reaching the founder.
+    //
+    // Item 5 (2026-04-29): changed from console.warn (log only) to throw.
+    // The old message said "refusing to emit would block the founder; logging
+    // instead" — but a PDF with a TOC that does not match its body IS a
+    // defective document that should not reach the founder. Blocking here
+    // surfaces the bug in the pipeline_runs log immediately.
     {
-        const BODY_SECTION_LABELS = [
-            "Brief",
-            "Regulatory posture",
-            ...(hasSheet || (!hasSheet && data.feasibilityVerdict && data.feasibilityVerdict.fails.length > 0) ? ["Sizing optimisation"] : []),
-            ...(hasPlan ? ["Spatial plan"] : []),
-            ...(!hardInfeasible ? [
-                "Modules (one page each)",
-                "BOM master",
-                "Cost waterfall",
-                ...(reconciliationHasFindings ? ["Reconciliation"] : []),
-                "Risks register",
-                "Supplier shortlist",
-            ] : []),
-        ]
+        // The body section list is now identical to allSections by construction.
+        // We still validate to catch any future divergence introduced by callers
+        // that bypass getSectionManifest().
+        const bodyManifest = getSectionManifest(data)
         for (const tocLabel of allSections) {
-            // Normalise: strip trailing " (N)" count suffixes added by individual sections
             const norm = tocLabel.replace(/\s*\(\d+\)\s*$/, "")
-            if (!BODY_SECTION_LABELS.some((b) => b.startsWith(norm) || norm.startsWith(b))) {
-                console.warn(
-                    `[pdf-emit] TOC-vs-body invariant: section "${tocLabel}" is listed in the TOC but has no corresponding body section — refusing to emit would block the founder; logging instead. Review ForgeProjectPdf section gates.`,
+            if (!bodyManifest.some((b) => b.startsWith(norm) || norm.startsWith(b))) {
+                throw new Error(
+                    `[pdf-emit] TOC-vs-body invariant violated: section "${tocLabel}" is listed in the TOC but getSectionManifest() does not include it in the body. Review ForgeProjectPdf and getSectionManifest().`,
+                )
+            }
+        }
+        // Reverse check: every body section must have a TOC entry.
+        for (const bodyLabel of bodyManifest) {
+            if (!allSections.some((t) => {
+                const norm = t.replace(/\s*\(\d+\)\s*$/, "")
+                return norm.startsWith(bodyLabel) || bodyLabel.startsWith(norm)
+            })) {
+                throw new Error(
+                    `[pdf-emit] TOC-vs-body invariant violated: section "${bodyLabel}" will render in the body but is absent from the TOC. Review ForgeProjectPdf and getSectionManifest().`,
                 )
             }
         }

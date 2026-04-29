@@ -33,7 +33,7 @@
  */
 
 export type VerdictStatus = "green" | "amber" | "red"
-export type VerdictAxis = "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency"
+export type VerdictAxis = "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency" | "decomposition_gaps"
 export type VerdictSeverity = "blocker" | "warning"
 
 export interface VerdictFail {
@@ -166,6 +166,26 @@ export interface VerdictInput {
             moduleName: string
             reason: string
         }>
+    } | null
+    /**
+     * Post-decomposition completeness gaps from product-class checklist
+     * matching (Item 6 — council-designed, 2026-04-29).
+     *
+     * When Max's module list is missing expected modules for a recognised
+     * product class (e.g. no ground control station in a High-Altitude
+     * Pseudo-Satellite decomposition), the gap is surfaced here as a
+     * WARNING on the "decomposition_gaps" axis. Not blocking — the
+     * checklist is a heuristic and Max may have legitimately renamed or
+     * merged modules.
+     *
+     * Populated by run-max-decomposition.ts after modules are built, stored
+     * in the pipeline_run output_ref, and passed here by run-proofreader.ts.
+     * Null when no product class was detected or no gaps were found.
+     */
+    decompositionGaps?: {
+        productClass: string
+        confidence: number
+        missingModules: string[]
     } | null
 }
 
@@ -549,6 +569,26 @@ export function computeFeasibilityVerdict(
                 evidence: `${input.shortlistCount} candidates against ${input.bomRowCount} rows — directory may be too thin for this domain.`,
             })
         }
+    }
+
+    // ── Decomposition completeness gaps ─────────────────────────────
+    // Item 6 (council-designed, 2026-04-29): when the product class
+    // checklist found missing modules, surface them as a WARNING on
+    // the decomposition_gaps axis. Not blocking — the checklist is a
+    // heuristic and Max may have legitimately renamed or merged modules.
+    if (
+        input.decompositionGaps &&
+        input.decompositionGaps.missingModules.length > 0
+    ) {
+        const gaps = input.decompositionGaps
+        checkedConstraints.push("decomposition_gaps")
+        const missingList = gaps.missingModules.join(", ")
+        fails.push({
+            axis: "decomposition_gaps",
+            severity: "warning",
+            summary: `${gaps.productClass} decomposition may be missing expected modules.`,
+            evidence: `Module checklist gap (confidence ${Math.round(gaps.confidence * 100)}%): the following expected modules were not found — ${missingList}. Max may have renamed or merged these; review the module list before proceeding to procurement.`,
+        })
     }
 
     // ── Status ──────────────────────────────────────────────────────
