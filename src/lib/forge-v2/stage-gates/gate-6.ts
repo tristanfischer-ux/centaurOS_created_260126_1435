@@ -69,6 +69,27 @@ const MIN_DOMAIN_STANDARD_COUNT = 3
  */
 const UNKNOWN_DOMAIN_MARKERS = new Set(["", "unknown", "general", "other"])
 
+/**
+ * Domains where shipping a product without ANY cited regulatory standards is
+ * a credibility-destroying P0. A 35m stratospheric aircraft, a Class III
+ * medical device, a road-going vehicle, or a defense system MUST cite
+ * regulations. Loop 21 council critique 2026-04-29: HAPS Wren shipped with
+ * "No regulatory items declared on the Brief" — silently passed Gate 6
+ * because Chase's research either didn't run or returned an empty
+ * standardCodes array, and the existing coverage check skipped on null
+ * domain. This floor catches that class of failure.
+ */
+const HIGH_REGULATION_DOMAINS = new Set([
+    "aerospace",
+    "medical",
+    "automotive",
+    "defense",
+    "rail",
+    "marine",
+    "oil_gas",
+    "nuclear",
+])
+
 // ── Input type ───────────────────────────────────────────────────────────────
 
 /** The minimal project data gate-6 needs from `cad_lab_projects`. */
@@ -112,10 +133,15 @@ export interface Gate6Input {
 async function loadInput(ctx: GateContext): Promise<Gate6Input> {
     const admin = createAdminClient()
 
-    // ── Load the project's research JSONB ─────────────────────────────────
+    // ── Load the project's research JSONB + subject (for domain fallback) ──
+    // We need `subject` so we can detect the domain from the founder's brief
+    // when Chase has run but didn't populate research.industryDomain (or when
+    // research is absent entirely). Loop 21 surfaced this gap on HAPS Wren —
+    // research existed but standardCodes was empty, so the gate previously
+    // returned vacuous PASS for a stratospheric aircraft.
     const { data: projectRow, error: projectError } = await admin
         .from("cad_lab_projects")
-        .select("id, research")
+        .select("id, subject, research")
         .eq("id", ctx.projectId)
         .single()
 
@@ -129,25 +155,46 @@ async function loadInput(ctx: GateContext): Promise<Gate6Input> {
     // INTENT: `research` is JSONB. Supabase returns it as a plain object.
     // We cast conservatively — any field may be absent if Chase hasn't run.
     const research = projectRow.research as Record<string, unknown> | null
+    const subject = typeof projectRow.subject === "string" ? projectRow.subject : ""
 
-    if (!research) {
-        // Chase hasn't run yet — gate is vacuously satisfied.
-        return emptyInput(ctx.projectId)
+    // Detect domain from research first; fall back to subject text if research
+    // didn't populate the field. This catches the Loop 21 HAPS-Wren case where
+    // research ran but industryDomain was null.
+    let industryDomain: string | null = null
+    if (research) {
+        const rawDomain = research.industryDomain
+        if (typeof rawDomain === "string" && rawDomain.trim().length > 0) {
+            industryDomain = rawDomain.trim().toLowerCase()
+        }
+    }
+    if (!industryDomain && subject.length > 0) {
+        try {
+            const { detectIndustryDomain } = await import(
+                "@/lib/cad-lab/industry-domains"
+            )
+            const detected = detectIndustryDomain(subject)
+            if (detected && !UNKNOWN_DOMAIN_MARKERS.has(detected)) {
+                industryDomain = detected
+            }
+        } catch (err) {
+            console.warn(
+                `[gate-6] domain detection from subject failed for project ${ctx.projectId}:`,
+                err instanceof Error ? err.message : err,
+            )
+        }
     }
 
-    const rawCodes = research.standardCodes
+    const rawCodes = research?.standardCodes
     const citedCodes: string[] = Array.isArray(rawCodes)
         ? (rawCodes as unknown[]).filter((c): c is string => typeof c === "string")
         : []
 
-    const rawDomain = research.industryDomain
-    const industryDomain: string | null =
-        typeof rawDomain === "string" && rawDomain.trim().length > 0
-            ? rawDomain.trim().toLowerCase()
-            : null
-
     if (citedCodes.length === 0) {
-        // No standards cited — existence check trivially passes, domain check skipped.
+        // No standards cited — existence check trivially passes, but the
+        // high-regulation-domain floor in check() will still fire if the
+        // domain is in HIGH_REGULATION_DOMAINS. Return the input with
+        // industryDomain populated (possibly via subject fallback) so the
+        // check function has what it needs.
         return {
             project: { projectId: ctx.projectId, citedCodes: [], industryDomain },
             resolvedRows: [],
@@ -210,6 +257,31 @@ function emptyInput(projectId: string): Gate6Input {
 function check(input: Gate6Input): DeterministicCheckResult {
     const { project, resolvedRows, unresolvedCodes } = input
 
+    const domain = project.industryDomain
+    const domainIsKnown = domain !== null && !UNKNOWN_DOMAIN_MARKERS.has(domain)
+
+    // ── Sub-check 0 (NEW, P0): High-regulation domain MUST cite ≥1 standard ──
+    // Loop 21 caught this gap: HAPS Wren (35m stratospheric aircraft) shipped
+    // with "No regulatory items declared on the Brief." The previous Gate 6
+    // check passed vacuously when citedCodes was empty AND research had no
+    // domain — but for high-regulation domains (aerospace, medical, etc.) an
+    // empty regulatory section is a credibility-destroying P0 failure. With
+    // the loadInput change to detect domain from subject, we now know the
+    // domain even if Chase didn't populate it, and we can hard-fail here.
+    if (
+        domainIsKnown &&
+        domain !== null &&
+        HIGH_REGULATION_DOMAINS.has(domain) &&
+        project.citedCodes.length === 0
+    ) {
+        return {
+            check_name: "standards_required_for_high_regulation_domain",
+            passed: false,
+            actual: `0 standards cited (project domain="${domain}" — high-regulation)`,
+            expected: `≥1 cited standard for ${domain} project class (HIGH_REGULATION_DOMAINS)`,
+        }
+    }
+
     // ── Sub-check 1: EXISTENCE ─────────────────────────────────────────────
     if (unresolvedCodes.length > 0) {
         return {
@@ -221,8 +293,6 @@ function check(input: Gate6Input): DeterministicCheckResult {
     }
 
     // ── Sub-check 2: DOMAIN COVERAGE ─────────────────────────────────────
-    const domain = project.industryDomain
-    const domainIsKnown = domain !== null && !UNKNOWN_DOMAIN_MARKERS.has(domain)
 
     if (!domainIsKnown) {
         // No domain detected — skip coverage check, return PASS.
@@ -277,12 +347,78 @@ function check(input: Gate6Input): DeterministicCheckResult {
  * registry wrapper `gate6` below, which overrides the runner's verdict
  * before the verdict row is written.
  */
+/**
+ * Build the structured constraint block injected into a Chase re-fire when
+ * Gate 6 fails. Stored on the gate verdict's `remediation_context_injected`
+ * field and consumed by `consumeRemediationContext("waiting_chase")` in
+ * `run-chase-research.ts` (per the gate iteration loop wired in commit
+ * 333892cc).
+ */
+function buildGate6RemediationContext(
+    input: Gate6Input,
+    result: DeterministicCheckResult,
+): string {
+    const domain = input.project.industryDomain ?? "(unknown)"
+    const cited = input.project.citedCodes.length
+    const resolved = input.resolvedRows.length
+    const unresolved = input.unresolvedCodes.length
+
+    let block = `Gate 6 standards-coverage failure (${result.check_name}). `
+    block += `Project domain: ${domain}. Cited: ${cited}, resolved: ${resolved}, unresolved: ${unresolved}.\n`
+
+    if (result.check_name === "standards_required_for_high_regulation_domain") {
+        block += `\nThis is a HIGH-REGULATION domain — your previous research did not cite ANY regulatory standards. `
+        block += `That is unacceptable for a ${domain} project. Re-run regulatory extraction with the verified `
+        block += `standards from the design_standards table for "${domain}" as a mandatory checklist. `
+        block += `Cite at LEAST ${MIN_DOMAIN_STANDARD_COUNT} domain-specific standards from the verified set; `
+        block += `discuss applicability for each.`
+    } else if (result.check_name === "standards_existence" && unresolved > 0) {
+        block += `\nThe following cited standards are NOT in the verified design_standards table — they may be `
+        block += `hallucinated or use non-canonical naming: ${input.unresolvedCodes.join(", ")}. `
+        block += `Replace them with verified standards from the table for the ${domain} domain. `
+        block += `Use exact standard_code formatting (e.g. "UL 9540A" not "UL 9540 A") and only cite codes that exist.`
+    } else if (result.check_name === "standards_domain_coverage") {
+        block += `\nDomain coverage too low. The verified design_standards table has standards specific to `
+        block += `"${domain}" — your regulatory section should cite ≥${MIN_DOMAIN_STANDARD_COUNT} of them. `
+        block += `Re-run regulatory extraction emphasising domain-specific compliance items.`
+    }
+
+    return block
+}
+
 export const gate6: DeterministicGate<Gate6Input> = {
     kind: "deterministic",
     gateId: 6,
     name: "Standards Coverage Check",
     loadInput,
-    check,
+    check(input: Gate6Input): DeterministicCheckResult {
+        const result = check(input)
+
+        // Attach remediation fields to the returned result so the cron
+        // handler's iteration-loop wiring (commit 333892cc) can extract
+        // remediation_target_stage + remediation_context_injected without
+        // re-running the check. Same pattern as Gate 2 and Gate 3.
+        const extended = result as DeterministicCheckResult & {
+            remediationContext: string
+            remediationTargetStage: string
+            severity: "P0" | "P1" | null
+        }
+
+        if (!result.passed) {
+            extended.remediationContext = buildGate6RemediationContext(input, result)
+            extended.remediationTargetStage = "waiting_chase"
+            // standards_required_for_high_regulation_domain is P0 (catastrophic
+            // for the project class). Other Gate 6 failures are P1.
+            extended.severity =
+                result.check_name === "standards_required_for_high_regulation_domain"
+                    ? "P0"
+                    : "P1"
+        } else {
+            extended.severity = null
+        }
+
+        return result
+    },
 }
 
 // ── Registry-level wrapper (for WARN reclassification) ───────────────────────
