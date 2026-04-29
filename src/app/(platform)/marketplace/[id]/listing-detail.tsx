@@ -177,25 +177,10 @@ export function MarketplaceListingDetail({
                     <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight mt-1">
                         {listing.title}
                     </h1>
-                    <ListingRatingSummary
-                        averageRating={listing.average_rating != null ? Number(listing.average_rating) : null}
-                        reviewCount={listing.review_count ?? 0}
-                    />
                 </div>
 
                 {/* CTA buttons */}
                 <div className="flex items-center gap-2 flex-shrink-0">
-                    {category !== 'People' && (listing.contact_email || attrs.contact_email) && (
-                        <QuoteRequestDialog
-                            listings={listing}
-                            trigger={
-                                <Button variant="default" className="bg-international-orange hover:bg-international-orange-hover">
-                                    <Send className="h-4 w-4 mr-2" />
-                                    Request Quote
-                                </Button>
-                            }
-                        />
-                    )}
                     {attrs.provider_id ? (
                         <Button
                             variant="secondary"

@@ -32,9 +32,10 @@ function isEmptyString(v: string): boolean {
   const lower = v.trim().toLowerCase()
   if (lower === '') return true
   if (EMPTY_SENTINELS.has(lower)) return true
-  // Catch "MISSING - Not found on website..." prefix patterns
-  if (lower.startsWith('missing') && lower.length < 80) return true
-  if (lower.startsWith('unknown') && lower.length < 80) return true
+  // Catch "MISSING - Not found on website..." and "UNKNOWN - ..." prefix patterns.
+  // No length cap — these sentinel prefixes are always junk regardless of length.
+  if (lower.startsWith('missing')) return true
+  if (lower.startsWith('unknown')) return true
   return false
 }
 
