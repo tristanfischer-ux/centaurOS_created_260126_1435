@@ -36,6 +36,10 @@ import {
     callOpenRouter,
     CHEAP_STRUCTURED_MODEL,
 } from "@/lib/ai/openrouter"
+import {
+    assessDirectoryCoverage,
+    formatCoverageDisclosure,
+} from "@/lib/suppliers/coverage-scoring"
 
 // ─── Types ────────────────────────────────────────────────────────────
 
@@ -769,6 +773,53 @@ async function matchSuppliersForProjectInternal(
                     )
                 }
             })
+        }
+
+        // SP1 (4/6 council): Assess directory coverage bias and persist disclosure.
+        // The supplier directory is skewed towards automotive/aerospace/electronics.
+        // When BOM categories fall outside those domains, degrade confidence explicitly.
+        try {
+            const bomCategories = modules
+                .map((m: CadLabModule) => (m as { category?: string }).category)
+                .filter((c): c is string => typeof c === "string" && c.length > 0)
+
+            // Also extract from diagnostic answers if available
+            const productType = (diagnostics as { productType?: string }).productType
+            if (productType) bomCategories.push(productType)
+
+            if (bomCategories.length > 0) {
+                const coverageReport = assessDirectoryCoverage(bomCategories)
+                const disclosure = formatCoverageDisclosure(coverageReport)
+
+                // Persist to gate_remediation_context as a non-destructive merge
+                const { data: currentProject } = await admin
+                    .from("cad_lab_projects")
+                    .select("gate_remediation_context")
+                    .eq("id", projectId)
+                    .maybeSingle()
+
+                const existingContext =
+                    (currentProject?.gate_remediation_context as Record<string, unknown> | null) ?? {}
+
+                await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        gate_remediation_context: {
+                            ...existingContext,
+                            supplier_directory_coverage: {
+                                report: coverageReport,
+                                disclosure,
+                            },
+                        } as unknown as Record<string, unknown>,
+                    })
+                    .eq("id", projectId)
+            }
+        } catch (coverageErr) {
+            // Non-blocking — coverage assessment failure must never break supplier matching.
+            console.warn(
+                "[forge-v2-supplier-match] Directory coverage assessment failed (non-blocking):",
+                coverageErr instanceof Error ? coverageErr.message : coverageErr,
+            )
         }
 
         return {
