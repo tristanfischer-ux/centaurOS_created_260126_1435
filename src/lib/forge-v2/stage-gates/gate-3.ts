@@ -106,11 +106,40 @@ interface Gate3CheckResult extends DeterministicCheckResult {
 async function loadInput(ctx: GateContext): Promise<Gate3Input> {
     const admin = createAdminClient()
 
-    const { data, error } = await admin
+    // Race-condition guard (Loop 21 + 22 evidence): the autopilot tracking
+    // row for waiting_sizing goes 'done' the moment Fang sizing's specialist
+    // function returns, but the actual `dimension_sheet` JSONB write to
+    // cad_lab_projects can land milliseconds AFTER on a separate transaction.
+    // The cron handler immediately calls Gate 3, which reads dimension_sheet,
+    // and the read can race the write.
+    //
+    // Mitigation: if the first read returns null, retry once after 1.5s.
+    // Total worst-case latency added: 1.5s on the race-window cases.
+    // PASS / non-null reads short-circuit immediately.
+    let data: { subject: string | null; dimension_sheet: unknown } | null = null
+    let error: { message: string } | null = null
+
+    const firstRead = await admin
         .from("cad_lab_projects")
         .select("id, subject, dimension_sheet")
         .eq("id", ctx.projectId)
         .maybeSingle()
+    data = firstRead.data as typeof data
+    error = firstRead.error as typeof error
+
+    if (!error && data && data.dimension_sheet == null) {
+        // Retry once after 1.5s — covers the eventual-consistency window
+        // between Fang sizing's tracking-row done-stamp and the JSONB write.
+        await new Promise((resolve) => setTimeout(resolve, 1500))
+        const secondRead = await admin
+            .from("cad_lab_projects")
+            .select("id, subject, dimension_sheet")
+            .eq("id", ctx.projectId)
+            .maybeSingle()
+        if (!secondRead.error && secondRead.data?.dimension_sheet != null) {
+            data = secondRead.data as typeof data
+        }
+    }
 
     if (error) {
         console.warn(
