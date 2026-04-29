@@ -72,7 +72,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             {/* Hero                                                    */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="relative overflow-hidden rounded-b-2xl bg-gradient-to-br from-background via-background to-orange-50/40">
-                <div className="relative z-10 px-4 sm:px-6 lg:px-12 pt-10 sm:pt-14 lg:pt-20 pb-10 sm:pb-14">
+                <div className="relative z-10 px-4 sm:px-6 lg:px-0 pt-10 sm:pt-14 lg:pt-20 pb-10 sm:pb-14">
                     <div className="max-w-3xl">
                         <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-5">
                             {firstName ? `Welcome, ${firstName}` : "Welcome"}
@@ -93,7 +93,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             {/* ─────────────────────────────────────────────────────── */}
             {/* Letter from Tristan                                     */}
             {/* ─────────────────────────────────────────────────────── */}
-            <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
+            <section className="px-4 sm:px-6 lg:px-0 pt-10 lg:pt-14">
                 <div className="max-w-2xl space-y-5 text-base sm:text-[17px] leading-relaxed text-foreground">
                     <p className="font-medium">{"Welcome. I’m Tristan Fischer."}</p>
                     <p>
@@ -115,7 +115,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             {/* ─────────────────────────────────────────────────────── */}
             {/* First hour card + primary CTA                           */}
             {/* ─────────────────────────────────────────────────────── */}
-            <section className="px-4 sm:px-6 lg:px-12 pt-10 lg:pt-14">
+            <section className="px-4 sm:px-6 lg:px-0 pt-10 lg:pt-14">
                 <div className="max-w-3xl">
                     <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-5">
                         Try these three in your first hour
@@ -163,7 +163,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
                 sections (Brainstorming · Fundraising · Workshop ·
                 Marketplace) in the order they appear in the sidebar. */}
             {/* ─────────────────────────────────────────────────────── */}
-            <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 space-y-6 lg:space-y-8 max-w-4xl">
+            <section className="px-4 sm:px-6 lg:px-0 pt-14 lg:pt-16 space-y-6 lg:space-y-8 max-w-4xl">
                 <SectionBlock
                     icon={Sparkles}
                     label="Brainstorming"
@@ -249,7 +249,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             {/* ─────────────────────────────────────────────────────── */}
             {/* Trimmed key-leaders roster                              */}
             {/* ─────────────────────────────────────────────────────── */}
-            <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 max-w-4xl">
+            <section className="px-4 sm:px-6 lg:px-0 pt-14 lg:pt-16 max-w-4xl">
                 <div className="flex items-center gap-3 mb-5">
                     <div className="h-8 w-1.5 bg-international-orange rounded-full" />
                     <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
@@ -294,7 +294,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             {/* ─────────────────────────────────────────────────────── */}
             {/* Closing + final CTA                                     */}
             {/* ─────────────────────────────────────────────────────── */}
-            <section className="px-4 sm:px-6 lg:px-12 pt-14 lg:pt-16 max-w-2xl">
+            <section className="px-4 sm:px-6 lg:px-0 pt-14 lg:pt-16 max-w-2xl">
                 <p className="text-base sm:text-lg text-foreground mb-2">
                     Have a look around, and let me know how you get on.
                 </p>

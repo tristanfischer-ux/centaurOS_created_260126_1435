@@ -226,7 +226,17 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
         try {
             const result = await generateMeetingThreadPdf(meeting.id)
             if (result.ok) {
-                window.open(result.signedUrl, "_blank", "noopener,noreferrer")
+                // Use programmatic anchor click instead of window.open so popup
+                // blockers do not interfere. Browsers treat user-initiated
+                // anchor clicks as safe download triggers.
+                const a = document.createElement("a")
+                a.href = result.signedUrl
+                a.download = `brainstorm-${meeting.id.slice(0, 8)}.pdf`
+                a.target = "_blank"
+                a.rel = "noopener noreferrer"
+                document.body.appendChild(a)
+                a.click()
+                a.remove()
                 setPdfState("done")
                 // Reset after a moment so the button is re-usable
                 setTimeout(() => setPdfState("idle"), 4_000)
@@ -381,7 +391,12 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                             Branch
                         </span>
                     )}
-                    {meeting.audioStatus === "ready" && meeting.audioClipsCount > 0 && (
+                    {/* Show Audio badge for ready sessions — covers both new sessions
+                        (audio_url set, audioClipsCount=0) and legacy sessions (clips
+                        array, audioClipsCount>0). audioClipsCount>0 check is removed
+                        because the new Gemini TTS path writes audio_url directly and
+                        never populates audio_clips. */}
+                    {meeting.audioStatus === "ready" && (
                         <span className="flex items-center gap-1 text-electric-blue">
                             <AudioLines className="h-3 w-3" />
                             Audio

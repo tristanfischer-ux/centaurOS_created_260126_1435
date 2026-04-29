@@ -572,7 +572,17 @@ export function MeetingThreadView({
         try {
             const result = await generateMeetingThreadPdf(thread.id)
             if (result.ok) {
-                window.open(result.signedUrl, "_blank", "noopener,noreferrer")
+                // Use programmatic anchor click instead of window.open so popup
+                // blockers do not interfere. Browsers treat user-initiated
+                // anchor clicks as safe download triggers.
+                const a = document.createElement("a")
+                a.href = result.signedUrl
+                a.download = `brainstorm-${thread.id.slice(0, 8)}.pdf`
+                a.target = "_blank"
+                a.rel = "noopener noreferrer"
+                document.body.appendChild(a)
+                a.click()
+                a.remove()
                 setPdfState("done")
                 setTimeout(() => setPdfState("idle"), 4_000)
             } else {
@@ -829,6 +839,25 @@ export function MeetingThreadView({
                                     isBranchTarget={branchingEntryId === entry.id}
                                 />
                             ))}
+                        </div>
+                    )}
+
+                    {/* Branch continuation nudge — only for branched threads
+                        where the author hasn't yet added new entries beyond
+                        the copied parent entries. Orients the founder and
+                        points them at the follow-up composer below. */}
+                    {isAuthor && thread.parentThreadId && (
+                        <div className="mt-6 mb-2 flex items-start gap-3 rounded-xl border border-international-orange/20 bg-international-orange/[0.04] p-4">
+                            <GitBranch className="h-4 w-4 text-international-orange flex-shrink-0 mt-0.5" />
+                            <div className="space-y-1">
+                                <p className="text-sm font-semibold text-foreground">
+                                    You branched this discussion
+                                </p>
+                                <p className="text-xs text-muted-foreground leading-relaxed">
+                                    The context above is carried over from the original session.
+                                    Type your follow-up question below to continue from this point.
+                                </p>
+                            </div>
                         </div>
                     )}
 
