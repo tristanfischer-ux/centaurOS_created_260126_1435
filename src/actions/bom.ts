@@ -67,6 +67,7 @@ import {
   runBomCountCheck,
   enrichPartsWithProvenance,
   summariseProvenanceGaps,
+  detectBomOutliers,
   type CostProvenance,
 } from "@/lib/bom/bom-reconciliation"
 import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
@@ -2652,6 +2653,70 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
       `[bom-distributed:merge] container-class check PASS: ` +
       `envelope=${loaded.briefedEnvelopeKind} project=${projectId}`,
     )
+  }
+
+  // ── Loop 26 A1/P4 — mass and cost outlier detection ──────────────
+  //
+  // Problem (council unanimous, 2026-04-29): the HAPS demo shipped with
+  // FUS-001 Central Fuselage Pod Monocoque at 700.00 kg when the entire
+  // platform mass target is ~160 kg. That is a 4× exceedance that any
+  // reviewer would spot immediately. The existing reconciliation gate only
+  // checks part-count and material chemistry — it does not check whether
+  // a single component's mass is physically plausible against the
+  // programme's assembly mass budget or its parent module's mass estimate.
+  //
+  // Fix: deterministic outlier detection (pure, no LLM) that flags:
+  //   (a) single component > 50% of total assembly mass (warning) or > 100% (error).
+  //   (b) single component > parent module estimated mass (error).
+  //   (c) single component cost > 80% of unit cost ceiling (warning).
+  //   (d) bill-of-materials mass sum vs module estimate divergence > 20% (warning).
+  //
+  // Does NOT block PDF generation — annotates only.
+  {
+    const totalMassBudgetKg =
+      typeof loaded.designBrief?.constraints?.maxMassKg === "number" &&
+      loaded.designBrief.constraints.maxMassKg > 0
+        ? loaded.designBrief.constraints.maxMassKg
+        : null
+
+    const unitCostCeilingGbp =
+      typeof loaded.designBrief?.constraints?.unitCostCeilingGbp === "number" &&
+      loaded.designBrief.constraints.unitCostCeilingGbp > 0
+        ? loaded.designBrief.constraints.unitCostCeilingGbp
+        : null
+
+    const outlierResult = detectBomOutliers(
+      validatedParts.map((p) => ({
+        partNumber: p.partNumber,
+        name: p.name,
+        massKg: p.massKg,
+        estimatedUnitCostGbp: p.estimatedUnitCostGbp,
+        sourceModuleId: p.sourceModuleId,
+      })),
+      loaded.modules.map((m) => ({
+        id: m.id,
+        name: m.name,
+        estimatedMassKg: (m as { estimatedMassKg?: number | null }).estimatedMassKg ?? null,
+      })),
+      totalMassBudgetKg,
+      unitCostCeilingGbp,
+    )
+
+    if (outlierResult.hasErrors) {
+      console.error(
+        `[bom-distributed:merge] OUTLIER_ERRORS: project=${projectId} errors=${outlierResult.flags.filter((f) => f.severity === "error").length} warnings=${outlierResult.flags.filter((f) => f.severity === "warning").length}`,
+      )
+      console.error(outlierResult.logLine)
+    } else if (outlierResult.hasAnyFlag) {
+      console.warn(
+        `[bom-distributed:merge] OUTLIER_WARNINGS: project=${projectId} warnings=${outlierResult.flags.length}`,
+      )
+      console.warn(outlierResult.logLine)
+    } else {
+      console.log(
+        `[bom-distributed:merge] outlier-check PASS: project=${projectId}`,
+      )
+    }
   }
 
   // ── Loop 24 Fix 5 — cost-provenance enrichment ───────────────────

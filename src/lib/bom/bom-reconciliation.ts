@@ -380,6 +380,280 @@ export function summariseProvenanceGaps(
     return { todoCount, parametricCount, quotedCount, bannerNeeded, bannerCopy }
 }
 
+// ---- Mass and cost outlier detection (Loop 26 A1/P4) ---------------
+
+/**
+ * Severity level for an outlier flag.
+ *
+ *   "warning" — flag is notable but does not indicate a definitive error.
+ *   "error"   — flag indicates a physically or financially impossible value.
+ */
+export type OutlierSeverity = "warning" | "error"
+
+/**
+ * A single outlier flag produced by {@link detectBomOutliers}.
+ * Stored alongside the bill of materials data so the PDF reconciliation
+ * section can surface it without re-running the check.
+ */
+export interface BomOutlierFlag {
+    /** Identifies the check that fired. */
+    checkId:
+        | "COMPONENT_EXCEEDS_TOTAL_MASS_BUDGET_100PCT"  // error: single component > total assembly mass
+        | "COMPONENT_EXCEEDS_TOTAL_MASS_BUDGET_50PCT"   // warning: single component > 50% of total mass
+        | "COMPONENT_EXCEEDS_MODULE_MASS_BUDGET"        // error: part exceeds its parent module's mass budget
+        | "COMPONENT_EXCEEDS_COST_CEILING_80PCT"        // warning: single component > 80% of unit cost ceiling
+        | "MODULE_BOM_MASS_DIVERGENCE"                  // warning: module-page estimated mass vs bill-of-materials mass total >20% off
+    severity: OutlierSeverity
+    /** Human-readable explanation. No acronyms; user-facing. */
+    message: string
+    /** Part number of the offending component, when applicable. */
+    partNumber?: string
+    /** Module identifier of the offending module, when applicable. */
+    moduleId?: string
+    /** The numeric value that triggered the flag (for display). */
+    observedValue?: number
+    /** The threshold that was exceeded (for display). */
+    thresholdValue?: number
+}
+
+/**
+ * Aggregate result returned by {@link detectBomOutliers}.
+ */
+export interface BomOutlierResult {
+    /** True when at least one error-severity flag was raised. */
+    hasErrors: boolean
+    /** True when at least one flag of any severity was raised. */
+    hasAnyFlag: boolean
+    /** All flags ordered by severity (errors first). */
+    flags: BomOutlierFlag[]
+    /** Single-line log summary ready for console.warn. */
+    logLine: string
+}
+
+/**
+ * Detect mass and cost outliers in a bill-of-materials assembly.
+ *
+ * This is a **pure function** — no I/O, no LLM calls. Call it after the
+ * skeleton + expansion merge but before persisting parts, so flags reach
+ * the PDF reconciliation section on the same regen that produced the data.
+ *
+ * Checks performed:
+ *
+ *   1. **Total mass budget — single component >50% (warning) or >100% (error).**
+ *      FUS-001 Central Fuselage Pod at 700 kg on a 160 kg platform is the
+ *      canonical example (Loop 26 HAPS demo). Any single component exceeding
+ *      the programme's total assembly mass budget is physically impossible.
+ *
+ *   2. **Module-level mass budget — part exceeds parent module budget (error).**
+ *      Each module declares an `estimatedMassKg` during Max decomposition.
+ *      A part attributed to that module must not exceed the module's own
+ *      budget — that would imply the module is heavier than the entire
+ *      sub-system it belongs to.
+ *
+ *   3. **Cost ceiling — single component >80% of unit cost ceiling (warning).**
+ *      A single COTS component eating 80%+ of the stated unit cost ceiling
+ *      means the rest of the bill of materials cannot close at all.
+ *
+ *   4. **Module mass divergence — bill-of-materials sum vs module estimate >20%.**
+ *      Fang sizes modules; the bill of materials generator independently
+ *      estimates part masses. When these diverge by more than 20% for a given
+ *      module, one of the two sources is wrong and the PDF would report
+ *      contradictory mass figures.
+ *
+ * @param parts         Merged bill of materials parts from the expansion stage.
+ * @param modules       Module list from Max's decomposition (for per-module budgets and mass divergence).
+ * @param totalMassBudgetKg  Programme-level assembly mass budget from the design brief (optional).
+ * @param unitCostCeilingGbp Founder's stated unit cost ceiling from the design brief (optional).
+ *
+ * @returns A structured result with all flags raised, ready for logging and PDF annotation.
+ */
+export function detectBomOutliers(
+    parts: Array<{
+        partNumber: string
+        name: string
+        massKg?: number | null
+        estimatedUnitCostGbp?: number | null
+        sourceModuleId?: string | null
+    }>,
+    modules: Array<{
+        id: string
+        name: string
+        estimatedMassKg?: number | null
+    }>,
+    totalMassBudgetKg?: number | null,
+    unitCostCeilingGbp?: number | null,
+): BomOutlierResult {
+    const flags: BomOutlierFlag[] = []
+
+    // ── Check 1 & 2: per-component mass vs total and module budgets ──
+
+    // Build a module id → estimated mass lookup for check 2.
+    const moduleEstimatedMass = new Map<string, number>()
+    for (const m of modules) {
+        if (typeof m.estimatedMassKg === "number" && m.estimatedMassKg > 0) {
+            moduleEstimatedMass.set(m.id, m.estimatedMassKg)
+        }
+    }
+
+    for (const part of parts) {
+        const massKg = typeof part.massKg === "number" && Number.isFinite(part.massKg) && part.massKg > 0
+            ? part.massKg
+            : null
+        if (massKg === null) continue
+
+        // Check 1: single component vs total assembly mass budget.
+        if (typeof totalMassBudgetKg === "number" && totalMassBudgetKg > 0) {
+            if (massKg > totalMassBudgetKg) {
+                flags.push({
+                    checkId: "COMPONENT_EXCEEDS_TOTAL_MASS_BUDGET_100PCT",
+                    severity: "error",
+                    partNumber: part.partNumber,
+                    observedValue: massKg,
+                    thresholdValue: totalMassBudgetKg,
+                    message:
+                        `Mass error: component "${part.name}" (${part.partNumber}) has a mass of ` +
+                        `${massKg.toFixed(2)} kg which exceeds the entire programme assembly mass ` +
+                        `budget of ${totalMassBudgetKg.toFixed(2)} kg. ` +
+                        `A single component cannot be heavier than the complete product. ` +
+                        `The mass figure for this component is almost certainly a scale error ` +
+                        `(for example, grams mistakenly entered as kilograms, or a sub-system ` +
+                        `total used instead of a part-level value). Regenerate the bill of ` +
+                        `materials and verify this component's mass against industry-standard ` +
+                        `references for its material and form factor.`,
+                })
+            } else if (massKg > totalMassBudgetKg * 0.5) {
+                flags.push({
+                    checkId: "COMPONENT_EXCEEDS_TOTAL_MASS_BUDGET_50PCT",
+                    severity: "warning",
+                    partNumber: part.partNumber,
+                    observedValue: massKg,
+                    thresholdValue: totalMassBudgetKg * 0.5,
+                    message:
+                        `Mass warning: component "${part.name}" (${part.partNumber}) accounts for ` +
+                        `${((massKg / totalMassBudgetKg) * 100).toFixed(1)}% of the programme ` +
+                        `assembly mass budget (${massKg.toFixed(2)} kg of ${totalMassBudgetKg.toFixed(2)} kg). ` +
+                        `A single component consuming more than 50% of the total mass budget ` +
+                        `is unusual and may indicate a scale error. Verify this figure before ` +
+                        `using it in a supplier or investor presentation.`,
+                })
+            }
+        }
+
+        // Check 2: single component vs its parent module's mass budget.
+        const modId = part.sourceModuleId
+        if (typeof modId === "string" && modId.length > 0) {
+            const moduleBudget = moduleEstimatedMass.get(modId)
+            if (typeof moduleBudget === "number" && moduleBudget > 0 && massKg > moduleBudget) {
+                const modName = modules.find((m) => m.id === modId)?.name ?? modId
+                flags.push({
+                    checkId: "COMPONENT_EXCEEDS_MODULE_MASS_BUDGET",
+                    severity: "error",
+                    partNumber: part.partNumber,
+                    moduleId: modId,
+                    observedValue: massKg,
+                    thresholdValue: moduleBudget,
+                    message:
+                        `Mass error: component "${part.name}" (${part.partNumber}) has a mass of ` +
+                        `${massKg.toFixed(2)} kg which exceeds the entire estimated mass of its ` +
+                        `parent module "${modName}" (${moduleBudget.toFixed(2)} kg). ` +
+                        `A single part cannot be heavier than the sub-system it belongs to. ` +
+                        `This is almost certainly a scale error — verify the component mass ` +
+                        `against the module-level mass budget before proceeding.`,
+                })
+            }
+        }
+    }
+
+    // ── Check 3: per-component cost vs unit cost ceiling ──
+
+    if (typeof unitCostCeilingGbp === "number" && unitCostCeilingGbp > 0) {
+        const warnThreshold = unitCostCeilingGbp * 0.8
+        for (const part of parts) {
+            const cost = typeof part.estimatedUnitCostGbp === "number" && Number.isFinite(part.estimatedUnitCostGbp)
+                ? part.estimatedUnitCostGbp
+                : null
+            if (cost === null || cost <= 0) continue
+
+            if (cost > warnThreshold) {
+                flags.push({
+                    checkId: "COMPONENT_EXCEEDS_COST_CEILING_80PCT",
+                    severity: "warning",
+                    partNumber: part.partNumber,
+                    observedValue: cost,
+                    thresholdValue: warnThreshold,
+                    message:
+                        `Cost warning: component "${part.name}" (${part.partNumber}) costs ` +
+                        `£${cost.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} — ` +
+                        `${((cost / unitCostCeilingGbp) * 100).toFixed(1)}% of the stated unit cost ` +
+                        `ceiling of £${unitCostCeilingGbp.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}. ` +
+                        `A single component consuming 80% or more of the entire programme cost ` +
+                        `ceiling leaves insufficient budget for the remaining bill of materials. ` +
+                        `Review whether this part can be substituted with a lower-cost alternative, ` +
+                        `or revise the stated cost ceiling to reflect realistic system economics.`,
+                })
+            }
+        }
+    }
+
+    // ── Check 4: module-level mass divergence (bill-of-materials sum vs module estimate) ──
+
+    // Build a module id → name lookup.
+    const moduleNameMap = new Map<string, string>(modules.map((m) => [m.id, m.name]))
+
+    // Sum bill-of-materials part masses per module.
+    const bomMassByModule = new Map<string, number>()
+    for (const part of parts) {
+        const modId = part.sourceModuleId
+        if (typeof modId !== "string" || modId.length === 0) continue
+        const massKg = typeof part.massKg === "number" && Number.isFinite(part.massKg) ? part.massKg : 0
+        bomMassByModule.set(modId, (bomMassByModule.get(modId) ?? 0) + massKg)
+    }
+
+    for (const [modId, moduleBudget] of moduleEstimatedMass) {
+        const bomSum = bomMassByModule.get(modId)
+        // Only check when the bill of materials has at least one mass-carrying part for this module.
+        if (typeof bomSum !== "number" || bomSum === 0) continue
+
+        const divergence = Math.abs(bomSum - moduleBudget) / Math.max(bomSum, moduleBudget)
+        if (divergence > 0.20) {
+            const modName = moduleNameMap.get(modId) ?? modId
+            flags.push({
+                checkId: "MODULE_BOM_MASS_DIVERGENCE",
+                severity: "warning",
+                moduleId: modId,
+                observedValue: bomSum,
+                thresholdValue: moduleBudget,
+                message:
+                    `Mass divergence: module "${modName}" has an estimated mass of ` +
+                    `${moduleBudget.toFixed(2)} kg from the sizing stage, but the sum of ` +
+                    `bill-of-materials part masses for this module totals ${bomSum.toFixed(2)} kg ` +
+                    `(a ${(divergence * 100).toFixed(1)}% divergence). ` +
+                    `The sizing specialist and the bill-of-materials generator have produced ` +
+                    `inconsistent figures. Whichever is wrong will cause the programme mass ` +
+                    `budget to appear misleading. Verify part-level masses against the ` +
+                    `module-level mass estimate.`,
+            })
+        }
+    }
+
+    // ── Sort: errors before warnings ──
+    flags.sort((a, b) => {
+        if (a.severity === b.severity) return 0
+        return a.severity === "error" ? -1 : 1
+    })
+
+    const hasErrors = flags.some((f) => f.severity === "error")
+    const hasAnyFlag = flags.length > 0
+
+    const logLine = hasAnyFlag
+        ? flags
+              .map((f) => `[bom-outlier] ${f.severity.toUpperCase()} check=${f.checkId} part=${f.partNumber ?? "-"} module=${f.moduleId ?? "-"} observed=${f.observedValue?.toFixed(2) ?? "-"} threshold=${f.thresholdValue?.toFixed(2) ?? "-"}`)
+              .join("\n")
+        : "[bom-outlier] PASS — no mass or cost outliers detected"
+
+    return { hasErrors, hasAnyFlag, flags, logLine }
+}
+
 // ---- Chemistry/spec reconciliation prompt builder ------------------
 
 /**
