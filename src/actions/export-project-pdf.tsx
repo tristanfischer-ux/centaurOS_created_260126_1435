@@ -59,6 +59,7 @@ import { checkMirrorParity } from "@/lib/bom/mirror-parity"
 import { buildSpendSummary, SPEND_BY_SUPPLIER_CONSTANTS } from "@/lib/bom/spend-by-supplier"
 import { applyBomCostFallback } from "@/lib/cad-lab/bom-cost-fallback"
 import { promoteSupplierScore } from "@/lib/cad-lab/supplier-strong-fit-promotion"
+import { detectIndustryDomain } from "@/lib/cad-lab/industry-domains"
 import {
     anyRiskMatrixIsBoilerplate,
     inferOwnerByDiscipline,
@@ -478,11 +479,25 @@ const TELEMETRY_LEAK_LINE_PATTERNS: ReadonlyArray<RegExp> = [
 ]
 
 const SCRATCH_PROMPT_INDICATORS: ReadonlyArray<RegExp> = [
+    // Pre-existing patterns (HYPERTAC LIMITED catastrophe, Loop 7 p.56)
     /\bWe need to produce a single sentence\b/i,
     /\bd\d+\s*words?,?\s*specific to the project\b/i,
     /\bSo we need to infer what\b.*\blikely brings\b/i,
     /\bThe supplier is .{1,40},\s*but no description\b/i,
     /\bMatch this STYLE and DEPTH\b/i,
+    // Loop 26 patterns: DeepSeek V4-Flash reasoning traces leaking via `content`
+    // Observed on nolato.com, Hedgerow PDF p.92 — full chain-of-thought visible
+    // to the founder because the model wrote its working before its answer.
+    /\bWe are asked to (write|produce|generate)\b/i,
+    /\bThe user (says|mentions|notes|states)\b/i,
+    /\bno description on file for\b/i,
+    /\bSo we need to infer what\b/i,
+    /\bLet me (think|consider|check|look)\b/i,
+    /\bI need to (write|produce|generate|find|check)\b/i,
+    /\bFirst[,.]?\s+(let'?s|i'?ll|we)\b/i,
+    /\bBased on (this|the above|what)\b/i,
+    /\bLooking at (this|the|what)\b/i,
+    /\b(But|However),?\s+\w+\s+(are|is)\s+not\s+(their|a)\s+(typical|usual|primary|core)\b/i,
 ]
 
 function cleanReviewText(raw: string | null | undefined): string {
@@ -847,6 +862,14 @@ interface PdfInput {
         costMismatchPct: number | null
     }
     suppliers: SupplierPdf[]
+    /**
+     * Council fix 4A (2026-04-29): directory bias disclosure.
+     * When the supplier directory has fewer than 10 entries in the project's
+     * detected industry domain, this field contains a disclosure note that
+     * the PDF renders as a yellow banner in the supplier section. Null means
+     * directory coverage is adequate (>= 10 entries) or could not be assessed.
+     */
+    supplierDirectoryCoverageNote: string | null
     auditLog: AuditRowPdf[]
     /** Loop 8 G1 (QC-GATES.md): deterministic numerical-consistency
      *  reconciliation. Populated server-side from the same `data` the
@@ -938,7 +961,7 @@ interface PdfInput {
         status: "green" | "amber" | "red"
         ranAtIso: string
         fails: Array<{
-            axis: "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency" | "decomposition_gaps"
+            axis: "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency" | "decomposition_gaps" | "data_completeness"
             severity: "blocker" | "warning"
             summary: string
             evidence: string
@@ -1029,6 +1052,16 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                     <Text style={styles.coverGridLabel}>Document generated</Text>
                     <Text style={styles.coverGridValue}>{fmtDateTime(data.generatedAtIso)}</Text>
                 </View>
+
+                {/* Fix 5A — council 4/6 (GPT-5.5 + Gemini + DeepSeek + Kimi):
+                    feasibility verdict prominence on cover. The RED/AMBER/GREEN
+                    verdict was only visible on the Feasibility Exception page
+                    deep inside the PDF. Founders missed it. Colour-coded badge
+                    + top 3 blockers on the cover ensures the first thing a
+                    reader sees is whether the design is feasible. */}
+                {data.feasibilityVerdict && (
+                    <FeasibilityCoverBadge verdict={data.feasibilityVerdict} />
+                )}
 
                 {/* System illustration (or honest placeholder).
                     Prefer the interior-exploded hero when present — the
@@ -1312,6 +1345,121 @@ const VERDICT_COLORS = {
     green: { bg: "#dcfce7", border: "#15803d", text: "#14532d", label: "GREEN" },
     unreviewed: { bg: "#f3f4f6", border: "#6b7280", text: "#374151", label: "UNREVIEWED" },
 } as const
+
+/**
+ * Fix 5A — council 4/6 (GPT-5.5 + Gemini + DeepSeek + Kimi): prominent
+ * feasibility verdict badge on the cover page.
+ *
+ * Previously the verdict was buried on the Feasibility Exception page deep
+ * inside the PDF. Founders missed it. This component renders a large,
+ * colour-coded badge (RED/AMBER/GREEN) with the top 3 blocking findings
+ * directly on the cover so the first thing any reader sees is whether the
+ * design is feasible.
+ */
+function FeasibilityCoverBadge({
+    verdict,
+}: {
+    verdict: NonNullable<PdfInput["feasibilityVerdict"]>
+}): React.ReactElement {
+    const phantom = verdict.status === "green" && verdict.checkedConstraints.length === 0
+    const effectiveStatus = phantom ? "unreviewed" : verdict.status
+    const theme = VERDICT_COLORS[effectiveStatus as keyof typeof VERDICT_COLORS] ?? VERDICT_COLORS.unreviewed
+
+    // Top 3 blockers for RED/AMBER — gives the reader immediate context
+    const topBlockers = verdict.fails
+        .filter((f) => f.severity === "blocker")
+        .slice(0, 3)
+    const topWarnings = topBlockers.length === 0
+        ? verdict.fails.filter((f) => f.severity === "warning").slice(0, 3)
+        : []
+    const topFindings = topBlockers.length > 0 ? topBlockers : topWarnings
+
+    return (
+        <View
+            style={{
+                marginTop: 18,
+                marginBottom: 4,
+                padding: 14,
+                borderRadius: 6,
+                backgroundColor: theme.bg,
+                borderWidth: 2,
+                borderColor: theme.border,
+            }}
+            wrap={false}
+        >
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                <View
+                    style={{
+                        backgroundColor: theme.border,
+                        paddingHorizontal: 10,
+                        paddingVertical: 4,
+                        borderRadius: 4,
+                    }}
+                >
+                    <Text
+                        style={{
+                            fontSize: 14,
+                            fontWeight: "bold",
+                            color: "white",
+                            letterSpacing: 1,
+                        }}
+                    >
+                        {theme.label}
+                    </Text>
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: "bold", color: theme.text }}>
+                    {effectiveStatus === "red"
+                        ? "Feasibility — blockers found"
+                        : effectiveStatus === "amber"
+                            ? "Feasibility — warnings found"
+                            : effectiveStatus === "green"
+                                ? "Feasibility — all checks passed"
+                                : "Feasibility — not yet reviewed"}
+                </Text>
+            </View>
+            {topFindings.length > 0 && (
+                <View style={{ marginTop: 8 }}>
+                    {topFindings.map((f, idx) => (
+                        <View
+                            key={idx}
+                            style={{
+                                flexDirection: "row",
+                                marginBottom: 3,
+                                paddingLeft: 4,
+                            }}
+                        >
+                            <Text style={{ width: 10, fontSize: 9, color: theme.text }}>
+                                •
+                            </Text>
+                            <Text
+                                style={{
+                                    flex: 1,
+                                    fontSize: 9,
+                                    color: theme.text,
+                                    lineHeight: 1.4,
+                                }}
+                            >
+                                {f.summary}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {effectiveStatus === "green" && (
+                <Text
+                    style={{
+                        fontSize: 8.5,
+                        color: theme.text,
+                        marginTop: 6,
+                        opacity: 0.8,
+                    }}
+                >
+                    {`${verdict.checkedConstraints.length} constraint${verdict.checkedConstraints.length === 1 ? "" : "s"} evaluated: ${verdict.checkedConstraints.join(", ")}.`}
+                </Text>
+            )}
+        </View>
+    )
+}
 
 /**
  * Loop 24 P0 — Phantom-GREEN guard.
@@ -1670,6 +1818,8 @@ function axisLabel(axis: NonNullable<PdfInput["feasibilityVerdict"]>["fails"][nu
             return "Cross-section consistency"
         case "decomposition_gaps":
             return "Module decomposition — completeness"
+        case "data_completeness":
+            return "Data completeness"
     }
 }
 
@@ -5931,6 +6081,33 @@ async function exportProjectPdfInternal(
             // model changes is a manual sync — caveat acknowledged.
             bomModel: "Claude Opus 4.7",
             bomProvider: "Anthropic",
+        }
+
+        // Council fix 4A (2026-04-29): supplier directory bias disclosure.
+        // Detect the project's industry domain and count how many
+        // marketplace_listings have matching industry tags. If fewer than
+        // 10, the shortlist was drawn from a thin directory and the PDF
+        // should tell the founder.
+        const SUPPLIER_COVERAGE_THRESHOLD = 10
+        let supplierDirectoryCoverageNote: string | null = null
+        {
+            const subjectForDomain = typeof project.subject === "string" ? project.subject : ""
+            const detectedDomain = detectIndustryDomain(subjectForDomain)
+            if (detectedDomain && detectedDomain !== "general") {
+                // Query marketplace_listings with an ilike on the
+                // industries JSONB array. The column stores an array of
+                // industry tags; we search for the domain keyword.
+                const { count: domainCount } = await admin
+                    .from("marketplace_listings")
+                    .select("id", { count: "exact", head: true })
+                    .in("category", ["Products", "Services"])
+                    .ilike("industries", `%${detectedDomain}%`)
+                if (typeof domainCount === "number" && domainCount < SUPPLIER_COVERAGE_THRESHOLD) {
+                    const domainLabel = detectedDomain.replace(/_/g, " ")
+                    supplierDirectoryCoverageNote =
+                        `Supplier shortlist drawn from a directory with limited coverage in ${domainLabel} (${domainCount} entries). Results may not reflect the full market.`
+                }
+            }
         }
 
         // Audit log rows. The dedicated audit_log table isn't yet

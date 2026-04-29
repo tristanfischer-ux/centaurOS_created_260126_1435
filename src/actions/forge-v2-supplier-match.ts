@@ -118,8 +118,18 @@ async function synthesizeSupplierForProject(
         const t = raw.trim().replace(/^["']|["']$/g, "")
         if (t.length < 10) return null
         // Prompt-leak markers — phrases the model only emits when it's echoing
-        // the instructions back instead of answering them.
+        // the instructions back instead of answering them, OR when a DeepSeek
+        // reasoning model has leaked its chain-of-thought into `content`.
+        //
+        // Loop 26 critique (Nolato, Hedgerow p.92): DeepSeek V4-Flash emitted
+        // its internal reasoning trace verbatim in `content` — "We are asked to
+        // write one sentence about Nolato as a supplier for a specific BOM part.
+        // The user says no description on file for Nolato. So we need to infer
+        // what Nolato brings..." — because the model treated the task as a
+        // reasoning problem and wrote its working before the answer. The
+        // patterns below catch this class of reasoning-trace leak.
         const LEAK_PATTERNS = [
+            // Pre-existing prompt-echo guards
             /\bwe need to write\b/i,
             /\bsentence must\b/i,
             /\bthe (supplier|founder) (description|brief) is\b/i,
@@ -128,6 +138,19 @@ async function synthesizeSupplierForProject(
             /^supplier:\s/im,
             /^matched bom parts:/im,
             /^(prompt|instructions?|system):/im,
+            // Loop 26: reasoning-trace patterns from DeepSeek thinking aloud
+            /\bwe are asked to (write|produce|generate)\b/i,
+            /\bthe user (says|mentions|notes|states)\b/i,
+            /\bso we need to infer\b/i,
+            /\bno description on file\b/i,
+            /\blet me (think|consider|check|look)\b/i,
+            /\bi need to (write|produce|generate|find|check)\b/i,
+            /\bfirst[,.]?\s+(let'?s|i'?ll|we)\b/i,
+            /\bthe question (is|asks)\b/i,
+            /\bbased on (this|the above|what)\b/i,
+            /\blooking at (this|the|what)\b/i,
+            /\bare (not|typically|known for|a)\s+their\s+(typical|usual|main|primary)\b/i,
+            /\bbut\s+\w+\s+are\s+not\s+(their|a)\s+(typical|usual|primary|core)\b/i,
         ]
         if (LEAK_PATTERNS.some((re) => re.test(t))) return null
         if (t.length > 350) {
@@ -138,12 +161,21 @@ async function synthesizeSupplierForProject(
         return t
     }
 
+    // W23 guard: suppressReasoningFallback=true prevents DeepSeek V4's
+    // reasoning_content from reaching the PDF even if `content` is empty.
+    // Supplier descriptions are prose, not structured extraction — a
+    // reasoning trace must never reach a user-visible field. Loop 26
+    // (Nolato, Hedgerow p.92): reasoning bled into `content` directly;
+    // the validate() patterns above catch that. This flag closes the
+    // separate path where `content` is empty and reasoning_content would
+    // be used as the fallback answer.
     const first = await callOpenRouter({
         model: CHEAP_STRUCTURED_MODEL,
         prompt,
         maxTokens: 256,
         temperature: 0.2,
         timeoutMs: 25_000,
+        suppressReasoningFallback: true,
     })
     const firstClean = first.ok ? validate(first.text) : null
     if (firstClean) return firstClean
@@ -167,6 +199,7 @@ async function synthesizeSupplierForProject(
         maxTokens: 256,
         temperature: 0,
         timeoutMs: 25_000,
+        suppressReasoningFallback: true,
     })
     const retryClean = retry.ok ? validate(retry.text) : null
     if (retryClean) return retryClean
