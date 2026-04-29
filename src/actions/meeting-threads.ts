@@ -1184,6 +1184,13 @@ export async function resetAudioForRetry(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { ok: false, error: 'Not authenticated' }
 
+  // T5a fix: explicitly include 'generating' in the status filter.
+  // Rows stuck at 'generating' (Vercel container killed mid-TTS) could never
+  // be reclaimed by generateSessionAudio whose atomic claim only accepts
+  // 'pending' or 'failed'. The user clicked Retry, so we are authoritative —
+  // permissively reset any non-terminal status (pending, failed, generating).
+  // 'ready' and 'refused_too_long' are intentionally excluded so Retry on a
+  // successfully-completed row is a no-op.
   const { error } = await supabase
     .from('meeting_threads')
     .update({
@@ -1193,6 +1200,7 @@ export async function resetAudioForRetry(
     })
     .eq('id', threadId)
     .eq('author_user_id', user.id)
+    .in('audio_status', ['pending', 'failed', 'generating'])
 
   if (error) {
     console.error('[MeetingThreads] resetAudioForRetry failed:', { threadId, error: error.message })

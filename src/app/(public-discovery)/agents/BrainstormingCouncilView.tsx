@@ -592,10 +592,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 })
                 if (startResult.threadId) {
                     liveThreadId = startResult.threadId
-                    // Pin the threadId in URL so a back-nav can recover
+                    // Pin the threadId in URL so a back-nav can recover.
+                    // GOTCHA: router.replace() inside startTransition is
+                    // unreliable — Next.js App Router batches the navigation
+                    // update and may revert the URL on the next render when
+                    // searchParams (from the server) re-asserts. Use
+                    // window.history.replaceState directly: this is an
+                    // imperative, synchronous DOM update that Next.js does
+                    // not overwrite on re-render, matching how the Next.js
+                    // docs recommend pinning non-navigation URL state.
                     const params = new URLSearchParams(window.location.search)
                     params.set("session", liveThreadId)
-                    router.replace(`${pathname}?${params}`)
+                    window.history.replaceState(null, "", `${pathname}?${params}`)
                 }
             } catch {
                 // Non-fatal — proceed without persistence; session still runs in memory
@@ -788,11 +796,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 if (liveThreadId) {
                     const completeResult = await completeMeetingThread(liveThreadId)
                     if (completeResult.ok) {
-                        // Strip ?session= from URL now that the thread is complete
+                        // Strip ?session= from URL now that the thread is complete.
+                        // Use window.history.replaceState for the same reason as
+                        // the pin above — avoids App Router re-render reversion.
                         const params = new URLSearchParams(window.location.search)
                         params.delete("session")
                         const newUrl = params.toString() ? `${pathname}?${params}` : pathname
-                        router.replace(newUrl)
+                        window.history.replaceState(null, "", newUrl)
                     }
                 } else {
                     // Fallback: no liveThreadId — bulk-insert the whole session
@@ -863,12 +873,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         setGeneratedAudioUrl(null)
         setGeneratedAudioClips(null)
         setShowPicker(false)
-        // Strip ?session= from URL so the reset is clean
+        // Strip ?session= from URL so the reset is clean.
+        // Use window.history.replaceState — avoids App Router re-render reversion.
         const params = new URLSearchParams(window.location.search)
         if (params.has("session")) {
             params.delete("session")
             const newUrl = params.toString() ? `${pathname}?${params}` : pathname
-            router.replace(newUrl)
+            window.history.replaceState(null, "", newUrl)
         }
         // Return focus to the question input so the next question
         // is immediately ready to type without an extra click.
