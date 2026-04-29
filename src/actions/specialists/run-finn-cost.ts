@@ -41,6 +41,11 @@
  *   - BUDGET_NOT_CHECKABLE   — foundry tier / usage lookup threw
  *   - PROJECT_NOT_FOUND      — id doesn't exist
  *   - PROJECT_FORBIDDEN      — project belongs to a different foundry
+ *   - INFEASIBLE_DESIGN      — feasibility_verdict.passed === false (preflight oracle
+ *                              detected a physics violation) OR dimension_sheet.feasible
+ *                              === false (sizing solver could not fit the design). Cost
+ *                              numbers on physically impossible designs are meaningless
+ *                              so Finn refuses to run. Fix the physics first.
  *   - NO_BOM                 — modules empty OR every module's keyParts[] is empty
  *   - ESTIMATE_FAILED        — inner estimateModuleCostsAi returned success=false
  *   - SAVE_FAILED            — saveCadLabAiCostEstimates returned an error
@@ -194,7 +199,7 @@ async function runFinnCostInternal(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, modules, research, diagnostic_answers, product_overview",
+                "id, foundry_id, modules, research, diagnostic_answers, product_overview, feasibility_verdict, dimension_sheet",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -221,6 +226,90 @@ async function runFinnCostInternal(
                 ok: false,
                 error: "Project not found",
                 errorCode: "PROJECT_FORBIDDEN",
+            }
+        }
+
+        // 2a. Feasibility gate — block Finn on physically infeasible designs.
+        //
+        //     Council consensus (6/6 models, 2026-04-29): cost numbers on
+        //     physically impossible designs are hallucinated and mislead founders
+        //     (e.g. Vertical Farm 1870% over container volume → Finn reported a
+        //     10% cost overrun as if it were meaningful). The fix: refuse to run
+        //     when EITHER the preflight oracle OR the sizing solver has declared
+        //     the design infeasible.
+        //
+        //     Two independent infeasibility signals:
+        //       (a) feasibility_verdict.passed === false  — set by the preflight
+        //           oracle at brief-lock time when physics ceilings are breached.
+        //       (b) dimension_sheet.feasible === false    — set by Fang's sizing
+        //           solver when the dimensions cannot fit in the declared envelope.
+        //
+        //     DECISION: on infeasibility we SKIP (return INFEASIBLE_DESIGN) rather
+        //     than label outputs "indicative only". A labelled number anchors the
+        //     founder on a figure that is geometrically impossible — eroding trust
+        //     more than a clean refusal. The UI routes them to fix the physics
+        //     first, then re-run Finn.
+        //
+        //     LEGACY PROJECTS: if both columns are null (project pre-dates the
+        //     preflight oracle / sizing solver), we allow Finn to run rather than
+        //     silently block all existing projects. A null verdict is NOT the same
+        //     as a FAILED verdict.
+        //
+        //     CONFLICT: if verdicts disagree (oracle passed but sizing failed or
+        //     vice versa), we take the stricter signal and block.
+        {
+            const feasibilityVerdict = (project.feasibility_verdict as {
+                passed?: boolean
+                blockers?: Array<{ axis?: string; explanation?: string }>
+                domain?: string
+            } | null) ?? null
+
+            const dimensionSheet = (project.dimension_sheet as {
+                feasible?: boolean
+                conflicts?: string[]
+            } | null) ?? null
+
+            // Check both signals — block on any hard infeasibility.
+            const oracleFailed =
+                feasibilityVerdict !== null && feasibilityVerdict.passed === false
+            const solverFailed =
+                dimensionSheet !== null && dimensionSheet.feasible === false
+
+            if (oracleFailed || solverFailed) {
+                // Build a human-readable summary from whichever signal fired.
+                const reasonParts: string[] = []
+
+                if (oracleFailed && feasibilityVerdict?.blockers?.length) {
+                    const oracleBlockers = feasibilityVerdict.blockers
+                        .filter((b) => b.explanation)
+                        .map((b) => b.explanation!)
+                        .slice(0, 3)
+                        .join("; ")
+                    if (oracleBlockers) reasonParts.push(oracleBlockers)
+                }
+
+                if (solverFailed && dimensionSheet?.conflicts?.length) {
+                    const solverConflicts = dimensionSheet.conflicts
+                        .slice(0, 2)
+                        .join("; ")
+                    if (solverConflicts) reasonParts.push(solverConflicts)
+                }
+
+                const reason =
+                    reasonParts.length > 0
+                        ? reasonParts.join(" | ")
+                        : "The design does not pass physics checks. Resolve the sizing issues and re-run."
+
+                console.warn(
+                    `[run-finn-cost] blocking cost run on infeasible design: project=${projectId}`,
+                    `oracle_failed=${oracleFailed} solver_failed=${solverFailed}`,
+                )
+
+                return {
+                    ok: false,
+                    error: `Cost estimation skipped — the design is not physically feasible. ${reason}`,
+                    errorCode: "INFEASIBLE_DESIGN",
+                }
             }
         }
 
