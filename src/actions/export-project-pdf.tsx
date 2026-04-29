@@ -1490,7 +1490,7 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
                     </Text>
                     {data.oracleProjectBand.targetBelowLow && (
                         <Text style={{ fontSize: 9, color: "#78350f", marginTop: 2, fontStyle: "italic" }}>
-                            The cost overrun shown later in this report is the gap between the design&apos;s estimate and the brief&apos;s target — not an estimation error. Either the brief target needs revising upward or the scope needs cutting before this design is feasible at the stated unit cost.
+                            If the design&apos;s estimated cost (shown later in this report) exceeds your stated target, the gap reflects industry-typical build costs rather than an estimation error — review whether the brief target should be revised upward or whether the scope needs cutting. If the engine&apos;s estimate comes in within your target, treat that as a flag that your scope may be tighter than industry-typical for this class.
                         </Text>
                     )}
                 </View>
