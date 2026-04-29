@@ -226,6 +226,15 @@ async function runFangReviewInternal(
                     .select("id", { count: "exact", head: true })
                     .eq("cad_lab_project_id", projectId)
                 if (!projectParts || projectParts === 0) {
+                    // Write a REVIEW_SKIPPED tombstone so the module is visible
+                    // to the feasibility gate rather than silently absent.
+                    // Council fix — item 1 (6/6, 2026-04-29).
+                    await saveFangReviewSkippedTombstone(
+                        projectId,
+                        moduleId,
+                        foundryId,
+                        "no bill of materials parts found — generate bill of materials first",
+                    )
                     return {
                         ok: false,
                         error: "This module has no parts yet — generate BOM first so Fang has something to review.",
@@ -339,6 +348,15 @@ async function runFangReviewInternal(
 
             if ("error" in reviewResult) {
                 await failPipelineRun(runId, "REVIEW_FAILED", reviewResult.error)
+                // Write a REVIEW_SKIPPED tombstone so the feasibility gate sees
+                // this module as explicitly skipped rather than silently absent.
+                // Council fix — item 1 (6/6, 2026-04-29).
+                await saveFangReviewSkippedTombstone(
+                    projectId,
+                    moduleId,
+                    foundryId,
+                    `specialist review failed: ${reviewResult.error}`,
+                )
                 return {
                     ok: false,
                     runId,
@@ -450,6 +468,15 @@ async function runFangReviewInternal(
                     runId,
                     "SAVE_FAILED",
                     "Fang produced a review but it couldn't be persisted — check Postgres logs.",
+                )
+                // Write a REVIEW_SKIPPED tombstone: the review ran but failed
+                // to persist. The feasibility gate sees an explicit skip rather
+                // than a silent absence. Council fix — item 1 (6/6, 2026-04-29).
+                await saveFangReviewSkippedTombstone(
+                    projectId,
+                    moduleId,
+                    foundryId,
+                    "review was produced but could not be persisted — check Postgres logs",
                 )
                 return {
                     ok: false,
@@ -596,6 +623,38 @@ async function runFangReviewInternal(
                 )
             }
 
+            // Loop 26 P0 — Bug A: Fail-closed on double-empty review.
+            //
+            // INTENT: When Fang returns 0 issues, we retry once. If the retry
+            // also produces 0 issues AND the verdict is not explicitly "pass"
+            // (i.e. Fang didn't perform a thorough check and conclude no
+            // concerns), we must NOT stamp the pipeline run as "done" — a
+            // "done" row with empty data causes the idempotency guard to treat
+            // the module as terminal, and the feasibility gate never sees the
+            // module as missing coverage. Call failPipelineRun instead so the
+            // retry counter in runFangReviewsForAllModules can cap re-attempts
+            // and the proofreader sees the module as unreviewed.
+            const isDoubleEmpty =
+                retryAttempted &&
+                finalReview.issues.length === 0 &&
+                finalReview.verdict !== "pass"
+            if (isDoubleEmpty) {
+                console.warn(
+                    `[run-fang-review] double-empty review for module=${moduleId} — failing pipeline run (EMPTY_REVIEW_AFTER_RETRY) so coverage gate catches this`,
+                )
+                await failPipelineRun(
+                    runId,
+                    "EMPTY_REVIEW_AFTER_RETRY",
+                    "Fang returned an empty review after one retry — module has not been validated.",
+                )
+                return {
+                    ok: false,
+                    runId,
+                    error: "Fang returned an empty review after one retry — module has not been validated.",
+                    errorCode: "EMPTY_REVIEW_AFTER_RETRY",
+                }
+            }
+
             await completePipelineRun(runId, {
                 output_ref: {
                     table: "cad_lab_projects",
@@ -611,7 +670,7 @@ async function runFangReviewInternal(
                     // Loop 24 P0: surface retry metadata so ops can track
                     // how often modules need a second attempt.
                     retryAttempted,
-                    doubleEmpty: retryAttempted && finalReview.issues.length === 0,
+                    doubleEmpty: false, // always false here — double-empty path returns early above
                 },
             })
 
@@ -632,6 +691,16 @@ async function runFangReviewInternal(
                     failErr instanceof Error ? failErr.message : failErr,
                 )
             }
+            // Write a REVIEW_SKIPPED tombstone so the feasibility gate surfaces
+            // this module as explicitly skipped rather than silently absent.
+            // Council fix — item 1 (6/6, 2026-04-29). Non-fatal — this is
+            // already inside a catch block; swallow any tombstone failure.
+            await saveFangReviewSkippedTombstone(
+                projectId,
+                moduleId,
+                foundryId,
+                `unexpected error during review: ${message}`,
+            ).catch(() => undefined)
             return {
                 ok: false,
                 runId,
@@ -893,6 +962,107 @@ async function saveFangReviewDirect(
     }
 
     return true
+}
+
+/**
+ * Writes a REVIEW_SKIPPED tombstone into `cad_lab_projects.reviews[moduleId]`
+ * so that modules which fail early-exit paths (MODULE_NO_PARTS, REVIEW_FAILED,
+ * INTERNAL, etc.) are visible to the proofreader and feasibility gate rather
+ * than silently absent.
+ *
+ * Council fix — item 1 (6/6 frontier models, 2026-04-29): the root cause of
+ * safety-critical modules being silently passed was that every early-exit
+ * path returned `{ok: false}` without writing to the reviews JSONB. The
+ * proofreader only iterates modules that HAVE review entries, so a module
+ * that hit MODULE_NO_PARTS was invisible — counted neither reviewed nor
+ * skipped — and the feasibility gate had no signal to block on.
+ *
+ * The tombstone uses a non-standard `_reviewSkipped: true` annotation (same
+ * pattern as `_retryAttempted`) because `ReviewVerdict` is a closed union.
+ * The proofreader's `hasSuccessfulReview` check explicitly rejects tombstones
+ * so they propagate into `unreviewedModules` as "review was skipped: <reason>".
+ *
+ * Non-fatal: failure to write the tombstone is logged but does not change
+ * the caller's error code — the module still shows up as unreviewed in
+ * the proofreader's manifest check (the JSONB absence path), which produces
+ * the correct blocking verdict regardless.
+ */
+export async function saveFangReviewSkippedTombstone(
+    projectId: string,
+    moduleId: string,
+    foundryId: string,
+    skipReason: string,
+): Promise<void> {
+    try {
+        const admin = createAdminClient()
+        const { data: row, error: readErr } = await admin
+            .from("cad_lab_projects")
+            .select("reviews")
+            .eq("id", projectId)
+            .eq("foundry_id", foundryId)
+            .maybeSingle()
+        if (readErr || !row) {
+            console.warn(
+                `[run-fang-review] saveFangReviewSkippedTombstone: pre-read failed for module=${moduleId}:`,
+                readErr?.message ?? "no row",
+            )
+            return
+        }
+
+        const existingReviews = (row.reviews as Record<string, SpecialistReview[]> | null) ?? {}
+        const forModule = existingReviews[moduleId] ?? []
+        // Do not overwrite an existing successful review.
+        const hasPriorSuccessful = forModule.some(
+            (r) => r.specialistId === SPECIALIST_ID &&
+                !(r as unknown as Record<string, unknown>)["_reviewSkipped"],
+        )
+        if (hasPriorSuccessful) return
+
+        // Remove any prior tombstone for this specialist so we don't duplicate.
+        const withoutOldFang = forModule.filter((r) => r.specialistId !== SPECIALIST_ID)
+
+        const tombstone: SpecialistReview = {
+            specialistId: SPECIALIST_ID,
+            specialistName: "Fang (VP Manufacturing)",
+            verdict: "fail",
+            summary: `Engineering review was skipped: ${skipReason}`,
+            issues: [],
+            recommendations: [],
+            calculations: [],
+            reviewMarkdown: "",
+            reviewedAt: new Date().toISOString(),
+            reviewTimeMs: 0,
+        }
+        // Attach the skip annotation so the proofreader can distinguish this
+        // tombstone from a genuine empty-pass review.
+        ;(tombstone as unknown as Record<string, unknown>)["_reviewSkipped"] = true
+        ;(tombstone as unknown as Record<string, unknown>)["_skipReason"] = skipReason
+
+        const mergedForModule = [...withoutOldFang, tombstone]
+        const nextReviews = { ...existingReviews, [moduleId]: mergedForModule }
+
+        const { error: writeErr } = await admin
+            .from("cad_lab_projects")
+            .update({ reviews: nextReviews as unknown as Database["public"]["Tables"]["cad_lab_projects"]["Row"]["reviews"] })
+            .eq("id", projectId)
+            .eq("foundry_id", foundryId)
+
+        if (writeErr) {
+            console.warn(
+                `[run-fang-review] saveFangReviewSkippedTombstone: write failed for module=${moduleId}:`,
+                writeErr.message,
+            )
+        } else {
+            console.info(
+                `[run-fang-review] REVIEW_SKIPPED tombstone written for module=${moduleId} reason="${skipReason}"`,
+            )
+        }
+    } catch (err) {
+        console.warn(
+            `[run-fang-review] saveFangReviewSkippedTombstone threw for module=${moduleId}:`,
+            err instanceof Error ? err.message : err,
+        )
+    }
 }
 
 /**

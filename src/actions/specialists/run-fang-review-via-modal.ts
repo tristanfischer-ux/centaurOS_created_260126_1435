@@ -153,6 +153,18 @@ export async function runFangReviewBackgroundViaModal(
                 .select("id", { count: "exact", head: true })
                 .eq("cad_lab_project_id", projectId)
             if (!projectParts || projectParts === 0) {
+                // Write a REVIEW_SKIPPED tombstone so the module is visible
+                // to the feasibility gate rather than silently absent.
+                // Council fix — item 1 (6/6, 2026-04-29).
+                const { saveFangReviewSkippedTombstone } = await import(
+                    "@/actions/specialists/run-fang-review"
+                )
+                await saveFangReviewSkippedTombstone(
+                    projectId,
+                    moduleId,
+                    foundryId,
+                    "no bill of materials parts found — generate bill of materials first",
+                )
                 return {
                     ok: false,
                     error:
@@ -390,12 +402,33 @@ Include these in your recommendations section with the prefix "ASSEMBLY:" so the
         const saveOk = await saveFangReviewDirect(projectId, moduleId, foundryId, review)
         if (!saveOk) {
             await failPipelineRun(runId, "SAVE_FAILED", "Fang produced a review but it could not be persisted")
+            // Council fix — item 1 (6/6, 2026-04-29): write tombstone on save failure
+            // so the feasibility gate surfaces this as explicitly skipped.
+            const { saveFangReviewSkippedTombstone } = await import(
+                "@/actions/specialists/run-fang-review"
+            )
+            await saveFangReviewSkippedTombstone(
+                projectId,
+                moduleId,
+                foundryId,
+                "review was produced but could not be persisted — check Postgres logs",
+            ).catch(() => undefined)
             return { ok: false, runId, error: "Fang's review couldn't be saved — try again in a moment.", errorCode: "SAVE_FAILED" }
         }
 
         const persisted = await loadFangReviewForModule(projectId, moduleId, foundryId)
         if (!persisted) {
             await failPipelineRun(runId, "SAVE_FAILED", "Fang review merged but read-back returned nothing")
+            // Council fix — item 1 (6/6, 2026-04-29): write tombstone on read-back failure.
+            const { saveFangReviewSkippedTombstone } = await import(
+                "@/actions/specialists/run-fang-review"
+            )
+            await saveFangReviewSkippedTombstone(
+                projectId,
+                moduleId,
+                foundryId,
+                "review was produced and saved but could not be read back — check Postgres logs",
+            ).catch(() => undefined)
             return { ok: false, runId, error: "Fang's review couldn't be saved — try again in a moment.", errorCode: "SAVE_FAILED" }
         }
 
@@ -503,6 +536,18 @@ Include these in your recommendations section with the prefix "ASSEMBLY:" so the
                 failErr instanceof Error ? failErr.message : failErr,
             )
         }
+        // Write a REVIEW_SKIPPED tombstone so the feasibility gate surfaces
+        // this module as explicitly skipped rather than silently absent.
+        // Council fix — item 1 (6/6, 2026-04-29).
+        const { saveFangReviewSkippedTombstone } = await import(
+            "@/actions/specialists/run-fang-review"
+        )
+        await saveFangReviewSkippedTombstone(
+            projectId,
+            moduleId,
+            foundryId,
+            `unexpected error during review via Modal: ${message}`,
+        ).catch(() => undefined)
         return {
             ok: false,
             runId,
