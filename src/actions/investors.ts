@@ -3596,3 +3596,115 @@ export async function getInvestorDirectoryStats(): Promise<InvestorDirectoryStat
     grantsByCountry,
   }
 }
+
+// ---------------------------------------------------------------------------
+// Phase 2 — Apex-outreach cross-project data (deep profiles + chunk evidence)
+// ---------------------------------------------------------------------------
+
+import { createApexClient, type ApexInvestorDeepProfile } from '@/lib/supabase/apex-client'
+
+/**
+ * Fetch the deep profile from apex-outreach for a given forge_capital_id.
+ * Returns null if bridge is unavailable, investor has no deep profile, or
+ * forge_capital_id is not set.
+ */
+export async function getInvestorDeepProfile(
+  forgeCapitalId: number | undefined
+): Promise<ApexInvestorDeepProfile | null> {
+  if (!forgeCapitalId) return null
+  const apex = createApexClient()
+  if (!apex) return null
+
+  const { data, error } = await apex
+    .from('investor_deep_profiles')
+    .select('investor_id, profile_json, updated_at')
+    .eq('investor_id', forgeCapitalId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[getInvestorDeepProfile] Query failed:', error.message)
+    return null
+  }
+
+  return data as ApexInvestorDeepProfile | null
+}
+
+// ---------------------------------------------------------------------------
+// Chunk evidence (§8 Source Evidence)
+// ---------------------------------------------------------------------------
+
+export interface ChunkEvidence {
+  chunk_text: string
+  page_url: string
+  chunk_index: number
+  cosine_similarity: number
+}
+
+export type GetChunkEvidenceResult =
+  | { ok: true; chunks: ChunkEvidence[]; indexing?: boolean }
+  | { ok: false; error: string }
+
+/**
+ * Fetch chunk-level website evidence for an investor from apex-outreach.
+ * Embeds the query text, then calls `match_chunks_for_investor` RPC on
+ * the apex-outreach database. Returns top N matching excerpts.
+ *
+ * When zero chunks match AND the investor has zero rows in
+ * `investor_page_chunks`, returns `indexing: true` (pages still being
+ * crawled/indexed).
+ */
+export async function getChunkEvidence(input: {
+  investorId: number
+  queryText: string
+  limit?: number
+}): Promise<GetChunkEvidenceResult> {
+  const { investorId, queryText, limit = 8 } = input
+
+  const apex = createApexClient()
+  if (!apex) {
+    return { ok: false, error: 'Apex-outreach bridge not configured' }
+  }
+
+  let vector: number[]
+  try {
+    vector = await embedQuery(queryText, { actionSlug: 'chunk-evidence' })
+  } catch {
+    return { ok: false, error: 'Could not embed query text' }
+  }
+
+  const { data, error } = await apex.rpc('match_chunks_for_investor', {
+    p_investor_id: investorId,
+    query_embedding: vector,
+    match_count: limit,
+    min_similarity: 0.0,
+  })
+
+  if (error) {
+    console.error('[getChunkEvidence] RPC failed:', error.message)
+    return { ok: false, error: error.message }
+  }
+
+  const chunks = ((data ?? []) as Array<{
+    chunk_text: string
+    page_url: string
+    chunk_index: number
+    cosine_similarity: number
+  }>).map((r) => ({
+    chunk_text: r.chunk_text,
+    page_url: r.page_url,
+    chunk_index: r.chunk_index,
+    cosine_similarity: r.cosine_similarity,
+  }))
+
+  if (chunks.length === 0) {
+    const { count } = await apex
+      .from('investor_page_chunks')
+      .select('id', { count: 'exact', head: true })
+      .eq('investor_id', investorId)
+    if (count === 0) {
+      return { ok: true, chunks: [], indexing: true }
+    }
+  }
+
+  return { ok: true, chunks }
+}

@@ -27,7 +27,7 @@ import {
   type ShortlistStage,
 } from '@/actions/investors'
 import { createClient } from '@/lib/supabase/server'
-import { createApexClient } from '@/lib/supabase/apex-client'
+import { createApexClient, type ApexInvestorDeepProfile } from '@/lib/supabase/apex-client'
 import { formatFundSize } from '@/lib/format'
 import type { InvestorTierAccess } from '@/actions/investors'
 import { KeyPeopleSection } from '../components/KeyPeopleSection'
@@ -45,6 +45,8 @@ import { CollapsibleSection } from './components/CollapsibleSection'
 import { PersonalisedInsight } from './components/PersonalisedInsight'
 import { FactStrip } from './components/FactStrip'
 import { RecentNewsBlock } from './components/RecentNewsBlock'
+import { DeepDossierContent } from './components/DeepDossierContent'
+import { SourceEvidence } from './components/SourceEvidence'
 import {
   ArrowLeft,
   Briefcase,
@@ -262,20 +264,20 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   // Apex-outreach enrichment: fetch deep profile (recent news, dossier) in
   // parallel with the rest of the page data. Graceful no-op when bridge is
   // unavailable (env vars missing) or the investor has no forge_capital_id.
-  async function fetchApexDeepProfile(): Promise<{ recentNews: string[]; deepProfile: Record<string, unknown> | null }> {
+  async function fetchApexDeepProfile(): Promise<{ recentNews: string[]; deepProfile: Record<string, unknown> | null; deepProfileUpdatedAt: string | undefined }> {
     const forgeCapId = attrs.forge_capital_id
-    if (!forgeCapId) return { recentNews: [], deepProfile: null }
+    if (!forgeCapId) return { recentNews: [], deepProfile: null, deepProfileUpdatedAt: undefined }
     const apex = createApexClient()
-    if (!apex) return { recentNews: [], deepProfile: null }
+    if (!apex) return { recentNews: [], deepProfile: null, deepProfileUpdatedAt: undefined }
     const { data } = await apex
       .from('investor_deep_profiles')
-      .select('profile_json')
+      .select('profile_json, updated_at')
       .eq('investor_id', forgeCapId)
       .maybeSingle()
-    if (!data?.profile_json) return { recentNews: [], deepProfile: null }
+    if (!data?.profile_json) return { recentNews: [], deepProfile: null, deepProfileUpdatedAt: undefined }
     const pj = data.profile_json as Record<string, unknown>
     const news = Array.isArray(pj.recent_news) ? (pj.recent_news as string[]) : []
-    return { recentNews: news, deepProfile: pj }
+    return { recentNews: news, deepProfile: pj, deepProfileUpdatedAt: data.updated_at ?? undefined }
   }
 
   const [contactResult, userSectorResult, coInvestorResult, apexResult] = await Promise.allSettled([
@@ -299,9 +301,9 @@ export default async function InvestorDetailPage({ params }: PageProps) {
     : {}
   const userSector = userSectorResult.status === 'fulfilled' ? userSectorResult.value : null
   const coInvestors = coInvestorResult.status === 'fulfilled' ? coInvestorResult.value.coInvestors : []
-  const { recentNews, deepProfile: apexDeepProfile } = apexResult.status === 'fulfilled'
+  const { recentNews, deepProfile: apexDeepProfile, deepProfileUpdatedAt } = apexResult.status === 'fulfilled'
     ? apexResult.value
-    : { recentNews: [] as string[], deepProfile: null }
+    : { recentNews: [] as string[], deepProfile: null, deepProfileUpdatedAt: undefined }
   const shortlistStage: ShortlistStage | null = shortlistResult.status === 'fulfilled'
     ? (shortlistResult.value[id] ?? null)
     : null
@@ -639,18 +641,17 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </LockedSection>
             )}
 
-            {/* §7 — Deep Dossier (Phase 2 placeholder) */}
-            <CollapsibleSection number={7} title="Deep Dossier" previewLines={2}>
-              <p className="text-sm text-muted-foreground italic">
-                Coming soon — a comprehensive deep dossier synthesising all intelligence on this investor will appear here in Phase 2.
-              </p>
+            {/* §7 — Deep Dossier */}
+            <CollapsibleSection number={7} title="Deep Dossier" previewLines={4}>
+              <DeepDossierContent
+                profile={apexDeepProfile as ApexInvestorDeepProfile['profile_json'] | null}
+                updatedAt={deepProfileUpdatedAt}
+              />
             </CollapsibleSection>
 
-            {/* §8 — Source Evidence (Phase 2 placeholder) */}
-            <CollapsibleSection number={8} title="Source Evidence" previewLines={2}>
-              <p className="text-sm text-muted-foreground italic">
-                Coming soon — source evidence with citations, links, and confidence scores will appear here in Phase 2.
-              </p>
+            {/* §8 — Source Evidence */}
+            <CollapsibleSection number={8} title="Source Evidence" previewLines={3}>
+              <SourceEvidence forgeCapitalId={attrs.forge_capital_id ?? undefined} />
             </CollapsibleSection>
 
             {/* ================================================================
