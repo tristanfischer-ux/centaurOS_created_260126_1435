@@ -38,6 +38,7 @@
  */
 
 import { callOpenRouter } from "@/lib/ai/openrouter"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // ─── Council model map — OpenRouter IDs keyed by specialist id ──────────────
 
@@ -98,6 +99,112 @@ const ROUND2_CLOSE_HEADER: Record<string, string> = {
     "vp-engineering":      "MERGE THIS WEEK:",
     "hiring-team":         "HIRE FOR THIS:",
     "legal-counsel":       "PROTECT THIS WEEK:",
+}
+
+// ─── Fiona grounding — FTS investor lookup ────────────────────────────────────
+
+/**
+ * Fetches up to 5 real UK investor names from marketplace_listing_pages
+ * whose scraped text matches the question via Postgres full-text search.
+ *
+ * Returns a compact KNOWN_FUNDS block (one line per fund) ready to inject
+ * into Fiona's system prompt. Returns an empty string when no relevant
+ * UK funds with cheque data are found — caller skips the block entirely.
+ *
+ * Runs inside getSpecialistRound1Response for fundraising-advisor only.
+ * Because the view fires all R1 calls in parallel (including Cal's framing),
+ * this 30 ms FTS call adds zero net latency: Fiona's LLM call is ~3–5 s.
+ *
+ * Reusable by Sage / Sal / Chase later — different grounding sources will
+ * need different helpers.
+ */
+async function getGroundedFundContext(question: string): Promise<string> {
+    try {
+        const supabase = createAdminClient()
+
+        // Step 1: FTS over marketplace_listing_pages for Finance category.
+        // Cast as never because match_listings_pages_fts was added after the
+        // last database.types.ts regeneration (same pattern as investors.ts).
+        const ftsResult = await (supabase as unknown as {
+            rpc: (
+                name: string,
+                args: Record<string, unknown>
+            ) => Promise<{
+                data: Array<{ listing_id: string }> | null
+                error: { message: string } | null
+            }>
+        }).rpc('match_listings_pages_fts', {
+            p_query: question,
+            p_category: 'Finance',
+            p_limit: 20,
+        })
+
+        if (ftsResult.error || !ftsResult.data || ftsResult.data.length === 0) {
+            return ''
+        }
+
+        const listingIds = ftsResult.data.map(r => r.listing_id)
+
+        // Step 2: Fetch the matching listings from marketplace_listings,
+        // filtering to UK-domiciled funds with cheque data in attributes.
+        const { data: listings, error: listingError } = await supabase
+            .from('marketplace_listings')
+            .select('id, title, description, country_iso, attributes')
+            .in('id', listingIds)
+            .eq('category', 'Finance')
+            .eq('country_iso', 'GB')
+            .limit(20)
+
+        if (listingError || !listings || listings.length === 0) {
+            return ''
+        }
+
+        // Step 3: Filter to rows that have cheque_range_gbp populated in
+        // attributes and a non-empty title (firm_name equivalent).
+        type ListingRow = {
+            id: string
+            title: string
+            description: string | null
+            country_iso: string | null
+            attributes: Record<string, unknown> | null
+        }
+        const qualified = (listings as ListingRow[]).filter(l => {
+            const attrs = l.attributes ?? {}
+            const cheque = attrs.cheque_range_gbp as { min?: number | null; max?: number | null } | null | undefined
+            return l.title && cheque && (cheque.min != null || cheque.max != null)
+        })
+
+        if (qualified.length === 0) {
+            return ''
+        }
+
+        // Step 4: Map each to a compact one-line summary. Cap at 5.
+        const lines: string[] = qualified.slice(0, 5).map(l => {
+            const attrs = l.attributes ?? {}
+            const cheque = attrs.cheque_range_gbp as { min?: number | null; max?: number | null } | null | undefined
+            const stageFocus = Array.isArray(attrs.stage_focus)
+                ? (attrs.stage_focus as string[]).slice(0, 2).join(', ')
+                : typeof attrs.stage_focus === 'string'
+                  ? attrs.stage_focus
+                  : 'stage unknown'
+            const minK = cheque?.min != null ? `£${Math.round(cheque.min / 1000)}K` : null
+            const maxK = cheque?.max != null ? `£${Math.round(cheque.max / 1000)}K` : null
+            const chequeStr = minK && maxK ? `${minK}–${maxK}` : (minK ?? maxK ?? 'cheque unspecified')
+            const thesis = typeof attrs.investment_thesis === 'string'
+                ? attrs.investment_thesis.trim().slice(0, 120)
+                : (l.description ?? '').trim().slice(0, 120)
+            return `- ${l.title} (${stageFocus}, ${chequeStr})${thesis ? ` — ${thesis}` : ''}`
+        })
+
+        const names = qualified.slice(0, 5).map(l => l.title).join(', ')
+        console.info(`[BrainstormCouncil] Grounded Fiona with ${lines.length} funds: ${names}`)
+
+        return lines.join('\n')
+    } catch (err) {
+        // Non-fatal — Fiona degrades gracefully to generic advice.
+        console.warn('[BrainstormCouncil] getGroundedFundContext failed (non-fatal):', String(err))
+        return ''
+    }
 }
 
 // ─── Specialist system prompts ───────────────────────────────────────────────
@@ -310,7 +417,22 @@ export async function getSpecialistRound1Response(
     if (!question?.trim()) return { ok: false, error: "Question is required" }
     const model = COUNCIL_MODEL_MAP[specialist.id] ?? "deepseek/deepseek-v4-flash"
     const modelLabel = COUNCIL_MODEL_LABEL[specialist.id] ?? "DeepSeek V4-Flash"
-    const system = getSpecialistSystemPrompt(specialist.id, specialist.name, specialist.title, question)
+    let system = getSpecialistSystemPrompt(specialist.id, specialist.name, specialist.title, question)
+
+    // ── Fiona grounding — inject real UK investor names to prevent hallucination
+    // Run FTS lookup in parallel with the LLM call: await it here because
+    // getGroundedFundContext is fast (~30 ms Postgres FTS) and must complete
+    // before we build the system prompt. Net latency impact is negligible
+    // because Fiona's LLM call (DeepSeek V4-Flash) takes 3–5 s — the FTS
+    // resolves long before the streaming response starts.
+    if (specialist.id === 'fundraising-advisor') {
+        const knownFunds = await getGroundedFundContext(question)
+        if (knownFunds) {
+            system +=
+                `\n\nThe following UK investors have public theses that may be relevant to this discussion. You may cite them BY NAME only if they actually fit the founder's situation. If none fit, do NOT name funds — speak generically about fund types and stages instead. Hallucinating fund names is a hard failure.\n\nKNOWN_FUNDS:\n${knownFunds}`
+        }
+    }
+
     const result = await callOpenRouter({
         model,
         system,
