@@ -8,8 +8,8 @@
  * SUPPLIER-DISCOVERY-PLAN.md. When a founder's project surfaces a
  * supplier gap (horticulture, HVAC, shipping container — domains the
  * existing 651-row directory has zero coverage of), this action asks
- * Claude Opus with the native web_search tool to find UK/EU suppliers
- * matching the gap, persists them as `suppliers` rows tagged
+ * Brave Search API + DeepSeek V4-Flash (via OpenRouter) to find UK/EU
+ * suppliers matching the gap, persists them as `suppliers` rows tagged
  * `verification_status = 'unverified-ai-discovery'`, and re-runs the
  * Chase matcher so the triggering project's shortlist refreshes.
  *
@@ -25,9 +25,9 @@
  *   - No admin promotion UI — added in V1
  *   - No two-witnesses auto-promotion — added in V1
  *
- * Vercel budget: one Opus web_search call (~60–90s) + up to 10 insert
- * statements + one re-match. Should fit in 300s. If it doesn't, the
- * plan's staged-runner pattern from autopilot is the next step.
+ * Vercel budget: 3 Brave Search calls (~5s total) + one DeepSeek
+ * V4-Flash call (~10-30s) + up to 10 insert statements + one re-match.
+ * Should fit comfortably in 120s.
  *
  * @related
  *   - Plan + red team: SUPPLIER-DISCOVERY-PLAN.md + REDTEAM.md
@@ -38,10 +38,8 @@
 
 import { createHash } from "node:crypto"
 
-import Anthropic from "@anthropic-ai/sdk"
-
 import { createAdminClient } from "@/lib/supabase/admin"
-import { getAnthropicKey } from "@/lib/ai/api-keys"
+import { callOpenRouter } from "@/lib/ai/openrouter"
 import { withAuth } from "@/lib/server-action-utils"
 import type { TrustedContext } from "@/lib/server-action-utils"
 import { matchSuppliersForProject } from "@/actions/forge-v2-supplier-match"
@@ -87,12 +85,8 @@ interface CandidateShape {
 
 // ─── Constants ─────────────────────────────────────────────────────────
 
-// COST TRIAL (2026-04-25): swap from claude-opus-4-7 → claude-sonnet-4-6.
-// Supplier discovery is web-search-grounded structured extraction — find
-// real companies that match the part shape, output JSON. Not a frontier-
-// reasoning task. ~5× cheaper. Web search itself does the heavy lifting;
-// the model just summarises + structures the result.
-const MODEL = "claude-sonnet-4-6"
+const DISCOVERY_MODEL = "deepseek/deepseek-v4-flash"
+const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
 const DAILY_CAP_PER_FOUNDRY = 20
 const IDEMPOTENCY_WINDOW_HOURS = 24
 const MAX_CANDIDATES = 10
@@ -148,30 +142,67 @@ function extractGap(m: CadLabModule, src: ProjectGapSource): {
     return { industry, process, material }
 }
 
-function buildDiscoveryPrompt(gap: {
-    industry: string | null
-    process: string | null
-    material: string | null
-    moduleName: string | null
-}): string {
-    return `You are a UK + EU industrial supplier researcher. A founder is building a product and needs to find manufacturers who can make parts for the module described below. The ForgeOS supplier directory has zero entries matching this gap, so I need you to research the web and identify 5-10 real, active, UK-or-EU companies that could genuinely supply this.
+async function fetchBraveSearch(query: string, apiKey: string): Promise<string> {
+    const url = new URL(BRAVE_SEARCH_URL)
+    url.searchParams.set("q", query)
+    url.searchParams.set("count", "10")
+    url.searchParams.set("search_lang", "en")
+    const res = await fetch(url.toString(), {
+        headers: {
+            Accept: "application/json",
+            "Accept-Encoding": "gzip",
+            "X-Subscription-Token": apiKey,
+        },
+        signal: AbortSignal.timeout(15_000),
+    })
+    if (!res.ok) {
+        throw new Error(`Brave Search ${res.status}: ${await res.text().catch(() => "no body")}`)
+    }
+    const data = await res.json()
+    const results = (data.web?.results ?? []) as Array<{
+        title?: string
+        url?: string
+        description?: string
+    }>
+    return results
+        .slice(0, 10)
+        .map(
+            (r, i) =>
+                `[${i + 1}] ${r.title ?? "—"}\n    ${r.url ?? ""}\n    ${r.description ?? ""}`,
+        )
+        .join("\n\n")
+}
+
+function buildDiscoveryPrompt(
+    gap: {
+        industry: string | null
+        process: string | null
+        material: string | null
+        moduleName: string | null
+    },
+    searchResults: string,
+): string {
+    return `You are a UK + EU industrial supplier researcher. A founder is building a product and needs to find manufacturers who can make parts for the module described below. The ForgeOS supplier directory has zero entries matching this gap.
 
 PROJECT CONTEXT: ${gap.industry ?? "not specified"}
 MODULE: ${gap.moduleName ?? "not specified"}
 MANUFACTURING PROCESS NEEDED: ${gap.process ?? "not specified"}
 MATERIAL NEEDED: ${gap.material ?? "not specified"}
 
-Use the web_search tool to find real companies. For each, return:
+Below are search results from Brave Search. Use ONLY these results to identify 5-10 real, active, UK-or-EU companies that could genuinely supply this. For each, return:
 - name (real company name)
 - website (real URL, starting https://)
 - hq_country (ISO-2 or country name, UK preferred)
 - capabilities (2–5 specific tags, e.g. "CNC machining", "food-grade HDPE", "ISO 9001")
 - rationale (one short sentence — why they match this gap)
 
+SEARCH RESULTS:
+${searchResults}
+
 CRITICAL constraints:
-- Do NOT invent companies. If you can only find 2 real matches, return 2.
+- Do NOT invent companies. Only use companies that appear in the search results above.
+- If you can only find 2 real matches, return 2.
 - Prefer UK companies; then EU; then broader only if nothing closer.
-- Skip any company whose website you cannot verify via search.
 - No fake review scores, no made-up certifications.
 
 Respond with ONLY valid JSON, no prose, no markdown fences:
@@ -267,9 +298,9 @@ export async function discoverSuppliersForGap(
             }
         }
 
-        const apiKey = getAnthropicKey()
-        if (!apiKey) {
-            return { ok: false, error: "ANTHROPIC_API_KEY not configured.", errorCode: "NO_API_KEY" }
+        const braveKey = process.env.BRAVE_SEARCH_API_KEY
+        if (!braveKey) {
+            return { ok: false, error: "BRAVE_SEARCH_API_KEY not configured.", errorCode: "NO_API_KEY" }
         }
 
         // 3. Insert job row (status = discovering)
@@ -322,41 +353,57 @@ export async function discoverSuppliersForGap(
             }
         }
 
-        // 4. Opus web_search call
-        const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
-        const prompt = buildDiscoveryPrompt({
+        // 4. Brave Search (3 queries) + DeepSeek V4-Flash synthesis
+        const gapDetails = {
             ...gap,
             moduleName: targetModule.name ?? null,
-        })
+        }
+        const searchQueries = [
+            `${gap.industry ?? ""} ${gap.process ?? ""} manufacturer UK`.trim(),
+            `${gap.material ?? ""} ${gap.process ?? ""} supplier Europe`.trim(),
+            `${gap.industry ?? ""} contract manufacturer ${gap.material ?? ""} UK EU`.trim(),
+        ].filter((q) => q.length > 10)
+
+        let searchResults: string
+        try {
+            const searchPromises = searchQueries.map((q) => fetchBraveSearch(q, braveKey))
+            const results = await Promise.all(searchPromises)
+            searchResults = results
+                .map((r, i) => `--- Search ${i + 1}: "${searchQueries[i]}" ---\n${r}`)
+                .join("\n\n")
+        } catch (err) {
+            const msg = err instanceof Error ? err.message : "brave search threw"
+            console.error("[supplier-discovery] Brave Search threw:", msg)
+            return await failJob(msg, "SEARCH_THREW")
+        }
+
+        if (!searchResults || searchResults.length < 50) {
+            return await failJob("Search returned no meaningful results.", "EMPTY_SEARCH")
+        }
+
+        const prompt = buildDiscoveryPrompt(gapDetails, searchResults)
 
         let rawJson: string
         try {
-            // GOTCHA: `tools: [{ type: "web_search_20250305", name: "web_search" }]`
-            // is the current Anthropic web-search tool identifier; the SDK types
-            // lag the API so we cast. See investor-intel.ts for the alternative
-            // non-tool-using pattern.
-            const response = await client.messages.create({
-                model: MODEL,
-                max_tokens: 4096,
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                tools: [
-                    { type: "web_search_20250305", name: "web_search", max_uses: 10 },
-                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                ] as any,
-                messages: [{ role: "user", content: prompt }],
+            const llmResult = await callOpenRouter({
+                model: DISCOVERY_MODEL,
+                prompt,
+                system: "You are a supplier research assistant. Output ONLY valid JSON. No markdown fences, no prose.",
+                maxTokens: 4096,
+                temperature: 0.2,
+                timeoutMs: 60_000,
             })
-            const textBlock = response.content.find((c) => c.type === "text")
-            if (!textBlock || textBlock.type !== "text") {
+            if (!llmResult.ok) {
                 return await failJob(
-                    "Research response had no text block.",
-                    "NO_TEXT",
+                    `DeepSeek synthesis failed: ${llmResult.error}`,
+                    "LLM_FAILED",
                 )
             }
-            rawJson = textBlock.text.trim()
+            rawJson = llmResult.text.trim()
         } catch (err) {
             const msg = err instanceof Error ? err.message : "discovery threw"
-            console.error("[supplier-discovery] Opus call threw:", msg)
-            return await failJob(msg, "OPUS_THREW")
+            console.error("[supplier-discovery] DeepSeek call threw:", msg)
+            return await failJob(msg, "LLM_THREW")
         }
 
         // Loop 7 fix (2026-04-26 NIGHT): all 44 prior discovery jobs
