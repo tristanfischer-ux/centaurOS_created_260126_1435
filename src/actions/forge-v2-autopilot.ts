@@ -116,6 +116,25 @@ export interface AutopilotState {
     failed_stages: string[]
     error?: string
     finished_at: string | null
+    /**
+     * Number of Max-redecomposition retries that have fired so far for this
+     * autopilot run. Incremented each time the waitForSizing handler emits
+     * NEEDS_MAX_REDECOMPOSITION and triggers a redecomposition. Capped at
+     * MAX_REDECOMPOSITION_ATTEMPTS (3) before the pipeline fails.
+     *
+     * Present only when at least one retry has been triggered.
+     */
+    redecomposition_attempts?: number
+    /**
+     * Human-readable topology-drift disclosure note written by the
+     * waitForMaxRedecomposition handler when the redecomposed module set
+     * differs substantially from the original (Jaccard distance > 0.35 or
+     * module count change > 20%).
+     *
+     * The UI should surface this as a yellow advisory banner on the
+     * Modules page. Present only when substantial drift was detected.
+     */
+    topology_drift_note?: string
 }
 
 /**

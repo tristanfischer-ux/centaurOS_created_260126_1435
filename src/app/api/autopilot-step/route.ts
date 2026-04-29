@@ -178,7 +178,7 @@ export async function POST(request: Request): Promise<NextResponse> {
     // ── 2. Run the specialist ───────────────────────────────────────
     let outcome: { ok: true } | { ok: false; error: string }
     try {
-        outcome = await runStep(projectId, step)
+        outcome = await runStep(projectId, step, state)
     } catch (err) {
         outcome = {
             ok: false,
@@ -208,11 +208,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     )
 }
 
+// ─── Hard cap for Max-redecomposition retries ────────────────────────────────
+// Council-calibrated 2026-04-29: unanimous vote for 3 across 6 frontier models.
+// After this many redecomposition attempts the pipeline fails with a clear
+// human-readable message rather than looping indefinitely.
+const MAX_REDECOMPOSITION_ATTEMPTS = 3
+
 // ─── Per-step specialist invocation ─────────────────────────────────────
 
 async function runStep(
     projectId: string,
     step: AutopilotStepName,
+    autopilotState: AutopilotState,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
     const foundryId = await getProjectFoundryId(projectId)
     if (!foundryId) {
@@ -267,9 +274,28 @@ async function runStep(
             // prepending the structured override block that tells Max what
             // structural change to make.
             //
+            // TOPOLOGY-DRIFT DISCLOSURE (Item 10, council-calibrated 2026-04-29):
+            // When Max produces a substantially different decomposition after
+            // redecomposition, the founder needs to know. We capture the module
+            // count before running Max, compare after, and flag substantial drift
+            // (>20% module count change or any module count change at all) as a
+            // warning in the autopilot_state.
+            //
             // The trigger string is deliberately "auto.brief-lock" (the same as
             // first-pass) so the pipeline_runs record looks identical to a normal
             // Max run — the remediation context in the prompt is the signal.
+
+            // ── Snapshot module count BEFORE redecomposition ─────────
+            const admin = createAdminClient()
+            const { data: preRedecomp } = await admin
+                .from("cad_lab_projects")
+                .select("modules")
+                .eq("id", projectId)
+                .maybeSingle()
+            const modulesBefore = (preRedecomp?.modules as Array<{ id: string; name?: string }> | null) ?? []
+            const moduleCountBefore = modulesBefore.length
+            const moduleNamesBefore = new Set(modulesBefore.map((m) => (m.name ?? "").toLowerCase().trim()))
+
             const { runMaxDecompositionBackground } = await import(
                 "@/actions/specialists/run-max-decomposition"
             )
@@ -281,8 +307,75 @@ async function runStep(
             if (!result.ok) {
                 return { ok: false, error: result.error ?? "Max redecomposition failed" }
             }
+
+            // ── Snapshot module count AFTER and compute topology drift ─
+            const { data: postRedecomp } = await admin
+                .from("cad_lab_projects")
+                .select("modules")
+                .eq("id", projectId)
+                .maybeSingle()
+            const modulesAfter = (postRedecomp?.modules as Array<{ id: string; name?: string }> | null) ?? []
+            const moduleCountAfter = modulesAfter.length
+            const moduleNamesAfter = new Set(modulesAfter.map((m) => (m.name ?? "").toLowerCase().trim()))
+
+            // Jaccard similarity of module name sets: intersection / union
+            const intersection = [...moduleNamesBefore].filter((n) => moduleNamesAfter.has(n))
+            const union = new Set([...moduleNamesBefore, ...moduleNamesAfter])
+            const jaccardSimilarity = union.size > 0 ? intersection.length / union.size : 1
+            const jaccardDistance = 1 - jaccardSimilarity
+
+            // Module count % change
+            const countDeltaPct =
+                moduleCountBefore > 0
+                    ? Math.abs(moduleCountAfter - moduleCountBefore) / moduleCountBefore
+                    : 0
+
+            // Council-calibrated drift threshold: Jaccard distance > 0.35 OR
+            // module count changes by > 20%.
+            const DRIFT_JACCARD_THRESHOLD = 0.35
+            const DRIFT_COUNT_PCT_THRESHOLD = 0.20
+
+            const isDriftSubstantial =
+                jaccardDistance > DRIFT_JACCARD_THRESHOLD ||
+                countDeltaPct > DRIFT_COUNT_PCT_THRESHOLD
+
+            const attemptNum = autopilotState.redecomposition_attempts ?? 0
+
+            if (isDriftSubstantial) {
+                console.warn(
+                    `[autopilot-step] waitForMaxRedecomposition: TOPOLOGY DRIFT DETECTED for project=${projectId} ` +
+                    `(attempt ${attemptNum}/${MAX_REDECOMPOSITION_ATTEMPTS}). ` +
+                    `Modules before: ${moduleCountBefore}, after: ${moduleCountAfter}. ` +
+                    `Jaccard distance: ${jaccardDistance.toFixed(2)}, count delta: ${(countDeltaPct * 100).toFixed(0)}%.`,
+                )
+                // Write the drift disclosure into autopilot_state so it surfaces in the UI.
+                const driftNote =
+                    `Topology drift (attempt ${attemptNum}/${MAX_REDECOMPOSITION_ATTEMPTS}): ` +
+                    `module count changed from ${moduleCountBefore} to ${moduleCountAfter} ` +
+                    `(${countDeltaPct > 0 ? "+" : ""}${Math.round((moduleCountAfter - moduleCountBefore))} modules, ` +
+                    `Jaccard distance ${jaccardDistance.toFixed(2)}). ` +
+                    `The revised decomposition differs substantially from the original brief. ` +
+                    `Review the Modules page to confirm the new architecture matches your intent.`
+
+                await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        autopilot_state: {
+                            ...autopilotState,
+                            topology_drift_note: driftNote,
+                        },
+                    } as never)
+                    .eq("id", projectId)
+            } else {
+                console.log(
+                    `[autopilot-step] waitForMaxRedecomposition: no substantial drift for project=${projectId} ` +
+                    `(modules: ${moduleCountBefore} → ${moduleCountAfter}, Jaccard distance: ${jaccardDistance.toFixed(2)})`,
+                )
+            }
+
             console.log(
-                `[autopilot-step] waitForMaxRedecomposition: Max redecomposition succeeded for project=${projectId} (${result.moduleCount} modules)`,
+                `[autopilot-step] waitForMaxRedecomposition: Max redecomposition succeeded for project=${projectId} ` +
+                `(${result.moduleCount} modules, drift: ${isDriftSubstantial ? "SUBSTANTIAL" : "minor"})`,
             )
             return { ok: true }
         }
@@ -321,12 +414,20 @@ async function runStep(
                 )
                 return { ok: true }
             }
-            // NEEDS_MAX_REDECOMPOSITION (Gates Council R1 P1):
+            // NEEDS_MAX_REDECOMPOSITION (Gates Council R1 P1 + Item 10 calibration):
             // Guard 3 in run-fang-sizing.ts fired — the solver's
             // recommendations contain a topology-level structural change
             // (split into 2 modules, externalise a skid, etc.). Re-sizing
             // the same module layout is futile; Max must redecompose with
             // the solver's structural guidance as a hard override.
+            //
+            // HARD RETRY CAP (Item 10, council-calibrated 2026-04-29):
+            // Without a cap, a brief whose envelope is fundamentally too tight
+            // for the target capacity would loop indefinitely:
+            //   Fang → NEEDS_MAX_REDECOMPOSITION → Max → Fang → repeat.
+            // The council (6 models, unanimous) recommends a cap of 3.
+            // On cap-exceeded: fail the project with a clear human-readable
+            // message; do NOT proceed with a known-infeasible decomposition.
             //
             // The remediation context is stashed by triggerRemediation into
             // gate_remediation_context.waiting_max so the next Max run picks
@@ -339,6 +440,23 @@ async function runStep(
                 "errorCode" in result &&
                 result.errorCode === "NEEDS_MAX_REDECOMPOSITION"
             ) {
+                // ── Retry-cap guard ──────────────────────────────────────
+                const attemptsSoFar = autopilotState.redecomposition_attempts ?? 0
+                if (attemptsSoFar >= MAX_REDECOMPOSITION_ATTEMPTS) {
+                    const capMsg =
+                        `Max-redecomposition retry cap reached (${MAX_REDECOMPOSITION_ATTEMPTS} attempts). ` +
+                        `The sizing solver repeatedly found that the module decomposition cannot fit ` +
+                        `within the briefed envelope. This usually means the target capacity, power, ` +
+                        `or performance specification cannot be achieved within the specified physical ` +
+                        `constraints. Please revise the brief — either increase the envelope size, ` +
+                        `reduce the target specification, or accept a multi-unit system. ` +
+                        `(Error from last sizing attempt: ${result.error ?? "topology overflow"})`
+                    console.error(
+                        `[autopilot-step] NEEDS_MAX_REDECOMPOSITION: cap reached after ${attemptsSoFar} attempts for project=${projectId}`,
+                    )
+                    return { ok: false, error: capMsg }
+                }
+
                 const waitingMaxContext =
                     (result as unknown as { _waitingMaxContext?: string })._waitingMaxContext ?? null
                 if (waitingMaxContext) {
@@ -362,8 +480,33 @@ async function runStep(
                                 `Original sizing error: ${result.error ?? "topology overflow"}`,
                         }
                     }
+
+                    // ── Increment attempt counter in autopilot_state ─────
+                    // This is a best-effort update — if it fails the cap guard
+                    // reads 0 next time (same as first attempt), which just means
+                    // one extra retry. Not worth failing the whole redecomposition
+                    // trigger over this.
+                    const newAttemptCount = attemptsSoFar + 1
+                    const admin = createAdminClient()
+                    const { error: stateUpdateErr } = await admin
+                        .from("cad_lab_projects")
+                        .update({
+                            autopilot_state: {
+                                ...autopilotState,
+                                redecomposition_attempts: newAttemptCount,
+                            },
+                        } as never)
+                        .eq("id", projectId)
+                    if (stateUpdateErr) {
+                        console.warn(
+                            `[autopilot-step] NEEDS_MAX_REDECOMPOSITION: failed to increment attempt counter for project=${projectId} (non-fatal):`,
+                            stateUpdateErr.message,
+                        )
+                    }
+
                     console.log(
-                        `[autopilot-step] NEEDS_MAX_REDECOMPOSITION: remediation triggered for project=${projectId} — stage reset to waiting_max_redecomposition`,
+                        `[autopilot-step] NEEDS_MAX_REDECOMPOSITION: remediation triggered for project=${projectId} ` +
+                        `— attempt ${newAttemptCount}/${MAX_REDECOMPOSITION_ATTEMPTS}, stage reset to waiting_max_redecomposition`,
                     )
                     // triggerRemediation already reset autopilot_state.stage via the
                     // apply_gate_remediation PG function. The cron will pick up
@@ -818,11 +961,15 @@ async function runFangReviewsForAllModules(
     // £ in Anthropic credits over a few hours.
     //
     // Fix per GPT-5.5 council consult: skip modules that already have a
-    // terminal pipeline_runs row (status IN ('done','failed')) OR an
-    // in-flight one (status='running' AND started_at < 15 min ago). Treat
-    // 'failed' as terminal too — otherwise the cron just re-fires failures
-    // forever. The proper fix (unique constraint on
-    // (project_id, module_id, specialist_id)) is a follow-up migration.
+    // terminal pipeline_runs row (status='done') OR an in-flight one
+    // (status='running' AND started_at < 15 min ago).
+    //
+    // Loop 26 P0 — Bug B (idempotency): 'failed' is now RETRIABLE (bounded).
+    // With Bug A fixed, double-empty reviews write a 'failed' row instead of
+    // 'done'. If we treat 'failed' as terminal here, those modules are silently
+    // abandoned and the coverage gate blocks forever. Instead, count 'failed'
+    // rows per module: if count < 2, re-dispatch; if count >= 2, treat as
+    // terminal (cap at 2 retries to prevent runaway credit burn).
     const { data: existingFangRows } = await admin
         .from("pipeline_runs")
         .select("input_ref, status, started_at")
@@ -831,6 +978,8 @@ async function runFangReviewsForAllModules(
         .eq("stage", "module.review.fang")
         .order("started_at", { ascending: false })
     const recentRunningCutoffMs = Date.now() - 15 * 60 * 1000
+    // Count 'failed' rows per module so we can cap retries.
+    const moduleFailedCount = new Map<string, number>()
     const moduleIdsAlreadyTerminalOrRecent = new Set<string>()
     // L9-FANG-IDEMPOTENCY (2026-04-27): the L8-P9 idempotency guard read
     // `row.input_ref?.module_id` (snake_case) but the field is persisted
@@ -845,10 +994,16 @@ async function runFangReviewsForAllModules(
         status: string
         started_at: string | null
     }>) {
-        const moduleId = row.input_ref?.moduleId ?? row.input_ref?.module_id
-        if (!moduleId) continue
-        if (row.status === "done" || row.status === "failed") {
-            moduleIdsAlreadyTerminalOrRecent.add(moduleId)
+        const mid = row.input_ref?.moduleId ?? row.input_ref?.module_id
+        if (!mid) continue
+        if (row.status === "done") {
+            moduleIdsAlreadyTerminalOrRecent.add(mid)
+            continue
+        }
+        if (row.status === "failed") {
+            // Accumulate failed count — the terminal decision is made after
+            // we know the total count for each module.
+            moduleFailedCount.set(mid, (moduleFailedCount.get(mid) ?? 0) + 1)
             continue
         }
         if (
@@ -856,8 +1011,17 @@ async function runFangReviewsForAllModules(
             row.started_at &&
             Date.parse(row.started_at) > recentRunningCutoffMs
         ) {
-            moduleIdsAlreadyTerminalOrRecent.add(moduleId)
+            moduleIdsAlreadyTerminalOrRecent.add(mid)
         }
+    }
+    // Modules with >= 2 failed rows have exhausted their retry budget — treat
+    // as terminal so we don't burn credits indefinitely.
+    const FANG_MAX_RETRIES = 2
+    for (const [mid, count] of moduleFailedCount.entries()) {
+        if (count >= FANG_MAX_RETRIES) {
+            moduleIdsAlreadyTerminalOrRecent.add(mid)
+        }
+        // count < FANG_MAX_RETRIES → module stays eligible for re-dispatch
     }
     const modulesToReview = modules.filter(
         (m) => !moduleIdsAlreadyTerminalOrRecent.has(m.id),
@@ -923,6 +1087,78 @@ async function runFangReviewsForAllModules(
             error: `All ${modules.length} Fang reviews failed`,
         }
     }
+
+    // ── Post-dispatch manifest check ────────────────────────────────────
+    //
+    // Council fix — item 1 (6/6 frontier models, 2026-04-29): after the batch
+    // completes, verify that every module in the project has a terminal
+    // pipeline_runs row (status "done" or "failed"). Modules still absent
+    // were silently dropped — never dispatched, never tombstoned, invisible
+    // to the feasibility gate. This is the root cause of safety-critical
+    // modules (avionics, electrical, wireless) passing feasibility without
+    // review on 3 of 5 demo projects.
+    //
+    // If any module is missing a terminal row: write a REVIEW_SKIPPED
+    // tombstone and return ok:false. The autopilot does NOT advance past
+    // running_fang_reviews; the cron re-fires on the next tick. On the next
+    // tick the idempotency guard sees the failed pipeline row and the
+    // tombstone is already in the reviews JSONB, so the proofreader surfaces
+    // the module as "review was skipped" and the feasibility gate blocks.
+    const { data: postBatchRows } = await admin
+        .from("pipeline_runs")
+        .select("input_ref, status")
+        .eq("project_id", projectId)
+        .eq("specialist_id", "vp-manufacturing")
+        .eq("stage", "module.review.fang")
+    const terminalModuleIds = new Set<string>()
+    for (const row of (postBatchRows ?? []) as Array<{
+        input_ref: { moduleId?: string; module_id?: string } | null
+        status: string
+    }>) {
+        const mId = row.input_ref?.moduleId ?? row.input_ref?.module_id
+        if (!mId) continue
+        if (row.status === "done" || row.status === "failed") {
+            terminalModuleIds.add(mId)
+        }
+    }
+
+    const orphanedModules = modules.filter(
+        (m) => !terminalModuleIds.has(m.id),
+    )
+    if (orphanedModules.length > 0) {
+        // Write tombstones for modules that were silently dropped. Non-fatal
+        // writes: if the tombstone fails, the module will still surface as
+        // "no review was attempted" in the proofreader's manifest check, which
+        // also blocks feasibility correctly.
+        const { saveFangReviewSkippedTombstone } = await import(
+            "@/actions/specialists/run-fang-review"
+        )
+        for (const m of orphanedModules) {
+            await saveFangReviewSkippedTombstone(
+                projectId,
+                m.id,
+                foundryId,
+                "module was not dispatched during the engineering review batch — this is a pipeline gap",
+            ).catch((err: unknown) => {
+                console.warn(
+                    `[autopilot-step:fang-reviews] tombstone write failed for orphaned module=${m.id}:`,
+                    err instanceof Error ? err.message : err,
+                )
+            })
+        }
+        const ids = orphanedModules.map((m) => m.id).join(", ")
+        console.warn(
+            `[autopilot-step:fang-reviews] manifest gap after batch: ${orphanedModules.length} module(s) have no terminal pipeline_runs row. Tombstones written. Module IDs: ${ids}`,
+        )
+        // Block the autopilot from advancing. The cron will re-trigger
+        // runFangReviews; orphaned modules now have tombstones so the
+        // feasibility gate will surface them as blocked findings.
+        return {
+            ok: false,
+            error: `${orphanedModules.length} module(s) were not reviewed (no pipeline record found after dispatch). Tombstones written — stage blocked until resolved.`,
+        }
+    }
+
     return { ok: true }
 }
 

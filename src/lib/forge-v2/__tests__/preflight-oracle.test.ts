@@ -113,13 +113,15 @@ const HEDGEROW_BRIEF: BriefInput = {
 
 describe("runPreflightOracle — five demo projects", () => {
 
-    it("(1) BESS 3.5 MWh in 40ft: PASSES — energy density ~52 Wh/L << 700 Wh/L ceiling", () => {
+    it("(1) BESS 3.5 MWh in 40ft: PASSES — energy density ~52 Wh/L << 1000 Wh/L ceiling", () => {
         const verdict = runPreflightOracle(BESS_BRIEF)
 
         expect(verdict.passed).toBe(true)
         expect(verdict.domain).toBe("bess")
         expect(verdict.blockers).toHaveLength(0)
-        expect(verdict.oracle_version).toBe(PREFLIGHT_ORACLE_VERSION)
+        // oracle_version now includes config version suffix — check it contains the base version
+        expect(verdict.oracle_version).toContain(PREFLIGHT_ORACLE_VERSION)
+        expect(verdict.oracle_version).toContain("2026-04-29")
 
         // No energy density blocker
         const densityBlocker = verdict.blockers.find(b => b.axis === "energy_density")
@@ -251,27 +253,27 @@ describe("runPreflightOracle — domain detection", () => {
 
 describe("runPreflightOracle — BESS physics", () => {
 
-    it("blocks when energy density exceeds NMC ceiling", () => {
-        // 10 MWh in a 20ft container: 10,000 kWh × 1000 / 33,200 L = 301 Wh/L — under ceiling
-        // Try 30 MWh in a 20ft container: 30,000 kWh × 1000 / 33,200 = 903 Wh/L — BLOCKS
+    it("blocks when energy density exceeds 1000 Wh/L ceiling (council-calibrated 2026-04-29)", () => {
+        // 35 MWh in a 20ft container: 35,000 kWh × 1000 / 33,200 L = 1054 Wh/L — BLOCKS (> 1000)
+        // (30 MWh in 20ft = 903 Wh/L which is below the new 1000 Wh/L ceiling)
         const v = runPreflightOracle({
-            subject: "30 MWh BESS in a 20-foot container for grid storage",
-            designBrief: { targetCapacityKwh: 30_000 },
+            subject: "35 MWh BESS in a 20-foot container for grid storage",
+            designBrief: { targetCapacityKwh: 35_000 },
         })
         expect(v.passed).toBe(false)
         const b = v.blockers.find(b => b.axis === "energy_density")
         expect(b).toBeDefined()
-        expect(b!.required).toBeGreaterThan(700)
-        expect(b!.ceiling).toBe(700)
+        expect(b!.required).toBeGreaterThan(1000)
+        expect(b!.ceiling).toBe(1000)
     })
 
-    it("warns (does not block) when at 80–100% of ceiling", () => {
-        // 38 MWh in a 40ft: 38,000 × 1000 / 67,800 = 560 Wh/L — 80% of 700 ceiling
+    it("warns (does not block) when above 70% of 1000 Wh/L ceiling (council-calibrated 2026-04-29)", () => {
+        // 50 MWh in a 40ft: 50,000 × 1000 / 67,800 = 738 Wh/L — above 70% warning (700 Wh/L) but below 1000 ceiling
         const v = runPreflightOracle({
-            subject: "38 MWh BESS in a 40-foot container",
-            designBrief: { targetCapacityKwh: 38_000 },
+            subject: "50 MWh BESS in a 40-foot container",
+            designBrief: { targetCapacityKwh: 50_000 },
         })
-        // Should be a warning, not a block
+        // Should be a warning, not a block (738 Wh/L < 1000 Wh/L ceiling)
         expect(v.passed).toBe(true)
         const w = v.warnings.find(w => w.axis === "energy_density")
         expect(w).toBeDefined()
@@ -304,7 +306,9 @@ describe("runPreflightOracle — verdict shape", () => {
 
     it("always includes oracle_version in the verdict", () => {
         const v = runPreflightOracle({ subject: "Some product" })
-        expect(v.oracle_version).toBe(PREFLIGHT_ORACLE_VERSION)
+        // oracle_version now includes both the logic version and the config version
+        // Format: "<logic-version>+config-<config-version>"
+        expect(v.oracle_version).toContain(PREFLIGHT_ORACLE_VERSION)
         expect(v.oracle_version).toContain("2026-04-29")
     })
 
