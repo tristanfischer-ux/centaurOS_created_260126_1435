@@ -2,7 +2,7 @@ import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { notFound } from "next/navigation"
-import { MarketplaceListingDetail } from "./listing-detail"
+import { MarketplaceListingDetail, type ListingPage } from "./listing-detail"
 import { MarketplaceListing } from "@/actions/marketplace"
 import { getProviderTrustSignals } from "@/actions/trust-signals"
 import { getProviderRatings } from "@/actions/ratings"
@@ -84,12 +84,18 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
         }
     }
 
-    // Fetch trust signals, ratings, executives, and reviews in parallel
+    // Fetch trust signals, ratings, executives, and website pages in parallel
     let trustSignals = null
     let ratings = null
 
-    const [execResult, ...providerResults] = await Promise.all([
+    const [execResult, pagesResult, ...providerResults] = await Promise.all([
         getListingExecutives(id),
+        supabase
+            .from('marketplace_listing_pages')
+            .select('url, page_text')
+            .eq('listing_id', id)
+            .order('scraped_at', { ascending: false })
+            .limit(3),
         ...(listing.created_by_provider_id
             ? [
                 getProviderTrustSignals(listing.created_by_provider_id),
@@ -114,6 +120,7 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
     }
 
     const executives = execResult.data ?? []
+    const pages = (pagesResult.data ?? []) as ListingPage[]
 
     return (
         <MarketplaceListingDetail
@@ -121,6 +128,7 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
             trustSignals={trustSignals}
             ratings={ratings}
             executives={executives}
+            pages={pages}
         />
     )
 }

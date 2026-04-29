@@ -64,3 +64,105 @@ export function hasValue(v: unknown): boolean {
 
   return true
 }
+
+/**
+ * coalesceFilled — returns the first argument for which hasValue() is true.
+ *
+ * Replaces chains of `listing.X ?? attrs.X` which only fall through on
+ * null/undefined, NOT on empty arrays. Use this so that an empty column-level
+ * array doesn't shadow a populated attrs value.
+ *
+ * Example:
+ *   coalesceFilled(listing.industries, attrs.industries)
+ *   // returns attrs.industries if listing.industries is [] (empty array)
+ */
+export function coalesceFilled<T>(...vals: T[]): T | undefined {
+  for (const v of vals) {
+    if (hasValue(v)) return v
+  }
+  return undefined
+}
+
+/**
+ * sanitiseStringArray — normalise any database string-array value into a
+ * clean, deduplicated string[].
+ *
+ * Handles the malformed shapes that appear in marketplace_listings:
+ *   • Clean string arrays: pass through, dedupe, drop junk entries.
+ *   • JSON string-in-array: `["[\"ISO 9001:2015\"", "\"ISO 14001:2015\"]"]`
+ *     — each element is attempted as JSON; sub-arrays are flattened.
+ *   • JSON-stringified array in a single element: `["[\"ISO 9001\",\"ISO 14001\"]"]`
+ *   • JSON-stringified array as the whole value: `"[\"ISO 9001\",\"ISO 14001\"]"`
+ */
+export function sanitiseStringArray(input: unknown): string[] {
+  if (input === null || input === undefined) return []
+
+  // If a plain string arrives, try to JSON-parse it as an array first.
+  if (typeof input === 'string') {
+    const trimmed = input.trim()
+    if (trimmed.startsWith('[')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          return sanitiseStringArray(parsed)
+        }
+      } catch {
+        // not valid JSON — treat as a single value
+      }
+    }
+    // Single clean string — strip outer quotes/brackets
+    const clean = trimmed.replace(/^["'\[{]|["'\]}]$/g, '').trim()
+    return isEmptyString(clean) ? [] : [clean]
+  }
+
+  if (!Array.isArray(input)) return []
+
+  const results: string[] = []
+  for (const item of input) {
+    if (item === null || item === undefined) continue
+    if (typeof item !== 'string') {
+      // Numbers, objects etc — stringify and recurse
+      const sub = sanitiseStringArray([String(item)])
+      results.push(...sub)
+      continue
+    }
+
+    const trimmed = item.trim()
+
+    // Attempt to JSON-parse each element (catches the malformed ISO cert shape)
+    if (trimmed.startsWith('[') || trimmed.startsWith('"')) {
+      try {
+        const parsed = JSON.parse(trimmed)
+        if (Array.isArray(parsed)) {
+          const sub = sanitiseStringArray(parsed)
+          results.push(...sub)
+          continue
+        }
+        if (typeof parsed === 'string') {
+          const clean = parsed.trim()
+          if (!isEmptyString(clean)) results.push(clean)
+          continue
+        }
+      } catch {
+        // fall through to plain-string handling
+      }
+    }
+
+    // Strip stray quotes, brackets, escaped quotes
+    const stripped = trimmed
+      .replace(/^["'\[]+|["'\]]+$/g, '')
+      .replace(/\\"/g, '')
+      .trim()
+
+    if (!isEmptyString(stripped)) results.push(stripped)
+  }
+
+  // Deduplicate (case-insensitive key, preserve original casing of first occurrence)
+  const seen = new Set<string>()
+  return results.filter((s) => {
+    const key = s.toLowerCase()
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}

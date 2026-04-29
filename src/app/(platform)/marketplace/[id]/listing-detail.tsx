@@ -7,31 +7,22 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import { safeParseAttributes, safeStringArray } from "@/lib/marketplace-utils"
+import { safeParseAttributes } from "@/lib/marketplace-utils"
 import { getCategoryBadgeClasses, type MarketplaceCategory } from "@/lib/marketplace-colors"
-import { hasValue } from "@/lib/has-value"
+import { hasValue, coalesceFilled, sanitiseStringArray } from "@/lib/has-value"
 import { buildOsmEmbedUrl, buildOsmViewUrl } from "@/lib/geocoding"
 import {
-    ShieldCheck,
     MapPin,
-    Clock,
-    Briefcase,
-    Building2,
-    Zap,
-    Award,
-    Layers,
     Timer,
     Package,
-    Wrench,
     Users,
-    BarChart3,
-    CheckCircle2,
     Calendar,
     MessageSquare,
     Loader2,
     ExternalLink,
     Globe,
     ChevronRight,
+    FileText,
 } from "lucide-react"
 import Link from "next/link"
 import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
@@ -54,18 +45,30 @@ interface RatingsData {
     error: string | null
 }
 
+export interface ListingPage {
+    url: string
+    page_text: string
+}
+
 interface MarketplaceListingDetailProps {
     listing: MarketplaceListing
     trustSignals?: TrustSignalsData | null
     ratings?: RatingsData | null
     executives?: PublicExecutive[]
+    pages?: ListingPage[]
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
+/** Capitalise the first letter of a string. */
+function capitalise(s: string): string {
+    if (!s) return s
+    return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
 /** Render a string array as chip pills, or null if empty. */
 function ChipList({ items, className }: { items: unknown; className?: string }) {
-    const arr = safeStringArray(items)
+    const arr = sanitiseStringArray(items)
     const valid = arr.filter((s) => hasValue(s))
     if (valid.length === 0) return null
     return (
@@ -106,6 +109,19 @@ function FieldRow({ label, children }: { label: string; children: React.ReactNod
     )
 }
 
+/**
+ * Truncate plain text at the last word boundary before `maxLen` chars,
+ * appending "…" if truncated. Collapses multiple whitespace / newlines.
+ */
+function truncateAtWord(text: string, maxLen: number): string {
+    // Collapse consecutive whitespace/newlines to a single space
+    const clean = text.replace(/\s+/g, ' ').trim()
+    if (clean.length <= maxLen) return clean
+    const cut = clean.slice(0, maxLen)
+    const lastSpace = cut.lastIndexOf(' ')
+    return (lastSpace > 0 ? cut.slice(0, lastSpace) : cut) + '…'
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function MarketplaceListingDetail({
@@ -113,6 +129,7 @@ export function MarketplaceListingDetail({
     trustSignals,
     ratings,
     executives = [],
+    pages = [],
 }: MarketplaceListingDetailProps) {
     const attrs = safeParseAttributes(listing.attributes)
     const category = listing.category
@@ -211,7 +228,10 @@ export function MarketplaceListingDetail({
             {/* Fractional executives (People listings only) */}
             {executives.length > 0 && <ExecutivesDisplay executives={executives} />}
 
-            {/* ── Section 5: Engage ─────────────────────────────────────────── */}
+            {/* ── Section 5: From their website ────────────────────────────── */}
+            <WebsiteExcerptsSection pages={pages} />
+
+            {/* ── Section 6: Engage ─────────────────────────────────────────── */}
             <EngageSection listing={listing} attrs={attrs} onContact={handleContact} isContacting={isContacting} />
         </div>
     )
@@ -227,16 +247,31 @@ function WhatTheyMakeSection({
     attrs: Record<string, unknown>
 }) {
     const capSummary = attrs.capability_summary ?? listing.description
-    const processCaps = Array.isArray(listing.process_capabilities) ? listing.process_capabilities : []
-    const products = listing.products ?? attrs.products
-    const specialties = listing.specialties ?? attrs.specialties
+    const processCaps = Array.isArray(listing.process_capabilities) && listing.process_capabilities.length > 0
+        ? listing.process_capabilities
+        : []
+
+    // coalesceFilled: prefer column-level if it has real entries; fall back to attrs
+    const products = coalesceFilled(listing.products as unknown, attrs.products)
+    const specialties = coalesceFilled(listing.specialties as unknown, attrs.specialties)
+
+    // New: primary_capabilities from attrs.marketplace_tags
+    const marketplaceTags = (attrs.marketplace_tags ?? {}) as Record<string, unknown>
+    const primaryCaps = sanitiseStringArray(marketplaceTags.primary_capabilities)
+    const searchKeywords = sanitiseStringArray(attrs.search_keywords)
+
+    // New: key differentiator from competitive_positioning
+    const competitivePos = (attrs.competitive_positioning ?? {}) as Record<string, unknown>
+    const keyDifferentiator = competitivePos.key_differentiator
 
     const hasAnything =
         hasValue(capSummary) ||
         (processCaps.length > 0) ||
         hasValue(products) ||
         hasValue(specialties) ||
-        hasValue(listing.subcategory)
+        hasValue(listing.subcategory) ||
+        primaryCaps.length > 0 ||
+        hasValue(keyDifferentiator)
 
     if (!hasAnything) return null
 
@@ -248,6 +283,13 @@ function WhatTheyMakeSection({
                 {hasValue(capSummary) && (
                     <p className="text-sm leading-relaxed text-foreground">
                         {String(capSummary)}
+                    </p>
+                )}
+
+                {/* Key differentiator — one-line pull quote */}
+                {hasValue(keyDifferentiator) && (
+                    <p className="text-sm text-muted-foreground italic border-l-2 border-international-orange/40 pl-3">
+                        {String(keyDifferentiator)}
                     </p>
                 )}
 
@@ -267,6 +309,30 @@ function WhatTheyMakeSection({
                         <div>
                             <p className="text-xs text-muted-foreground mb-2">Processes</p>
                             <div className="flex flex-wrap gap-1.5">{chips}</div>
+                        </div>
+                    )
+                })()}
+
+                {/* Primary capabilities from attrs.marketplace_tags — deduplicated against process_capabilities */}
+                {primaryCaps.length > 0 && (() => {
+                    // Build a set of existing process names for dedup
+                    const existingProcesses = new Set(
+                        processCaps
+                            .map((c) => typeof c === 'string' ? c : (c as { process_name?: string })?.process_name ?? '')
+                            .map((s) => s.toLowerCase())
+                    )
+                    const deduped = primaryCaps.filter((s) => !existingProcesses.has(s.toLowerCase()))
+                    if (deduped.length === 0) return null
+                    return (
+                        <div>
+                            <p className="text-xs text-muted-foreground mb-2">Primary capabilities</p>
+                            <div className="flex flex-wrap gap-1.5">
+                                {deduped.map((s, i) => (
+                                    <span key={i} className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted text-foreground">
+                                        {s}
+                                    </span>
+                                ))}
+                            </div>
                         </div>
                     )
                 })()}
@@ -296,6 +362,23 @@ function WhatTheyMakeSection({
                         </span>
                     </div>
                 )}
+
+                {/* Search keywords — discoverable-as row */}
+                {searchKeywords.length > 0 && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Discoverable as</p>
+                        <div className="flex flex-wrap gap-1">
+                            {searchKeywords.map((kw, i) => (
+                                <span
+                                    key={i}
+                                    className="text-[10px] px-2 py-0.5 rounded-full bg-background border border-border/50 text-muted-foreground"
+                                >
+                                    {kw}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </section>
     )
@@ -310,11 +393,32 @@ function ManufacturingSpecificsSection({
     listing: MarketplaceListing
     attrs: Record<string, unknown>
 }) {
-    const materials = listing.materials ?? attrs.materials
-    const industries = listing.industries ?? attrs.industries
-    const equipment = listing.key_equipment ?? attrs.key_equipment
+    // coalesceFilled fixes the empty-array shadowing bug
+    const materials = coalesceFilled(listing.materials as unknown, attrs.materials)
+    const industries = coalesceFilled(listing.industries as unknown, attrs.industries)
+    const equipment = coalesceFilled(listing.key_equipment as unknown, attrs.key_equipment)
 
-    const hasAnything = hasValue(materials) || hasValue(industries) || hasValue(equipment)
+    // New fields from attrs.marketplace_tags + attrs.competitive_positioning
+    const marketplaceTags = (attrs.marketplace_tags ?? {}) as Record<string, unknown>
+    const competitivePos = (attrs.competitive_positioning ?? {}) as Record<string, unknown>
+
+    const materialsExpertise = sanitiseStringArray(marketplaceTags.materials_expertise)
+    const batchSize = competitivePos.batch_size ?? marketplaceTags.batch_size
+
+    // Production type — split on '|' into chips
+    const productionTypeRaw = competitivePos.production_type
+    const productionTypeChips: string[] = hasValue(productionTypeRaw)
+        ? String(productionTypeRaw).split('|').map((s) => s.trim()).filter((s) => hasValue(s))
+        : []
+
+    const hasAnything =
+        hasValue(materials) ||
+        hasValue(industries) ||
+        hasValue(equipment) ||
+        materialsExpertise.length > 0 ||
+        hasValue(batchSize) ||
+        productionTypeChips.length > 0
+
     if (!hasAnything) return null
 
     return (
@@ -327,6 +431,21 @@ function ManufacturingSpecificsSection({
                         <ChipList items={materials} />
                     </div>
                 )}
+
+                {/* Materials expertise — separate from raw materials list */}
+                {materialsExpertise.length > 0 && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Materials expertise</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {materialsExpertise.map((s, i) => (
+                                <span key={i} className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted text-foreground">
+                                    {s}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 {hasValue(industries) && (
                     <div>
                         <p className="text-xs text-muted-foreground mb-2">Industries served</p>
@@ -337,6 +456,30 @@ function ManufacturingSpecificsSection({
                     <div>
                         <p className="text-xs text-muted-foreground mb-2">Key equipment</p>
                         <ChipList items={equipment} />
+                    </div>
+                )}
+
+                {/* Batch size */}
+                {hasValue(batchSize) && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Batch size</p>
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted text-foreground">
+                            {String(batchSize)}
+                        </span>
+                    </div>
+                )}
+
+                {/* Production type — chips split on '|' */}
+                {productionTypeChips.length > 0 && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Production type</p>
+                        <div className="flex flex-wrap gap-1.5">
+                            {productionTypeChips.map((s, i) => (
+                                <span key={i} className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted text-foreground capitalize">
+                                    {s.replace(/_/g, ' ')}
+                                </span>
+                            ))}
+                        </div>
                     </div>
                 )}
             </div>
@@ -353,23 +496,37 @@ function ProjectFitAndTrustSection({
     listing: MarketplaceListing
     attrs: Record<string, unknown>
 }) {
-    const leadTime = listing.lead_time ?? attrs.lead_time
-    const minOrder = listing.minimum_order ?? attrs.minimum_order
-    const finHealth = listing.financial_health ?? attrs.financial_health
-    const prodCapacity = listing.production_capacity ?? attrs.production_capacity
-    const certifications = listing.certifications ?? attrs.certifications
-    const qualitySystems = listing.quality_systems ?? attrs.quality_systems
+    const leadTime = coalesceFilled(listing.lead_time as unknown, attrs.lead_time)
+    const minOrder = coalesceFilled(listing.minimum_order as unknown, attrs.minimum_order)
+    const finHealth = coalesceFilled(listing.financial_health as unknown, attrs.financial_health)
+    const prodCapacity = coalesceFilled(listing.production_capacity as unknown, attrs.production_capacity)
+    const qualitySystems = coalesceFilled(listing.quality_systems as unknown, attrs.quality_systems)
+
+    // Certifications — always sanitise to handle the malformed ISO cert shape
+    const certRaw = coalesceFilled(listing.certifications as unknown, attrs.certifications)
+    const certifications = sanitiseStringArray(certRaw)
+
+    const securityClrRaw = coalesceFilled(listing.security_clearances as unknown, attrs.security_clearances)
+    const securityClearances = sanitiseStringArray(securityClrRaw)
+
     const dqs = listing.data_quality_score
     const iso14001 = listing.iso_14001
     const carbonDisclosed = listing.carbon_disclosed
-    const securityClr = listing.security_clearances ?? attrs.security_clearances
     const verTier = listing.verification_tier
+
+    // New: market_segment, technical_level, pricing_tier from attrs.competitive_positioning
+    const competitivePos = (attrs.competitive_positioning ?? {}) as Record<string, unknown>
+    const marketSegment = competitivePos.market_segment
+    const technicalLevel = competitivePos.technical_level
+    const pricingTier = competitivePos.pricing_tier
 
     const hasAnything =
         hasValue(leadTime) || hasValue(minOrder) || hasValue(finHealth) ||
-        hasValue(prodCapacity) || hasValue(certifications) || hasValue(qualitySystems) ||
+        hasValue(prodCapacity) || certifications.length > 0 || hasValue(qualitySystems) ||
         (dqs != null) || (iso14001 === true) || (carbonDisclosed === true) ||
-        hasValue(securityClr) || hasValue(verTier)
+        securityClearances.length > 0 || hasValue(verTier) ||
+        hasValue(marketSegment) || hasValue(technicalLevel) ||
+        (hasValue(pricingTier) && String(pricingTier).toLowerCase() !== 'unknown')
 
     if (!hasAnything) return null
 
@@ -413,7 +570,7 @@ function ProjectFitAndTrustSection({
                         <span className="text-sm text-foreground">{String(prodCapacity)}</span>
                     </FieldRow>
                 )}
-                {hasValue(certifications) && (
+                {certifications.length > 0 && (
                     <FieldRow label="Certifications">
                         <ChipList items={certifications} />
                     </FieldRow>
@@ -438,11 +595,39 @@ function ProjectFitAndTrustSection({
                         </span>
                     </FieldRow>
                 )}
-                {hasValue(securityClr) && (
+                {securityClearances.length > 0 && (
                     <FieldRow label="Security clearances">
-                        <ChipList items={securityClr} />
+                        <ChipList items={securityClearances} />
                     </FieldRow>
                 )}
+
+                {/* Market segment */}
+                {hasValue(marketSegment) && (
+                    <FieldRow label="Market segment">
+                        <span className="text-sm text-foreground capitalize">
+                            {capitalise(String(marketSegment).replace(/_/g, ' '))}
+                        </span>
+                    </FieldRow>
+                )}
+
+                {/* Technical level */}
+                {hasValue(technicalLevel) && (
+                    <FieldRow label="Technical level">
+                        <span className="text-sm text-foreground capitalize">
+                            {capitalise(String(technicalLevel).replace(/_/g, ' '))}
+                        </span>
+                    </FieldRow>
+                )}
+
+                {/* Pricing tier — only if not "unknown" */}
+                {hasValue(pricingTier) && String(pricingTier).toLowerCase() !== 'unknown' && (
+                    <FieldRow label="Pricing tier">
+                        <span className="text-sm text-foreground capitalize">
+                            {capitalise(String(pricingTier).replace(/_/g, ' '))}
+                        </span>
+                    </FieldRow>
+                )}
+
                 {/* Sustainability flags — only shown when true */}
                 {(iso14001 === true || carbonDisclosed === true) && (
                     <FieldRow label="Sustainability">
@@ -474,13 +659,21 @@ function CompanyBackgroundSection({
     listing: MarketplaceListing
     attrs: Record<string, unknown>
 }) {
-    const city = listing.city ?? attrs.city
-    const country = listing.country ?? attrs.country
-    const address = listing.address ?? attrs.address ?? attrs.ch_registered_address
-    const companySize = listing.company_size ?? attrs.company_size
-    const employeeCountExact = listing.employee_count_exact ?? attrs.employee_count_exact
-    const foundedYear = listing.founded_year ?? attrs.founded_year ?? attrs.year_founded
-    const keyPeople = listing.key_people ?? attrs.key_people
+    const city = coalesceFilled(listing.city as unknown, attrs.city)
+    const country = coalesceFilled(listing.country as unknown, attrs.country)
+    const address = coalesceFilled(listing.address as unknown, attrs.address, attrs.ch_registered_address)
+
+    // attrs.location — use if richer than city+country (i.e. contains a street-level component)
+    const attrsLocation = attrs.location
+
+    const companySize = coalesceFilled(listing.company_size as unknown, attrs.company_size)
+    const employeeCountExact = coalesceFilled(listing.employee_count_exact as unknown, attrs.employee_count_exact)
+    const foundedYear = coalesceFilled(listing.founded_year as unknown, attrs.founded_year, attrs.year_founded)
+    const keyPeopleRaw = coalesceFilled(listing.key_people as unknown, attrs.key_people)
+
+    // attrs.employees band — shown only when no exact count and no company_size
+    const employeesBand = attrs.employees
+
     const directors = Array.isArray(attrs.ch_directors) ? attrs.ch_directors : []
     const pscs = Array.isArray(attrs.ch_psc) ? attrs.ch_psc : []
     const sicCodes = Array.isArray(attrs.ch_sic_codes) ? attrs.ch_sic_codes : []
@@ -488,12 +681,23 @@ function CompanyBackgroundSection({
     const chStatus = attrs.ch_company_status
     const chType = attrs.ch_company_type
 
-    const locationStr = [city, country].filter((v) => hasValue(v)).join(', ')
+    const locationStr = [city, country].filter((v) => hasValue(v)).map(String).join(', ')
+
+    // Use attrs.location if it's richer (contains a digit or is longer than city+country)
+    const attrsLocationStr = hasValue(attrsLocation) ? String(attrsLocation) : ''
+    const useAttrsLocation =
+        attrsLocationStr.length > 0 &&
+        (attrsLocationStr.length > locationStr.length + 5 || /\d/.test(attrsLocationStr))
+
+    const displayLocation = useAttrsLocation ? attrsLocationStr : locationStr
+
+    const keyPeople = Array.isArray(keyPeopleRaw) ? keyPeopleRaw : []
 
     const hasAnything =
-        hasValue(locationStr) || hasValue(address) ||
+        hasValue(displayLocation) || hasValue(address) ||
         hasValue(companySize) || hasValue(employeeCountExact) ||
-        hasValue(foundedYear) || hasValue(keyPeople) ||
+        (!hasValue(employeeCountExact) && !hasValue(companySize) && hasValue(employeesBand)) ||
+        hasValue(foundedYear) || keyPeople.length > 0 ||
         directors.length > 0 || pscs.length > 0 || sicCodes.length > 0 ||
         hasValue(chNumber) || hasValue(chStatus) || hasValue(chType)
 
@@ -503,11 +707,11 @@ function CompanyBackgroundSection({
         <section className="space-y-4">
             <SectionHeader label="Company background" />
             <dl className="space-y-0">
-                {hasValue(locationStr) && (
+                {hasValue(displayLocation) && (
                     <FieldRow label="Location">
                         <span className="text-sm text-foreground flex items-center gap-1.5">
                             <MapPin className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
-                            {locationStr}
+                            {displayLocation}
                         </span>
                     </FieldRow>
                 )}
@@ -515,12 +719,10 @@ function CompanyBackgroundSection({
                     const addrStr = String(address)
                     // Suppress the address if it's just a city/country variant (no street
                     // number or road name) and we already have a city+country location string.
-                    // A real street address will contain a digit or be long enough to include
-                    // a road name. Pure "City, Country" variants are not worth showing.
                     const isStreetLevel = /\d/.test(addrStr) || addrStr.length > 50
-                    if (!isStreetLevel && hasValue(locationStr)) return null
+                    if (!isStreetLevel && hasValue(displayLocation)) return null
                     return (
-                        <FieldRow label={hasValue(locationStr) ? "Registered address" : "Address"}>
+                        <FieldRow label={hasValue(displayLocation) ? "Registered address" : "Address"}>
                             <span className="text-sm text-foreground">{addrStr}</span>
                         </FieldRow>
                     )
@@ -538,6 +740,15 @@ function CompanyBackgroundSection({
                         <span className="text-sm text-foreground flex items-center gap-1.5">
                             <Users className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
                             {String(companySize)}
+                        </span>
+                    </FieldRow>
+                )}
+                {/* attrs.employees band — only when no exact count and no company_size */}
+                {!hasValue(employeeCountExact) && !hasValue(companySize) && hasValue(employeesBand) && (
+                    <FieldRow label="Company size">
+                        <span className="text-sm text-foreground flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            {String(employeesBand)} employees
                         </span>
                     </FieldRow>
                 )}
@@ -576,7 +787,7 @@ function CompanyBackgroundSection({
                 )}
 
                 {/* Key people */}
-                {hasValue(keyPeople) && Array.isArray(keyPeople) && keyPeople.length > 0 && (
+                {keyPeople.length > 0 && (
                     <FieldRow label="Key people">
                         <div className="space-y-1">
                             {(keyPeople as Array<{ name?: string; role?: string; title?: string }>).map((p, i) => {
@@ -655,7 +866,64 @@ function CompanyBackgroundSection({
     )
 }
 
-// ── Section 5: Engage ─────────────────────────────────────────────────────────
+// ── Section 5: From their website ────────────────────────────────────────────
+
+function WebsiteExcerptsSection({ pages }: { pages: ListingPage[] }) {
+    if (!pages || pages.length === 0) return null
+
+    // Pick the 2 longest page_text rows
+    const sorted = [...pages]
+        .filter((p) => p.page_text && p.page_text.trim().length > 50)
+        .sort((a, b) => b.page_text.length - a.page_text.length)
+        .slice(0, 2)
+
+    if (sorted.length === 0) return null
+
+    return (
+        <section className="space-y-4">
+            <SectionHeader label="From their website" />
+            <div className="space-y-3">
+                {sorted.map((page, i) => {
+                    let hostname = ''
+                    try {
+                        hostname = new URL(page.url).hostname.replace(/^www\./, '')
+                    } catch {
+                        hostname = page.url
+                    }
+                    const excerpt = truncateAtWord(page.page_text, 400)
+                    return (
+                        <Card key={i} className="bg-muted/30">
+                            <CardContent className="pt-4 pb-4 space-y-2">
+                                <div className="flex items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                        <FileText className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                                        <span className="text-xs font-medium text-muted-foreground truncate">
+                                            Excerpt from {hostname}
+                                        </span>
+                                    </div>
+                                    <a
+                                        href={page.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[10px] text-international-orange hover:underline inline-flex items-center gap-0.5 flex-shrink-0"
+                                    >
+                                        View source
+                                        <ExternalLink className="h-2.5 w-2.5" />
+                                    </a>
+                                </div>
+                                <p className="text-sm text-foreground/80 leading-relaxed">
+                                    {excerpt}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    )
+                })}
+            </div>
+        </section>
+    )
+}
+
+// ── Section 6: Engage ─────────────────────────────────────────────────────────
 
 function EngageSection({
     listing,
@@ -668,7 +936,7 @@ function EngageSection({
     onContact: () => void
     isContacting: boolean
 }) {
-    const websiteUrl = listing.website_url ?? attrs.website_url
+    const websiteUrl = coalesceFilled(listing.website_url as unknown, attrs.website_url)
     const linkedinUrl = attrs.linkedin_url ?? attrs.contact_linkedin
 
     // Map — only shown if geocoding succeeded
