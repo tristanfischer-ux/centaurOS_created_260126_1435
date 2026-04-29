@@ -7,7 +7,6 @@ import { MarketplaceListing } from "@/actions/marketplace"
 import { getProviderTrustSignals } from "@/actions/trust-signals"
 import { getProviderRatings } from "@/actions/ratings"
 import { getListingExecutives } from "@/actions/listing-executives"
-import { getReviewsForListing } from "@/actions/marketplace-reviews"
 import { geocodeAddress } from "@/lib/geocoding"
 import { hasValue } from "@/lib/has-value"
 
@@ -89,9 +88,8 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
     let trustSignals = null
     let ratings = null
 
-    const [execResult, reviewsResult, ...providerResults] = await Promise.all([
+    const [execResult, ...providerResults] = await Promise.all([
         getListingExecutives(id),
-        getReviewsForListing(id),
         ...(listing.created_by_provider_id
             ? [
                 getProviderTrustSignals(listing.created_by_provider_id),
@@ -123,8 +121,6 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
             trustSignals={trustSignals}
             ratings={ratings}
             executives={executives}
-            reviews={reviewsResult.reviews}
-            currentUserId={user?.id ?? null}
         />
     )
 }

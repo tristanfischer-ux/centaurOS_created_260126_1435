@@ -31,17 +31,13 @@ import {
     Loader2,
     ExternalLink,
     Globe,
-    Send,
     ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
-import { QuoteRequestDialog } from "@/components/marketplace/quote-request-dialog"
 import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
 import type { PublicExecutive } from "@/actions/listing-executives"
-import type { MarketplaceReview } from "@/actions/marketplace-reviews"
-import { ListingReviewsSection, ListingRatingSummary } from "@/components/marketplace/listing-reviews"
 import { toast } from "sonner"
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -63,8 +59,6 @@ interface MarketplaceListingDetailProps {
     trustSignals?: TrustSignalsData | null
     ratings?: RatingsData | null
     executives?: PublicExecutive[]
-    reviews?: MarketplaceReview[]
-    currentUserId?: string | null
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -119,8 +113,6 @@ export function MarketplaceListingDetail({
     trustSignals,
     ratings,
     executives = [],
-    reviews = [],
-    currentUserId = null,
 }: MarketplaceListingDetailProps) {
     const attrs = safeParseAttributes(listing.attributes)
     const category = listing.category
@@ -221,13 +213,6 @@ export function MarketplaceListingDetail({
 
             {/* ── Section 5: Engage ─────────────────────────────────────────── */}
             <EngageSection listing={listing} attrs={attrs} onContact={handleContact} isContacting={isContacting} />
-
-            {/* Reviews */}
-            <ListingReviewsSection
-                listingId={listing.id}
-                initialReviews={reviews}
-                currentUserId={currentUserId}
-            />
         </div>
     )
 }
@@ -700,17 +685,6 @@ function EngageSection({
             <div className="space-y-4">
                 {/* Primary CTAs */}
                 <div className="flex flex-wrap gap-3">
-                    {(hasValue(listing.contact_email) || hasValue(attrs.contact_email)) && (
-                        <QuoteRequestDialog
-                            listings={listing}
-                            trigger={
-                                <Button variant="default" className="bg-international-orange hover:bg-international-orange-hover">
-                                    <Send className="h-4 w-4 mr-2" />
-                                    Request Quote
-                                </Button>
-                            }
-                        />
-                    )}
                     {hasValue(attrs.provider_id) && (
                         <Button variant="secondary" onClick={onContact} disabled={isContacting}>
                             {isContacting ? (
