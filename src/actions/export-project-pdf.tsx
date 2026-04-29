@@ -66,6 +66,12 @@ import {
     repairRiskRowFromContext,
 } from "@/lib/risk/boilerplate-detect"
 import { computeFeasibilityVerdict as computeFeasibilityVerdictFn } from "@/lib/feasibility/compute-verdict"
+import {
+    triageWithFangFindings,
+    regulatoryStatusLabel,
+    regulatoryStatusColour,
+    type FangIssue,
+} from "@/lib/regulatory-triage"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -678,6 +684,10 @@ interface Regulatory {
     evidenceRequired?: string
     ownerRole?: string
     gapAction?: string
+    /** Item 2 (council 2026-04-29): confidence and verified timestamp for
+     *  the unverified-extraction badge — separate from triage status. */
+    confidence?: number | null
+    verifiedAt?: string | null
 }
 
 interface ModulePdf {
@@ -966,6 +976,13 @@ interface PdfInput {
         capacity_at_alternate_class: { value: number | null; units: string }
         trade_off_note: string
     } | null
+    /**
+     * Item 2 (council 2026-04-29): true when the regulatory triage pass found
+     * ALL rows still undifferentiated (all "in-scope-not-started" with no
+     * "not-applicable" or "design-impact-identified"). The RegulatorySection
+     * renders a warning banner when this is true.
+     */
+    regulatoryUndifferentiated: boolean
 }
 
 // ─── PDF Component ─────────────────────────────────────────────────────
@@ -1796,7 +1813,7 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
     )
 }
 
-function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactElement {
+function RegulatorySection({ items, data }: { items: Regulatory[]; data: PdfInput }): React.ReactElement {
     // Loop 3 P4: when at least one item carries the new compliance-matrix
     // fields (applicability / designImpact / evidenceRequired / ownerRole
     // / gapAction), render the rich layout. When none do, fall back to
@@ -1854,13 +1871,56 @@ function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactEleme
                     </Text>
                 </View>
             )}
+            {/* Item 2 (council 2026-04-29): undifferentiated warning banner — fires when
+             *  the post-Chase triage pass could not differentiate any standard from
+             *  &quot;not-started&quot;, meaning the product class is either too novel or
+             *  the brief description is too sparse for keyword matching to resolve
+             *  applicability. Manual review is required in this case. */}
+            {items.length > 0 && data.regulatoryUndifferentiated && (
+                <View
+                    style={{
+                        marginBottom: 8,
+                        padding: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#fdf2f8",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#9d174d",
+                    }}
+                >
+                    <Text style={{ fontSize: 9, fontWeight: "bold", color: "#831843" }}>
+                        Automated triage could not differentiate standards for this product class — manual applicability review required.
+                    </Text>
+                    <Text style={{ fontSize: 8.5, color: "#831843", marginTop: 3 }}>
+                        All standards remain at &quot;not-started&quot; because the brief description did not match the keyword rules for the domain exclusion or design-impact elevation passes. A qualified compliance engineer should review each standard below and mark it not-applicable or flag design impact before procurement or certification.
+                    </Text>
+                </View>
+            )}
             {items.map((r, i) => {
                 const rowUnverified = isUnverifiedExtraction(r.confidence, r.verifiedAt)
                 return (
                 <View key={i} style={{ marginBottom: 10 }} wrap={false}>
                     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
                         <Text style={{ fontWeight: "bold", marginRight: 8 }}>{r.code}</Text>
-                        {r.status && <Text style={styles.pillMuted}>{r.status}</Text>}
+                        {r.status && (() => {
+                            const colours = regulatoryStatusColour(r.status)
+                            return (
+                                <Text
+                                    style={{
+                                        fontSize: 8,
+                                        paddingHorizontal: 6,
+                                        paddingVertical: 2,
+                                        borderRadius: 3,
+                                        backgroundColor: colours.bg,
+                                        color: colours.text,
+                                        borderWidth: 1,
+                                        borderColor: colours.border,
+                                        marginRight: 4,
+                                    }}
+                                >
+                                    {regulatoryStatusLabel(r.status)}
+                                </Text>
+                            )
+                        })()}
                         {r.ownerRole && (
                             <Text style={[styles.pillMuted, { marginLeft: 6 }]}>
                                 {r.ownerRole}
@@ -4736,7 +4796,7 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
             {/* 1 + 2 on the same page-stream */}
             <Page size="A4" style={styles.page} wrap>
                 <BriefSection data={data} />
-                <RegulatorySection items={data.regulatory} />
+                <RegulatorySection items={data.regulatory} data={data} />
                 <PdfFooter label="Brief + regulatory" />
             </Page>
 
@@ -5184,7 +5244,7 @@ async function exportProjectPdfInternal(
                 toleranceTarget?: string
                 quantityTarget?: string
                 complianceNotes?: string
-                constraints?: { unitCostCeilingGbp?: number; maxMassKg?: number }
+                constraints?: { unitCostCeilingGbp?: number; maxMassKg?: number; markets?: string[] }
                 regulatory?: Array<{
                     code?: string
                     name?: string
@@ -5396,6 +5456,49 @@ async function exportProjectPdfInternal(
                     : null,
             }
         })
+
+        // Item 2 (council 2026-04-29): full regulatory triage with Fang findings.
+        //
+        // Chase ran an initial triage pass at extraction time (no Fang data yet).
+        // Now that modules and their Fang reviews are available, run a second pass
+        // that can additionally elevate standards to "design-impact-identified"
+        // when a Fang issue directly implicates a specific standard's scope.
+        //
+        // Example: Fang finds "350-bar hydrogen storage pressure" in a module →
+        // PESR and hydrogen-specific standards are elevated from
+        // "in-scope-not-started" to "design-impact-identified".
+        //
+        // Also catches any legacy "not-started" rows from older persisted Chase
+        // outputs that predate the triage step (back-compat upgrade).
+        let regulatoryMatrixUndifferentiated = false
+        {
+            const subject = typeof project.subject === "string" ? project.subject : ""
+            const markets = Array.isArray(designBrief?.constraints?.markets)
+                ? (designBrief!.constraints!.markets as string[])
+                : ["GB"]
+            const allModuleReviews = modules.flatMap((m) =>
+                m.reviews.map((r) => ({
+                    issues: r.issues,
+                    recommendations: r.recommendations,
+                })),
+            )
+            const triageResult = triageWithFangFindings(
+                // Cast to CadLabDesignBriefRegulatoryItem[] — the Regulatory interface
+                // is a strict subset; triage reads code/name/status/applicability and
+                // writes status/gapAction/designImpact which all exist on Regulatory too.
+                regulatory as unknown as import("@/lib/cad-lab-types").CadLabDesignBriefRegulatoryItem[],
+                subject,
+                markets,
+                allModuleReviews,
+            )
+            regulatoryMatrixUndifferentiated = triageResult.matrixUndifferentiated
+            console.log(
+                `[export-project-pdf] regulatory triage (with Fang): ${triageResult.triageSummary}`,
+                regulatoryMatrixUndifferentiated
+                    ? "UNDIFFERENTIATED — warning banner will fire"
+                    : "differentiated",
+            )
+        }
 
         // L16-A1 (2026-04-27): snapshot the canonical specs ledger from the
         // current modules + parts state. This is the minimum-viable wiring
@@ -6363,6 +6466,11 @@ async function exportProjectPdfInternal(
                     trade_off_note: alt.trade_off_note,
                 }
             })(),
+            // Item 2 (council 2026-04-29): regulatory triage result — true when ALL
+            // standards remain undifferentiated after the two-phase triage pass
+            // (Chase-time keyword pass + Fang-findings elevation). Triggers the
+            // warning banner in RegulatorySection.
+            regulatoryUndifferentiated: regulatoryMatrixUndifferentiated,
         }
 
         try {

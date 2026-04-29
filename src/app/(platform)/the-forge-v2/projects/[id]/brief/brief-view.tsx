@@ -41,8 +41,8 @@ export interface RegulatoryStandardRow {
     code: string
     name: string
     summary: string
-    /** Compliance state — `not-started` until a project_compliance_packet table ships. */
-    status: "met" | "in-progress" | "not-started"
+    /** Compliance state — extended with Item 2 triage statuses (2026-04-29). */
+    status: "met" | "in-progress" | "not-started" | "not-applicable" | "in-scope-not-started" | "design-impact-identified" | "evidence-captured"
 }
 
 export interface BriefRevisionRow {
