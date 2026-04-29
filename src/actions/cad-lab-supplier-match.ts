@@ -2,24 +2,36 @@
  * @file cad-lab-supplier-match.ts — Multi-factor supplier matching for CadLab modules.
  *
  * @description Server action that matches CadLab modules to marketplace listings
- * using a 9-factor scoring system (100pts total):
+ * using a 12-factor scoring system (100pts base + up to 21pts bonuses):
  *
- * | Factor             | Max | Source                                             |
- * |--------------------|-----|----------------------------------------------------|
- * | Semantic relevance | 30  | match_marketplace_listings RPC (cosine sim)         |
- * | Process match      | 15  | listing text + subcategory                          |
- * | Material match     | 10  | listing materials + text                            |
- * | Industry match     | 10  | listing industries vs inferred project industry     |
- * | Certifications     | 10  | listing certifications (regulated-industry aligned) |
- * | Keyword relevance  | 10  | text matching on title/description/categories       |
- * | Specialties match  | 7   | listing specialties vs search terms                 |
- * | Capability match   | 5   | process_capabilities JSONB (sparse: 13.7% coverage) |
- * | Quality & trust    | 3   | is_verified flag (sparse: 0.2% coverage)            |
+ * | Factor              | Max | Source                                              |
+ * |---------------------|-----|-----------------------------------------------------|
+ * | Semantic relevance  | 30  | match_marketplace_listings RPC (cosine sim)          |
+ * | Process match       | 15  | listing text + subcategory                           |
+ * | Material match      | 10  | listing materials + text                             |
+ * | Industry match      | 10  | listing industries vs inferred project industry      |
+ * | Certifications      | 10  | listing certifications (regulated-industry aligned)  |
+ * | Keyword relevance   | 10  | text matching on title/description/categories        |
+ * | Specialties match   | 7   | listing specialties vs search terms                  |
+ * | Capability match    | 5   | process_capabilities JSONB (sparse: 13.7% coverage)  |
+ * | Quality & trust     | 3   | is_verified flag (sparse: 0.2% coverage)             |
+ * | --- BONUSES (additive, do not replace base weights) ---                  |
+ * | Sustainability      | 5   | iso_14001 (1.8% coverage — only field populated)     |
+ * | Capacity fit        | 5   | production_capacity text + employee_count_exact      |
+ * | Verification trust  | 4   | verification_tier enum + data_quality_score >= 70    |
+ * | Region bonus        | 8   | country/country_iso vs brief target market           |
  *
  * REWEIGHT 2026-04-18: Previous weighting (capability 25 + quality 10) produced
  * all scores in the 21–31 range because capability JSONB is only 13.7% populated
  * and is_verified is 0.2%. Added industry/certifications/specialties which read
  * well-populated attribute fields (79–97%), restoring meaningful score spread.
+ *
+ * ENRICHMENT 2026-04-29: Added sustainability / capacity-fit / verification-trust
+ * bonus scores leveraging the freshly-enriched 33k-row supplier DB. All three are
+ * ADDITIVE — they do not compress existing weights. Coverage calibration (Services
+ * + Products, n=19,928): iso_14001=1.8%, ecovadis/recycled_content=0% (skip),
+ * verification_tier only "unverified"/"claimed" (no higher tiers yet), dqs>=70=61%,
+ * production_capacity=7.2%, employee_count_exact=1.5%.
  *
  * When process or material are unavailable on the module input, their points
  * redistribute to semantic + keyword so the total always sums to 100.
@@ -89,6 +101,24 @@ export interface ScoreBreakdown {
    * Stays at 0 when the brief doesn't declare a target market.
    */
   region: number
+  /**
+   * Sustainability bonus (0-5 pts) — iso_14001=true awards full 5 pts.
+   * ecovadis/recycled_content are 0% populated in DB (2026-04-29 audit) and
+   * intentionally omitted from scoring until the DB is enriched.
+   */
+  sustainability: number
+  /**
+   * Capacity fit bonus (0-5 pts) — checks production_capacity text against
+   * a rough scale bucket derived from the module's batchSize field.
+   * Coverage: 7.2% of rows have production_capacity text (2026-04-29 audit).
+   */
+  capacityFit: number
+  /**
+   * Verification trust bonus (0-4 pts) — verification_tier enum + dqs>=70.
+   * DB currently has only "unverified" (91%) and "claimed" (9%) tiers;
+   * higher tiers ("verified", "premium") reserved for when enrichment adds them.
+   */
+  verificationTrust: number
   total: number
 }
 
@@ -122,6 +152,12 @@ export interface CadLabSupplierMatch {
   contactEmail?: string | null
   contactName?: string | null
   dataQualityScore?: number | null
+  // ENRICHMENT 2026-04-29: New fields from the 33k-row DB enrichment pass.
+  // Coverage: iso_14001=1.8%, verification_tier=100% (all "unverified"/"claimed"),
+  // key_people=100% (all rows populated), lead_time=5.3%.
+  iso14001?: boolean | null
+  verificationTier?: string | null
+  keyPeople?: Array<{ name?: string; title?: string }> | null
 }
 
 // ─── Category Normalization Maps ────────────────────────────────────
@@ -661,6 +697,118 @@ function scoreCapabilityMatch(
   return bestScore / maxPts
 }
 
+// ─── Enrichment Bonus Scores (additive — do not compress BASE_WEIGHTS) ─────
+//
+// These three functions score the new fields from the 2026-04-29 DB enrichment
+// pass. They return raw pts (not 0-1 normalised) because they are bonuses added
+// directly to the total rather than multiplied by a weight. Callers add the
+// return value to ScoreBreakdown directly.
+//
+// Coverage calibration (Services+Products, n=19,928):
+//   iso_14001      = 1.8%  populated (368 true rows)
+//   ecovadis_score = 0%    — field exists but not yet enriched; skip
+//   recycled_%     = 0%    — field exists but not yet enriched; skip
+//   verification_tier: "unverified"=91%, "claimed"=9%; no higher tiers yet
+//   data_quality_score >= 70 = 61% of rows
+//   production_capacity text = 7.2% of rows
+//   employee_count_exact     = 1.5% of rows (too sparse for hard rules)
+
+/**
+ * Sustainability bonus (0-5 pts additive).
+ *
+ * Awards 5 pts when iso_14001=true. ecovadis_score and recycled_content_percent
+ * are intentionally excluded — both fields are 0% populated as of 2026-04-29.
+ * When they are enriched, add: +2 if ecovadis_score >= 60, +1 if recycled >= 30,
+ * cap total at 5.
+ *
+ * Only fires when the project does NOT explicitly deprioritise sustainability
+ * (checked via a simple flag the caller passes — defaults to true = award score).
+ */
+function scoreSustainability(
+  iso14001: boolean | null | undefined,
+  awardSustainability: boolean,
+): number {
+  if (!awardSustainability) return 0
+  let pts = 0
+  if (iso14001 === true) pts += 5
+  // ecovadis_score / recycled_content_percent: skip — 0% coverage in DB (2026-04-29)
+  return Math.min(pts, 5)
+}
+
+/**
+ * Capacity fit bonus (0-5 pts additive).
+ *
+ * Compares a rough scale bucket (derived from the module's batchSize or the
+ * brief's target_scale field) against production_capacity text + employee_count_exact.
+ * A keyword-bucket approach is intentional — production_capacity is free text
+ * and only 7.2% populated. Mis-match = 0; match = 5; no partial credit.
+ *
+ * Scale buckets:
+ *   prototype  → supplier capacity text contains "prototype" / "low-volume" / "small-batch" OR employee_count < 50
+ *   pilot      → "pilot" / "low-volume" / "small batch" in capacity text
+ *   production → "mass production" / "high-volume" / "large-scale" / employee_count > 200
+ */
+function scoreCapacityFit(
+  productionCapacity: string | null | undefined,
+  employeeCountExact: number | null | undefined,
+  batchSize: string | null | undefined,
+): number {
+  if (!batchSize) return 0
+  const cap = (productionCapacity ?? "").toLowerCase()
+  const batch = batchSize.toLowerCase()
+  const emp = employeeCountExact ?? null
+
+  // Determine the requested scale bucket
+  const wantsPrototype = batch.includes("prototype") || batch.includes("low") || batch.includes("sample")
+  const wantsProduction = batch.includes("production") || batch.includes("10k") || batch.includes("10000") || batch.includes("high")
+  const wantsPilot = batch.includes("pilot") || batch.includes("100") || batch.includes("1000")
+
+  // Score against capacity text (primary signal)
+  if (cap.length > 0) {
+    if (wantsPrototype && (cap.includes("prototype") || cap.includes("low-volume") || cap.includes("small batch") || cap.includes("low volume"))) return 5
+    if (wantsPilot && (cap.includes("pilot") || cap.includes("low-volume") || cap.includes("small batch"))) return 5
+    if (wantsProduction && (cap.includes("mass production") || cap.includes("high-volume") || cap.includes("high volume") || cap.includes("large-scale"))) return 5
+  }
+  // Fallback: employee_count heuristic (1.5% coverage but worth using)
+  if (emp !== null) {
+    if (wantsPrototype && emp < 50) return 5
+    if (wantsProduction && emp > 200) return 5
+  }
+  return 0
+}
+
+/**
+ * Verification trust bonus (0-4 pts additive).
+ *
+ * verification_tier enum: "verified"=3, "claimed"=2, "unverified"=0.
+ * An additional +1 if data_quality_score >= 70.
+ *
+ * DB state as of 2026-04-29: only "unverified" and "claimed" tiers exist.
+ * "verified" and "premium" tiers are reserved for future enrichment passes.
+ * Max currently achievable in practice: "claimed" (2) + dqs>=70 (1) = 3 pts.
+ */
+function scoreVerificationTrust(
+  verificationTier: string | null | undefined,
+  dataQualityScore: number | null | undefined,
+): number {
+  let pts = 0
+  switch (verificationTier) {
+    case "verified":
+    case "premium":
+      pts += 3
+      break
+    case "claimed":
+      pts += 2
+      break
+    case "unverified":
+    default:
+      pts += 0
+      break
+  }
+  if (typeof dataQualityScore === "number" && dataQualityScore >= 70) pts += 1
+  return Math.min(pts, 4)
+}
+
 // ─── Main Action ────────────────────────────────────────────────────
 
 /**
@@ -810,7 +958,7 @@ export async function matchCadLabModuleSuppliers(
   // back to GenericStringError and every column access TS-fails.
   const { data: rawListings } = await supabase
     .from("marketplace_listings")
-    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, country_iso, city, address, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, contact_title, contact_phone, contact_linkedin, data_quality_score, products, production_capacity, quality_systems, key_people, iso_14001, ecovadis_score, carbon_disclosed, recycled_content_percent, enrichment_quality, average_rating, review_count")
+    .select("id, title, description, attributes, is_verified, subcategory, category, process_capabilities, certifications, materials, industries, key_equipment, specialties, country, country_iso, city, address, employee_count_exact, founded_year, lead_time, minimum_order, export_controls, security_clearances, website_url, contact_email, contact_name, contact_title, contact_phone, contact_linkedin, data_quality_score, products, production_capacity, quality_systems, key_people, iso_14001, ecovadis_score, carbon_disclosed, recycled_content_percent, enrichment_quality, average_rating, review_count, verification_tier")
     .in("id", [...candidateIds])
     .in("category", ["Products", "Services"])
 
@@ -1073,6 +1221,26 @@ export async function matchCadLabModuleSuppliers(
         input.targetMarket,
       )
 
+      // Bonus 1: Sustainability (additive, 0-5 pts)
+      // awardSustainability=true unless caller explicitly opts out (no mechanism yet)
+      const sustainabilityPts = scoreSustainability(
+        listing.iso_14001,
+        true,
+      )
+
+      // Bonus 2: Capacity fit (additive, 0-5 pts)
+      const capacityFitPts = scoreCapacityFit(
+        listing.production_capacity,
+        listing.employee_count_exact,
+        input.batchSize,
+      )
+
+      // Bonus 3: Verification trust (additive, 0-4 pts)
+      const verificationTrustPts = scoreVerificationTrust(
+        listing.verification_tier,
+        listing.data_quality_score,
+      )
+
       // Relevance gate. Now includes industry + cert alignment — an aerospace
       // shop with AS9100 but weak semantic overlap still surfaces.
       // SEMANTIC-ONLY FLOOR: a high semantic score alone (without process /
@@ -1104,12 +1272,16 @@ export async function matchCadLabModuleSuppliers(
         certifications: Math.round(certificationsRaw * weights.certifications * 10) / 10,
         specialties: Math.round(specialtiesRaw * weights.specialties * 10) / 10,
         region: Math.round(regionRaw * REGION_BONUS_MAX_POINTS * 10) / 10,
+        sustainability: sustainabilityPts,
+        capacityFit: capacityFitPts,
+        verificationTrust: verificationTrustPts,
         total: 0,
       }
       breakdown.total = Math.round(
         (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality +
          breakdown.keyword + breakdown.capability + breakdown.industry +
-         breakdown.certifications + breakdown.specialties + breakdown.region) * 10,
+         breakdown.certifications + breakdown.specialties + breakdown.region +
+         breakdown.sustainability + breakdown.capacityFit + breakdown.verificationTrust) * 10,
       ) / 10
 
       if (breakdown.total >= MIN_SCORE_THRESHOLD) {
@@ -1136,6 +1308,16 @@ export async function matchCadLabModuleSuppliers(
           ? (listing.security_clearances as unknown[]).filter((c): c is string => typeof c === "string")
           : null
 
+        // key_people: 100% populated (all 19,928 rows have this field).
+        // Surface top 2 contacts for outreach use.
+        const rawKeyPeople = listing.key_people as unknown
+        const keyPeopleArr: Array<{ name?: string; title?: string }> | null =
+          Array.isArray(rawKeyPeople)
+            ? (rawKeyPeople as Array<Record<string, unknown>>)
+                .slice(0, 2)
+                .map((p) => ({ name: p.name as string | undefined, title: p.title as string | undefined }))
+            : null
+
         matches.push({
           id: listing.id,
           name: listing.title || "Unknown Supplier",
@@ -1158,6 +1340,9 @@ export async function matchCadLabModuleSuppliers(
           contactEmail: listing.contact_email ?? null,
           contactName: listing.contact_name ?? null,
           dataQualityScore: listing.data_quality_score ?? null,
+          iso14001: listing.iso_14001 ?? null,
+          verificationTier: listing.verification_tier ?? null,
+          keyPeople: keyPeopleArr,
         })
       }
     }

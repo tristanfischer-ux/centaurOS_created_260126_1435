@@ -427,28 +427,51 @@ async function fetchMarketplaceSupplierContextForBom(
     const ids = semantic.map((r: { id: string }) => r.id)
     const { data: listings } = await admin
       .from("marketplace_listings")
-      .select("id, title, subcategory, specialties, materials, description")
+      .select("id, title, subcategory, specialties, materials, description, process_capabilities, certifications, key_equipment, lead_time, production_capacity, country_iso, iso_14001, verification_tier, data_quality_score")
       .in("id", ids)
       .in("category", ["Products", "Services"])
 
     if (!listings || listings.length === 0) return ""
 
-    const lines = listings.slice(0, 20).map((l) => {
+    // Cap at 15 rows to keep token budget under ~3000 tokens of supplier context.
+    // Format: one compact line per supplier summarising manufacturing capabilities
+    // (process + materials + lead_time) so Max generates practically-sourceable
+    // parts rather than training-data priors.
+    const lines = listings.slice(0, 15).map((l) => {
       const parts: string[] = []
       if (l.title) parts.push(l.title)
       if (l.subcategory) parts.push(`(${l.subcategory})`)
+
+      // Materials (top 3)
       const mats = Array.isArray(l.materials)
         ? (l.materials as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 3).join(", ")
         : null
       if (mats) parts.push(`materials: ${mats}`)
-      const specs = Array.isArray(l.specialties)
-        ? (l.specialties as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 3).join(", ")
+
+      // Process capabilities from JSONB (top 2 processes)
+      const caps = Array.isArray(l.process_capabilities)
+        ? (l.process_capabilities as Array<Record<string, unknown>>)
+            .map((c) => c.process_category)
+            .filter((v): v is string => typeof v === "string")
+            .slice(0, 2)
+            .join(", ")
         : null
-      if (specs) parts.push(`specialties: ${specs}`)
+      if (caps) parts.push(`process: ${caps}`)
+
+      // Lead time (real procurement signal)
+      if (l.lead_time && typeof l.lead_time === "string") parts.push(`lead: ${l.lead_time}`)
+
+      // Country + quality signals
+      const flags: string[] = []
+      if (l.country_iso && typeof l.country_iso === "string") flags.push(l.country_iso)
+      if (l.iso_14001 === true) flags.push("ISO14001")
+      if (l.verification_tier === "verified" || l.verification_tier === "claimed") flags.push(l.verification_tier)
+      if (flags.length > 0) parts.push(flags.join("/"))
+
       return `- ${parts.join(" | ")}`
     }).join("\n")
 
-    return `\nKNOWN SUPPLIERS IN OUR DIRECTORY FOR THIS DOMAIN (sourced from 19,928-supplier database):\n${lines}\n\nGenerate a BOM that is practically sourceable from suppliers like these. Do NOT specify materials, processes, or components that have no realistic supplier match in this list. Where a part category is well-represented in the list above, prefer those categories.`
+    return `\nKNOWN SUPPLIERS IN OUR DIRECTORY FOR THIS DOMAIN (sourced from 19,928-supplier database):\n${lines}\n\nGenerate a BOM that is practically sourceable from suppliers like these. Prefer materials and processes represented in this list. Where a part category is well-represented, use those categories. Where lead times appear, factor them into any notes about procurement complexity.`
   } catch (err) {
     // Non-fatal — BOM still generates without marketplace grounding
     console.warn("[bom:fix1] fetchMarketplaceSupplierContextForBom failed (non-fatal):", err instanceof Error ? err.message : err)
