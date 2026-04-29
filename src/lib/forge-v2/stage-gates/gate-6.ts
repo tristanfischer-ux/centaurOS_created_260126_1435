@@ -184,9 +184,31 @@ async function loadInput(ctx: GateContext): Promise<Gate6Input> {
         }
     }
 
-    const rawCodes = research?.standardCodes
-    const citedCodes: string[] = Array.isArray(rawCodes)
-        ? (rawCodes as unknown[]).filter((c): c is string => typeof c === "string")
+    // Chase does NOT write top-level `research.standardCodes` (verified
+    // 2026-04-29 03:22 BST against Loop 22 production data — the field
+    // simply doesn't exist on any project's research object). The actual
+    // structured regulatory items live at `research.designBrief.regulatory`
+    // as an array of `{ code, name, status, summary, gapAction, ownerRole }`
+    // objects. Extract `.code` from each entry to build citedCodes.
+    //
+    // Gate 6 PRE this fix returned vacuous PASS on every project because
+    // the empty array filter (line above) read a non-existent field. Loop
+    // 22 surfaced this — five demos all FAILed Gate 6 with "Cited: 0"
+    // despite Chase having produced 12-23 regulatory items each. Loop 19
+    // critique flagged the failure mode but not the path mismatch — which
+    // is why earlier loops also produced false-PASS Gate 6 verdicts.
+    const designBriefRegulatory = (research as { designBrief?: { regulatory?: unknown } } | null)
+        ?.designBrief?.regulatory
+    const citedCodes: string[] = Array.isArray(designBriefRegulatory)
+        ? (designBriefRegulatory as unknown[])
+              .map((entry) => {
+                  if (entry && typeof entry === "object" && "code" in entry) {
+                      const code = (entry as { code: unknown }).code
+                      return typeof code === "string" ? code : null
+                  }
+                  return null
+              })
+              .filter((c): c is string => c !== null && c.length > 0)
         : []
 
     if (citedCodes.length === 0) {
