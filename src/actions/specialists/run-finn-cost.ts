@@ -75,8 +75,9 @@ import { runCostReconciliation } from "@/actions/specialists/run-cost-reconcilia
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
-import type { CadLabModule } from "@/lib/cad-lab-types"
+import type { AiCostEstimate, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
+import { estimateNreCosts } from "@/lib/cost/nre-cost-layer"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -513,7 +514,42 @@ async function runFinnCostInternal(
                 },
             })
 
-            // 8. Post-Finn cost reconciliation (Item 7 fix).
+            // 8. NRE cost layer (F1, GPT-5.5 + Kimi critical).
+            //    Estimate non-recurring costs that Finn's unit cost excludes:
+            //    tooling, certification, testing, fixtures, warranty, freight.
+            //    Non-blocking — NRE estimation failure must never break the pipeline.
+            try {
+                const bomTotal = Object.values(estimates as Record<string, AiCostEstimate>)
+                    .reduce((sum, est) => sum + (est.totalPerUnit ?? 0), 0)
+
+                const productClassHint =
+                    (project.product_overview as string) ??
+                    (project.diagnostic_answers as DiagnosticAnswers | null)?.productType ??
+                    ""
+
+                const nreBreakdown = estimateNreCosts(
+                    bomTotal,
+                    productClassHint,
+                    (project.diagnostic_answers as DiagnosticAnswers | null)?.geography ?? "United Kingdom",
+                )
+
+                await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        ai_cost_estimates: {
+                            ...(estimates as Record<string, unknown>),
+                            _nre_breakdown: nreBreakdown,
+                        } as unknown as Record<string, unknown>,
+                    })
+                    .eq("id", projectId)
+            } catch (nreErr) {
+                console.warn(
+                    "[run-finn-cost] NRE estimation failed (non-blocking):",
+                    nreErr instanceof Error ? nreErr.message : nreErr,
+                )
+            }
+
+            // 9. Post-Finn cost reconciliation (Item 7 fix).
             //    Compares Finn's canonical total against the BOM-derived
             //    total, supplier quotes, and the brief's cost ceiling.
             //    This MUST NOT block the pipeline even if it throws —
