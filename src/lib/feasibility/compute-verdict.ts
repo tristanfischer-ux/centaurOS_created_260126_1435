@@ -33,7 +33,7 @@
  */
 
 export type VerdictStatus = "green" | "amber" | "red"
-export type VerdictAxis = "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings"
+export type VerdictAxis = "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "cross_modal_consistency"
 export type VerdictSeverity = "blocker" | "warning"
 
 export interface VerdictFail {

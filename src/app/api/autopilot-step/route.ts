@@ -428,6 +428,125 @@ async function runStep(
                     err instanceof Error ? err.message : err,
                 )
             }
+
+            // ── Cross-modal consistency gate (council R1 P1) ──────────
+            //
+            // Runs AFTER illustration generation, BEFORE supplier matching.
+            // Catches BOM-vs-module divergences before the engine spends
+            // time matching suppliers for parts that don't actually exist.
+            //
+            // Loop 24 evidence: BOM count and keyParts count diverged on
+            // 4 of 5 demos. Vertical Farm showed 4 tiers in illustration
+            // but 6 in BOM; Desalination CIP module missing from BOM but
+            // cost persisted in waterfall.
+            //
+            // When blockers are found the step returns ok:false so the
+            // autopilot stops at generating_illustration and the founder
+            // sees the inconsistency rather than a fabricated supplier
+            // shortlist for parts that don't exist.
+            try {
+                const { runCrossModalCheck } = await import(
+                    "@/lib/forge-v2/cross-modal-consistency"
+                )
+                const cmAdmin = createAdminClient()
+                const { data: cmProject } = await cmAdmin
+                    .from("cad_lab_projects")
+                    .select("modules, spatial_plan, ai_cost_estimates, system_illustration_url")
+                    .eq("id", projectId)
+                    .maybeSingle()
+
+                if (cmProject) {
+                    // Pull parts for BOM count by module.
+                    const { data: cmParts } = await cmAdmin
+                        .from("parts")
+                        .select("source_module_id")
+                        .eq("cad_lab_project_id", projectId)
+                    const bomPartCountByModuleId: Record<string, number> = {}
+                    for (const p of cmParts ?? []) {
+                        const mid = typeof p.source_module_id === "string"
+                            ? p.source_module_id : null
+                        if (!mid) continue
+                        bomPartCountByModuleId[mid] = (bomPartCountByModuleId[mid] ?? 0) + 1
+                    }
+
+                    // Finn total from ai_cost_estimates.
+                    const aiEst = cmProject.ai_cost_estimates as Record<string, unknown> | null
+                    let finnTotal: number | null = null
+                    if (aiEst && typeof aiEst === "object") {
+                        let s = 0; let any = false
+                        for (const v of Object.values(aiEst)) {
+                            if (v && typeof v === "object") {
+                                const obj = v as { totalPerUnit?: unknown; totalGbp?: unknown }
+                                const t = typeof obj.totalPerUnit === "number" ? obj.totalPerUnit
+                                    : typeof obj.totalGbp === "number" ? obj.totalGbp : null
+                                if (t !== null && t > 0) { s += t; any = true }
+                            }
+                        }
+                        if (any) finnTotal = s
+                    }
+
+                    const rawModules = (Array.isArray(cmProject.modules) ? cmProject.modules : []) as Array<Record<string, unknown>>
+                    const spatialPlan = cmProject.spatial_plan as Record<string, unknown> | null
+                    const fangPlacements: Record<string, number> | null = (() => {
+                        if (!spatialPlan || typeof spatialPlan !== "object") return null
+                        const pl = (spatialPlan as Record<string, unknown>).placements
+                        if (!pl || typeof pl !== "object" || Array.isArray(pl)) return null
+                        const r: Record<string, number> = {}
+                        for (const [k, v] of Object.entries(pl as Record<string, unknown>)) {
+                            if (typeof v === "number") r[k] = v
+                            else if (v && typeof v === "object") {
+                                const c = (v as Record<string, unknown>).count
+                                if (typeof c === "number") r[k] = c
+                            }
+                        }
+                        return Object.keys(r).length > 0 ? r : null
+                    })()
+
+                    const cmVerdict = runCrossModalCheck({
+                        modules: rawModules.map((m) => ({
+                            id: typeof m.id === "string" ? m.id : String(m.id ?? ""),
+                            name: typeof m.name === "string" ? m.name : null,
+                            keyParts: Array.isArray(m.keyParts) ? m.keyParts as unknown[] : null,
+                        })),
+                        bomPartCountByModuleId,
+                        canonicalBomTotalGbp: null, // BOM dedup total not available here; cost check runs in proofreader
+                        finnModuleTotalGbp: finnTotal,
+                        fangLayoutPlacementsByModuleId: fangPlacements,
+                        systemIllustrationUrl:
+                            typeof cmProject.system_illustration_url === "string"
+                                ? cmProject.system_illustration_url : null,
+                    })
+
+                    if (!cmVerdict.passed) {
+                        const summary = cmVerdict.blockers
+                            .slice(0, 3)
+                            .map((b) => `[${b.axis}] ${b.explanation}`)
+                            .join(" | ")
+                        console.warn(
+                            `[autopilot-step] cross-modal gate FAILED for project=${projectId}: ${summary}`,
+                        )
+                        return {
+                            ok: false,
+                            error:
+                                `Cross-modal consistency gate: ${cmVerdict.blockers.length} blocker(s) found. ` +
+                                `Fix the BOM-vs-module divergences before supplier matching. ` +
+                                summary,
+                        }
+                    }
+                    console.info(
+                        `[autopilot-step] cross-modal gate PASSED for project=${projectId} (${cmVerdict.warnings.length} warning(s))`,
+                    )
+                }
+            } catch (cmErr) {
+                // Non-fatal: log and continue. The proofreader runs the same
+                // check and will surface blockers in the verdict. The gate
+                // here is an early-stop optimisation, not a hard dependency.
+                console.warn(
+                    "[autopilot-step] cross-modal gate threw (non-fatal):",
+                    cmErr instanceof Error ? cmErr.message : cmErr,
+                )
+            }
+
             return { ok: true }
         }
 

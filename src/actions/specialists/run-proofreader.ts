@@ -33,8 +33,10 @@ import {
 import {
     computeFeasibilityVerdict,
     type FeasibilityVerdict,
+    type VerdictFail,
 } from "@/lib/feasibility/compute-verdict"
 import { dedupedUnitTotalGbp } from "@/lib/bom/assembly-dedup"
+import { runCrossModalCheck } from "@/lib/forge-v2/cross-modal-consistency"
 
 /**
  * V4-Pro is the preferred proofreader (frontier reasoning at half-Haiku
@@ -309,6 +311,98 @@ export async function runProofreaderBackground(
         }
     }
 
+    // Cross-modal consistency gate (council R1 P1 — Loop 24 evidence).
+    //
+    // Runs BEFORE computeFeasibilityVerdict so its blockers can be injected
+    // into the same feasibility_verdict.fails[] array the PDF renders.
+    // The gate is deterministic — no LLM call. It checks:
+    //   (a) Per-module: keyParts[] count vs BOM row count per source_module_id.
+    //   (b) System: canonical BOM total vs Finn per-module total (<1% threshold).
+    //   (c) Fang layout placement count vs keyParts count.
+    //   (d) Illustration object count — deferred (URL only, no metadata).
+    //
+    // Blockers are translated to VerdictFail entries on the
+    // "cross_modal_consistency" axis and merged into the verdict below.
+
+    // Build bomPartCountByModuleId from parts table.
+    const bomPartCountByModuleId: Record<string, number> = {}
+    for (const p of parts) {
+        const mid = typeof p.source_module_id === "string" ? p.source_module_id : null
+        if (!mid) continue
+        bomPartCountByModuleId[mid] = (bomPartCountByModuleId[mid] ?? 0) + 1
+    }
+
+    // Finn per-module total from ai_cost_estimates.
+    const aiCostEstimatesObj = project.ai_cost_estimates as Record<string, unknown> | null
+    let finnModuleTotalGbp: number | null = null
+    if (aiCostEstimatesObj && typeof aiCostEstimatesObj === "object") {
+        let sum = 0
+        let any = false
+        for (const v of Object.values(aiCostEstimatesObj)) {
+            if (v && typeof v === "object") {
+                const obj = v as { totalPerUnit?: unknown; totalGbp?: unknown }
+                const t = typeof obj.totalPerUnit === "number" ? obj.totalPerUnit
+                    : typeof obj.totalGbp === "number" ? obj.totalGbp : null
+                if (t !== null && t > 0) { sum += t; any = true }
+            }
+        }
+        if (any) finnModuleTotalGbp = sum
+    }
+
+    // Fang layout placements from spatial_plan.placements (keyed by module id or name).
+    const fangLayoutPlacementsByModuleId: Record<string, number> | null = (() => {
+        if (!spatialPlan || typeof spatialPlan !== "object") return null
+        const placements = (spatialPlan as Record<string, unknown>).placements
+        if (!placements || typeof placements !== "object" || Array.isArray(placements)) return null
+        const result: Record<string, number> = {}
+        for (const [key, val] of Object.entries(placements as Record<string, unknown>)) {
+            if (typeof val === "number") {
+                result[key] = val
+            } else if (val && typeof val === "object") {
+                // Some placements encode as { count: N }
+                const countField = (val as Record<string, unknown>).count
+                if (typeof countField === "number") result[key] = countField
+            }
+        }
+        return Object.keys(result).length > 0 ? result : null
+    })()
+
+    const crossModalVerdict = runCrossModalCheck({
+        modules: modules.map((m) => ({
+            id: typeof (m as Record<string, unknown>).id === "string"
+                ? (m as Record<string, unknown>).id as string
+                : String((m as Record<string, unknown>).id ?? ""),
+            name: typeof (m as Record<string, unknown>).name === "string"
+                ? (m as Record<string, unknown>).name as string
+                : null,
+            keyParts: Array.isArray((m as Record<string, unknown>).keyParts)
+                ? (m as Record<string, unknown>).keyParts as unknown[]
+                : null,
+        })),
+        bomPartCountByModuleId,
+        canonicalBomTotalGbp: canonicalUnitCostGbp > 0 ? canonicalUnitCostGbp : null,
+        finnModuleTotalGbp,
+        fangLayoutPlacementsByModuleId,
+        systemIllustrationUrl:
+            typeof project.system_illustration_url === "string"
+                ? project.system_illustration_url
+                : null,
+    })
+
+    // Translate cross-modal blockers into VerdictFail entries.
+    const crossModalFails: VerdictFail[] = crossModalVerdict.blockers.map((b) => ({
+        axis: "cross_modal_consistency" as const,
+        severity: "blocker" as const,
+        summary: `Cross-modal inconsistency (${b.axis}): ${b.module_id ? `module ${b.module_id} — ` : ""}divergence ${(b.divergence_pct * 100).toFixed(1)}%.`,
+        evidence: b.explanation,
+    }))
+
+    if (crossModalFails.length > 0) {
+        console.info(
+            `[run-proofreader] cross-modal gate: ${crossModalFails.length} blocker(s) for project=${projectId}`,
+        )
+    }
+
     const verdict: FeasibilityVerdict = computeFeasibilityVerdict({
         dimensionSheet,
         briefConstraints: briefConstraints ?? null,
@@ -330,6 +424,18 @@ export async function runProofreaderBackground(
         // Fix 3: Fang CRITICAL findings escalated to feasibility verdict blockers.
         fangModuleReviews: fangModuleReviews.length > 0 ? fangModuleReviews : null,
     })
+
+    // Merge cross-modal blockers into the verdict.
+    // If cross-modal blockers exist, upgrade status to RED regardless of
+    // other axes (a divergent BOM is a blocker for downstream quality).
+    if (crossModalFails.length > 0) {
+        verdict.fails.push(...crossModalFails)
+        verdict.checkedConstraints.push("cross_modal_consistency")
+        // Re-derive status: any blocker → RED.
+        if (verdict.status !== "red") {
+            (verdict as { status: string }).status = "red"
+        }
+    }
 
     const { error: updateErr } = await admin
         .from("cad_lab_projects")
