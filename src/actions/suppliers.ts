@@ -427,6 +427,123 @@ async function searchSuppliersCore(
   }
 
   // ── Keyword/browse path (fallback or no query) ──
+  // INTENT: When semantic search fails (e.g. OpenAI quota exhausted), fall back to
+  // FTS first, then plain ilike. The old fallback used the entire query string as a
+  // single ilike substring (%PCB assembly SMT electronics manufacturing%) which
+  // matches zero rows for multi-word queries — only exact-phrase matches in title or
+  // description would work. FTS tokenises the query and uses OR logic (ts_rank_cd),
+  // so "PCB assembly SMT electronics manufacturing" correctly surfaces suppliers
+  // whose scraped pages contain any of those terms.
+  //
+  // DECISION: For multi-word queries (>1 word) when the semantic path failed,
+  // attempt match_listings_pages_fts across both supplier categories. If FTS returns
+  // results, fetch full rows by ID and return in rank order. Only fall through to
+  // ilike if FTS returns nothing (empty DB, no scraped pages for this domain, etc.).
+  const trimmedQuery = (filters.query ?? '').trim()
+  const isMultiWord = trimmedQuery.split(/\s+/).length > 1
+
+  if (trimmedQuery.length > 0 && isMultiWord) {
+    try {
+      const ftsRpcKw = (cat: string) =>
+        (supabase as unknown as {
+          rpc: (
+            name: string,
+            args: Record<string, unknown>
+          ) => Promise<{
+            data: Array<{
+              listing_id: string
+              best_rank: number
+              page_count: number
+              best_page_url: string | null
+            }> | null
+            error: { message: string } | null
+          }>
+        }).rpc('match_listings_pages_fts', {
+          p_query: trimmedQuery,
+          p_category: cat,
+          p_limit: Math.min(limit * 3, 200),
+        })
+
+      const supplierCategories = filters.category
+        ? [filters.category]
+        : ['Services', 'Products']
+
+      const ftsResults = await Promise.all(supplierCategories.map(cat => ftsRpcKw(cat)))
+
+      // Collect listing IDs in FTS rank order, dedupe across categories
+      const ftsById = new Map<string, number>()
+      for (const r of ftsResults) {
+        if (r?.error) {
+          console.warn('[searchSuppliers] keyword FTS error (non-fatal):', r.error.message)
+          continue
+        }
+        for (const hit of (r?.data ?? [])) {
+          if (!hit.listing_id) continue
+          const existing = ftsById.get(hit.listing_id)
+          if (!existing || (hit.best_rank ?? 0) > existing) {
+            ftsById.set(hit.listing_id, hit.best_rank ?? 0)
+          }
+        }
+      }
+
+      if (ftsById.size > 0) {
+        const ftsIds = Array.from(ftsById.entries())
+          .sort(([, a], [, b]) => b - a)
+          .map(([id]) => id)
+
+        const { data: ftsRows, error: ftsRowsErr } = await supabase
+          .from('marketplace_listings')
+          .select('*')
+          .in('id', ftsIds)
+          .in('category', ['Services', 'Products'])
+
+        if (ftsRowsErr) {
+          console.warn('[searchSuppliers] FTS row fetch failed (non-fatal):', ftsRowsErr.message)
+          // Fall through to ilike below
+        } else if (ftsRows && ftsRows.length > 0) {
+          // Re-sort by FTS rank (the .in() query doesn't preserve order)
+          const rankMap = ftsById
+          const sortedRows = (ftsRows as Array<Record<string, unknown>>).sort(
+            (a, b) => (rankMap.get(b.id as string) ?? 0) - (rankMap.get(a.id as string) ?? 0)
+          )
+
+          let ftsKwResults = sortedRows.map(mapToSupplierCard)
+
+          // Apply any explicit column filters (country, certifications)
+          if (filters.country) {
+            const countryLower = filters.country.toLowerCase()
+            ftsKwResults = ftsKwResults.filter(r => {
+              const attrs = r.attributes as Record<string, unknown>
+              return ((attrs.country as string) || '').toLowerCase().includes(countryLower)
+            })
+          }
+          if (filters.certifications && filters.certifications.length > 0) {
+            ftsKwResults = ftsKwResults.filter(r => {
+              const attrs = r.attributes as Record<string, unknown>
+              const certs = attrs.certifications as string | string[] | null | undefined
+              const certsStr = typeof certs === 'string' ? certs.toLowerCase() : Array.isArray(certs) ? certs.map(c => (c as string).toLowerCase()).join(',') : ''
+              return filters.certifications!.some(cert => certsStr.includes(cert.toLowerCase()))
+            })
+          }
+
+          const paginated = ftsKwResults.slice(offset, offset + limit)
+          return {
+            results: paginated,
+            total: ftsKwResults.length,
+            searchMode: 'keyword',
+          }
+        }
+      }
+    } catch (ftsErr) {
+      console.warn('[searchSuppliers] keyword FTS path failed (non-fatal):', ftsErr)
+      // Fall through to ilike below
+    }
+  }
+
+  // ── Plain ilike fallback (single-word queries, browse, or FTS failed) ──
+  // GOTCHA: for multi-word queries this only matches if the ENTIRE phrase appears
+  // verbatim in title or description. Acceptable for single-word searches; FTS
+  // handles multi-word above. This path is now the last-resort only.
   let query = supabase
     .from('marketplace_listings')
     .select('*', { count: 'exact' })
@@ -441,10 +558,10 @@ async function searchSuppliersCore(
     query = query.eq('category', filters.category as 'People' | 'Products' | 'Services' | 'AI')
   }
   if (filters.country) {
-    const countryLower = filters.country.toLowerCase()
     // Note: filtering by country in attributes requires text search or custom logic
     // For now, this is post-filtered on the client side in semantic path
     // For keyword search, we apply it after fetching
+    void filters.country
   }
 
   query = query.range(offset, offset + limit - 1)
