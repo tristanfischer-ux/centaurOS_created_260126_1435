@@ -2348,6 +2348,38 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
     }
   })
 
+  // ── Loop 25 Fix 2 — post-merge propagation assertion ──────────────
+  // If the merge stage produced zero parts from a non-empty module list,
+  // something silently dropped the key-parts → BOM row pipeline. Fail
+  // loudly instead of persisting an empty BOM and letting the PDF lie
+  // ("BOM master (0 rows) — No parts generated yet" against a full
+  // module page with cost breakdowns).
+  //
+  // Root cause caught: migration 20260429300000_parts_cost_provenance.sql
+  // added a NOT NULL column but was not applied to production. The SELECT
+  // in export-project-pdf.tsx includes `cost_provenance`; PostgREST
+  // returns an empty result when the column is absent, making the PDF
+  // read 0 rows even though the parts table had 63 rows. The fix is
+  // applying the migration — this assertion makes the regression
+  // self-diagnosing on the NEXT run if the pattern recurs.
+  if (validatedParts.length === 0 && loaded.modules.length > 0) {
+    const msg =
+      `BOM_PROPAGATION_FAILED: merge produced 0 parts from ` +
+      `${loaded.modules.length} modules. ` +
+      `Skeleton parts count: ${skeletonParts.length}. ` +
+      `Expansions keys: ${Object.keys(expansions).length}. ` +
+      `This indicates the skeleton stage returned an empty array or ` +
+      `all parts were filtered out in merge validation.`
+    console.error(`[bom-distributed:merge] ${msg}`)
+    await recordBomStageFailure(
+      projectId,
+      state,
+      "BOM_PROPAGATION_FAILED",
+      msg,
+    )
+    return
+  }
+
   // Duplicate check — skeleton already guards, defence in depth.
   const partNumbers = new Set<string>()
   for (const p of validatedParts) {

@@ -136,11 +136,13 @@ function MatchScorecard({ pillars }: { pillars: FirmMatchResult['pillars'] }) {
         {SCORECARD_DIMS.map(({ key, label }) => {
           const value = pillars[key]
           const isNA = value == null
-          let fillColor = '#d1d5db'
+          // Brand-orange ramp — matches MatchPillarBars and [id]/page.tsx scorecard.
+          // 2026-04-28 design audit: replace green/amber/red with orange ramp.
+          let fillColor = '#e5e7eb' // N/A: neutral
           if (!isNA) {
-            if (value >= 70)      fillColor = '#16a34a'
-            else if (value >= 40) fillColor = '#f59e0b'
-            else                  fillColor = '#dc2626'
+            if (value >= 70)      fillColor = '#ff4500' // international-orange — strong
+            else if (value >= 40) fillColor = '#fdba74' // orange-300 — moderate
+            else                  fillColor = '#cbd5e1' // slate-300 — weak
           }
           return (
             <div key={key} className="text-center">
@@ -538,33 +540,35 @@ function InvestorMainView({
 
   return (
     <div className="space-y-5">
-      {/* News Intelligence section — live web-searched data */}
-      <InvestorIntelSection firmId={firm.id} />
-
-      {/* Match Scorecard — Forge Capital 6-pillar bar chart. Renders when we
-          have pillar scores; gracefully omitted when the dialog is opened
-          outside a search context. */}
+      {/* Match Scorecard — Forge Capital 6-pillar bar chart. First section so
+          the founder immediately sees how this investor matches their profile.
+          Renders when we have pillar scores; gracefully omitted otherwise. */}
       {matchResult && <MatchScorecard pillars={matchResult.pillars} />}
 
       {/* Match Explanation — light-blue lightbulb callout. Generated from
           pillar scores + the founder's query. Plain text only (no HTML) so
           interpolated values from query / DB cannot inject markup. */}
       {explanation && (
-        <div className="rounded-lg p-3 text-sm leading-relaxed"
-             style={{ background: 'hsl(210 80% 96%)', border: '1px solid hsl(210 80% 88%)' }}>
+        <div className="rounded-lg p-3.5 text-sm leading-relaxed"
+             style={{ background: 'hsl(210 80% 96%)', border: '1px solid hsl(210 80% 88%)', color: 'hsl(215 50% 25%)' }}>
           <span style={{ marginRight: '6px' }}>💡</span>
+          <span className="font-medium">Based on available information — </span>
           {explanation}
         </div>
       )}
 
-      {/* Pitch Guidance — yellow callout. */}
+      {/* Pitch Guidance — amber callout. */}
       {pitchGuidance && (
-        <div className="rounded-lg p-3 text-sm leading-relaxed"
-             style={{ background: 'hsl(45 90% 94%)', border: '1px solid hsl(45 75% 80%)' }}>
-          <div className="font-semibold mb-1" style={{ color: 'hsl(30 70% 35%)' }}>Pitch Guidance</div>
+        <div className="rounded-lg p-3.5 text-sm leading-relaxed"
+             style={{ background: 'hsl(45 90% 94%)', border: '1px solid hsl(45 75% 80%)', color: 'hsl(30 60% 30%)' }}>
+          <div className="font-semibold mb-1.5">Pitch Guidance</div>
           {pitchGuidance}
         </div>
       )}
+
+      {/* News Intelligence section — live web-searched data. Placed after the
+          scorecard / match panels so founders see fit-signal first. */}
+      <InvestorIntelSection firmId={firm.id} />
 
       {/* Forge Capital order — Tristan 2026-04-27: Investment Thesis →
           Ideal Company Profile → Investment Pattern → Team Expertise →
@@ -703,12 +707,16 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange, query }: Inve
     setView({ type: 'investor' })
 
     try {
-      const [firmResult, contactsResult, matchScoreResult] = await Promise.all([
+      // INTENT: Fetch firm + contacts in parallel — these unblock the loading
+      // skeleton and let the modal content appear. computeMatchScores is
+      // intentionally excluded from this critical path: it does 4 sequential
+      // Supabase round-trips (getUser → profiles → foundries → listings) and
+      // was adding ~500–1500ms of blocking latency before the dialog would
+      // render any content. The Match Scorecard is non-critical UX — it
+      // populates a few hundred ms later without the user waiting.
+      const [firmResult, contactsResult] = await Promise.all([
         getInvestorById(id),
         getInvestorContacts(id),
-        // computeMatchScores returns {} when no foundry profile exists; the
-        // dialog gracefully omits the scorecard in that case.
-        computeMatchScores([id]).catch(() => ({} as Record<string, FirmMatchResult>)),
       ])
 
       if (!firmResult.firm) {
@@ -718,13 +726,19 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange, query }: Inve
 
       setFirm(firmResult.firm)
       setContacts(contactsResult.contacts)
-      setMatchResult(matchScoreResult[id])
     } catch (err) {
       console.error('[InvestorDetailDialog] Failed to fetch:', err)
       setError('Failed to load investor details.')
     } finally {
       setLoading(false)
     }
+
+    // INTENT: Fetch match scorecard in the background — does not block content
+    // render. The dialog shows firm + contacts immediately; the scorecard
+    // populates once the heavier profile lookup completes.
+    computeMatchScores([id])
+      .then(scores => setMatchResult(scores[id]))
+      .catch(() => { /* scorecard is optional — silent fail is fine */ })
   }, [])
 
   useEffect(() => {
@@ -761,18 +775,48 @@ export function InvestorDetailDialog({ firmId, open, onOpenChange, query }: Inve
           ) : error ? (
             <DialogTitle className="text-destructive">{error}</DialogTitle>
           ) : firm && view.type === 'investor' ? (
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className={cn('inline-block h-2.5 w-2.5 rounded-full shrink-0', qualityDotClass(attrs?.data_quality_score))} />
-                <DialogTitle className="text-xl font-bold text-foreground">{firm.title}</DialogTitle>
+            <div className="space-y-1.5">
+              {/* Firm name with orange accent bar — matches Forge Capital header pattern */}
+              <div className="flex items-center gap-3">
+                <div className="h-7 w-1.5 bg-international-orange rounded-full shrink-0" />
+                <DialogTitle className="text-xl font-bold text-foreground leading-tight">{firm.title}</DialogTitle>
               </div>
-              <div className="flex items-center gap-2 flex-wrap">
+              {/* Entity-type badges + location line */}
+              <div className="flex items-center gap-2 flex-wrap pl-4">
+                {firm.subcategory && <Badge variant="secondary">{firm.subcategory}</Badge>}
                 {attrs?.firm_type && <Badge variant="outline">{attrs.firm_type}</Badge>}
-                {attrs?.fund_size_gbp && <Badge variant="secondary">{formatFundSize(attrs.fund_size_gbp)}</Badge>}
-                {attrs?.data_quality_score != null && (
-                  <span className="text-xs text-muted-foreground">Quality: {attrs.data_quality_score.toFixed(1)}/10</span>
+                {attrs?.is_active_deploying && (
+                  <Badge variant="outline" className="text-success border-success/30 bg-success/10">Actively deploying</Badge>
+                )}
+                {attrs?.hq_city && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1">
+                    {attrs.hq_city}
+                  </span>
                 )}
               </div>
+              {/* Website / LinkedIn / Twitter links — inline in the header */}
+              {(attrs?.website_url || attrs?.linkedin_company_url || attrs?.twitter_company_url) && (
+                <div className="flex items-center gap-3 pl-4 flex-wrap">
+                  {attrs.website_url && ensureProtocol(attrs.website_url) && (
+                    <a href={ensureProtocol(attrs.website_url)} target="_blank" rel="noopener noreferrer"
+                       className="inline-flex items-center gap-1 text-xs text-international-orange hover:underline">
+                      <Globe className="h-3 w-3" /> Website <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                  {attrs.linkedin_company_url && ensureProtocol(attrs.linkedin_company_url) && (
+                    <a href={ensureProtocol(attrs.linkedin_company_url)} target="_blank" rel="noopener noreferrer"
+                       className="inline-flex items-center gap-1 text-xs text-international-orange hover:underline">
+                      <Linkedin className="h-3 w-3" /> LinkedIn <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                  {attrs.twitter_company_url && ensureProtocol(attrs.twitter_company_url) && (
+                    <a href={ensureProtocol(attrs.twitter_company_url)} target="_blank" rel="noopener noreferrer"
+                       className="inline-flex items-center gap-1 text-xs text-international-orange hover:underline">
+                      <ExternalLink className="h-3 w-3" /> X / Twitter <ExternalLink className="h-2.5 w-2.5" />
+                    </a>
+                  )}
+                </div>
+              )}
             </div>
           ) : (view.type === 'partner' || view.type === 'portfolio') ? (
             <DialogTitle className="sr-only">{dialogTitle}</DialogTitle>
