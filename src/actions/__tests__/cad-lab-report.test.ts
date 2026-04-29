@@ -51,7 +51,7 @@ jest.mock('@/lib/ai/limit-check', () => ({
   FREE_TIER_SPECIALISTS: new Set(),
 }))
 
-// ─── Mock fetchWithTimeout ────────────────────────────────────────────
+// ─── Mock fetchWithTimeout (used by Phase 2 / Gemini writer) ────────
 
 const mockFetchWithTimeout = jest.fn()
 
@@ -61,6 +61,14 @@ jest.mock('@/lib/fetch-with-timeout', () => ({
 
 jest.mock('@/lib/retry', () => ({
   withRetry: jest.fn((fn: () => Promise<unknown>) => fn()),
+}))
+
+// ─── Mock callOpenRouter (used by Phase 1 / outline) ────────────────
+
+const mockCallOpenRouter = jest.fn()
+
+jest.mock('@/lib/ai/openrouter', () => ({
+  callOpenRouter: (...args: unknown[]) => mockCallOpenRouter(...args),
 }))
 
 // ─── Import after mocks ──────────────────────────────────────────────
@@ -178,16 +186,20 @@ function mockGeminiResponse(text: string, promptTokens = 200, candidateTokens = 
 describe('structureReportOutline', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
+    process.env.OPENROUTER_API_KEY = 'test-openrouter-key'
   })
 
   afterEach(() => {
-    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.OPENROUTER_API_KEY
   })
 
+  function mockOpenRouterOutline(content: string, inputTokens = 500, outputTokens = 300) {
+    return { ok: true, text: content, inputTokens, outputTokens, modelUsed: 'deepseek/deepseek-v4-pro' }
+  }
+
   it('returns a valid outline on happy path', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce(
-      mockOpusResponse(JSON.stringify(VALID_OUTLINE)),
+    mockCallOpenRouter.mockResolvedValueOnce(
+      mockOpenRouterOutline(JSON.stringify(VALID_OUTLINE)),
     )
 
     const result = await structureReportOutline(FIXTURE_DATA)
@@ -200,15 +212,15 @@ describe('structureReportOutline', () => {
 
   it('handles JSON wrapped in code fences', async () => {
     const fenced = '```json\n' + JSON.stringify(VALID_OUTLINE) + '\n```'
-    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(fenced))
+    mockCallOpenRouter.mockResolvedValueOnce(mockOpenRouterOutline(fenced))
 
     const result = await structureReportOutline(FIXTURE_DATA)
     expect(result.outline.sections).toHaveLength(2)
   })
 
   it('throws meaningful error on malformed JSON', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce(
-      mockOpusResponse('{ this is not valid json }}'),
+    mockCallOpenRouter.mockResolvedValueOnce(
+      mockOpenRouterOutline('{ this is not valid json }}'),
     )
 
     const result = await structureReportOutline(FIXTURE_DATA)
@@ -217,16 +229,18 @@ describe('structureReportOutline', () => {
 
   it('returns error when outline has 0 sections', async () => {
     const emptySections = { ...VALID_OUTLINE, sections: [] }
-    mockFetchWithTimeout.mockResolvedValueOnce(
-      mockOpusResponse(JSON.stringify(emptySections)),
+    mockCallOpenRouter.mockResolvedValueOnce(
+      mockOpenRouterOutline(JSON.stringify(emptySections)),
     )
 
     const result = await structureReportOutline(FIXTURE_DATA)
     expect(result).toHaveProperty('error')
   })
 
-  it('returns error when API key is missing', async () => {
-    delete process.env.ANTHROPIC_API_KEY
+  it('returns error when OpenRouter call fails', async () => {
+    mockCallOpenRouter.mockResolvedValueOnce(
+      { ok: false, text: '', error: 'API error', inputTokens: 0, outputTokens: 0, modelUsed: '' },
+    )
 
     const result = await structureReportOutline(FIXTURE_DATA)
     expect(result).toHaveProperty('error')
@@ -239,8 +253,8 @@ describe('structureReportOutline', () => {
         { id: 'full', title: 'Full Section', sectionType: 'product-overview', brief: 'Do it', keyPoints: ['a'], dataHighlights: ['b'] },
       ],
     }
-    mockFetchWithTimeout.mockResolvedValueOnce(
-      mockOpusResponse(JSON.stringify(sparse)),
+    mockCallOpenRouter.mockResolvedValueOnce(
+      mockOpenRouterOutline(JSON.stringify(sparse)),
     )
 
     const result = await structureReportOutline(FIXTURE_DATA)
@@ -313,17 +327,21 @@ describe('writeReportSections', () => {
 describe('audience steering', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
+    process.env.OPENROUTER_API_KEY = 'test-openrouter-key'
     process.env.GOOGLE_AI_API_KEY = 'test-google-key'
   })
 
   afterEach(() => {
-    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.OPENROUTER_API_KEY
     delete process.env.GOOGLE_AI_API_KEY
   })
 
-  function extractSystemPrompt(callArgs: unknown[]): string {
-    // fetchWithTimeout signature: (url, init, timeoutMs)
+  function extractSystemPromptFromOpenRouter(callArgs: unknown[]): string {
+    const opts = callArgs[0] as { system?: string } | undefined
+    return opts?.system ?? ''
+  }
+
+  function extractSystemPromptFromFetch(callArgs: unknown[]): string {
     const init = callArgs[1] as { body?: string } | undefined
     if (!init?.body) return ''
     try {
@@ -335,39 +353,39 @@ describe('audience steering', () => {
   }
 
   it('structureReportOutline defaults to investor context when audience is omitted', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+    mockCallOpenRouter.mockResolvedValueOnce({ ok: true, text: JSON.stringify(VALID_OUTLINE), inputTokens: 500, outputTokens: 300, modelUsed: 'deepseek/deepseek-v4-pro' })
 
     await structureReportOutline(FIXTURE_DATA)
 
-    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    const sysPrompt = extractSystemPromptFromOpenRouter(mockCallOpenRouter.mock.calls[0])
     expect(sysPrompt).toContain('Investor / Executive reader')
   })
 
   it('structureReportOutline injects engineer context when audience=engineer', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+    mockCallOpenRouter.mockResolvedValueOnce({ ok: true, text: JSON.stringify(VALID_OUTLINE), inputTokens: 500, outputTokens: 300, modelUsed: 'deepseek/deepseek-v4-pro' })
 
     await structureReportOutline(FIXTURE_DATA, 'engineer')
 
-    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    const sysPrompt = extractSystemPromptFromOpenRouter(mockCallOpenRouter.mock.calls[0])
     expect(sysPrompt).toContain('Engineer / Technical reviewer')
     expect(sysPrompt).not.toContain('Investor / Executive reader')
   })
 
   it('structureReportOutline injects supplier context when audience=supplier', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+    mockCallOpenRouter.mockResolvedValueOnce({ ok: true, text: JSON.stringify(VALID_OUTLINE), inputTokens: 500, outputTokens: 300, modelUsed: 'deepseek/deepseek-v4-pro' })
 
     await structureReportOutline(FIXTURE_DATA, 'supplier')
 
-    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    const sysPrompt = extractSystemPromptFromOpenRouter(mockCallOpenRouter.mock.calls[0])
     expect(sysPrompt).toContain('Supplier / Procurement reader')
   })
 
   it('structureReportOutline injects marketing context when audience=marketing', async () => {
-    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(JSON.stringify(VALID_OUTLINE)))
+    mockCallOpenRouter.mockResolvedValueOnce({ ok: true, text: JSON.stringify(VALID_OUTLINE), inputTokens: 500, outputTokens: 300, modelUsed: 'deepseek/deepseek-v4-pro' })
 
     await structureReportOutline(FIXTURE_DATA, 'marketing')
 
-    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
+    const sysPrompt = extractSystemPromptFromOpenRouter(mockCallOpenRouter.mock.calls[0])
     expect(sysPrompt).toContain('Marketing press asset')
   })
 
@@ -378,8 +396,7 @@ describe('audience steering', () => {
 
     await writeReportSections(VALID_OUTLINE, FIXTURE_DATA, { in: 500, out: 300 }, 'engineer')
 
-    const sysPrompt = extractSystemPrompt(mockFetchWithTimeout.mock.calls[0])
-    // Engineer tone is terse/technical; the word "terse" is distinctive to that register.
+    const sysPrompt = extractSystemPromptFromFetch(mockFetchWithTimeout.mock.calls[0])
     expect(sysPrompt.toLowerCase()).toContain('terse')
   })
 })
@@ -387,11 +404,11 @@ describe('audience steering', () => {
 describe('extractJson (via structureReportOutline)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    process.env.ANTHROPIC_API_KEY = 'test-anthropic-key'
+    process.env.OPENROUTER_API_KEY = 'test-openrouter-key'
   })
 
   afterEach(() => {
-    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.OPENROUTER_API_KEY
   })
 
   it('strips code fences and comments', async () => {
@@ -399,17 +416,16 @@ describe('extractJson (via structureReportOutline)', () => {
 // This is a comment
 ${JSON.stringify(VALID_OUTLINE)}
 \`\`\``
-    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(withComments))
+    mockCallOpenRouter.mockResolvedValueOnce({ ok: true, text: withComments, inputTokens: 500, outputTokens: 300, modelUsed: 'deepseek/deepseek-v4-pro' })
 
     const result = await structureReportOutline(FIXTURE_DATA)
     expect(result.outline.sections).toHaveLength(2)
   })
 
   it('strips trailing commas', async () => {
-    // Manually add trailing commas
     const withTrailing = JSON.stringify(VALID_OUTLINE)
       .replace('"includeImage":false}', '"includeImage":false,}')
-    mockFetchWithTimeout.mockResolvedValueOnce(mockOpusResponse(withTrailing))
+    mockCallOpenRouter.mockResolvedValueOnce({ ok: true, text: withTrailing, inputTokens: 500, outputTokens: 300, modelUsed: 'deepseek/deepseek-v4-pro' })
 
     const result = await structureReportOutline(FIXTURE_DATA)
     expect(result.outline.sections).toHaveLength(2)

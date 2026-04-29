@@ -87,8 +87,8 @@ describe("stage-narratives — chronological order matches autopilot pipeline", 
     it("full pipeline order matches the stage-config nextStage chain", () => {
         // Canonical order declared in stage-config.ts nextStage pointers:
         // waiting_chase → locking_brief → waiting_max → waiting_sizing →
-        // waiting_layout → waiting_bom → waiting_finn → generating_illustration →
-        // matching_suppliers → running_fang_reviews → proofreading → generating_pdf
+        // waiting_layout → waiting_bom → waiting_finn →
+        // matching_suppliers → running_fang_reviews → proofreading → generating_illustration → generating_pdf
         const expected = [
             "waiting_chase",
             "locking_brief",
@@ -97,10 +97,10 @@ describe("stage-narratives — chronological order matches autopilot pipeline", 
             "waiting_layout",
             "waiting_bom",
             "waiting_finn",
-            "generating_illustration",
             "matching_suppliers",
             "running_fang_reviews",
             "proofreading",
+            "generating_illustration",
             "generating_pdf",
         ]
         expect(NARRATIVE_STAGE_ORDER).toEqual(expected)
