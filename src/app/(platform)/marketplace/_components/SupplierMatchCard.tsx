@@ -31,7 +31,7 @@
 
 import { useState, useTransition } from 'react'
 import Link from 'next/link'
-import { Loader2, Sparkles } from 'lucide-react'
+import { Loader2, Sparkles, Heart } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { MarketplaceListing } from '@/actions/marketplace'
 import { generateSupplierWhyFit } from '@/actions/suppliers'
@@ -322,13 +322,19 @@ export interface SupplierMatchCardProps {
   rank?: number
   /** Semantic search query that produced this result — for why-fit + region scoring */
   searchQuery?: string
+  /** Whether this listing is in the user's saved set */
+  isSaved?: boolean
+  /** Whether a save/unsave action is in flight for this listing */
+  isSaving?: boolean
+  /** Callback to toggle saved state — receives the listing id + the click event */
+  onToggleSave?: (listingId: string, e: React.MouseEvent) => void
 }
 
 // ---------------------------------------------------------------------------
 // Main component — Forge Capital search-result-card structure
 // ---------------------------------------------------------------------------
 
-export function SupplierMatchCard({ listing, rank, searchQuery }: SupplierMatchCardProps) {
+export function SupplierMatchCard({ listing, rank, searchQuery, isSaved = false, isSaving = false, onToggleSave }: SupplierMatchCardProps) {
   const attrs = listing.attributes
 
   // Composite match score for the right-column big number
@@ -428,17 +434,52 @@ export function SupplierMatchCard({ listing, rank, searchQuery }: SupplierMatchC
           )}
         </div>
 
-        {/* Right: composite score */}
-        {compositeScore != null && compositeScore > 0 && (
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            <div style={{ fontSize: '22px', fontWeight: 900, lineHeight: 1, color: 'hsl(var(--foreground))' }}>
-              {compositeScore}%
+        {/* Right: composite score + save heart */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexShrink: 0 }}>
+          {compositeScore != null && compositeScore > 0 && (
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '22px', fontWeight: 900, lineHeight: 1, color: 'hsl(var(--foreground))' }}>
+                {compositeScore}%
+              </div>
+              <div style={{ fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+                match
+              </div>
             </div>
-            <div style={{ fontSize: '10px', color: 'hsl(var(--muted-foreground))', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px' }}>
-              match
-            </div>
-          </div>
-        )}
+          )}
+          {/* FIX 2: Heart / save toggle — stops link navigation via e.preventDefault */}
+          {onToggleSave && (
+            <button
+              type="button"
+              onClick={(e) => onToggleSave(listing.id, e)}
+              disabled={isSaving}
+              aria-label={isSaved ? `Remove ${listing.title} from saved` : `Save ${listing.title}`}
+              style={{
+                background: 'none',
+                border: 'none',
+                padding: '4px',
+                cursor: isSaving ? 'wait' : 'pointer',
+                borderRadius: '6px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: isSaved ? '#ff4500' : 'hsl(var(--muted-foreground))',
+                transition: 'color 0.15s ease',
+              }}
+            >
+              {isSaving ? (
+                <Loader2 style={{ width: '15px', height: '15px' }} className="animate-spin" />
+              ) : (
+                <Heart
+                  style={{
+                    width: '15px',
+                    height: '15px',
+                    fill: isSaved ? '#ff4500' : 'none',
+                  }}
+                />
+              )}
+            </button>
+          )}
+        </div>
       </div>
 
       {/* ── 6-column scorecard ── */}

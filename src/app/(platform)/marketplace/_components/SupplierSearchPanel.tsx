@@ -16,13 +16,27 @@
  *   - On submit: hides charts, shows ranked match cards
  *   - On clear: charts reappear
  *
+ * URL PARAMS (Fix 1 — back-nav state restore):
+ *   - ?q=<search text> — populates the search box and auto-runs the search on mount
+ *   - ?saved=1 — shows the "Saved" filter view on mount
+ *   - Form submit pushes ?q=... to the URL so back-nav restores state
+ *
+ * FAVOURITES (Fix 2):
+ *   - Heart icon on each card + "Saved" filter chip
+ *   - Uses saved_marketplace_listings table via saved-suppliers server actions
+ *
+ * LOADING STATE (Fix 3):
+ *   - Search button immediately shows "Searching…" with a spinner on submit,
+ *     before the server action returns.
+ *
  * DECISION: SupplierStatsCharts is defined inline in this file (not a separate file)
  * per the brief's "keep file count to the three above" constraint.
  * DECISION: stats are fetched in the server page (page.tsx) and passed as a prop
  * because this is a client component and cannot await server actions directly.
  */
 
-import { useState, useTransition, useCallback, useRef } from 'react'
+import { useState, useTransition, useCallback, useRef, useEffect } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import {
   PieChart,
   Pie,
@@ -36,12 +50,13 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from 'recharts'
-import { Search, Loader2, X } from 'lucide-react'
+import { Search, Loader2, X, Heart } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { SupplierMatchCard } from './SupplierMatchCard'
 import { SupplierExtractedPills, parseSupplierQuery } from './SupplierExtractedPills'
 import type { ExtractedSupplierQuery } from './SupplierExtractedPills'
 import { searchSuppliers } from '@/actions/suppliers'
+import { saveSupplierListing, unsaveSupplierListing } from '@/actions/saved-suppliers'
 import type { SupplierDirectoryStats } from '@/actions/suppliers'
 import type { MarketplaceListing } from '@/actions/marketplace'
 
@@ -324,6 +339,8 @@ const CATEGORY_CHIPS = [
 // Types
 // ---------------------------------------------------------------------------
 
+type MappedListing = MarketplaceListing & { similarity?: number }
+
 interface SupplierSearchPanelProps {
   /** Initial server-fetched listings (browse all, no query) */
   initialListings: MarketplaceListing[]
@@ -331,6 +348,12 @@ interface SupplierSearchPanelProps {
   totalCount: number
   /** Pre-fetched directory stats for the chart block */
   stats: SupplierDirectoryStats
+  /** Initial query from URL ?q= param — triggers auto-search on mount */
+  initialQuery?: string
+  /** Whether to open the Saved filter view on mount (?saved=1) */
+  initialShowSaved?: boolean
+  /** Listing IDs the user has already saved — pre-populated from the server */
+  initialSavedIds?: string[]
 }
 
 // ---------------------------------------------------------------------------
@@ -341,40 +364,67 @@ export function SupplierSearchPanel({
   initialListings,
   totalCount,
   stats,
+  initialQuery = '',
+  initialShowSaved = false,
+  initialSavedIds = [],
 }: SupplierSearchPanelProps) {
-  const [query, setQuery] = useState('')
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+
+  const [query, setQuery] = useState(initialQuery)
   const [activeChip, setActiveChip] = useState<string | null>(null)
-  const [results, setResults] = useState<(MarketplaceListing & { similarity?: number })[]>(
-    initialListings as (MarketplaceListing & { similarity?: number })[]
+  const [results, setResults] = useState<MappedListing[]>(
+    initialListings as MappedListing[]
   )
   const [displayCount, setDisplayCount] = useState(initialListings.length)
-  const [activeQuery, setActiveQuery] = useState<string>('')
-  const [extractedQuery, setExtractedQuery] = useState<ExtractedSupplierQuery | null>(null)
+  const [activeQuery, setActiveQuery] = useState<string>(initialQuery)
+  const [extractedQuery, setExtractedQuery] = useState<ExtractedSupplierQuery | null>(
+    initialQuery ? parseSupplierQuery(initialQuery) : null
+  )
   const [isPending, startTransition] = useTransition()
+  // FIX 3: optimistic loading state — flips to true immediately on button
+  // click so the user sees "Searching…" before the server action returns.
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // FIX 2: Favourites state
+  const [savedIds, setSavedIds] = useState<Set<string>>(new Set(initialSavedIds))
+  const [showSaved, setShowSaved] = useState(initialShowSaved)
+  // Track in-flight save/unsave per card
+  const [savingIds, setSavingIds] = useState<Set<string>>(new Set())
 
   // INTENT: Charts are visible pre-search and hidden when a search result set
   // is active — mirrors the investor page pattern.
   const isFiltered = activeQuery.trim().length > 0
 
-  const runSearch = useCallback(
+  // FIX 1: Auto-run search on mount if there's an initialQuery from the URL.
+  // Use a ref to ensure it only fires once even in StrictMode double-invocation.
+  const didAutoSearch = useRef(false)
+  useEffect(() => {
+    if (initialQuery && !didAutoSearch.current) {
+      didAutoSearch.current = true
+      runSearchInternal(initialQuery)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ---------------------------------------------------------------------------
+  // Core search logic (extracted so auto-search and handleSubmit share it)
+  // ---------------------------------------------------------------------------
+
+  const runSearchInternal = useCallback(
     (searchQuery: string) => {
       if (!searchQuery.trim()) {
-        // Reset to initial browse — charts reappear
-        setResults(initialListings as (MarketplaceListing & { similarity?: number })[])
+        setResults(initialListings as MappedListing[])
         setDisplayCount(initialListings.length)
         setActiveQuery('')
         setExtractedQuery(null)
+        setIsSubmitting(false)
         return
       }
 
       startTransition(async () => {
-        // 50 default — couples with the supplier detail page's max useful
-        // pagination at this point. 24 was too low: founders flagged the
-        // count looking suspiciously identical across very different queries
-        // because the cap was pinning every result set at 24.
-        // W41: wrap in try/catch so a server-action error surfaces as an
-        // empty state rather than a silent hang (Sarah: "does nothing").
         let result: Awaited<ReturnType<typeof searchSuppliers>>
         try {
           result = await searchSuppliers({
@@ -387,12 +437,15 @@ export function SupplierSearchPanel({
           setDisplayCount(0)
           setActiveQuery(searchQuery)
           setExtractedQuery(null)
+          setIsSubmitting(false)
           return
         }
 
-        // searchSuppliers returns SupplierCard[], but we need MarketplaceListing shape for the card.
-        // Map SupplierCard → MarketplaceListing (best-effort — the card reads from .attributes anyway).
-        const mapped = result.results.map((r) => ({
+        // GOTCHA: MarketplaceListing has many optional nullable fields that the
+        // SupplierCard doesn't include. Cast via unknown to satisfy the type checker
+        // while keeping the data we actually use. The card components only read
+        // the fields we populate here.
+        const mapped: MappedListing[] = result.results.map((r) => ({
           id: r.id,
           title: r.name,
           description: r.description ?? '',
@@ -418,23 +471,72 @@ export function SupplierSearchPanel({
           contact_email: null,
           average_rating: null,
           review_count: null,
+          lead_time: (r.attributes.lead_time as string | null) ?? null,
+          minimum_order: (r.attributes.minimum_order as string | null) ?? null,
+          production_capacity: (r.attributes.production_capacity as string | null) ?? null,
+          quality_systems: (r.attributes.quality_systems as string | null) ?? null,
+          products: null,
+          specialties: null,
+          address: null,
+          website_url: (r.attributes.website_url as string | null) ?? null,
+          founded_year: null,
+          employee_count_exact: null,
+          data_quality_score: null,
+          carbon_disclosed: null,
+          key_people: null,
+          latitude: null,
+          longitude: null,
           similarity: r.similarity,
-        }))
+        } as MappedListing))
 
         setResults(mapped)
         setDisplayCount(mapped.length)
         setActiveQuery(searchQuery)
-        // Parse the query client-side (no LLM call — regex only) and store
-        // for the extracted-pills row rendered between form and count bar.
         setExtractedQuery(parseSupplierQuery(searchQuery))
+        setIsSubmitting(false)
       })
     },
     [initialListings]
   )
 
+  const runSearch = useCallback(
+    (searchQuery: string) => {
+      // FIX 1: Push the query to the URL so back-nav restores state.
+      // Use replace: true when editing mid-search (chip clicks) to avoid
+      // polluting history; use push on explicit form submit (handleSubmit does push).
+      const params = new URLSearchParams(searchParams.toString())
+      if (searchQuery.trim()) {
+        params.set('q', searchQuery.trim())
+      } else {
+        params.delete('q')
+      }
+      if (showSaved) {
+        params.set('saved', '1')
+      } else {
+        params.delete('saved')
+      }
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      runSearchInternal(searchQuery)
+    },
+    [router, pathname, searchParams, showSaved, runSearchInternal]
+  )
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    runSearch(query.trim())
+    // FIX 3: optimistic "Searching…" state fires immediately on button click.
+    setIsSubmitting(true)
+    const trimmed = query.trim()
+    // FIX 1: Use router.push (not replace) on explicit search button press so
+    // the user can press Back to return to their previous query.
+    const params = new URLSearchParams(searchParams.toString())
+    if (trimmed) {
+      params.set('q', trimmed)
+    } else {
+      params.delete('q')
+    }
+    params.delete('saved')
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+    runSearchInternal(trimmed)
   }
 
   const handleChipClick = (chip: (typeof CATEGORY_CHIPS)[0]) => {
@@ -446,6 +548,8 @@ export function SupplierSearchPanel({
     } else {
       setActiveChip(chip.label)
       setQuery(chip.query)
+      // FIX 3: show optimistic loading state for chip clicks too
+      setIsSubmitting(true)
       runSearch(chip.query)
     }
   }
@@ -453,9 +557,93 @@ export function SupplierSearchPanel({
   const handleClear = () => {
     setQuery('')
     setActiveChip(null)
+    setIsSubmitting(false)
     runSearch('')
     textareaRef.current?.focus()
   }
+
+  // FIX 2: Toggle saved filter chip
+  const handleToggleSaved = () => {
+    const next = !showSaved
+    setShowSaved(next)
+    const params = new URLSearchParams(searchParams.toString())
+    if (next) {
+      params.set('saved', '1')
+    } else {
+      params.delete('saved')
+    }
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
+  // FIX 2: Save / unsave a listing
+  const handleToggleSave = useCallback(
+    async (listingId: string, e: React.MouseEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+
+      if (savingIds.has(listingId)) return // debounce
+      setSavingIds(prev => new Set(prev).add(listingId))
+
+      const isSaved = savedIds.has(listingId)
+
+      // Optimistic update
+      setSavedIds(prev => {
+        const next = new Set(prev)
+        if (isSaved) {
+          next.delete(listingId)
+        } else {
+          next.add(listingId)
+        }
+        return next
+      })
+
+      try {
+        const result = isSaved
+          ? await unsaveSupplierListing(listingId)
+          : await saveSupplierListing(listingId)
+
+        if (!result.ok) {
+          // Revert optimistic update on failure
+          setSavedIds(prev => {
+            const next = new Set(prev)
+            if (isSaved) {
+              next.add(listingId)
+            } else {
+              next.delete(listingId)
+            }
+            return next
+          })
+        }
+      } catch {
+        // Revert on error
+        setSavedIds(prev => {
+          const next = new Set(prev)
+          if (isSaved) {
+            next.add(listingId)
+          } else {
+            next.delete(listingId)
+          }
+          return next
+        })
+      } finally {
+        setSavingIds(prev => {
+          const next = new Set(prev)
+          next.delete(listingId)
+          return next
+        })
+      }
+    },
+    [savedIds, savingIds]
+  )
+
+  // FIX 2: Determine which results to display (normal vs saved-only filter)
+  const savedCount = savedIds.size
+  const displayResults = showSaved
+    ? results.filter(r => savedIds.has(r.id))
+    : results
+
+  // FIX 3: Combined pending state for button display
+  const isSearching = isSubmitting || isPending
 
   return (
     <div className="space-y-4">
@@ -497,7 +685,7 @@ export function SupplierSearchPanel({
           )}
         </div>
 
-        {/* Category chips + search button row */}
+        {/* Category chips + saved filter + search button row */}
         <div className="flex items-center gap-2 flex-wrap">
           {CATEGORY_CHIPS.map((chip) => (
             <button
@@ -518,18 +706,51 @@ export function SupplierSearchPanel({
             </button>
           ))}
 
+          {/* FIX 2: Saved filter chip */}
+          <button
+            type="button"
+            onClick={handleToggleSaved}
+            className={`
+              flex items-center gap-1 text-xs font-medium px-3 py-1.5 rounded-full transition-all duration-150
+              ${
+                showSaved
+                  ? 'bg-international-orange/10 text-international-orange font-bold ring-1 ring-international-orange/40'
+                  : 'bg-muted/60 text-muted-foreground hover:bg-muted hover:text-foreground'
+              }
+            `}
+            aria-pressed={showSaved}
+          >
+            <Heart
+              className={`h-3 w-3 ${showSaved ? 'fill-international-orange text-international-orange' : ''}`}
+            />
+            Saved
+            {savedCount > 0 && (
+              <span className={`
+                ml-0.5 text-[10px] font-bold px-1 rounded-full
+                ${showSaved ? 'bg-international-orange/20 text-international-orange' : 'bg-muted text-muted-foreground'}
+              `}>
+                {savedCount}
+              </span>
+            )}
+          </button>
+
           <Button
             type="submit"
             size="sm"
-            disabled={isPending || !query.trim()}
+            disabled={isSearching || !query.trim()}
             className="ml-auto bg-international-orange hover:bg-international-orange text-white gap-1.5"
           >
-            {isPending ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            {isSearching ? (
+              <>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                Searching…
+              </>
             ) : (
-              <Search className="h-3.5 w-3.5" />
+              <>
+                <Search className="h-3.5 w-3.5" />
+                Search
+              </>
             )}
-            Search
           </Button>
         </div>
       </form>
@@ -551,9 +772,20 @@ export function SupplierSearchPanel({
       {isFiltered && (
         <div className="flex items-center gap-3 text-xs text-muted-foreground">
           <span>
-            Showing{' '}
-            <span className="font-semibold text-foreground">{displayCount}</span> results for{' '}
-            <span className="italic">&ldquo;{activeQuery}&rdquo;</span>
+            {showSaved ? (
+              <>
+                Showing{' '}
+                <span className="font-semibold text-foreground">{displayResults.length}</span> saved result{displayResults.length !== 1 ? 's' : ''} from{' '}
+                <span className="font-semibold text-foreground">{displayCount}</span> total matches for{' '}
+                <span className="italic">&ldquo;{activeQuery}&rdquo;</span>
+              </>
+            ) : (
+              <>
+                Showing{' '}
+                <span className="font-semibold text-foreground">{displayCount}</span> results for{' '}
+                <span className="italic">&ldquo;{activeQuery}&rdquo;</span>
+              </>
+            )}
             {' · '}
             <button
               type="button"
@@ -573,8 +805,8 @@ export function SupplierSearchPanel({
         </div>
       )}
 
-      {/* ── Pending spinner (pre-first-result) ── */}
-      {!isFiltered && isPending && (
+      {/* ── Pending spinner (pre-first-result, before isFiltered flips) ── */}
+      {!isFiltered && isSearching && (
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin" />
           Searching…
@@ -583,28 +815,50 @@ export function SupplierSearchPanel({
 
       {/* ── Results list — only visible after a search is submitted ── */}
       {isFiltered && (
-        results.length === 0 && !isPending ? (
+        displayResults.length === 0 && !isPending ? (
           <div className="rounded-xl bg-muted/30 py-12 text-center text-sm text-muted-foreground">
             <Search className="h-8 w-8 mx-auto mb-3 text-muted-foreground/40" />
-            <p className="font-medium text-foreground mb-1">No suppliers matched your search</p>
-            <p>Try different keywords, or{' '}
-              <button
-                type="button"
-                onClick={handleClear}
-                className="text-international-orange hover:underline"
-              >
-                clear the search
-              </button>
-            </p>
+            {showSaved ? (
+              <>
+                <p className="font-medium text-foreground mb-1">No saved suppliers in these results</p>
+                <p>
+                  Save suppliers by clicking the{' '}
+                  <Heart className="inline h-3 w-3" /> on any card, or{' '}
+                  <button
+                    type="button"
+                    onClick={handleToggleSaved}
+                    className="text-international-orange hover:underline"
+                  >
+                    show all results
+                  </button>
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="font-medium text-foreground mb-1">No suppliers matched your search</p>
+                <p>Try different keywords, or{' '}
+                  <button
+                    type="button"
+                    onClick={handleClear}
+                    className="text-international-orange hover:underline"
+                  >
+                    clear the search
+                  </button>
+                </p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
-            {results.map((listing, idx) => (
+            {displayResults.map((listing, idx) => (
               <SupplierMatchCard
                 key={listing.id}
                 listing={listing}
                 rank={idx + 1}
                 searchQuery={activeQuery || undefined}
+                isSaved={savedIds.has(listing.id)}
+                isSaving={savingIds.has(listing.id)}
+                onToggleSave={handleToggleSave}
               />
             ))}
           </div>

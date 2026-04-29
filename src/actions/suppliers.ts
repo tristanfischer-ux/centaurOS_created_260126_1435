@@ -334,14 +334,22 @@ async function searchSuppliersCore(
         (Number(b.similarity) || 0) - (Number(a.similarity) || 0)
       )
 
+      // FIX 4: If the vector + FTS merge produced zero candidates (e.g. the
+      // query embedding has low cosine similarity across all supplier embeddings
+      // AND FTS found no page text matches), fall through to the keyword/FTS
+      // path rather than returning empty results immediately. The keyword path
+      // runs a fresh FTS with the raw query string which often catches exact
+      // terms that the semantic path misses (product names, postcodes, process
+      // keywords that don't appear in the DB's embedding text).
       if (supplierMatches.length === 0) {
-        return {
-          results: [],
-          total: 0,
-          searchMode: 'semantic',
-          _telemetry: { vectorHitCount: _vectorHitCount, ftsHitCount: ftsById.size },
-        }
-      }
+        console.warn('[searchSuppliers] semantic+FTS merge returned 0 candidates — falling through to keyword path', {
+          query: filters.query,
+          vectorHits: _vectorHitCount,
+          ftsHits: ftsById.size,
+        })
+        // Fall through to keyword/browse path below by NOT returning here.
+        // embeddingQuotaExhausted stays false (embedding worked, it just returned poor matches)
+      } else {
 
       // DECISION: The RPC returns only id, category, title, description, similarity — NOT
       // top-level columns (certifications, country, etc.) or attributes JSONB.
@@ -440,6 +448,7 @@ async function searchSuppliersCore(
         searchMode: 'semantic',
         _telemetry: { vectorHitCount: _vectorHitCount, ftsHitCount: ftsById.size },
       }
+      } // end else (supplierMatches.length > 0)
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       const isQuotaExhausted =
