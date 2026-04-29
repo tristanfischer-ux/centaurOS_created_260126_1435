@@ -148,16 +148,16 @@ export function NarrativeProgressView({
         // clipped by the fixed mobile nav or layout padding.
         <div className="space-y-8 pb-16">
             {/* ── Heading ─────────────────────────────────────────────── */}
-            <header className="space-y-2">
-                <h1 className="text-3xl font-semibold tracking-tight">
-                    {status.projectName}
-                </h1>
-                {status.briefSummary && (
-                    <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed">
-                        {status.briefSummary}
-                    </p>
-                )}
-            </header>
+            {/* INTENT: WorkspaceShell already renders the page-level <h1> with
+                the orange accent bar (project name from crumbs). Only render
+                the brief summary here — a second <h1> with identical text
+                duplicated the heading and broke accessibility (two H1s per
+                page, same text). */}
+            {status.briefSummary && (
+                <p className="text-sm text-muted-foreground max-w-2xl leading-relaxed -mt-4">
+                    {status.briefSummary}
+                </p>
+            )}
 
             {/* ── Ready banner with download button ───────────────────── */}
             {hasPdf && (

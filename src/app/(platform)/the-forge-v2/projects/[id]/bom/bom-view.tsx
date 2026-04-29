@@ -35,6 +35,8 @@ import { RunSpecialistButton } from "@/components/pipeline/run-specialist-button
 
 import "./bom-v2.css"
 
+import type { ComponentRef, Provenance } from "@/types/component-intelligence"
+
 // ─── Types ──────────────────────────────────────────────────────────────
 
 export interface BomPartRow {
@@ -59,6 +61,20 @@ export interface BomPartRow {
     moduleId: string
     /** Inherited from the owning module so the row can show "—" honestly. */
     moduleLeadWeeks: number | null
+    /**
+     * Reference to the component_intelligence record for this part.
+     * Optional today — null means the row uses Max-invented values (existing behaviour).
+     * Populated when Phase B/C component extraction has matched a real manufacturer part.
+     *
+     * ADDITIVE: No existing field shape is changed. Null = fallback to current behaviour.
+     */
+    componentRef?: ComponentRef | null
+    /**
+     * Provenance for this BOM row's AI-extracted fields (cost estimate, lead time, etc.).
+     * Optional today — populated as Phase B/C extraction runs.
+     * When present, the PDF renderer can cite the extraction source.
+     */
+    provenance?: Provenance | null
 }
 
 export interface BomCategoryGroup {

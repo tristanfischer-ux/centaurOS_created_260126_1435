@@ -62,6 +62,63 @@ describe("stage-narratives — loop-25 founder UX", () => {
     })
 })
 
+describe("stage-narratives — chronological order matches autopilot pipeline", () => {
+    /**
+     * The canonical stage order is declared in src/lib/forge-v2/stage-config.ts
+     * via the nextStage chain: waiting_sizing → waiting_layout → waiting_bom.
+     * This test locks the order so a future edit to NARRATIVE_STAGE_ORDER
+     * cannot silently re-introduce the "Laying it out" at position 10 bug
+     * (loop-26 dom snapshot: waiting_layout appeared as Stage 10 instead of Stage 5).
+     */
+    it("waiting_layout appears immediately after waiting_sizing (position 5)", () => {
+        const sizingIdx = NARRATIVE_STAGE_ORDER.indexOf("waiting_sizing")
+        const layoutIdx = NARRATIVE_STAGE_ORDER.indexOf("waiting_layout")
+        expect(sizingIdx).toBeGreaterThanOrEqual(0)
+        expect(layoutIdx).toBe(sizingIdx + 1)
+    })
+
+    it("waiting_layout appears before waiting_bom", () => {
+        const layoutIdx = NARRATIVE_STAGE_ORDER.indexOf("waiting_layout")
+        const bomIdx = NARRATIVE_STAGE_ORDER.indexOf("waiting_bom")
+        expect(layoutIdx).toBeGreaterThanOrEqual(0)
+        expect(bomIdx).toBeGreaterThan(layoutIdx)
+    })
+
+    it("full pipeline order matches the stage-config nextStage chain", () => {
+        // Canonical order declared in stage-config.ts nextStage pointers:
+        // waiting_chase → locking_brief → waiting_max → waiting_sizing →
+        // waiting_layout → waiting_bom → waiting_finn → generating_illustration →
+        // matching_suppliers → running_fang_reviews → proofreading → generating_pdf
+        const expected = [
+            "waiting_chase",
+            "locking_brief",
+            "waiting_max",
+            "waiting_sizing",
+            "waiting_layout",
+            "waiting_bom",
+            "waiting_finn",
+            "generating_illustration",
+            "matching_suppliers",
+            "running_fang_reviews",
+            "proofreading",
+            "generating_pdf",
+        ]
+        expect(NARRATIVE_STAGE_ORDER).toEqual(expected)
+    })
+
+    it("solver_error is NOT in NARRATIVE_STAGE_ORDER (it is an exception state, not a sequential step)", () => {
+        expect(NARRATIVE_STAGE_ORDER).not.toContain("solver_error")
+    })
+
+    it("'done' is NOT in NARRATIVE_STAGE_ORDER (it is a terminal state, not a sequential step)", () => {
+        expect(NARRATIVE_STAGE_ORDER).not.toContain("done")
+    })
+
+    it("'failed' is NOT in NARRATIVE_STAGE_ORDER (it is a terminal state, not a sequential step)", () => {
+        expect(NARRATIVE_STAGE_ORDER).not.toContain("failed")
+    })
+})
+
 describe("stage-narratives — unwired stages render empty-state copy, not errors", () => {
     it("every stage has a defined narrative entry (no undefined holes in the Record)", () => {
         // If a stage is missing from the Record, STAGE_NARRATIVES[stage] would be undefined
