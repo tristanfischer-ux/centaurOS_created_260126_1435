@@ -376,6 +376,53 @@ function fmtKg(n: number | null | undefined): string {
     return `${n.toLocaleString("en-GB", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kg`
 }
 
+/**
+ * D3 — Loop 26 unverified-extraction badge.
+ *
+ * Returns true when a data row should display the "Unverified" pill:
+ *   - confidence is absent (null / undefined) — older rows never had it; most cautious default
+ *   - confidence is present but below the 0.7 threshold
+ *   - verifiedAt is absent (null / undefined)
+ *
+ * Do NOT call for deterministic-rule-derived fields (solver envelope,
+ * feasibility verdict, mass). Only for LLM-extracted values where a
+ * human or authoritative source hasn't confirmed the claim.
+ */
+function isUnverifiedExtraction(
+    confidence: number | null | undefined,
+    verifiedAt: string | null | undefined,
+): boolean {
+    // Absence of verifiedAt is sufficient to mark unverified.
+    if (!verifiedAt) return true
+    // When verifiedAt present, still flag if confidence is explicitly low.
+    if (confidence != null && confidence < 0.7) return true
+    return false
+}
+
+/**
+ * D3 — Inline "Unverified" pill for PDF rendering.
+ * Rendered inline beside a value when isUnverifiedExtraction returns true.
+ * Uses a muted amber colour so it is visible but not alarming on every row.
+ */
+function UnverifiedPill(): React.ReactElement {
+    return (
+        <Text
+            style={{
+                fontSize: 6.5,
+                color: "#92400e",
+                backgroundColor: "#fef3c7",
+                paddingHorizontal: 3,
+                paddingVertical: 1,
+                borderRadius: 2,
+                marginLeft: 3,
+                fontWeight: "bold",
+            }}
+        >
+            Unverified
+        </Text>
+    )
+}
+
 function fmtDateTime(iso: string | null | undefined): string {
     if (!iso) return "—"
     const d = new Date(iso)
@@ -1763,6 +1810,15 @@ function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactEleme
             r.ownerRole ||
             r.gapAction,
     )
+    // D3 — Loop 26: count unverified entries for the section-level callout.
+    // All regulatory rows default to unverified because Chase/LLM extraction
+    // has <60% precision on multi-page regulatory tables (council finding).
+    // The section callout fires when ≥30% of rows are unverified.
+    const unverifiedCount = items.filter((r) =>
+        isUnverifiedExtraction(r.confidence, r.verifiedAt),
+    ).length
+    const unverifiedFraction = items.length > 0 ? unverifiedCount / items.length : 0
+    const showRegulatoryUnverifiedCallout = items.length > 0 && unverifiedFraction >= 0.3
     return (
         <View break>
             <Text style={styles.h2}>2. Regulatory posture</Text>
@@ -1778,7 +1834,29 @@ function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactEleme
                     standard is unimportant.
                 </Text>
             )}
-            {items.map((r, i) => (
+            {/* D3 — Loop 26: section-level callout when ≥30% of entries are unverified. */}
+            {showRegulatoryUnverifiedCallout && (
+                <View
+                    style={{
+                        marginBottom: 8,
+                        padding: 8,
+                        borderRadius: 4,
+                        backgroundColor: "#fef3c7",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#b45309",
+                    }}
+                >
+                    <Text style={{ fontSize: 9, fontWeight: "bold", color: "#78350f" }}>
+                        {unverifiedCount} of {items.length} regulatory entries are unverified extractions — confirm with a qualified compliance reviewer before procurement.
+                    </Text>
+                    <Text style={{ fontSize: 8.5, color: "#78350f", marginTop: 3 }}>
+                        These entries were populated by an automated extraction pass. Precision on conditional regulatory specifications is 40–70%. Each entry marked &quot;Unverified&quot; should be cross-checked against the original standard text before any procurement, certification, or design-freeze decision.
+                    </Text>
+                </View>
+            )}
+            {items.map((r, i) => {
+                const rowUnverified = isUnverifiedExtraction(r.confidence, r.verifiedAt)
+                return (
                 <View key={i} style={{ marginBottom: 10 }} wrap={false}>
                     <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
                         <Text style={{ fontWeight: "bold", marginRight: 8 }}>{r.code}</Text>
@@ -1788,6 +1866,8 @@ function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactEleme
                                 {r.ownerRole}
                             </Text>
                         )}
+                        {/* D3 — Loop 26: inline unverified pill per row */}
+                        {rowUnverified && <UnverifiedPill />}
                     </View>
                     <Text style={{ fontStyle: "italic", marginBottom: 2 }}>{r.name}</Text>
                     {r.summary && <Text style={{ marginBottom: 3 }}>{r.summary}</Text>}
@@ -1816,7 +1896,8 @@ function RegulatorySection({ items }: { items: Regulatory[] }): React.ReactEleme
                         </Text>
                     )}
                 </View>
-            ))}
+                )
+            })}
         </View>
     )
 }

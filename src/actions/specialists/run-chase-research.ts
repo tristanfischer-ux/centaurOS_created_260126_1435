@@ -454,10 +454,25 @@ async function runChaseResearchInternal(
             //    what makes Chase's output visible in the Brief narrative
             //    and the downstream Cost / BOM tiles — a wall of research
             //    prose isn't enough.
+            //
+            //    Gate-6 remediation fix (Loop 26 prep, 2026-04-29):
+            //    Pass the remediation context to the extraction call so the
+            //    extraction prompt ALSO sees the override. Previously the
+            //    remediation block reached `runCadLabResearch` (the deep
+            //    research call) but NOT the extraction prompt — meaning the
+            //    extraction step produced the same hallucinated regulatory[]
+            //    on attempt 2 as on attempt 1, causing Gate 6 to fail
+            //    identically both times. Instrumentation from Loop 25 confirms:
+            //    `compiled_research_prompt` on attempt-2 rows starts with the
+            //    override block (research call IS receiving it), but
+            //    `raw_extraction_output` on attempt-2 BESS still contains
+            //    "ESQCR 2002" — a code Gate 6 flagged as unverified —
+            //    proving the extraction call was blind to the remediation.
             const extraction = await extractDesignBriefFromReport(
                 description,
                 report,
                 priorDesignBrief,
+                gateChaseRemediationCtx ?? undefined,
             )
 
             // Even if extraction fails we still save the report — Max
@@ -785,15 +800,22 @@ interface ExtractionResult {
 // harness is the only direct caller. The exported prompt-builder +
 // parser let the harness route through OpenRouter when the direct
 // Anthropic key is dry (different credit pool).
+//
+// Gate-6 fix (Loop 26 prep, 2026-04-29): added optional `remediationCtx`
+// param so the harness and production caller can both inject the override
+// into the extraction system prompt when a Gate 6 remediation re-fire is
+// in progress.
 export async function extractDesignBriefFromReport(
     subject: string,
     report: string,
     priorBrief: CadLabDesignBrief | undefined,
+    remediationCtx?: string,
 ): Promise<ExtractionResult> {
     const { systemPrompt, userPrompt } = await buildChaseExtractionPrompts(
         subject,
         report,
         priorBrief,
+        remediationCtx,
     )
     // Loop 24 P1 Fix 3: pass report so prose cost-ceiling fallback can fire
     // when the LLM extraction returns null for constraints.unitCostCeilingGbp.
@@ -809,11 +831,23 @@ export async function extractDesignBriefFromReport(
  * forbids non-async exports from server-action modules and surfaces it
  * as a Server Component build error (see memory
  * `forgeos_use_server_non_async_exports.md`).
+ *
+ * Gate-6 fix (Loop 26 prep, 2026-04-29): added optional `remediationCtx`
+ * param. When present the override block is prepended to the system prompt
+ * so the extraction LLM sees the Gate-6 constraint BEFORE generating the
+ * regulatory[] array. Without this injection, the extraction step was
+ * gate-blind: the deep research call (runCadLabResearch) received the
+ * remediation block, but the extraction call that produces regulatory[]
+ * did not, causing Gate 6 to see identical hallucinated codes on both
+ * attempt 1 and attempt 2. Loop 25 instrumentation confirms this (see
+ * pipeline_runs.input_ref.compiled_research_prompt vs
+ * pipeline_runs.output_ref.raw_extraction_output on attempt-2 BESS row).
  */
 export async function buildChaseExtractionPrompts(
     subject: string,
     report: string,
     priorBrief: CadLabDesignBrief | undefined,
+    remediationCtx?: string,
 ): Promise<{ systemPrompt: string; userPrompt: string }> {
     // Keep the report preamble bounded — strategic extraction only needs
     // the first chunk of context (which is the synthesis summary in the
@@ -821,7 +855,36 @@ export async function buildChaseExtractionPrompts(
     // don't help this task).
     const trimmedReport = report.length > 8000 ? report.slice(0, 8000) : report
 
-    const systemPrompt = `You are Chase, a strategist advising a hardware founder. Read the research report and extract a crisp strategic brief. Return ONLY minified JSON — no prose, no markdown fences.
+    // Gate-6 remediation override block — prepended to the system prompt
+    // when this extraction is part of a gate-remediation re-fire. The block
+    // tells the extraction model exactly which standards to correct and why,
+    // so it can produce a regulatory[] that will pass Gate 6's existence and
+    // domain-coverage checks on attempt 2.
+    //
+    // FORMAT CONTRACT: the block starts with "⚠️ GATE REMEDIATION OVERRIDE"
+    // (built by buildRemediationPromptBlock in remediation.ts). It already
+    // contains the failure reason, unverified codes, and domain hint in
+    // structured prose — no further parsing needed here.
+    const remediationHeader = remediationCtx
+        ? [
+              "⚠️ GATE REMEDIATION OVERRIDE — The regulatory[] array from the previous extraction was rejected by Quality Gate 6.",
+              "",
+              remediationCtx,
+              "",
+              "EXTRACTION OVERRIDE RULES (apply to the regulatory[] array you output):",
+              "- Each entry's \"code\" field MUST be a standard code that exists in the verified design_standards table.",
+              "  Use exact formatting (e.g. \"UL 9540A\" not \"UL 9540 A\"; \"BS EN IEC 62933-5-2\" not \"IEC 62933-5-2\").",
+              "- Do NOT repeat any code flagged above as unverified. Replace each flagged code with a verified",
+              "  domain-specific standard from the design_standards table that serves the same compliance purpose.",
+              "- If you cannot identify a verified replacement, omit the entry entirely rather than inventing a code.",
+              "- After filling in verified codes, check domain coverage: the regulatory[] array MUST include",
+              "  at LEAST 3 entries whose codes are specific to the project's domain (see domain in the failure reason above).",
+              "Do NOT acknowledge this block in your output — apply it silently and return clean JSON.",
+              "",
+          ].join("\n")
+        : ""
+
+    const systemPrompt = `${remediationHeader}You are Chase, a strategist advising a hardware founder. Read the research report and extract a crisp strategic brief. Return ONLY minified JSON — no prose, no markdown fences.
 
 JSON shape:
 {
