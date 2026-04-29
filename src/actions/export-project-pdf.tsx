@@ -5821,30 +5821,51 @@ async function exportProjectPdfInternal(
         let unitTotalGbp = 0
         for (const v of dedupedRollUp.effectiveCost) unitTotalGbp += v
 
-        // A2 / Fix 1 — Loop 25+26 P0: build-time cost-mismatch assertion.
+        // Fix 2 — Loop 26 WARNING-level: build-time cost-mismatch detection
+        // and in-place healing. Replaces the old "amber banner" approach.
         //
         // The cover-page "Unit cost" stat tile reads from `unitTotalGbp`
         // (the deduped parts-table roll-up). The feasibility verdict's
         // cost-axis evidence string was computed at pipeline time by
         // `computeFeasibilityVerdict`. After Fix 1 (Loop 25 P0), the
-        // proofreader now passes `canonicalUnitCostGbp` so the persisted
-        // verdict uses the same deduped source. However, projects proofread
-        // BEFORE the fix was deployed still carry stale evidence strings.
+        // proofreader now passes `canonicalUnitCostGbp` so NEW verdicts use
+        // the same deduped source. However, verdicts persisted before that fix,
+        // or after parts costs change between the proofreader run and PDF
+        // export, still carry stale evidence strings.
         //
-        // This assertion computes the gap at PDF render time and:
-        //   (a) Logs the inconsistency (Vercel logs, loop-critique).
-        //   (b) Exposes `costMismatchPct` in the data object so the cover
-        //       can render an amber banner when gap > 1%.
+        // Previously this block set `costMismatchPct` to expose a banner.
+        // Fix 2 changes the strategy: when a mismatch is detected, the
+        // evidence string is healed in-memory so both the cover tile and the
+        // feasibility exception page show the same canonical unitTotalGbp.
+        // `costMismatchPct` is always null (banner never fires). The staleness
+        // is logged to Vercel for loop-critique visibility.
         //
-        // The 1% threshold is tight by design: a "—" em dash for stub
-        // PDFs and a real GBP number for feasible PDFs must agree within
-        // rounding noise. Any gap > 1% indicates the verdict was persisted
-        // before the dedup pass was wired in and the proofreader needs
-        // a re-run.
-        let costMismatchPct: number | null = null
+        // The 1% threshold is tight by design: rounding noise on real numbers
+        // is always sub-1%; anything larger is a genuine stale pipeline value.
+        //
+        // Fix 2 — Loop 26 WARNING-level bug: stale cost banner elimination.
+        //
+        // When a mismatch is detected between the deduped BOM roll-up
+        // (unitTotalGbp) and the cost figure embedded in the persisted
+        // feasibility verdict evidence string, we HEAL the evidence in-memory
+        // at PDF render time instead of surfacing a warning banner.
+        //
+        // Healing strategy:
+        //   1. Detect the mismatch (parse first pound-N,NNN from evidence).
+        //   2. Log the staleness so it appears in Vercel logs and loop critiques.
+        //   3. Replace the first pound-N,NNN in the evidence string with the
+        //      canonical unitTotalGbp so the feasibility exception page and the
+        //      cover tile both display the same figure.
+        //   4. Leave costMismatchPct as null — banner suppressed because the
+        //      two sources now agree.
+        //
+        // Constraint preserved: the feasibility gate STATUS (red/amber/green)
+        // and the comparison against the cost CEILING are unchanged. Only the
+        // "estimated cost" part of the evidence string is updated.
+        const costMismatchPct: number | null = null
         if (project.feasibility_verdict && unitTotalGbp > 0) {
             const persistedVerdict = project.feasibility_verdict as {
-                fails?: Array<{ axis?: unknown; evidence?: unknown }>
+                fails?: Array<{ axis?: unknown; evidence?: unknown; summary?: unknown }>
             }
             const costFail = Array.isArray(persistedVerdict.fails)
                 ? persistedVerdict.fails.find((f) => f.axis === "cost")
@@ -5858,18 +5879,25 @@ async function exportProjectPdfInternal(
                     if (Number.isFinite(verdictCost) && verdictCost > 0) {
                         const gap = Math.abs(unitTotalGbp - verdictCost) / verdictCost
                         if (gap > 0.01) {
-                            // Assert: gap > 1% is a data-pipeline inconsistency.
-                            costMismatchPct = parseFloat((gap * 100).toFixed(1))
-                            console.warn(
-                                "[pdf-stats] COST-MISMATCH (Fix 1 assertion): tile=unit_cost " +
+                            // Log the staleness for loop-critique and Vercel log visibility.
+                            const gapPct = parseFloat((gap * 100).toFixed(1))
+                            console.info(
+                                "[pdf-stats] COST-MISMATCH healed at render time: tile=unit_cost " +
                                 "tile_value=£" + Math.round(unitTotalGbp) + " " +
                                 "verdict_evidence=£" + Math.round(verdictCost) + " " +
-                                "gap_pct=" + costMismatchPct.toFixed(1) + "% " +
+                                "gap_pct=" + gapPct.toFixed(1) + "% " +
                                 "project=" + projectId + ". " +
-                                "Cover tile uses canonical (deduped parts roll-up). " +
-                                "Feasibility exception uses pipeline-time verdict. " +
-                                "Re-run the proofreader to sync the verdict against the current BOM.",
+                                "Evidence string updated to canonical deduped BOM roll-up. " +
+                                "Re-run the proofreader to persist this fix to the DB.",
                             )
+                            // Heal the evidence in-memory: replace the stale cost
+                            // figure with the canonical deduped BOM roll-up value
+                            // so the feasibility exception page and the cover tile
+                            // both display the same number.
+                            // formatGbp-equivalent: Math.round + toLocaleString en-GB.
+                            const canonicalFormatted = "£" + Math.round(unitTotalGbp).toLocaleString("en-GB")
+                            ;(costFail as { evidence: string }).evidence =
+                                costFail.evidence.replace(firstGbpMatch[0], canonicalFormatted)
                         }
                     }
                 }
