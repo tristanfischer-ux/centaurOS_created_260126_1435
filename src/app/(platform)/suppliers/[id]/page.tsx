@@ -188,10 +188,9 @@ export default async function SupplierDetailPage({ params }: PageProps) {
 
       <Separator />
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        {/* Main content (left, 2/3 width) */}
-        <div className="lg:col-span-2 space-y-6">
+      {/* Single-column layout — Tristan 2026-04-28: NO multi-column grids,
+          NO sidebar. All sections stack vertically full-width. */}
+      <div className="space-y-6">
           {/* About section */}
           {aboutText && (
             <Card>
@@ -357,94 +356,88 @@ export default async function SupplierDetailPage({ params }: PageProps) {
               </CardContent>
             </Card>
           )}
-        </div>
 
-        {/* Sidebar (right, 1/3 width) */}
-        <div className="lg:col-span-1 space-y-6">
-          {/* Company Details */}
-          <Card>
-            <CardHeader>
-              <h2 className="text-lg font-semibold text-foreground">Company Details</h2>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* DECISION: Show combined location when city+country available,
-                  otherwise show country alone. Avoids redundant display. */}
-              {hqLocation && (
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-                    Location
-                  </p>
-                  <p className="mt-1 text-sm text-foreground flex items-center gap-1">
-                    <MapPin className="h-4 w-4 text-international-orange flex-shrink-0" />
-                    {hqLocation}
-                  </p>
-                </div>
-              )}
+          {/* Company Details — moved from sidebar into single-column flow */}
+          {(hqLocation || country || yearFounded || employeeCount) && (
+            <Card>
+              <CardHeader>
+                <h2 className="text-lg font-semibold text-foreground">Company Details</h2>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* DECISION: Show combined location when city+country available,
+                    otherwise show country alone. Avoids redundant display. */}
+                {hqLocation && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+                      Location
+                    </p>
+                    <p className="mt-1 text-sm text-foreground flex items-center gap-1">
+                      <MapPin className="h-4 w-4 text-international-orange flex-shrink-0" />
+                      {hqLocation}
+                    </p>
+                  </div>
+                )}
 
-              {!hqLocation && country && (
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-                    Country
-                  </p>
-                  <p className="mt-1 text-sm text-foreground flex items-center gap-1">
-                    <Globe className="h-4 w-4 text-international-orange flex-shrink-0" />
-                    {country}
-                  </p>
-                </div>
-              )}
+                {!hqLocation && country && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+                      Country
+                    </p>
+                    <p className="mt-1 text-sm text-foreground flex items-center gap-1">
+                      <Globe className="h-4 w-4 text-international-orange flex-shrink-0" />
+                      {country}
+                    </p>
+                  </div>
+                )}
 
-              {yearFounded && (
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-                    Founded
-                  </p>
-                  <p className="mt-1 text-sm text-foreground flex items-center gap-1">
-                    <Calendar className="h-4 w-4 text-international-orange flex-shrink-0" />
-                    {yearFounded}
-                  </p>
-                </div>
-              )}
+                {yearFounded && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+                      Founded
+                    </p>
+                    <p className="mt-1 text-sm text-foreground flex items-center gap-1">
+                      <Calendar className="h-4 w-4 text-international-orange flex-shrink-0" />
+                      {yearFounded}
+                    </p>
+                  </div>
+                )}
 
-              {employeeCount && (
-                <div>
-                  <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-                    Employees
-                  </p>
-                  <p className="mt-1 text-sm text-foreground flex items-center gap-1">
-                    <Users className="h-4 w-4 text-international-orange flex-shrink-0" />
-                    {employeeCount}
-                  </p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                {employeeCount && (
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+                      Employees
+                    </p>
+                    <p className="mt-1 text-sm text-foreground flex items-center gap-1">
+                      <Users className="h-4 w-4 text-international-orange flex-shrink-0" />
+                      {employeeCount}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          )}
 
-          {/* Website Link */}
+          {/* Website Link — moved from sidebar into single-column flow */}
           {website && (
             <Card>
               <CardHeader>
                 <h2 className="text-lg font-semibold text-foreground">Links</h2>
               </CardHeader>
               <CardContent>
-                <Button
-                  asChild
-                  variant="secondary"
-                  className="w-full"
+                <a
+                  href={ensureProtocol(website)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-sm text-international-orange hover:underline"
                 >
-                  <a
-                    href={ensureProtocol(website)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  >
-                    <Globe className="h-4 w-4 mr-2" />
-                    Visit Website
-                  </a>
-                </Button>
+                  <Globe className="h-4 w-4 shrink-0" />
+                  Visit Website
+                </a>
               </CardContent>
             </Card>
           )}
 
-          {/* Data Quality & Verification */}
+          {/* Data Quality — moved from sidebar into single-column flow */}
           <Card>
             <CardHeader>
               <h2 className="text-lg font-semibold text-foreground">Data Quality</h2>
@@ -484,7 +477,6 @@ export default async function SupplierDetailPage({ params }: PageProps) {
               )}
             </CardContent>
           </Card>
-        </div>
       </div>
     </div>
   )

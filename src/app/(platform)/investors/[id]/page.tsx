@@ -421,16 +421,15 @@ export default async function InvestorDetailPage({ params }: PageProps) {
 
         <Separator />
 
-        {/* Two-column layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main content — 2/3 width */}
-          {/* Tristan 2026-04-27: Forge Capital section order is
-              Match Scorecard → Investment Thesis (FIRST big section) →
-              Ideal Company Profile → Investment Pattern → Team Expertise →
-              Connection Brief → Value Add → Fund Details → … → Founded /
-              BVCA chips. The old "About" card duplicated investment_thesis
-              and pushed it below the fold, so it has been removed. */}
-          <div className="lg:col-span-2 space-y-6">
+        {/* Single-column layout — Tristan 2026-04-28: NO multi-column grids,
+            NO sidebar. All sections stack vertically full-width.
+            Section order mirrors Forge Capital modal:
+            Match Scorecard → Investment Thesis → Key Details → Ideal Company
+            Profile → Investment Pattern → Team Expertise → Connection Brief →
+            Value Add → Fund Details → … → Key People → Portfolio →
+            Co-Investment → Fund Performance → Data Panorama → Notes →
+            Similar Investors. */}
+        <div className="space-y-6">
             {/* Match Scorecard — Forge Capital 6-pillar breakdown of how
                 this investor matches the foundry's profile. Renders only
                 when match data is available (foundry profile exists). */}
@@ -518,23 +517,20 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                   </h2>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {/* Fund Size and Cheque Range */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {attrs.fund_size_gbp && (
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Fund Size</p>
-                        <p className="text-sm font-semibold text-foreground">{fundSizeLabel}</p>
-                      </div>
-                    )}
-                    {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cheque Range</p>
-                        <p className="text-sm font-semibold text-foreground">
-                          {formatFundSize(attrs.cheque_range_gbp.min) ?? '?'} — {formatFundSize(attrs.cheque_range_gbp.max) ?? '?'}
-                        </p>
-                      </div>
-                    )}
-                  </div>
+                  {attrs.fund_size_gbp && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Fund Size</p>
+                      <p className="text-sm font-semibold text-foreground">{fundSizeLabel}</p>
+                    </div>
+                  )}
+                  {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cheque Range</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {formatFundSize(attrs.cheque_range_gbp.min) ?? '?'} — {formatFundSize(attrs.cheque_range_gbp.max) ?? '?'}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Stage Focus */}
                   {attrs.stage_focus && attrs.stage_focus.length > 0 && (
@@ -801,92 +797,74 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             {similarFirms.length > 0 && (
               <SimilarInvestorsSection firms={similarFirms} similarityScores={similarScores} />
             )}
-          </div>
 
-          {/* Sidebar — 1/3 width */}
-          <div className="space-y-4">
-            {/* Fund details */}
-            <Card>
-              <CardHeader>
-                <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  Fund Details
-                </h2>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {fundSizeLabel && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Fund Size</p>
-                    <p className="text-sm font-semibold text-foreground">{fundSizeLabel}</p>
-                  </div>
-                )}
-                {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cheque Size</p>
-                    <p className="text-sm font-semibold text-foreground">
-                      {formatFundSize(attrs.cheque_range_gbp.min) ?? '?'}
-                      {' – '}
-                      {formatFundSize(attrs.cheque_range_gbp.max) ?? '?'}
-                    </p>
-                  </div>
-                )}
-                {aumLabel && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">AUM</p>
-                    <p className="text-sm font-semibold text-foreground">{aumLabel}</p>
-                  </div>
-                )}
-                {attrs.geo_focus && attrs.geo_focus.length > 0 && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Geo Focus</p>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {attrs.geo_focus.map(g => (
-                        <Badge key={g} variant="outline" className="text-xs">{g}</Badge>
-                      ))}
+            {/* Fund Details — moved from sidebar into single-column flow */}
+            {(fundSizeLabel || aumLabel || (attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null)) || (attrs.geo_focus && attrs.geo_focus.length > 0) || attrs.hq_city || attrs.hardware_fit_score != null) && (
+              <Card>
+                <CardHeader>
+                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
+                    <Building2 className="h-4 w-4 text-muted-foreground" />
+                    Fund Details
+                  </h2>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {fundSizeLabel && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Fund Size</p>
+                      <p className="text-sm font-semibold text-foreground">{fundSizeLabel}</p>
                     </div>
-                  </div>
-                )}
-                {attrs.hq_city && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">HQ</p>
-                    <p className="text-sm text-foreground">{attrs.hq_city}</p>
-                  </div>
-                )}
-                {/* Hardware fit — professional+ only */}
-                {attrs.hardware_fit_score != null && access.intelligenceAccess && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Hardware Fit</p>
-                    <p className="text-sm font-semibold text-foreground">{Number(attrs.hardware_fit_score).toFixed(1)}/10</p>
-                  </div>
-                )}
-                {attrs.hardware_fit_score != null && !access.intelligenceAccess && (
-                  <div>
-                    <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1">
-                      Hardware Fit <Lock className="h-2.5 w-2.5" />
-                    </p>
-                    <p className="text-xs text-muted-foreground">Professional plan</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Verification footer — Tristan 2026-04-27: skip Data Quality
-                (quality_score, data_source) — internal-only fields. Keep the
-                website-verified + intel-synthesised dates per Forge Capital
-                external view. */}
-            {(attrs.last_synced || attrs.last_verified) && (
-              <div className="text-xs text-muted-foreground border-t border-border pt-3 mt-2">
-                {attrs.last_verified && !isNaN(new Date(attrs.last_verified).getTime()) && (
-                  <span>Website verified: {new Date(attrs.last_verified).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                )}
-                {attrs.last_verified && attrs.last_synced && <span> · </span>}
-                {attrs.last_synced && !isNaN(new Date(attrs.last_synced).getTime()) && (
-                  <span>Intel synthesised: {new Date(attrs.last_synced).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                )}
-              </div>
+                  )}
+                  {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Cheque Size</p>
+                      <p className="text-sm font-semibold text-foreground">
+                        {formatFundSize(attrs.cheque_range_gbp.min) ?? '?'}
+                        {' – '}
+                        {formatFundSize(attrs.cheque_range_gbp.max) ?? '?'}
+                      </p>
+                    </div>
+                  )}
+                  {aumLabel && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">AUM</p>
+                      <p className="text-sm font-semibold text-foreground">{aumLabel}</p>
+                    </div>
+                  )}
+                  {attrs.geo_focus && attrs.geo_focus.length > 0 && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Geographic Focus</p>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {attrs.geo_focus.map(g => (
+                          <Badge key={g} variant="outline" className="text-xs">{g}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {attrs.hq_city && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Headquarters</p>
+                      <p className="text-sm text-foreground">{attrs.hq_city}</p>
+                    </div>
+                  )}
+                  {attrs.hardware_fit_score != null && access.intelligenceAccess && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5">Hardware Fit</p>
+                      <p className="text-sm font-semibold text-foreground">{Number(attrs.hardware_fit_score).toFixed(1)}/10</p>
+                    </div>
+                  )}
+                  {attrs.hardware_fit_score != null && !access.intelligenceAccess && (
+                    <div>
+                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-0.5 flex items-center gap-1">
+                        Hardware Fit <Lock className="h-2.5 w-2.5" />
+                      </p>
+                      <p className="text-xs text-muted-foreground">Professional plan</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
             )}
 
-            {/* Outreach status */}
+            {/* Outreach status — moved from sidebar into single-column flow */}
             {(attrs.outreach_status || attrs.outreach_priority) && (
               <Card>
                 <CardHeader>
@@ -916,7 +894,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Links */}
+            {/* Links — moved from sidebar into single-column flow */}
             {(attrs.website_url || attrs.linkedin_company_url) && (
               <Card>
                 <CardHeader>
@@ -948,9 +926,23 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 </CardContent>
               </Card>
             )}
+
+            {/* Verification footer — Tristan 2026-04-27: skip Data Quality
+                (quality_score, data_source) — internal-only fields. Keep the
+                website-verified + intel-synthesised dates. */}
+            {(attrs.last_synced || attrs.last_verified) && (
+              <div className="text-xs text-muted-foreground border-t border-border pt-3">
+                {attrs.last_verified && !isNaN(new Date(attrs.last_verified).getTime()) && (
+                  <span>Website verified: {new Date(attrs.last_verified).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                )}
+                {attrs.last_verified && attrs.last_synced && <span> · </span>}
+                {attrs.last_synced && !isNaN(new Date(attrs.last_synced).getTime()) && (
+                  <span>Intel synthesised: {new Date(attrs.last_synced).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
-      </div>
     </TooltipProvider>
   )
 }
