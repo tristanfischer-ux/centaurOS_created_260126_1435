@@ -13,7 +13,7 @@ import {
     validateCostTree,
     type ModuleCostEntry,
     type CostLineItem,
-} from "@/lib/cost/cost-tree-validation"
+} from "../cost-tree-validation"
 
 // ── Fixtures ──────────────────────────────────────────────────────────────────
 
