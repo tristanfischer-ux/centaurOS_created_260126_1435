@@ -18,6 +18,7 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 import { withAuth } from '@/lib/server-action-utils'
 import { callClaudeCentral } from '@/lib/ai/claude-client'
 import { applySectorBoost } from '@/lib/sector-boost'
+import { logSearchQuery } from '@/lib/search-telemetry'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -43,6 +44,14 @@ export interface SupplierSearchResult {
   results: SupplierCard[]
   total: number
   searchMode: 'semantic' | 'keyword' | 'browse'
+  /**
+   * Phase A.5 telemetry: id of the row written to `search_query_log` for this
+   * call. The UI threads this id into click handlers so that
+   * `recordSearchClick` can attach click events to the originating query.
+   * Undefined for unauthenticated callers or when the telemetry insert
+   * failed (telemetry is fail-open).
+   */
+  searchQueryLogId?: string
 }
 
 export interface SupplierCard {
@@ -112,15 +121,15 @@ function mapToSupplierCard(row: Record<string, unknown>): SupplierCard {
 // ---------------------------------------------------------------------------
 
 /**
- * Searches suppliers in the marketplace. Uses semantic search (pgvector) when a
- * natural-language query is provided (> 5 chars), falling back to keyword/browse.
- *
- * @param filters Search filters including optional query, category, country, certifications, sortBy
- * @returns Ranked supplier results with search mode indicator
+ * Internal supplier-search core. Runs the vector + FTS hybrid pipeline and
+ * returns a `SupplierSearchResult` augmented with a hidden `_telemetry` field
+ * that the public wrapper consumes to write a `search_query_log` row. Kept
+ * as a private function so existing callers of `searchSuppliers` still get
+ * Phase A.5 instrumentation via the wrapper below.
  */
-export async function searchSuppliers(
+async function searchSuppliersCore(
   filters: SupplierSearchFilters = {}
-): Promise<SupplierSearchResult> {
+): Promise<SupplierSearchResult & { _telemetry?: { ftsHitCount?: number; vectorHitCount?: number } }> {
   const supabase = await createClient()
   const limit = Math.min(filters.limit || 24, 100)
   const offset = filters.offset || 0
@@ -220,6 +229,9 @@ export async function searchSuppliers(
         }
       }
 
+      // Phase A.5 telemetry: capture pre-merge vector pool count for logging.
+      const _vectorHitCount = supplierMatches.length
+
       // Phase A merge: collect FTS results across both supplier categories.
       // Errors are non-fatal — fall back to vector-only if FTS fails.
       const ftsById = new Map<string, { best_rank: number; page_count: number; best_page_url: string | null }>()
@@ -303,7 +315,12 @@ export async function searchSuppliers(
       )
 
       if (supplierMatches.length === 0) {
-        return { results: [], total: 0, searchMode: 'semantic' }
+        return {
+          results: [],
+          total: 0,
+          searchMode: 'semantic',
+          _telemetry: { vectorHitCount: _vectorHitCount, ftsHitCount: ftsById.size },
+        }
       }
 
       // DECISION: The RPC returns only id, category, title, description, similarity — NOT
@@ -401,6 +418,7 @@ export async function searchSuppliers(
         results: paginatedResults.map(mapToSupplierCard),
         total: results.length,
         searchMode: 'semantic',
+        _telemetry: { vectorHitCount: _vectorHitCount, ftsHitCount: ftsById.size },
       }
     } catch (err) {
       console.error('Semantic search failed, falling back to keyword:', err)
@@ -469,6 +487,88 @@ export async function searchSuppliers(
     total: results.length,
     searchMode: filters.query ? 'keyword' : 'browse',
   }
+}
+
+/**
+ * Public supplier-search action with Phase A.5 instrumentation. Wraps
+ * `searchSuppliersCore`, writes a row to `search_query_log` for any
+ * authenticated query, and returns the new `search_query_log.id` so the UI
+ * can attach click events via `recordSearchClick`.
+ *
+ * Telemetry is fail-open: if the insert errors, we still return the user's
+ * results normally. Anonymous searches are not logged (RLS is user-scoped).
+ *
+ * @param filters Search filters including optional query, category, country, certifications, sortBy
+ * @returns Ranked supplier results with search mode indicator
+ */
+export async function searchSuppliers(
+  filters: SupplierSearchFilters = {}
+): Promise<SupplierSearchResult> {
+  const _telemetryStart = Date.now()
+  const baseResult = await searchSuppliersCore(filters)
+
+  // Strip the internal `_telemetry` field from the returned shape so
+  // downstream consumers (UI, analytics) only see the public fields.
+  const { _telemetry, ...publicResult } = baseResult
+
+  const trimmedQuery = (filters.query ?? '').trim()
+  if (trimmedQuery.length === 0) {
+    return publicResult
+  }
+
+  // Resolve user + foundry for the telemetry row. RLS requires
+  // profile_id = auth.uid(), so anonymous searches are skipped here.
+  let searchQueryLogId: string | undefined
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      let foundryId: string | null = null
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('foundry_id')
+          .eq('id', user.id)
+          .maybeSingle()
+        foundryId = profile?.foundry_id ?? null
+      } catch {
+        foundryId = null
+      }
+
+      const logId = await logSearchQuery({
+        supabase,
+        profileId: user.id,
+        foundryId,
+        surface: 'suppliers',
+        queryText: trimmedQuery,
+        // Suppliers span Services + Products at the search layer; record both
+        // so downstream analytics can split by category if needed.
+        category: filters.category ?? 'Services,Products',
+        resultCount: baseResult.results.length,
+        ftsHitCount: _telemetry?.ftsHitCount ?? null,
+        vectorHitCount: _telemetry?.vectorHitCount ?? null,
+        topResultIds: baseResult.results.slice(0, 5).map((r) => r.id),
+        latencyMs: Date.now() - _telemetryStart,
+        clientMeta: {
+          searchMode: baseResult.searchMode,
+          total: baseResult.total,
+          appliedFilters: {
+            category: filters.category ?? null,
+            country: filters.country ?? null,
+            certifications: filters.certifications ?? null,
+            supplierType: filters.supplierType ?? null,
+          },
+        },
+      })
+      searchQueryLogId = logId ?? undefined
+    }
+  } catch (err) {
+    // Telemetry must never break the user's search. Log and move on.
+    const msg = err instanceof Error ? err.message : String(err)
+    console.warn('[searchSuppliers] telemetry resolve failed (non-fatal):', msg)
+  }
+
+  return { ...publicResult, searchQueryLogId }
 }
 
 /**

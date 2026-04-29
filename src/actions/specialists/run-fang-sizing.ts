@@ -56,6 +56,10 @@ import { decideAutoAdjustment, type BriefAutoAdjustment } from "@/lib/sizing/aut
 import { getRulesByDomain } from "@/lib/sizing/rules/_registry"
 import type { DimensionSheet, Envelope } from "@/lib/sizing/types"
 import type { Database } from "@/types/database.types"
+import {
+    areSameProductClass,
+    getEnvelopeClassificationTag,
+} from "@/lib/forge-v2/envelope-classification"
 
 // ─── Subject-text heuristic (fallback when Max didn't populate industryDomain) ───
 
@@ -143,7 +147,18 @@ export interface RunFangSizingError {
     ok: false
     skipped?: false
     error: string
-    errorCode?: string
+    /**
+     * SOLVER_ERROR — Fang produced NULL/feasible=null dimension_sheet.
+     *   Pipeline must set autopilot_state.stage = 'solver_error' (terminal).
+     *
+     * DELIVER_AND_PUSHBACK — alternate envelope is a different product class.
+     *   The briefed-class max-feasible sheet is already persisted from attempt 1
+     *   with class-fence fields. Pipeline should advance normally; the PDF will
+     *   render the trade-off callout from closest_feasible_alternate.
+     *
+     * All other codes are transient errors that may be retried.
+     */
+    errorCode?: string | "SOLVER_ERROR" | "DELIVER_AND_PUSHBACK"
     runId?: string
 }
 
@@ -358,30 +373,169 @@ async function runFangSizingInternal(
         "waiting_sizing",
     )
 
-    // Gate 3 remediation: when a previous run was INFEASIBLE and the gate
-    // stashed a remediation context, the solver already computed the best
-    // feasible alternate on attempt 1 — it lives at
-    // dimension_sheet.closest_feasible_alternate.envelope.
+    // ── Gate 3 remediation path ──────────────────────────────────────────────
     //
-    // DECISION: feed that alternate envelope back in as the starting envelope
-    // for this retry run. The solver's own feasibility sweep proves it fits;
-    // this is legitimate engineering trade-off (pick the alternate the solver
-    // already computed feasible), NOT tolerance relaxation.
+    // When Gate 3 FAILs on a previous attempt and the cron handler triggers
+    // remediation, it stashes context at gate_remediation_context["waiting_sizing"].
+    // The solver's attempt 1 may have stored closest_feasible_alternate.envelope
+    // — the alternate we feed into attempt 2.
     //
-    // SAFETY: if closest_feasible_alternate is absent (attempt 1 found no
-    // feasible alternate at all), keep briefEnvelope unchanged — the solver
-    // will INFEASIBLE again and surface the right escalation path.
-    let remediationEnvelopeOverride: import("@/lib/sizing/types").Envelope | undefined = undefined
+    // GUARD 1 — NULL / feasible-null = solver error, NOT recoverable
+    // ─────────────────────────────────────────────────────────────────
+    // If we are in a remediation context (attempt 2) AND the previous
+    // dimension_sheet is still null (Fang produced nothing on attempt 1),
+    // that is a solver error, not an infeasibility we can retry through.
+    // Advancing to matching_suppliers or generating_illustration with a NULL
+    // sheet produces a PDF with no actual sizing — the Loop 24 HAPS /
+    // Desalination / Hedgerow failure pattern.
+    //
+    // COUNCIL RULE (GPT-5.5 snippet, gate3-council-2/SYNTHESIS.md 2026-04-29):
+    //   if (!dimensionSheet || dimensionSheet.feasible == null) → SOLVER_ERROR
+    //
+    // We surface this as a `RunFangSizingError` with errorCode SOLVER_ERROR.
+    // The autopilot-step handler receiving this error MUST set
+    // autopilot_state.stage = 'solver_error' (terminal) so the cron loop
+    // stops advancing the project.
+
     if (gateSizingRemediationCtx) {
         const prevSheet = (project.dimension_sheet as DimensionSheet | null) ?? null
-        const alternate = prevSheet?.closest_feasible_alternate ?? null
-        remediationEnvelopeOverride = alternate?.envelope ?? undefined
-        console.log("[fang-sizing] remediation override applied:", {
-            fromEnvelope: prevSheet?.envelope?.kind ?? "(none)",
-            toEnvelope: remediationEnvelopeOverride?.kind ?? "(no alternate — keeping current)",
-            attempt: "gate-remediation-retry",
-            contextChars: gateSizingRemediationCtx.length,
-        })
+        if (!prevSheet || prevSheet.feasible == null) {
+            console.error(
+                "[fang-sizing] SOLVER_ERROR: remediation context present but dimension_sheet is null/feasible=null.",
+                { projectId, prevSheetPresent: !!prevSheet },
+            )
+            return {
+                ok: false,
+                error:
+                    "Fang produced no dimension sheet on attempt 1. " +
+                    "Solver cannot proceed — this project requires manual brief review.",
+                errorCode: "SOLVER_ERROR",
+                runId: "",
+            }
+        }
+    }
+
+    // ── Gate 3 remediation: class-fence + deliver-and-pushback ───────────────
+    //
+    // GUARD 2 — alternate must share the briefed product class for auto-retry
+    // ─────────────────────────────────────────────────────────────────────────
+    // Read closest_feasible_alternate from the previous attempt.
+    // If the alternate is in the SAME product class as the briefed envelope
+    // (e.g. 40ft ISO → 53ft HC, both "transportable_container"), we can
+    // safely retry with the alternate — the solver proved it fits.
+    //
+    // If the alternate is in a DIFFERENT product class (e.g. 40ft ISO →
+    // warehouse_bay), we must NOT silently swap. Instead we annotate the
+    // existing dimension_sheet with class-fence fields and return a special
+    // `DELIVER_AND_PUSHBACK` errorCode. The autopilot-step handler receiving
+    // this advances the project normally (the briefed-class max-feasible
+    // sheet is already persisted from attempt 1) AND attaches the pushback
+    // payload so the PDF renders the trade-off callout.
+    //
+    // ANTI-CHEAT: areSameProductClass() is a deterministic enum compare.
+    // NEVER replaced with an LLM call.
+
+    let remediationEnvelopeOverride: Envelope | undefined = undefined
+    if (gateSizingRemediationCtx) {
+        const prevSheet = (project.dimension_sheet as DimensionSheet | null)!
+        const alternate = prevSheet.closest_feasible_alternate ?? null
+
+        if (alternate?.envelope) {
+            const briefedEnvelope = briefEnvelope ?? prevSheet.envelope
+            const sameClass = areSameProductClass(briefedEnvelope, alternate.envelope)
+
+            if (!sameClass) {
+                // ── Deliver-and-pushback path ──────────────────────────────────
+                // The solver's alternate is a different product class.
+                // Annotate the existing sheet with class-fence fields so the PDF
+                // can render the "you might consider this" trade-off callout.
+                // Then return DELIVER_AND_PUSHBACK — no retry with the alternate.
+                const briefedTag = getEnvelopeClassificationTag(briefedEnvelope)
+                const alternateTag = getEnvelopeClassificationTag(alternate.envelope)
+
+                // Extract the primary capacity metric from the existing sheet.
+                // We look for the first numeric target value as a best-effort proxy.
+                const primaryTargetEntry = Object.entries(prevSheet.target ?? {}).find(
+                    ([, v]) => typeof v === "number",
+                )
+                const capacityValue = primaryTargetEntry?.[1] ?? null
+                const capacityUnits = primaryTargetEntry?.[0] ?? "units"
+                const alternateCapacityValue =
+                    alternate.target
+                        ? (Object.values(alternate.target).find((v) => typeof v === "number") ?? null)
+                        : null
+
+                // Patch the sheet's closest_feasible_alternate with class-fence fields.
+                // This is a WRITE to the DB so the PDF export picks it up.
+                const patchedAlternate = {
+                    ...alternate,
+                    briefed_classification_tag: briefedTag,
+                    alternate_classification_tag: alternateTag,
+                    product_class_match: false as const,
+                    capacity_at_briefed_class: {
+                        value: capacityValue as number | null,
+                        units: capacityUnits,
+                        deficit: null,
+                        summary: `The briefed ${briefedEnvelope.label} class (${briefedTag}) ` +
+                            `cannot achieve the full target. ` +
+                            `Maximum feasible: ${capacityValue ?? "see sheet"} ${capacityUnits}.`,
+                    },
+                    capacity_at_alternate_class: {
+                        value: alternateCapacityValue as number | null,
+                        units: capacityUnits,
+                    },
+                    trade_off_note: `If you relax the envelope class from ${briefedTag} ` +
+                        `(${briefedEnvelope.label}) to ${alternateTag} ` +
+                        `(${alternate.envelope.label}), the full target may be achievable. ` +
+                        `Return to the brief and update the envelope to switch. ` +
+                        `Otherwise the design proceeds at the maximum feasible capacity ` +
+                        `for the briefed class.`,
+                }
+
+                // Persist the patched sheet with class-fence fields.
+                const admin = createAdminClient()
+                const patchedSheet = { ...prevSheet, closest_feasible_alternate: patchedAlternate }
+                await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        dimension_sheet: patchedSheet as unknown as Database["public"]["Tables"]["cad_lab_projects"]["Row"]["dimension_sheet"],
+                    } as Database["public"]["Tables"]["cad_lab_projects"]["Update"])
+                    .eq("id", projectId)
+
+                console.log("[fang-sizing] class-fence DELIVER_AND_PUSHBACK:", {
+                    briefedClass: briefedTag,
+                    alternateClass: alternateTag,
+                    briefedEnvelope: briefedEnvelope.kind,
+                    alternateEnvelope: alternate.envelope.kind,
+                })
+
+                return {
+                    ok: false,
+                    error:
+                        `Alternate envelope (${alternate.envelope.label}) is a different product class ` +
+                        `(${alternateTag}) from the briefed envelope (${briefedEnvelope.label}, ${briefedTag}). ` +
+                        `Delivering briefed-class max-feasible result with alternate as a pushback suggestion.`,
+                    errorCode: "DELIVER_AND_PUSHBACK",
+                    runId: "",
+                }
+            }
+
+            // Same product class — safe to retry with the alternate envelope.
+            remediationEnvelopeOverride = alternate.envelope
+            console.log("[fang-sizing] remediation same-class override applied:", {
+                fromEnvelope: prevSheet.envelope?.kind ?? "(none)",
+                toEnvelope: remediationEnvelopeOverride.kind,
+                briefedClass: getEnvelopeClassificationTag(briefedEnvelope),
+                alternateClass: getEnvelopeClassificationTag(alternate.envelope),
+                attempt: "gate-remediation-retry",
+                contextChars: gateSizingRemediationCtx.length,
+            })
+        } else {
+            // No alternate computed — solver failed without a feasible fallback.
+            // Keep briefEnvelope unchanged; the solver will INFEASIBLE again
+            // and Gate 3 attempt 2 will escalate to Max re-decompose.
+            console.log("[fang-sizing] remediation: no alternate found, retrying with original envelope")
+        }
     }
 
     // 3. Open pipeline_run row.

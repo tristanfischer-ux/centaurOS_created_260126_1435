@@ -73,6 +73,12 @@ export type AutopilotStage =
     | "done"
     | "failed"          // v1.5 (2026-04-28): set by recordFailure() when retries
                         // exhausted; cron filter excludes by `stage NOT IN ('done','failed')`
+    | "solver_error"    // v1.6 (2026-04-29 Loop 24 P0): TERMINAL stage set when
+                        // Fang produces NULL dimension_sheet (feasible == null or
+                        // dimension_sheet entirely absent after retry). Projects in
+                        // solver_error do NOT generate a PDF, do NOT advance to
+                        // matching_suppliers. Cron filter must exclude this stage.
+                        // Root cause: council R2 gate-3 fix — NULL hard-block.
 
 export interface AutopilotState {
     started_at: string

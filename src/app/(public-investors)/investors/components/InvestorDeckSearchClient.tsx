@@ -36,6 +36,7 @@ import {
 } from '@/actions/investors'
 import { Loader2 } from 'lucide-react'
 import { extractDocumentText } from '@/actions/extract-document-text'
+import { recordSearchClick } from '@/actions/search-click'
 import { InvestorStatsCharts } from './InvestorStatsCharts'
 import { MatchPillarBars } from '@/app/(platform)/investors/components/MatchPillarBars'
 import type { InvestorDirectoryStats } from '@/actions/investors'
@@ -203,6 +204,11 @@ export function InvestorDeckSearchClient({
   const [topPage, setTopPage] = useState(0)
   // ── Favourites toggle ────────────────────────────────────────────────────
   const [showSaved, setShowSaved] = useState(false)
+  // Phase A.5 instrumentation. The `searchQueryLogId` returned from the
+  // server action keys per-card click events back to the originating query
+  // via `recordSearchClick`. Cleared between searches; `null` = no
+  // telemetry available (anonymous user, telemetry insert failed, etc.).
+  const [searchQueryLogId, setSearchQueryLogId] = useState<string | null>(null)
 
   const isPaid = PAID_TIERS.has(tier)
   const isFree = tier === 'free'
@@ -250,6 +256,7 @@ export function InvestorDeckSearchClient({
         setFirms(result.firms)
         setTotal(result.total)
         setMatchOutputs(result.matchOutputs ?? {})
+        setSearchQueryLogId(result.searchQueryLogId ?? null)
         if (result.resolvedTier) setTier(result.resolvedTier as ResolvedTier)
         setExtractedProfile(extractProfile(trimmed, result.firms))
         // Surface engine failures as a visible callout rather than a silent empty state
@@ -640,6 +647,16 @@ export function InvestorDeckSearchClient({
                 onRevealWhyFit={isPaid ? () => handleRevealWhyFit(firm.id) : undefined}
                 isLocked={false}
                 isPaid={isPaid}
+                onTrackClick={(clickType) => {
+                  // Phase A.5 — fire-and-forget; no UI gate.
+                  if (!searchQueryLogId) return
+                  void recordSearchClick({
+                    queryLogId: searchQueryLogId,
+                    listingId: firm.id,
+                    position: rank - 1,
+                    clickType,
+                  })
+                }}
               />
             )
           })}
@@ -1249,6 +1266,12 @@ interface MatchCardProps {
   onRevealWhyFit?: () => Promise<void>
   isLocked: boolean
   isPaid: boolean
+  /**
+   * Phase A.5 click telemetry. Fired on `open` (cover-link click) and
+   * `expand` (Why-fit accordion). Card never blocks user interaction on
+   * this — it's fire-and-forget.
+   */
+  onTrackClick?: (clickType: 'open' | 'expand') => void
 }
 
 function MatchCard({
@@ -1262,6 +1285,7 @@ function MatchCard({
   onRevealWhyFit,
   isLocked,
   isPaid,
+  onTrackClick,
 }: MatchCardProps) {
   const attrs = firm.attributes
   const firmType = attrs.firm_type
@@ -1299,6 +1323,9 @@ function MatchCard({
   const handleExpand = (e: React.MouseEvent) => {
     e.stopPropagation()
     if (!isPaid) return
+    // Fire telemetry only on the open transition — closing the panel is
+    // not a "found something interesting" signal.
+    if (!expanded) onTrackClick?.('expand')
     if (!expanded && !matchOutput && onRevealWhyFit) {
       setExpanded(true)
       startEnrichTransition(async () => {
@@ -1410,6 +1437,7 @@ function MatchCard({
         className="absolute inset-0 rounded-xl"
         aria-hidden
         tabIndex={-1}
+        onClick={() => onTrackClick?.('open')}
       />
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">

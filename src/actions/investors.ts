@@ -33,6 +33,7 @@ import {
   MONTHLY_INVESTOR_VIEW_CAPS,
   MAX_DAILY_INVESTOR_VIEWS,
 } from '@/lib/ai/limit-check'
+import { logSearchQuery } from '@/lib/search-telemetry'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -208,6 +209,24 @@ export interface InvestorSearchResult {
    * Suitable for display directly to the user in an amber callout.
    */
   failureMessage?: string
+  /**
+   * Phase A.5 telemetry: id of the row written to `search_query_log` for
+   * this call. The UI threads this id into click handlers so that
+   * `recordSearchClick` can attach click events to the originating query.
+   * Undefined for unauthenticated callers (we do not log anonymous searches)
+   * or when the telemetry insert failed (telemetry is fail-open).
+   */
+  searchQueryLogId?: string
+  /**
+   * Phase A.5 internal hit-count breakdown for the merged vector + FTS pool,
+   * threaded out from the semantic path so the wrapper can log them. Not
+   * exposed in the public type — consumers should ignore.
+   * @internal
+   */
+  _telemetry?: {
+    ftsHitCount?: number
+    vectorHitCount?: number
+  }
 }
 
 /**
@@ -998,6 +1017,10 @@ async function searchInvestorsCore(
           semanticData.push(row)
         }
       }
+      // Phase A.5 telemetry: capture pre-merge counts so the wrapper can log
+      // how each pool contributed. vectorHitCount = unique ids from vector RPC
+      // after dedup; ftsHitCount snapshot taken below once `ftsRows` is ready.
+      const _vectorHitCount = semanticData.length
 
       // Phase A merge: pull in listings that ONLY surfaced via FTS (no
       // cosine similarity), assign a synthetic similarity derived from
@@ -1190,7 +1213,12 @@ async function searchInvestorsCore(
       const paginatedFirms = await attachContactStatuses(firms.slice(from, from + safePageSize))
       const hasMore = from + paginatedFirms.length < total
 
-      return { firms: paginatedFirms, total, hasMore }
+      return {
+        firms: paginatedFirms,
+        total,
+        hasMore,
+        _telemetry: { vectorHitCount: _vectorHitCount, ftsHitCount: ftsRows.length },
+      }
     } catch (err) {
       // FLOW: Semantic search failed.
       // INSTRUMENTATION: Log the bound query length so the next dim-mismatch
@@ -1426,6 +1454,7 @@ const MATCH_OUTPUT_ENRICH_TOP_N = 12
 export async function searchInvestors(
   filters: InvestorFilters = {}
 ): Promise<InvestorSearchResult> {
+  const _telemetryStart = Date.now()
   const baseResult = await searchInvestorsCore(filters)
 
   // Caller opt-out: directory browse path, filter pickers etc. don't need
@@ -1438,6 +1467,8 @@ export async function searchInvestors(
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
+    // Anonymous searches are not logged (RLS would reject); telemetry is
+    // user-scoped only. The wrapper still returns firms-only as before.
     return { ...baseResult, resolvedTier: 'anonymous' }
   }
 
@@ -1453,14 +1484,41 @@ export async function searchInvestors(
     foundryId = null
   }
 
+  // Phase A.5 instrumentation. Fail-open: never block on telemetry.
+  // Skip when there is no query at all (filter-only browse) — the value
+  // signal is in actual user queries, not "load page" baselines.
+  let searchQueryLogId: string | undefined
+  const trimmedQuery = (filters.query ?? '').trim()
+  if (trimmedQuery.length > 0) {
+    const logId = await logSearchQuery({
+      supabase,
+      profileId: user.id,
+      foundryId,
+      surface: 'investors',
+      queryText: trimmedQuery,
+      category: 'Finance',
+      resultCount: baseResult.firms.length,
+      ftsHitCount: baseResult._telemetry?.ftsHitCount ?? null,
+      vectorHitCount: baseResult._telemetry?.vectorHitCount ?? null,
+      topResultIds: baseResult.firms.slice(0, 5).map((f) => f.id),
+      latencyMs: Date.now() - _telemetryStart,
+      clientMeta: {
+        semanticFailed: baseResult.semanticFailed ?? false,
+        rateLimited: baseResult.rateLimited ?? false,
+        total: baseResult.total,
+      },
+    })
+    searchQueryLogId = logId ?? undefined
+  }
+
   const access = await getInvestorTierAccess()
   // Free tier (and any user without a foundry) gets firms-only.
   if (access.tier === 'free' || !foundryId) {
-    return { ...baseResult, resolvedTier: access.tier }
+    return { ...baseResult, resolvedTier: access.tier, searchQueryLogId }
   }
 
   if (baseResult.firms.length === 0) {
-    return { ...baseResult, matchOutputs: {}, resolvedTier: access.tier }
+    return { ...baseResult, matchOutputs: {}, resolvedTier: access.tier, searchQueryLogId }
   }
 
   // INTENT: Enrich only the visible top-N to bound cost. The UI renders
@@ -1487,7 +1545,7 @@ export async function searchInvestors(
     matchOutputs = {}
   }
 
-  return { ...baseResult, matchOutputs, resolvedTier: access.tier }
+  return { ...baseResult, matchOutputs, resolvedTier: access.tier, searchQueryLogId }
 }
 
 // ---------------------------------------------------------------------------

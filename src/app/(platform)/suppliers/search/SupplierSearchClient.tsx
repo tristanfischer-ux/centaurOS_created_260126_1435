@@ -15,6 +15,7 @@ import Link from 'next/link'
 import { ChevronDown, Filter } from 'lucide-react'
 import { searchSuppliers } from '@/actions/suppliers'
 import type { SupplierCard, SupplierSearchResult } from '@/actions/suppliers'
+import { recordSearchClick } from '@/actions/search-click'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -51,6 +52,9 @@ export function SupplierSearchClient({
   const [isPending, startTransition] = useTransition()
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
   const [showStats, setShowStats] = useState(true)
+  // Phase A.5 — id of the most recent `search_query_log` row, used to key
+  // click events back to the originating query via `recordSearchClick`.
+  const [searchQueryLogId, setSearchQueryLogId] = useState<string | null>(null)
 
   // Compute stats from current results
   const stats = useCallback(() => {
@@ -81,6 +85,7 @@ export function SupplierSearchClient({
       setResults(data.results)
       setTotal(data.total)
       setSearchMode(data.searchMode)
+      setSearchQueryLogId(data.searchQueryLogId ?? null)
     })
   }, [query, category, country, certifications, sortBy])
 
@@ -101,6 +106,7 @@ export function SupplierSearchClient({
       setResults(data.results)
       setTotal(data.total)
       setSearchMode(data.searchMode)
+      setSearchQueryLogId(data.searchQueryLogId ?? null)
     })
   }, [query, country, certifications, sortBy])
 
@@ -127,6 +133,9 @@ export function SupplierSearchClient({
       setResults(prev => [...prev, ...data.results])
       setTotal(data.total)
       setSearchMode(data.searchMode)
+      // Replace the current query-log id with the latest page so newly
+      // appended cards key clicks to the right log row.
+      setSearchQueryLogId(data.searchQueryLogId ?? null)
     })
   }, [offset, query, category, country, certifications, sortBy])
 
@@ -301,8 +310,21 @@ export function SupplierSearchClient({
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {results.map(supplier => (
-              <SupplierResultCard key={supplier.id} supplier={supplier} />
+            {results.map((supplier, idx) => (
+              <SupplierResultCard
+                key={supplier.id}
+                supplier={supplier}
+                onOpen={() => {
+                  // Phase A.5 — fire-and-forget click telemetry. No UI gate.
+                  if (!searchQueryLogId) return
+                  void recordSearchClick({
+                    queryLogId: searchQueryLogId,
+                    listingId: supplier.id,
+                    position: idx,
+                    clickType: 'open',
+                  })
+                }}
+              />
             ))}
           </div>
 
@@ -341,7 +363,14 @@ function StatCard({ label, value }: { label: string; value: number }) {
 // Result card
 // ---------------------------------------------------------------------------
 
-function SupplierResultCard({ supplier }: { supplier: SupplierCard }) {
+function SupplierResultCard({
+  supplier,
+  onOpen,
+}: {
+  supplier: SupplierCard
+  /** Phase A.5 — fired when the cover Link is activated. */
+  onOpen?: () => void
+}) {
   const attrs = supplier.attributes as Record<string, unknown>
   const location = [attrs.city, attrs.country].filter(Boolean).join(', ')
   const certs = (attrs.certifications as string | string[] | null) || ''
@@ -362,7 +391,7 @@ function SupplierResultCard({ supplier }: { supplier: SupplierCard }) {
     : Array.isArray(industries) ? industries.slice(0, 2) : []
 
   return (
-    <Link href={`/suppliers/${supplier.id}`}>
+    <Link href={`/suppliers/${supplier.id}`} onClick={onOpen}>
       <div className="rounded-lg border border-border bg-card p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full flex flex-col">
         <div className="flex items-start justify-between mb-2">
           <h3 className="text-base font-semibold text-foreground line-clamp-1 flex-1">

@@ -867,6 +867,30 @@ interface PdfInput {
         }>
         tradeoffs: string[]
     } | null
+    /**
+     * Alternate envelope pushback from the class-fence guard (Loop 24 P0).
+     *
+     * Populated when Gate 3 found a feasible alternate in a DIFFERENT product
+     * class from the briefed envelope (e.g. 40ft container → warehouse bay).
+     * Instead of silently swapping, the engine delivers the briefed-class
+     * max-feasible result AND surfaces this as a "consider this" trade-off.
+     *
+     * When non-null, the Brief section renders a warning-level callout showing:
+     *   - What the briefed class can achieve (e.g. 1.4 MWh in 40ft container)
+     *   - What the alternate class can achieve (e.g. 3.5 MWh in warehouse bay)
+     *   - Trade-off note guiding the founder on whether to relax the envelope
+     *
+     * Null when (a) sizing was feasible at the briefed class on the first pass,
+     * (b) no feasible alternate was found, or (c) the alternate is the same
+     * product class (safe auto-retry, no pushback needed).
+     */
+    alternateEnvelopePushback: {
+        briefed_envelope: { kind: string; label: string; classification_tag: string }
+        alternate_envelope: { kind: string; label: string; classification_tag: string }
+        capacity_at_briefed_class: { value: number | null; units: string; deficit: number | null; summary: string }
+        capacity_at_alternate_class: { value: number | null; units: string }
+        trade_off_note: string
+    } | null
 }
 
 // ─── PDF Component ─────────────────────────────────────────────────────
@@ -1415,6 +1439,48 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
             <Text style={styles.h2}>1. Brief</Text>
             {data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
                 <FeasibilityVerdictBanner verdict={data.feasibilityVerdict} />
+            )}
+            {/* ── Alternate envelope pushback callout (Loop 24 P0 class-fence) ──
+              * Rendered when Gate 3 found a feasible alternate in a DIFFERENT
+              * product class from the briefed envelope. Warning-level — not an
+              * error; the design is valid at the briefed class, but the founder
+              * may want to relax the envelope to hit their full target.
+              * Uses semantic warning tokens: bg-warning/10 → #fef3c7, border-warning → #a16207.
+              */}
+            {data.alternateEnvelopePushback != null && (
+                <View
+                    style={{
+                        marginTop: 10,
+                        marginBottom: 8,
+                        padding: 10,
+                        borderRadius: 4,
+                        backgroundColor: "#fef3c7",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#a16207",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#92400e", marginBottom: 4 }}>
+                        Trade-off note from sizing engine
+                    </Text>
+                    <Text style={{ fontSize: 9.5, color: "#78350f", marginBottom: 4 }}>
+                        {`Your brief specified a ${data.alternateEnvelopePushback.briefed_envelope.classification_tag} envelope (${data.alternateEnvelopePushback.briefed_envelope.label}). `}
+                        {data.alternateEnvelopePushback.capacity_at_briefed_class.value != null
+                            ? `At that envelope, the maximum feasible capacity is ${data.alternateEnvelopePushback.capacity_at_briefed_class.value} ${data.alternateEnvelopePushback.capacity_at_briefed_class.units}${data.alternateEnvelopePushback.capacity_at_briefed_class.deficit != null ? `, short of your target by ${data.alternateEnvelopePushback.capacity_at_briefed_class.deficit} ${data.alternateEnvelopePushback.capacity_at_briefed_class.units}` : ""}. `
+                            : data.alternateEnvelopePushback.capacity_at_briefed_class.summary + " "
+                        }
+                    </Text>
+                    {data.alternateEnvelopePushback.capacity_at_alternate_class.value != null && (
+                        <Text style={{ fontSize: 9.5, color: "#78350f", marginBottom: 4 }}>
+                            {`If you consider relaxing the envelope class to ${data.alternateEnvelopePushback.alternate_envelope.classification_tag} (${data.alternateEnvelopePushback.alternate_envelope.label}), ${data.alternateEnvelopePushback.capacity_at_alternate_class.value} ${data.alternateEnvelopePushback.capacity_at_alternate_class.units} may be achievable.`}
+                        </Text>
+                    )}
+                    <Text style={{ fontSize: 9.5, color: "#78350f", marginBottom: 4 }}>
+                        {data.alternateEnvelopePushback.trade_off_note}
+                    </Text>
+                    <Text style={{ fontSize: 8.5, color: "#92400e", fontStyle: "italic" }}>
+                        To switch, return to the brief and update the envelope. Otherwise the design proceeds as briefed at the maximum feasible capacity for the briefed envelope class.
+                    </Text>
+                </View>
             )}
             {b.subject && (
                 <View style={styles.para}>
@@ -5637,6 +5703,35 @@ async function exportProjectPdfInternal(
                             : new Date().toISOString(),
                     fails,
                     tradeoffs,
+                }
+            })(),
+            // ── Alternate envelope pushback (Loop 24 P0 class-fence) ───────────
+            // Read from dimension_sheet.closest_feasible_alternate when that
+            // alternate carries product_class_match === false (set deterministically
+            // by the Guard 2 class-fence in run-fang-sizing.ts).
+            alternateEnvelopePushback: (() => {
+                const sheet = (project.dimension_sheet ?? null) as import("@/lib/sizing/types").DimensionSheet | null
+                const alt = sheet?.closest_feasible_alternate
+                if (!alt) return null
+                // Only render the callout when the class-fence fields are present
+                // AND product_class_match is explicitly false.
+                if (alt.product_class_match !== false) return null
+                if (!alt.briefed_classification_tag || !alt.alternate_classification_tag) return null
+                if (!alt.capacity_at_briefed_class || !alt.trade_off_note) return null
+                return {
+                    briefed_envelope: {
+                        kind: sheet!.envelope?.kind ?? "custom",
+                        label: sheet!.envelope?.label ?? "briefed envelope",
+                        classification_tag: alt.briefed_classification_tag,
+                    },
+                    alternate_envelope: {
+                        kind: alt.envelope?.kind ?? "custom",
+                        label: alt.envelope?.label ?? "alternate envelope",
+                        classification_tag: alt.alternate_classification_tag,
+                    },
+                    capacity_at_briefed_class: alt.capacity_at_briefed_class,
+                    capacity_at_alternate_class: alt.capacity_at_alternate_class ?? { value: null, units: "units" },
+                    trade_off_note: alt.trade_off_note,
                 }
             })(),
         }

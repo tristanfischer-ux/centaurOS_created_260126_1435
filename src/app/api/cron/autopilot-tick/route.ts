@@ -139,11 +139,16 @@ async function tickOnce(request: Request): Promise<TickResult> {
     // root cause of "wedged" demos diagnosed 2026-04-28. The correct
     // condition for "active" is `stage NOT IN ('done', 'failed')`, which is
     // the canonical end-of-pipeline check from the plan.
+    // TERMINAL STAGES: 'done', 'failed', 'solver_error'
+    // 'solver_error' added 2026-04-29 (Loop 24 P0 gate-3 council R2 fix):
+    // projects where Fang produced a NULL dimension_sheet are permanently
+    // blocked from advancing. They must NOT re-fire matching_suppliers or
+    // generating_illustration. The UI surfaces a structured error instead.
     const { data: projects, error } = await admin
         .from("cad_lab_projects")
         .select("id, autopilot_state")
         .not("autopilot_state", "is", null)
-        .not("autopilot_state->>stage", "in", '("done","failed")')
+        .not("autopilot_state->>stage", "in", '("done","failed","solver_error")')
         .not("autopilot_state->>started_at", "is", null)
         .order("updated_at", { ascending: false })
         .limit(MAX_PROJECTS_PER_TICK * 2)
@@ -158,7 +163,9 @@ async function tickOnce(request: Request): Promise<TickResult> {
             const state = p.autopilot_state as AutopilotState | null
             if (!state) return false
             if (!state.started_at) return false
-            if (state.stage === "done" || state.stage === "failed") return false
+            // TERMINAL stages — must be kept in sync with the DB filter above.
+            // 'solver_error' added 2026-04-29: NULL dimension_sheet hard-block.
+            if (state.stage === "done" || state.stage === "failed" || state.stage === "solver_error") return false
             return true
         })
         .slice(0, MAX_PROJECTS_PER_TICK)
@@ -187,7 +194,12 @@ async function tickOnce(request: Request): Promise<TickResult> {
         const state = project.autopilot_state as AutopilotState
         const stage = state.stage as AutopilotStage
 
-        if (stage === "done") {
+        // TERMINAL stages: 'done' and 'solver_error' are both terminal.
+        // 'failed' is excluded upstream by the DB query; 'solver_error'
+        // is excluded by the in-memory filter above, but belt-and-suspenders
+        // guard here prevents accidental advance if a project somehow slips
+        // through (e.g. stale STAGE_CONFIG lookup returns undefined).
+        if (stage === "done" || stage === "solver_error") {
             details.push({
                 projectId: project.id,
                 stage,

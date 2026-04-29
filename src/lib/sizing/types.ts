@@ -283,6 +283,52 @@ export interface DimensionSheet {
         module_dimensions: Record<string, ModuleDimensions>
         /** Human-readable summary of what changed vs the primary attempt. */
         delta_from_primary: string
+
+        // ── Loop 24 class-fence fields (gate-3 council R2 P0) ──────────
+        //
+        // INTENT: deterministic class-fence fields added 2026-04-29 so the
+        // gate can distinguish "solver picked a bigger container" (same class,
+        // safe auto-retry) from "solver picked a warehouse bay" (different
+        // product class, deliver-and-pushback required).
+        //
+        // ANTI-CHEAT: product_class_match is computed deterministically by
+        // comparing EnvelopeClassificationTag values. NEVER set by an LLM.
+
+        /** EnvelopeClassificationTag of the BRIEFED envelope. */
+        briefed_classification_tag?: string
+        /** EnvelopeClassificationTag of THIS alternate envelope. */
+        alternate_classification_tag?: string
+        /**
+         * True only when both tags are equal AND neither is "unknown".
+         * Computed deterministically by areSameProductClass() in
+         * src/lib/forge-v2/envelope-classification.ts.
+         * NEVER set by an LLM.
+         */
+        product_class_match?: boolean
+        /**
+         * Capacity achievable within the BRIEFED product class envelope.
+         * Set when product_class_match === false so the PDF can show
+         * "1.4 MWh achievable in 40ft container vs 3.5 MWh briefed".
+         */
+        capacity_at_briefed_class?: {
+            value: number | null
+            units: string
+            deficit: number | null
+            summary: string
+        }
+        /**
+         * Capacity achievable in the ALTERNATE (different-class) envelope.
+         * Set when product_class_match === false.
+         */
+        capacity_at_alternate_class?: {
+            value: number | null
+            units: string
+        }
+        /**
+         * Human-readable trade-off note for the PDF callout.
+         * e.g. "If you relax container → warehouse bay, the full 3.5 MWh target is achievable."
+         */
+        trade_off_note?: string
     } | null
     generated_at: string
 }
