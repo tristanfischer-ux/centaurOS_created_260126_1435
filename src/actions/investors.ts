@@ -894,6 +894,14 @@ async function searchInvestorsCore(
   // finds relevant firms even when those exact words aren't in the title).
   // DECISION: Uses match_marketplace_listings_v2 which returns attributes + accepts
   // category filter, eliminating the 200-row re-fetch and client-side filtering.
+  //
+  // GOTCHA: When OpenAI quota is exhausted the embedding call fails and the code
+  // falls through to the ilike keyword path. But a prose query like "AI drug
+  // discovery, Pre-Seed, London" will never match any firm title, so ilike returns
+  // zero results — a false "no matches". Flag set in the catch block below tells
+  // the keyword path to skip the ilike and return the full directory instead.
+  let quotaExhaustedProseFallback = false
+
   if (query && query.trim().length > 5) {
     try {
       // DECISION: Use OpenAI text-embedding-3-small (1536-dim) to match the
@@ -1258,6 +1266,16 @@ async function searchInvestorsCore(
         }
       }
       // Short / firm-name-like query, OR quota exhausted: fall through to keyword path below.
+      // GOTCHA: When quota is exhausted and the query is prose (e.g. "AI drug
+      // discovery, Pre-Seed, London"), the ilike fallback at the keyword path
+      // cannot match any firm title/description and returns 0 rows — giving the
+      // user a false "no matches" result. Flag this so the keyword path skips
+      // the ilike and returns the full directory (sorted by name), which is far
+      // better than zero. Explicit filter chips (stage/sector/geo passed as
+      // structured params) are preserved and still narrow the result set.
+      if (isQuotaExhausted && looksLikeProse(query.trim())) {
+        quotaExhaustedProseFallback = true
+      }
     }
   }
 
@@ -1272,7 +1290,9 @@ async function searchInvestorsCore(
     // INTENT: DB-level sorting via RPC — sort + filter + paginate in a single query.
     // No over-fetching: Postgres handles ORDER BY on JSONB attributes directly.
     const safeFirmTypes = firmType?.filter((t: string) => VALID_FIRM_TYPES.has(t))
-    const safeQuery = query?.trim().slice(0, 200) || null
+    // When quota is exhausted and the query is prose, don't pass it as an ilike
+    // filter — it would return zero results. Return the full directory instead.
+    const safeQuery = quotaExhaustedProseFallback ? null : (query?.trim().slice(0, 200) || null)
 
     const { data: rpcData, error: rpcError } = await supabase.rpc(
       'search_investors_sorted',
@@ -1323,7 +1343,11 @@ async function searchInvestorsCore(
 
   // Full-text search
   // SECURITY: Cap query length to prevent DoS via huge ilike patterns
-  if (query && query.trim().length > 0) {
+  // DECISION: Skip ilike when `quotaExhaustedProseFallback` is true. A prose
+  // query ("AI drug discovery, Pre-Seed, London") will never match a firm title
+  // via ilike — omitting the ilike returns the full directory alphabetically,
+  // which is far more useful than zero results when the embedding API is down.
+  if (query && query.trim().length > 0 && !quotaExhaustedProseFallback) {
     const sanitized = sanitizeFilterValue(query.trim().slice(0, 200))
     if (sanitized) {
       const term = `%${sanitized}%`
