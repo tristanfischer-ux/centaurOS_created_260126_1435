@@ -32,6 +32,7 @@ import {
     Send,
     Link2,
     Check,
+    FileDown,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -44,6 +45,7 @@ import { cn } from "@/lib/utils"
 import { COUNCIL_POSITION_LABELS } from "@/lib/agents/council"
 import { getSpecialistById } from "@/lib/agents/specialists-config"
 import { appendMeetingEntries, branchMeetingThread } from "@/actions/meeting-threads"
+import { generateMeetingThreadPdf } from "@/actions/meeting-thread-pdf"
 import type { MeetingThreadDetail, MeetingEntryRow } from "@/actions/meeting-threads"
 import type { SubscriptionTier } from "@/lib/billing/plans"
 import { getPrimaryTargetForTier } from "@/lib/agents/failover"
@@ -495,6 +497,7 @@ export function MeetingThreadView({
     const [entries, setEntries] = useState<MeetingEntryRow[]>(thread.entries)
     const [branchingEntryId, setBranchingEntryId] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
+    const [pdfState, setPdfState] = useState<"idle" | "generating" | "done" | "error">("idle")
     // F3 legacy playlist controls (used only when audioUrl is absent)
     const [activeClipIdx, setActiveClipIdx] = useState(0)
     const audioRef = useRef<HTMLAudioElement | null>(null)
@@ -562,6 +565,27 @@ export function MeetingThreadView({
             setTimeout(() => setCopied(false), 2000)
         })
     }, [thread.id])
+
+    const handleDownloadPdf = useCallback(async () => {
+        if (pdfState === "generating") return
+        setPdfState("generating")
+        try {
+            const result = await generateMeetingThreadPdf(thread.id)
+            if (result.ok) {
+                window.open(result.signedUrl, "_blank", "noopener,noreferrer")
+                setPdfState("done")
+                setTimeout(() => setPdfState("idle"), 4_000)
+            } else {
+                console.error("[MeetingThreadView] PDF generation failed:", result.error)
+                setPdfState("error")
+                setTimeout(() => setPdfState("idle"), 4_000)
+            }
+        } catch (err) {
+            console.error("[MeetingThreadView] PDF generation threw:", err)
+            setPdfState("error")
+            setTimeout(() => setPdfState("idle"), 4_000)
+        }
+    }, [thread.id, pdfState])
 
     const tierLabel = TIER_LABELS[thread.councilTier] ?? thread.councilTier
     // GOTCHA: rows written before commit fc381a3a stored the JSON string '[]'
@@ -730,25 +754,49 @@ export function MeetingThreadView({
                         </div>
                     </div>
 
-                    {/* Copy link CTA */}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        className="flex-shrink-0 gap-1.5 text-xs"
-                        onClick={handleCopyLink}
-                    >
-                        {copied ? (
-                            <>
-                                <Check className="h-3.5 w-3.5 text-success" />
-                                Copied
-                            </>
-                        ) : (
-                            <>
-                                <Link2 className="h-3.5 w-3.5" />
-                                Copy link
-                            </>
-                        )}
-                    </Button>
+                    {/* Header actions — Copy link + Download PDF */}
+                    <div className="flex-shrink-0 flex items-center gap-1">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            onClick={handleCopyLink}
+                        >
+                            {copied ? (
+                                <>
+                                    <Check className="h-3.5 w-3.5 text-success" />
+                                    Copied
+                                </>
+                            ) : (
+                                <>
+                                    <Link2 className="h-3.5 w-3.5" />
+                                    Copy link
+                                </>
+                            )}
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            className="gap-1.5 text-xs"
+                            onClick={handleDownloadPdf}
+                            disabled={pdfState === "generating"}
+                            title="Download transcript as PDF"
+                            aria-label="Download transcript as PDF"
+                        >
+                            {pdfState === "generating" ? (
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                                <FileDown className="h-3.5 w-3.5" />
+                            )}
+                            {pdfState === "generating"
+                                ? "Generating PDF…"
+                                : pdfState === "done"
+                                    ? "Open PDF"
+                                    : pdfState === "error"
+                                        ? "Failed — retry"
+                                        : "Download PDF"}
+                        </Button>
+                    </div>
                 </div>
             </div>
 

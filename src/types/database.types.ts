@@ -12844,6 +12844,7 @@ export type Database = {
           specialist_ids: string[]
           status: string
           topic: string
+          transcript_pdf_url: string | null
           updated_at: string
         }
         Insert: {
@@ -12867,6 +12868,7 @@ export type Database = {
           specialist_ids?: string[]
           status?: string
           topic: string
+          transcript_pdf_url?: string | null
           updated_at?: string
         }
         Update: {
@@ -12890,6 +12892,7 @@ export type Database = {
           specialist_ids?: string[]
           status?: string
           topic?: string
+          transcript_pdf_url?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -20190,6 +20193,134 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      search_click_log: {
+        Row: {
+          click_type: string
+          created_at: string
+          id: string
+          listing_id: string | null
+          position: number
+          profile_id: string | null
+          query_log_id: string
+        }
+        Insert: {
+          click_type: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          position: number
+          profile_id?: string | null
+          query_log_id: string
+        }
+        Update: {
+          click_type?: string
+          created_at?: string
+          id?: string
+          listing_id?: string | null
+          position?: number
+          profile_id?: string | null
+          query_log_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_click_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "search_click_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "search_click_log_query_log_id_fkey"
+            columns: ["query_log_id"]
+            isOneToOne: false
+            referencedRelation: "search_query_log"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      search_query_log: {
+        Row: {
+          category: string | null
+          client_meta: Json | null
+          created_at: string
+          foundry_id: string | null
+          fts_hit_count: number | null
+          id: string
+          latency_ms: number | null
+          profile_id: string | null
+          query_length: number | null
+          query_terms: number | null
+          query_text: string
+          result_count: number
+          surface: string
+          top_result_ids: string[] | null
+          vector_hit_count: number | null
+        }
+        Insert: {
+          category?: string | null
+          client_meta?: Json | null
+          created_at?: string
+          foundry_id?: string | null
+          fts_hit_count?: number | null
+          id?: string
+          latency_ms?: number | null
+          profile_id?: string | null
+          query_length?: number | null
+          query_terms?: number | null
+          query_text: string
+          result_count: number
+          surface: string
+          top_result_ids?: string[] | null
+          vector_hit_count?: number | null
+        }
+        Update: {
+          category?: string | null
+          client_meta?: Json | null
+          created_at?: string
+          foundry_id?: string | null
+          fts_hit_count?: number | null
+          id?: string
+          latency_ms?: number | null
+          profile_id?: string | null
+          query_length?: number | null
+          query_terms?: number | null
+          query_text?: string
+          result_count?: number
+          surface?: string
+          top_result_ids?: string[] | null
+          vector_hit_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "search_query_log_foundry_id_fkey"
+            columns: ["foundry_id"]
+            isOneToOne: false
+            referencedRelation: "foundries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "search_query_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "search_query_log_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sector_skills: {
         Row: {
@@ -27627,7 +27758,7 @@ export type Database = {
         | "Pending_Peer_Review"
         | "Pending_Executive_Approval"
       technique_question_status: "queued" | "answered" | "closed"
-      verification_tier: "unverified" | "claimed" | "verified"
+      verification_tier: "unverified" | "claimed" | "verified" | "premium"
       working_style: "proactive" | "responsive" | "blended"
     }
     CompositeTypes: {
@@ -28002,7 +28133,7 @@ export const Constants = {
         "Pending_Executive_Approval",
       ],
       technique_question_status: ["queued", "answered", "closed"],
-      verification_tier: ["unverified", "claimed", "verified"],
+      verification_tier: ["unverified", "claimed", "verified", "premium"],
       working_style: ["proactive", "responsive", "blended"],
     },
   },

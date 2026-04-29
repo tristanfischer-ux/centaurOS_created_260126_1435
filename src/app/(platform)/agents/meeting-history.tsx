@@ -50,6 +50,8 @@ import {
     ImageIcon,
     Sparkles,
     RotateCcw,
+    FileDown,
+    Loader2,
 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
@@ -62,6 +64,7 @@ import {
 } from "@/actions/meeting-threads"
 import { generateSessionInfographic } from "@/actions/brainstorm-cover"
 import { generateSessionAudio } from "@/actions/brainstorm-audio"
+import { generateMeetingThreadPdf } from "@/actions/meeting-thread-pdf"
 import { getMeetingHistory } from "@/actions/agent-artifacts"
 import type { MeetingThreadSummary } from "@/actions/meeting-threads"
 import type { MeetingHistoryItem } from "@/actions/agent-artifacts"
@@ -175,6 +178,7 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
     const canMutate = hasPermalink
     const [isRetryingCover, setIsRetryingCover] = useState(false)
     const [isRetryingAudio, setIsRetryingAudio] = useState(false)
+    const [pdfState, setPdfState] = useState<"idle" | "generating" | "done" | "error">("idle")
 
     // W36 / FIX A: retry cover image generation.
     // Resets cover_status to 'pending' first so the atomic claim in
@@ -210,6 +214,31 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
             await generateSessionAudio(meeting.id)
         } finally {
             setIsRetryingAudio(false)
+        }
+    }
+
+    // Download session transcript as a PDF.
+    async function handleDownloadPdf(e: React.MouseEvent) {
+        e.preventDefault()
+        e.stopPropagation()
+        if (pdfState === "generating") return
+        setPdfState("generating")
+        try {
+            const result = await generateMeetingThreadPdf(meeting.id)
+            if (result.ok) {
+                window.open(result.signedUrl, "_blank", "noopener,noreferrer")
+                setPdfState("done")
+                // Reset after a moment so the button is re-usable
+                setTimeout(() => setPdfState("idle"), 4_000)
+            } else {
+                console.error("[MeetingCard] PDF generation failed:", result.error)
+                setPdfState("error")
+                setTimeout(() => setPdfState("idle"), 4_000)
+            }
+        } catch (err) {
+            console.error("[MeetingCard] PDF generation threw:", err)
+            setPdfState("error")
+            setTimeout(() => setPdfState("idle"), 4_000)
         }
     }
 
@@ -382,13 +411,42 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                     </Badge>
                 </div>
 
-                {/* CTA — visible affordance indicating the card is navigable */}
+                {/* CTA row — view meeting link + download PDF button */}
                 {hasPermalink && (
-                    <div className="pt-1">
+                    <div className="pt-1 flex items-center justify-between gap-2">
                         <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-electric-blue">
                             View meeting
                             <ExternalLink className="h-3 w-3" />
                         </span>
+                        <button
+                            type="button"
+                            onClick={handleDownloadPdf}
+                            disabled={pdfState === "generating"}
+                            className={cn(
+                                "inline-flex items-center gap-1.5 text-[11px] font-medium transition-colors",
+                                pdfState === "error"
+                                    ? "text-destructive"
+                                    : pdfState === "done"
+                                        ? "text-success"
+                                        : "text-muted-foreground hover:text-foreground",
+                                pdfState === "generating" && "opacity-60 cursor-not-allowed",
+                            )}
+                            title="Download session as PDF"
+                            aria-label="Download session as PDF"
+                        >
+                            {pdfState === "generating" ? (
+                                <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                                <FileDown className="h-3 w-3" />
+                            )}
+                            {pdfState === "generating"
+                                ? "Generating PDF…"
+                                : pdfState === "done"
+                                    ? "Open PDF"
+                                    : pdfState === "error"
+                                        ? "Failed"
+                                        : "Download PDF"}
+                        </button>
                     </div>
                 )}
             </CardContent>
