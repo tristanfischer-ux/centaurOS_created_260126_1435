@@ -368,7 +368,7 @@ export function SupplierMatchCard({ listing, rank, searchQuery, isSaved = false,
     ''
   const snippet = description.length > 260 ? description.slice(0, 257) + '…' : description
 
-  // Capability tags — top 4 UNIQUE process_capability names. Dedupe before
+  // Capability tags — top 6 UNIQUE process_capability names. Dedupe before
   // slicing so React never sees duplicate keys when a listing has repeated
   // process_name entries in process_capabilities[].
   const capTags = Array.from(
@@ -381,10 +381,17 @@ export function SupplierMatchCard({ listing, rank, searchQuery, isSaved = false,
         })
         .filter((t): t is string => Boolean(t)),
     ),
-  ).slice(0, 4)
+  ).slice(0, 6)
 
-  // 6-pillar breakdown
-  const pillars = computeSupplierPillars(listing, searchQuery)
+  // Cert + material chips — surface real data, not counts
+  const certTags = (listing.certifications ?? []).filter(Boolean).slice(0, 5)
+  const materialTags = (listing.materials ?? []).filter(Boolean).slice(0, 5)
+
+  // Facts row — only render facts that exist
+  const facts: Array<{ label: string; value: string }> = []
+  if (listing.lead_time) facts.push({ label: 'Lead time', value: listing.lead_time })
+  if (listing.minimum_order) facts.push({ label: 'MOQ', value: listing.minimum_order })
+  if (listing.production_capacity) facts.push({ label: 'Capacity', value: listing.production_capacity })
 
   return (
     <Link
@@ -482,20 +489,28 @@ export function SupplierMatchCard({ listing, rank, searchQuery, isSaved = false,
         </div>
       </div>
 
-      {/* ── 6-column scorecard ── */}
-      <SupplierScorecard pillars={pillars} />
-
       {/* ── Description snippet ── */}
       {snippet && (
-        <p style={{ fontSize: '12px', color: 'hsl(var(--muted-foreground))', lineHeight: 1.55, marginBottom: '8px', margin: '0 0 8px' }}>
+        <p style={{ fontSize: '12.5px', color: 'hsl(var(--foreground))', lineHeight: 1.55, marginBottom: '10px', margin: '0 0 10px' }}>
           {snippet}
         </p>
       )}
 
-      {/* ── Tags row + why-fit button row ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
-        {/* Capability tags */}
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', flex: 1 }}>
+      {/* ── Facts strip (lead time, MOQ, capacity) — only when present ── */}
+      {facts.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '14px', marginBottom: '10px', fontSize: '11px', color: 'hsl(var(--muted-foreground))' }}>
+          {facts.map((f) => (
+            <span key={f.label}>
+              <span style={{ fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.3px', fontSize: '10px' }}>{f.label}: </span>
+              <span style={{ color: 'hsl(var(--foreground))', fontWeight: 500 }}>{f.value}</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── Capability tags ── */}
+      {capTags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
           {capTags.map((tag) => (
             <span
               key={tag}
@@ -513,8 +528,50 @@ export function SupplierMatchCard({ listing, rank, searchQuery, isSaved = false,
             </span>
           ))}
         </div>
+      )}
 
-        {/* Why-fit — small button, bottom-right */}
+      {/* ── Materials chips ── */}
+      {materialTags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '6px' }}>
+          {materialTags.map((tag) => (
+            <span
+              key={tag}
+              style={{
+                fontSize: '10.5px',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                background: 'hsl(var(--international-orange) / 0.08)',
+                color: 'hsl(var(--foreground))',
+                fontWeight: 500,
+                border: '1px solid hsl(var(--international-orange) / 0.25)',
+              }}
+            >
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── Cert chips + why-fit button row ── */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', flex: 1 }}>
+          {certTags.map((tag) => (
+            <span
+              key={tag}
+              className="border-success/30 bg-success/10 text-success"
+              style={{
+                fontSize: '10.5px',
+                padding: '2px 6px',
+                borderRadius: '4px',
+                fontWeight: 600,
+                border: '1px solid',
+              }}
+            >
+              ✓ {tag}
+            </span>
+          ))}
+        </div>
+
         {searchQuery && (
           <div style={{ flexShrink: 0 }}>
             <WhyFitExpander listingId={listing.id} searchQuery={searchQuery} />

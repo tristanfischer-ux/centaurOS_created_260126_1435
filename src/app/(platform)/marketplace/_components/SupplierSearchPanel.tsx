@@ -138,9 +138,8 @@ function SupplierStatsCharts({ stats }: SupplierStatsChartsProps) {
       </div>
 
       {/* ── Stat tiles ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <StatTile label="Total suppliers"        value={stats.total} />
-        <StatTile label="Verified"               value={stats.verified} />
         <StatTile label="With certifications"    value={stats.withCertifications} />
         <StatTile label="Countries represented"  value={stats.countries} />
       </div>
@@ -372,12 +371,27 @@ export function SupplierSearchPanel({
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
+  // FIX 1 (back-nav): Try sessionStorage cache first so back-nav restores
+  // results instantly without waiting for the async re-search.
+  const cacheKey = `supplier-search:${initialQuery}`
+  const cached =
+    typeof window !== 'undefined' && initialQuery
+      ? (() => {
+          try {
+            const raw = window.sessionStorage.getItem(cacheKey)
+            return raw ? (JSON.parse(raw) as MappedListing[]) : null
+          } catch {
+            return null
+          }
+        })()
+      : null
+
   const [query, setQuery] = useState(initialQuery)
   const [activeChip, setActiveChip] = useState<string | null>(null)
   const [results, setResults] = useState<MappedListing[]>(
-    initialListings as MappedListing[]
+    (cached ?? initialListings) as MappedListing[]
   )
-  const [displayCount, setDisplayCount] = useState(initialListings.length)
+  const [displayCount, setDisplayCount] = useState((cached ?? initialListings).length)
   const [activeQuery, setActiveQuery] = useState<string>(initialQuery)
   const [extractedQuery, setExtractedQuery] = useState<ExtractedSupplierQuery | null>(
     initialQuery ? parseSupplierQuery(initialQuery) : null
@@ -400,11 +414,19 @@ export function SupplierSearchPanel({
 
   // FIX 1: Auto-run search on mount if there's an initialQuery from the URL.
   // Use a ref to ensure it only fires once even in StrictMode double-invocation.
+  // Skip if we already hydrated from sessionStorage cache — instant back-nav.
   const didAutoSearch = useRef(false)
   useEffect(() => {
     if (initialQuery && !didAutoSearch.current) {
       didAutoSearch.current = true
-      runSearchInternal(initialQuery)
+      if (cached && cached.length > 0) {
+        // Already hydrated from sessionStorage — set activeQuery so isFiltered=true
+        // and skip the re-fetch. User sees results immediately on back-nav.
+        setActiveQuery(initialQuery)
+        setExtractedQuery(parseSupplierQuery(initialQuery))
+      } else {
+        runSearchInternal(initialQuery)
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -494,6 +516,19 @@ export function SupplierSearchPanel({
         setActiveQuery(searchQuery)
         setExtractedQuery(parseSupplierQuery(searchQuery))
         setIsSubmitting(false)
+
+        // FIX 1: Persist results to sessionStorage so back-nav from a detail
+        // page restores instantly without a re-fetch.
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.setItem(
+              `supplier-search:${searchQuery}`,
+              JSON.stringify(mapped),
+            )
+          } catch {
+            // sessionStorage quota or disabled — silently ignore
+          }
+        }
       })
     },
     [initialListings]
