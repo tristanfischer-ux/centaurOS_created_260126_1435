@@ -272,6 +272,25 @@ async function runStep(
             ) {
                 return { ok: true }
             }
+            // DELIVER_AND_PUSHBACK (Loop 24 Gate-3 class-fence):
+            // Guard 2 in run-fang-sizing.ts already persisted the
+            // briefed-class max-feasible dimension_sheet with
+            // `product_class_match: false` and the class-fence fields.
+            // The alternate envelope is a different product class — we
+            // cannot retry sizing with it without changing the brief.
+            // The data IS there for the PDF to render the trade-off
+            // callout, so we treat this as "sizing done" and allow the
+            // autopilot to advance to the next stage normally.
+            if (
+                !result.ok &&
+                "errorCode" in result &&
+                result.errorCode === "DELIVER_AND_PUSHBACK"
+            ) {
+                console.log(
+                    `[autopilot-step] sizing complete with class-drift pushback for project=${projectId} — advancing`,
+                )
+                return { ok: true }
+            }
             return result.ok
                 ? { ok: true }
                 : { ok: false, error: result.error ?? "Sizing failed" }
