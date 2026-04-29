@@ -1358,17 +1358,16 @@ function isHardInfeasible(
 
 function FeasibilityVerdictBanner({
     verdict,
+    showAxes = false,
 }: {
     verdict: NonNullable<PdfInput["feasibilityVerdict"]>
+    showAxes?: boolean
 }): React.ReactElement {
-    // Loop 24 P0: phantom-GREEN is when the solver ran but had no inputs.
-    // Render as UNREVIEWED rather than GREEN so the founder does not
-    // treat the absence of fails as an approval signal.
     const phantomGreen = verdict.status === "green" && verdict.checkedConstraints.length === 0
     const colorKey: keyof typeof VERDICT_COLORS = phantomGreen ? "unreviewed" : verdict.status
     const c = VERDICT_COLORS[colorKey]
-    const blockerCount = verdict.fails.filter((f) => f.severity === "blocker").length
-    const warnCount = verdict.fails.filter((f) => f.severity === "warning").length
+    const blockers = verdict.fails.filter((f) => f.severity === "blocker")
+    const warnings = verdict.fails.filter((f) => f.severity === "warning")
     return (
         <View
             style={{
@@ -1388,19 +1387,48 @@ function FeasibilityVerdictBanner({
             <Text style={{ fontSize: 9, color: c.text, marginTop: 2 }}>
                 {phantomGreen
                     ? "Feasibility check ran but returned no findings — the solver had insufficient data (no dimension sheet, no brief cost ceiling, no parts mass). Treat as unreviewed, not approved."
-                    : blockerCount > 0
-                      ? `${blockerCount} blocker${blockerCount === 1 ? "" : "s"}`
+                    : blockers.length > 0
+                      ? `${blockers.length} blocker${blockers.length === 1 ? "" : "s"}`
                       : ""}
-                {!phantomGreen && blockerCount > 0 && warnCount > 0 ? " · " : ""}
-                {!phantomGreen && warnCount > 0
-                    ? `${warnCount} warning${warnCount === 1 ? "" : "s"}`
+                {!phantomGreen && blockers.length > 0 && warnings.length > 0 ? " · " : ""}
+                {!phantomGreen && warnings.length > 0
+                    ? `${warnings.length} warning${warnings.length === 1 ? "" : "s"}`
                     : ""}
                 {!phantomGreen && verdict.fails.length === 0 && verdict.checkedConstraints.length > 0
                     ? `No constraint conflicts detected. Constraints checked: ${verdict.checkedConstraints.join(", ")}.`
                     : !phantomGreen && verdict.fails.length > 0
-                      ? " — see Feasibility Exception page below."
+                      ? " — see Feasibility Exception page for detail."
                       : ""}
             </Text>
+            {showAxes && blockers.length > 0 && (
+                <View style={{ marginTop: 6 }}>
+                    {blockers.map((f, idx) => (
+                        <View key={`ba-${idx}`} style={{ flexDirection: "row", marginBottom: 2, paddingLeft: 4 }}>
+                            <Text style={{ width: 10, fontSize: 8, color: c.text }}>•</Text>
+                            <Text style={{ flex: 1, fontSize: 8, color: c.text }}>
+                                {axisLabel(f.axis)}: {f.summary}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {showAxes && blockers.length === 0 && warnings.length > 0 && (
+                <View style={{ marginTop: 6 }}>
+                    {warnings.slice(0, 5).map((f, idx) => (
+                        <View key={`wa-${idx}`} style={{ flexDirection: "row", marginBottom: 2, paddingLeft: 4 }}>
+                            <Text style={{ width: 10, fontSize: 8, color: c.text }}>•</Text>
+                            <Text style={{ flex: 1, fontSize: 8, color: c.text }}>
+                                {axisLabel(f.axis)}: {f.summary}
+                            </Text>
+                        </View>
+                    ))}
+                </View>
+            )}
+            {showAxes && !phantomGreen && verdict.fails.length > 0 && (
+                <Text style={{ fontSize: 7.5, color: c.text, marginTop: 6, opacity: 0.75, fontStyle: "italic" }}>
+                    This verdict is computed deterministically from the sizing solver, bill of materials, and cost waterfall — not from language-model opinion. Constraint axes that lacked input data were not evaluated and are not reflected above.
+                </Text>
+            )}
         </View>
     )
 }
