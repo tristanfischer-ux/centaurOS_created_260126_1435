@@ -177,7 +177,23 @@ async function runDeterministicGate(
     // a Promise object whose `.passed`/`.check_name`/`.actual`/`.expected` were
     // all `undefined`, producing the "undefined: expected undefined, got undefined"
     // failure_details we saw on Loop 20 (commit 4c957755 era).
-    const result = await gate.check(input)
+    let result: DeterministicCheckResult
+    try {
+        result = await gate.check(input)
+    } catch (err) {
+        // Log the real exception so Vercel surfaces the root cause.
+        // Previously this was swallowed by the outer try/catch, making the
+        // actual throw invisible in logs — only a generic WARN was returned.
+        // Loop 22 diagnosis: Gate 3 buildRemediationContext threw on sheet.envelope.label
+        // (null deref on older DB-stored dimension_sheets); Gate 5 check attachment
+        // threw before remediationContext was written. Both now fixed, but this log
+        // guard ensures any future gate.check() exception is immediately visible.
+        console.error(
+            `[gate-runner] gate.check() threw: gateId=${gate.gateId} project=${ctx.projectId}`,
+            err,
+        )
+        throw err // re-throw so the outer catch in runGate handles WARN return + lock release
+    }
 
     return {
         verdict: result.passed ? "PASS" : "FAIL",

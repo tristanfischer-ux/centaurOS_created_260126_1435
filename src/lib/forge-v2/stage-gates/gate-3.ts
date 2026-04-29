@@ -209,8 +209,11 @@ function check(input: Gate3Input): Gate3CheckResult {
             expected: "FEASIBLE with module_dimensions populated",
             isInfeasibleButEmitted: true,
             isInfeasibleAndEmpty: false,
-            conflicts: sheet.conflicts,
-            recommendations: sheet.recommendations,
+            // DEFENSIVE: conflicts/recommendations are typed as required string[] but
+            // older solver output in the DB may omit them. Default to [] to prevent
+            // buildRemediationContext from throwing on .length / .slice calls.
+            conflicts: sheet.conflicts ?? [],
+            recommendations: sheet.recommendations ?? [],
         }
     }
 
@@ -224,8 +227,9 @@ function check(input: Gate3Input): Gate3CheckResult {
         expected: "FEASIBLE with module_dimensions populated",
         isInfeasibleButEmitted: false,
         isInfeasibleAndEmpty: true,
-        conflicts: sheet.conflicts,
-        recommendations: sheet.recommendations,
+        // DEFENSIVE: same null-safety as above.
+        conflicts: sheet.conflicts ?? [],
+        recommendations: sheet.recommendations ?? [],
     }
 }
 
@@ -261,9 +265,11 @@ function buildRemediationContext(
     const baseContext = [
         `Gate 3 sizing feasibility failure — ${pattern}.`,
         `Project: ${input.subject}`,
-        `Domain: ${sheet.rules_domain} v${sheet.rules_version}`,
-        `Envelope: ${sheet.envelope.label}`,
-        `Target: ${JSON.stringify(sheet.target)}`,
+        // DEFENSIVE: rules_domain / rules_version / envelope may be absent on
+        // dimension_sheets produced by older solver versions stored in the DB.
+        `Domain: ${sheet.rules_domain ?? "(unknown)"} v${sheet.rules_version ?? "(unknown)"}`,
+        `Envelope: ${sheet.envelope?.label ?? "(unknown)"}`,
+        `Target: ${JSON.stringify(sheet.target ?? {})}`,
         "",
         "Solver conflicts:",
         conflictLines,

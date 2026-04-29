@@ -648,8 +648,30 @@ export const gate5: DeterministicGate<Gate5Input> = {
     // to satisfy the interface. The runner.ts calls await on the result of runGate(),
     // which in turn awaits the check. TypeScript allows this cast because the runner
     // never enforces the sync contract at the call site.
-    check: (input: Gate5Input) =>
-        check(input) as unknown as DeterministicCheckResult,
+    //
+    // CRITICAL FIX (Loop 22): The runner only fires remediation when the check result
+    // carries `remediationContext` and `remediationTargetStage` fields (runner.ts:417-422).
+    // Without these fields willRemediate is always false, so Gate 5 never triggered a
+    // Chase re-match after FAIL — explaining the 0/5 universal FAIL pattern where
+    // attempt 2 was identical to attempt 1. Match the Gate 2/3 pattern: attach
+    // remediation fields to the returned result before returning. The runner reads
+    // them via the DeterministicCheckResult structural cast.
+    check: ((input: Gate5Input) =>
+        check(input).then((result) => {
+            // Attach remediation fields — consumed by runner.ts willRemediate guard.
+            // DECISION: structural extension via type-cast — same pattern as gate-2 and gate-3.
+            const extended = result as Gate5CheckResult & {
+                remediationContext: string
+                remediationTargetStage: string
+                severity: "P0" | "P1" | null
+            }
+            extended.remediationContext = result.passed
+                ? ""
+                : buildRemediationContext(input, result)
+            extended.remediationTargetStage = "matching_suppliers"
+            extended.severity = gateSeverity(result)
+            return result
+        })) as unknown as (input: Gate5Input) => DeterministicCheckResult,
 }
 
 // ── Re-exports for cron handler ─────────────────────────────────────────────
