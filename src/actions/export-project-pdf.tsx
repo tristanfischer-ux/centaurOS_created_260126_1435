@@ -73,6 +73,10 @@ import {
     regulatoryStatusColour,
     type FangIssue,
 } from "@/lib/regulatory-triage"
+import {
+    SUPPLIER_DESCRIPTION_LEAK_PATTERNS,
+    SUPPLIER_DESCRIPTION_FALLBACK,
+} from "@/lib/ai/supplier-description-sanitiser"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -478,26 +482,23 @@ const TELEMETRY_LEAK_LINE_PATTERNS: ReadonlyArray<RegExp> = [
     /^\[CAD Lab Review Result\].*$/im,
 ]
 
+// SCRATCH_PROMPT_INDICATORS: authoritative list is in supplier-description-sanitiser.ts
+// (SUPPLIER_DESCRIPTION_LEAK_PATTERNS). The PDF renderer imports that list rather
+// than maintaining a parallel copy. Additional patterns below are PDF-render-layer
+// specific (telemetry markers that don't apply at generation time).
+//
+// Pre-existing patterns kept for backwards-compatibility with shortlist rows
+// written by earlier versions of the synthesis prompt.
 const SCRATCH_PROMPT_INDICATORS: ReadonlyArray<RegExp> = [
-    // Pre-existing patterns (HYPERTAC LIMITED catastrophe, Loop 7 p.56)
+    // ── Patterns shared with generation-time validate() ──────────────────
+    // (imported from SUPPLIER_DESCRIPTION_LEAK_PATTERNS — see import above)
+    ...SUPPLIER_DESCRIPTION_LEAK_PATTERNS,
+    // ── PDF-layer-only additions (pre-existing, Loop 7 catastrophe) ──────
     /\bWe need to produce a single sentence\b/i,
     /\bd\d+\s*words?,?\s*specific to the project\b/i,
     /\bSo we need to infer what\b.*\blikely brings\b/i,
     /\bThe supplier is .{1,40},\s*but no description\b/i,
     /\bMatch this STYLE and DEPTH\b/i,
-    // Loop 26 patterns: DeepSeek V4-Flash reasoning traces leaking via `content`
-    // Observed on nolato.com, Hedgerow PDF p.92 — full chain-of-thought visible
-    // to the founder because the model wrote its working before its answer.
-    /\bWe are asked to (write|produce|generate)\b/i,
-    /\bThe user (says|mentions|notes|states)\b/i,
-    /\bno description on file for\b/i,
-    /\bSo we need to infer what\b/i,
-    /\bLet me (think|consider|check|look)\b/i,
-    /\bI need to (write|produce|generate|find|check)\b/i,
-    /\bFirst[,.]?\s+(let'?s|i'?ll|we)\b/i,
-    /\bBased on (this|the above|what)\b/i,
-    /\bLooking at (this|the|what)\b/i,
-    /\b(But|However),?\s+\w+\s+(are|is)\s+not\s+(their|a)\s+(typical|usual|primary|core)\b/i,
 ]
 
 function cleanReviewText(raw: string | null | undefined): string {
@@ -506,8 +507,14 @@ function cleanReviewText(raw: string | null | undefined): string {
 
     // 1. If the text contains an LLM scratch-prompt pattern, swap it for
     //    a neutral placeholder rather than show the leaked thinking-trace.
+    //    Uses SUPPLIER_DESCRIPTION_FALLBACK from the shared sanitiser so
+    //    the fallback text is consistent across generation-time and render-time.
     if (SCRATCH_PROMPT_INDICATORS.some((re) => re.test(text))) {
-        return "Project-specific synthesis pending — directory entry has insufficient public information for the matcher."
+        console.warn(
+            `[export-project-pdf] reasoning-trace or prompt-echo leak caught at render time.` +
+                ` Raw (first 120 chars): "${text.slice(0, 120).replace(/\n/g, " ")}"`,
+        )
+        return SUPPLIER_DESCRIPTION_FALLBACK
     }
 
     // 2. Strip whole lines that match any internal-telemetry pattern.
@@ -1006,6 +1013,14 @@ interface PdfInput {
      * renders a warning banner when this is true.
      */
     regulatoryUndifferentiated: boolean
+    /**
+     * Loop 26 D1/D4: detected industry domain for the project.
+     * Passed to RegulatorySection so it can escalate the missing-data
+     * placeholder to a red warning for safety-critical domains (potable water,
+     * medical, aerospace, defence, oil and gas, nuclear processing).
+     * "general" means detection found no strong domain signal.
+     */
+    detectedDomain: import("@/lib/cad-lab/industry-domains").IndustryDomain
 }
 
 // ─── PDF Component ─────────────────────────────────────────────────────
@@ -1999,6 +2014,18 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
     )
 }
 
+// Loop 26 D1/D4: domains where an absent regulatory matrix is legally reckless.
+// The placeholder escalates to red and uses stronger language for these domains.
+const SAFETY_CRITICAL_DOMAINS: ReadonlySet<import("@/lib/cad-lab/industry-domains").IndustryDomain> =
+    new Set([
+        "water_treatment", // potable water, desalination — WHO / BS EN 15748 / WRAS
+        "medical",         // implants, diagnostics — MDR 2017/745, FDA 510(k)
+        "aerospace",       // aircraft, unmanned aircraft — EASA CS-25, DO-178C
+        "defense",         // mil-spec — ITAR, DEF STAN
+        "oil_gas",         // pressure vessels, subsea — PSSR, PED
+        "processing",      // pharmaceutical, cleanroom — GMP, ATEX
+    ])
+
 function RegulatorySection({ items, data }: { items: Regulatory[]; data: PdfInput }): React.ReactElement {
     // Loop 3 P4: when at least one item carries the new compliance-matrix
     // fields (applicability / designImpact / evidenceRequired / ownerRole
@@ -2022,11 +2049,67 @@ function RegulatorySection({ items, data }: { items: Regulatory[]; data: PdfInpu
     ).length
     const unverifiedFraction = items.length > 0 ? unverifiedCount / items.length : 0
     const showRegulatoryUnverifiedCallout = items.length > 0 && unverifiedFraction >= 0.3
+
+    // D1/D4 — Loop 26: determine urgency colour for the mandatory-section placeholder.
+    // Safety-critical domains get a red warning; all other domains get amber.
+    const isSafetyCritical = SAFETY_CRITICAL_DOMAINS.has(data.detectedDomain)
+    const missingBg = isSafetyCritical ? "#fef2f2" : "#fffbeb"
+    const missingBorderColour = isSafetyCritical ? "#b91c1c" : "#b45309"
+    const missingHeadColour = isSafetyCritical ? "#7f1d1d" : "#78350f"
+    const missingBodyColour = isSafetyCritical ? "#991b1b" : "#92400e"
+
     return (
         <View break>
             <Text style={styles.h2}>2. Regulatory posture</Text>
             {items.length === 0 && (
-                <Text style={styles.muted}>No regulatory items declared on the Brief.</Text>
+                // Loop 26 D1/D4: mandatory-section placeholder — never silently omit.
+                // The compliance review stage has not yet run (or returned no
+                // applicable standards). Founders must not share this document with
+                // suppliers, certification bodies, or investors until this section is
+                // populated. For safety-critical domains the callout is red because
+                // operating without a compliance matrix is a legal and safety risk.
+                <View
+                    style={{
+                        marginTop: 6,
+                        marginBottom: 8,
+                        padding: 10,
+                        borderRadius: 4,
+                        backgroundColor: missingBg,
+                        borderLeftWidth: 3,
+                        borderLeftColor: missingBorderColour,
+                    }}
+                >
+                    <Text
+                        style={{
+                            fontSize: 10,
+                            fontWeight: "bold",
+                            color: missingHeadColour,
+                            marginBottom: 4,
+                        }}
+                    >
+                        {isSafetyCritical
+                            ? "Regulatory analysis not yet performed — this is legally required for this product class"
+                            : "Regulatory analysis not yet performed — this section will be populated when the compliance review stage completes"}
+                    </Text>
+                    <Text
+                        style={{ fontSize: 9, color: missingBodyColour, marginBottom: 4 }}
+                    >
+                        {isSafetyCritical
+                            ? "This product operates in a safety-critical domain. A compliance matrix identifying applicable standards, design impacts, evidence requirements, and gap actions is mandatory before any procurement, certification, or investor-facing use of this document. Do not share this report until the regulatory review stage has run and this section is populated."
+                            : "The compliance review stage has not yet run for this project. When it completes, this section will list each applicable standard with its status, owner, and next gap action. Until then, do not use this document for procurement or regulatory submissions."}
+                    </Text>
+                    {isSafetyCritical && (
+                        <Text
+                            style={{
+                                fontSize: 8.5,
+                                color: missingBodyColour,
+                                fontStyle: "italic",
+                            }}
+                        >
+                            {`Detected domain: ${data.detectedDomain.replace(/_/g, " ")}. Typical standards for this domain include national drinking-water regulations, pressure-system and material-contact approvals, and operator qualification requirements. Engage a qualified compliance engineer before design freeze.`}
+                        </Text>
+                    )}
+                </View>
             )}
             {hasMatrix && items.length > 0 && (
                 <Text style={[styles.muted, { marginBottom: 8, fontSize: 9 }]}>

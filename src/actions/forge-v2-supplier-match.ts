@@ -37,6 +37,10 @@ import {
     CHEAP_STRUCTURED_MODEL,
 } from "@/lib/ai/openrouter"
 import {
+    SUPPLIER_DESCRIPTION_LEAK_PATTERNS,
+    SUPPLIER_DESCRIPTION_FALLBACK,
+} from "@/lib/ai/supplier-description-sanitiser"
+import {
     assessDirectoryCoverage,
     formatCoverageDisclosure,
 } from "@/lib/suppliers/coverage-scoring"
@@ -113,46 +117,28 @@ async function synthesizeSupplierForProject(
     //      system message + temperature 0.
     //   3. On second fail, return deterministic safe template — never ship a
     //      raw model output that failed validation.
-    const validate = (raw: string | null | undefined): string | null => {
+    const validate = (raw: string | null | undefined, pass: string): string | null => {
         if (!raw) return null
         const t = raw.trim().replace(/^["']|["']$/g, "")
         if (t.length < 10) return null
-        // Prompt-leak markers — phrases the model only emits when it's echoing
-        // the instructions back instead of answering them, OR when a DeepSeek
-        // reasoning model has leaked its chain-of-thought into `content`.
+        // Detect LLM reasoning-trace and prompt-echo leaks using the shared
+        // pattern list from supplier-description-sanitiser.ts. This list is
+        // the single source of truth — the PDF renderer imports the same
+        // patterns for its second-layer defence in cleanReviewText().
         //
         // Loop 26 critique (Nolato, Hedgerow p.92): DeepSeek V4-Flash emitted
-        // its internal reasoning trace verbatim in `content` — "We are asked to
-        // write one sentence about Nolato as a supplier for a specific BOM part.
-        // The user says no description on file for Nolato. So we need to infer
-        // what Nolato brings..." — because the model treated the task as a
-        // reasoning problem and wrote its working before the answer. The
-        // patterns below catch this class of reasoning-trace leak.
-        const LEAK_PATTERNS = [
-            // Pre-existing prompt-echo guards
-            /\bwe need to write\b/i,
-            /\bsentence must\b/i,
-            /\bthe (supplier|founder) (description|brief) is\b/i,
-            /\boutput only\b/i,
-            /\bd50 words\b/i,
-            /^supplier:\s/im,
-            /^matched bom parts:/im,
-            /^(prompt|instructions?|system):/im,
-            // Loop 26: reasoning-trace patterns from DeepSeek thinking aloud
-            /\bwe are asked to (write|produce|generate)\b/i,
-            /\bthe user (says|mentions|notes|states)\b/i,
-            /\bso we need to infer\b/i,
-            /\bno description on file\b/i,
-            /\blet me (think|consider|check|look)\b/i,
-            /\bi need to (write|produce|generate|find|check)\b/i,
-            /\bfirst[,.]?\s+(let'?s|i'?ll|we)\b/i,
-            /\bthe question (is|asks)\b/i,
-            /\bbased on (this|the above|what)\b/i,
-            /\blooking at (this|the|what)\b/i,
-            /\bare (not|typically|known for|a)\s+their\s+(typical|usual|main|primary)\b/i,
-            /\bbut\s+\w+\s+are\s+not\s+(their|a)\s+(typical|usual|primary|core)\b/i,
-        ]
-        if (LEAK_PATTERNS.some((re) => re.test(t))) return null
+        // its internal reasoning trace verbatim in `content`. The patterns
+        // catch this class of reasoning-trace leak. When a match is found,
+        // log with console.warn so Vercel logs can identify which model/prompt
+        // produced the contaminated output.
+        if (SUPPLIER_DESCRIPTION_LEAK_PATTERNS.some((re) => re.test(t))) {
+            console.warn(
+                `[forge-v2-supplier-match] reasoning-trace leak detected` +
+                    ` for supplier "${match.id}" (${match.name}) on ${pass}.` +
+                    ` Raw (first 120 chars): "${t.slice(0, 120).replace(/\n/g, " ")}"`,
+            )
+            return null
+        }
         if (t.length > 350) {
             const cut = t.slice(0, 350)
             const lastSpace = cut.lastIndexOf(" ")
@@ -177,7 +163,7 @@ async function synthesizeSupplierForProject(
         timeoutMs: 25_000,
         suppressReasoningFallback: true,
     })
-    const firstClean = first.ok ? validate(first.text) : null
+    const firstClean = first.ok ? validate(first.text, "first pass") : null
     if (firstClean) return firstClean
 
     if (!first.ok) {
@@ -185,8 +171,10 @@ async function synthesizeSupplierForProject(
             `[forge-v2-supplier-match] synthesis call failed for ${match.id}: ${first.error}`,
         )
     } else {
+        // validate() already logged if a leak was detected; this covers the
+        // "output was too short or otherwise empty" case.
         console.warn(
-            `[forge-v2-supplier-match] synthesis leak/empty for ${match.id} on first pass`,
+            `[forge-v2-supplier-match] synthesis empty/invalid for "${match.id}" on first pass`,
         )
     }
 
@@ -201,21 +189,13 @@ async function synthesizeSupplierForProject(
         timeoutMs: 25_000,
         suppressReasoningFallback: true,
     })
-    const retryClean = retry.ok ? validate(retry.text) : null
+    const retryClean = retry.ok ? validate(retry.text, "retry pass") : null
     if (retryClean) return retryClean
 
     // Deterministic safe fallback — never ship raw failed model output to PDF.
-    const partsList = matchedParts
-        .slice(0, 3)
-        .map((p) => p.partNumber)
-        .filter(Boolean)
-        .join(", ")
-    const partsPhrase = partsList
-        ? ` for ${partsList}`
-        : matchedParts.length > 0
-          ? " for matched components"
-          : ""
-    return `${match.name} is a candidate${partsPhrase}; capability and lead time to be verified during procurement.`
+    // Uses the shared fallback text from supplier-description-sanitiser so
+    // both generation-time and render-time fallbacks are consistent.
+    return SUPPLIER_DESCRIPTION_FALLBACK
 }
 
 // ─── Orchestrator ─────────────────────────────────────────────────────
