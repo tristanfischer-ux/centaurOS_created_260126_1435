@@ -75,6 +75,7 @@ import type {
 } from "@/lib/cad-lab-types"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { extractCostCeilingFromProse } from "@/lib/brief-cost-ceiling-extractor"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -521,6 +522,22 @@ async function runChaseResearchInternal(
                     extraction.brief?.regulatory || priorDesignBrief?.regulatory,
             }
 
+            // Loop 24 P1 Fix 3: structured log so we can audit the final
+            // ceiling value that reaches the database. One of:
+            //   - a number from LLM JSON extraction
+            //   - a number from prose regex fallback
+            //   - undefined (no ceiling found anywhere)
+            const finalCeiling = mergedDesignBrief.constraints?.unitCostCeilingGbp
+            if (typeof finalCeiling === "number") {
+                console.log(
+                    `[brief-parse] cost_ceiling final: gbp=${finalCeiling} (saved to research.designBrief)`,
+                )
+            } else {
+                console.warn(
+                    "[brief-parse] cost_ceiling NOT FOUND in brief (final merged value is absent — waterfall will show 'Not declared')",
+                )
+            }
+
             // 7. Persist. saveCadLabResearch expects a CadLabResearchResult —
             //    we reuse the one we got back with our merged designBrief
             //    substituted in.
@@ -778,7 +795,9 @@ export async function extractDesignBriefFromReport(
         report,
         priorBrief,
     )
-    return await callExtractionWithPrompts(systemPrompt, userPrompt)
+    // Loop 24 P1 Fix 3: pass report so prose cost-ceiling fallback can fire
+    // when the LLM extraction returns null for constraints.unitCostCeilingGbp.
+    return await callExtractionWithPrompts(systemPrompt, userPrompt, report)
 }
 
 /**
@@ -956,6 +975,7 @@ Output JSON only.`
 async function callExtractionWithPrompts(
     systemPrompt: string,
     userPrompt: string,
+    reportText?: string,
 ): Promise<ExtractionResult> {
     // Loop 8 cost cut (2026-04-26 — Tristan flagged "very, very, very
     // expensive"): default to DeepSeek V4-Pro via OpenRouter (~10× cheaper
@@ -991,7 +1011,7 @@ async function callExtractionWithPrompts(
             ? result.text.slice(0, 50000) + "\n[TRUNCATED]"
             : result.text
 
-        const parsed = tryParseBriefJson(result.text)
+        const parsed = tryParseBriefJson(result.text, reportText)
         if (!parsed) {
             console.warn(
                 "[run-chase-research] V4-Pro returned non-JSON; falling back to Sonnet",
@@ -1004,6 +1024,7 @@ async function callExtractionWithPrompts(
                 userPrompt,
                 result.inputTokens,
                 result.outputTokens,
+                reportText,
             )
         }
         // L9-P2 (2026-04-26): V4-Pro is silently dropping the 5 matrix
@@ -1035,6 +1056,7 @@ async function callExtractionWithPrompts(
                 userPrompt,
                 result.inputTokens,
                 result.outputTokens,
+                reportText,
             )
         }
         return {
@@ -1045,7 +1067,7 @@ async function callExtractionWithPrompts(
             rawLlmText,
         }
     }
-    return callExtractionViaAnthropic(systemPrompt, userPrompt, 0, 0)
+    return callExtractionViaAnthropic(systemPrompt, userPrompt, 0, 0, reportText)
 }
 
 /**
@@ -1061,6 +1083,7 @@ async function callExtractionViaAnthropic(
     userPrompt: string,
     priorTokensIn: number,
     priorTokensOut: number,
+    reportText?: string,
 ): Promise<ExtractionResult> {
     try {
         // Loop 7+ fix (2026-04-26 NIGHT): bumped 4096 → 8192. The Loop 7
@@ -1079,7 +1102,7 @@ async function callExtractionViaAnthropic(
         const rawLlmText = text.length > 50000
             ? text.slice(0, 50000) + "\n[TRUNCATED]"
             : text
-        const parsed = tryParseBriefJson(text)
+        const parsed = tryParseBriefJson(text, reportText)
         if (!parsed) {
             console.warn(
                 "[run-chase-research] Sonnet extraction returned non-JSON; report still saved",
@@ -1130,8 +1153,15 @@ export async function parseChaseExtraction(
  * code block (```json ... ```) wrapping so a slightly misbehaved model
  * still produces usable output. Returns null when the text isn't
  * salvageable — caller falls back to raw-report-only persistence.
+ *
+ * Loop 24 P1 Fix 3 (2026-04-29): accepts an optional `reportText` to run
+ * the prose cost-ceiling extractor as a fallback when the LLM emits null
+ * for `constraints.unitCostCeilingGbp`.
  */
-function tryParseBriefJson(raw: string): Partial<CadLabDesignBrief> | null {
+function tryParseBriefJson(
+    raw: string,
+    reportText?: string,
+): Partial<CadLabDesignBrief> | null {
     if (!raw || typeof raw !== "string") return null
     let candidate = raw.trim()
     // Strip ```json ... ``` fences.
@@ -1149,7 +1179,8 @@ function tryParseBriefJson(raw: string): Partial<CadLabDesignBrief> | null {
     }
     try {
         const parsed = JSON.parse(candidate) as Record<string, unknown>
-        return normaliseBriefShape(parsed)
+        const brief = normaliseBriefShape(parsed, reportText)
+        return brief
     } catch {
         return null
     }
@@ -1159,9 +1190,19 @@ function tryParseBriefJson(raw: string): Partial<CadLabDesignBrief> | null {
  * Filters / coerces the parsed object to the CadLabDesignBrief shape.
  * We silently drop unknown keys and reject values of the wrong type so
  * a misbehaved model can't corrupt the jsonb column.
+ *
+ * Loop 24 P1 Fix 3 (2026-04-29): when `unitCostCeilingGbp` is absent from
+ * the LLM's JSON, run `extractCostCeilingFromProse` over the optional
+ * `reportText` as a deterministic fallback. Emits a structured log line for
+ * every brief parse so we can audit which briefs the extractor reaches.
+ *
+ * @param raw        - The parsed JSON object from the LLM extraction.
+ * @param reportText - Optional raw report text to scan when the LLM misses
+ *                     the cost ceiling.
  */
 function normaliseBriefShape(
     raw: Record<string, unknown>,
+    reportText?: string,
 ): Partial<CadLabDesignBrief> {
     const brief: Partial<CadLabDesignBrief> = {}
 
@@ -1183,6 +1224,23 @@ function normaliseBriefShape(
         const constraints: NonNullable<CadLabDesignBrief["constraints"]> = {}
         if (typeof c.unitCostCeilingGbp === "number" && Number.isFinite(c.unitCostCeilingGbp)) {
             constraints.unitCostCeilingGbp = c.unitCostCeilingGbp
+            console.log(
+                `[brief-parse] cost_ceiling extracted: gbp=${c.unitCostCeilingGbp} source="LLM JSON constraints.unitCostCeilingGbp"`,
+            )
+        } else if (reportText) {
+            // Loop 24 P1 Fix 3: LLM returned null/missing for unitCostCeilingGbp.
+            // Try deterministic regex extraction from the report prose.
+            const proseHit = extractCostCeilingFromProse(reportText)
+            if (proseHit) {
+                constraints.unitCostCeilingGbp = proseHit.gbp
+                console.log(
+                    `[brief-parse] cost_ceiling extracted via prose fallback: gbp=${proseHit.gbp} source="${proseHit.source}"`,
+                )
+            } else {
+                console.warn(
+                    "[brief-parse] cost_ceiling NOT FOUND in brief (LLM returned null, prose fallback found nothing)",
+                )
+            }
         }
         if (typeof c.firstShipDate === "string" && /^\d{4}-\d{2}-\d{2}$/.test(c.firstShipDate)) {
             constraints.firstShipDate = c.firstShipDate
@@ -1204,6 +1262,19 @@ function normaliseBriefShape(
         }
         if (Object.keys(constraints).length > 0) {
             brief.constraints = constraints
+        }
+    } else if (reportText) {
+        // No constraints block at all in the JSON. Still run prose extraction.
+        const proseHit = extractCostCeilingFromProse(reportText)
+        if (proseHit) {
+            brief.constraints = { unitCostCeilingGbp: proseHit.gbp }
+            console.log(
+                `[brief-parse] cost_ceiling extracted via prose fallback (no constraints block): gbp=${proseHit.gbp} source="${proseHit.source}"`,
+            )
+        } else {
+            console.warn(
+                "[brief-parse] cost_ceiling NOT FOUND in brief (no constraints block, prose fallback found nothing)",
+            )
         }
     }
 
