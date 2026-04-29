@@ -105,6 +105,32 @@ export function areSameProductClass(a: Envelope, b: Envelope): boolean {
 }
 
 /**
+ * Stricter deterministic same-envelope-variant check.
+ *
+ * Extends areSameProductClass by also requiring that both envelopes share
+ * the exact same `kind` value. This catches within-class size swaps —
+ * the Loop 25 Desalination Module 3.1 failure mode where the solver silently
+ * substituted a 20ft ISO container for a briefed 40ft ISO container. Both
+ * are "transportable_container" (same class), so areSameProductClass returned
+ * true and Guard 2 did NOT fire. areSameEnvelopeVariant closes this gap.
+ *
+ * GPT-5.5 and DeepSeek council holdout 2026-04-29: "same family of error as
+ * phantom-GREEN — the system presents feasibility by mutating the brief."
+ *
+ * DECISION: `kind` is the canonical variant discriminator. It is always a
+ * fixed enum value set by the canonical envelope definitions in
+ * src/lib/sizing/envelopes.ts, never interpolated or normalised by the LLM.
+ *
+ * ANTI-CHEAT RULE: This function must NEVER be replaced with an LLM call.
+ */
+export function areSameEnvelopeVariant(a: Envelope, b: Envelope): boolean {
+    // Must pass the class check first — different-class envelopes are never
+    // the same variant even if their kind strings happened to collide.
+    if (!areSameProductClass(a, b)) return false
+    return a.kind === b.kind
+}
+
+/**
  * Build the structured alternate-envelope pushback payload.
  *
  * Called when the solver's closest_feasible_alternate is in a different

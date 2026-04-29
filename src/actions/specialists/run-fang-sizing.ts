@@ -58,6 +58,7 @@ import type { DimensionSheet, Envelope } from "@/lib/sizing/types"
 import type { Database } from "@/types/database.types"
 import {
     areSameProductClass,
+    areSameEnvelopeVariant,
     getEnvelopeClassificationTag,
 } from "@/lib/forge-v2/envelope-classification"
 
@@ -417,22 +418,28 @@ async function runFangSizingInternal(
 
     // ── Gate 3 remediation: class-fence + deliver-and-pushback ───────────────
     //
-    // GUARD 2 — alternate must share the briefed product class for auto-retry
+    // GUARD 2 — alternate must share the EXACT briefed envelope variant for auto-retry
     // ─────────────────────────────────────────────────────────────────────────
     // Read closest_feasible_alternate from the previous attempt.
-    // If the alternate is in the SAME product class as the briefed envelope
-    // (e.g. 40ft ISO → 53ft HC, both "transportable_container"), we can
-    // safely retry with the alternate — the solver proved it fits.
+    // If the alternate is the SAME envelope variant as the briefed envelope
+    // (same kind AND same product class), we can safely retry — the solver
+    // proved it fits within the same physical package.
     //
-    // If the alternate is in a DIFFERENT product class (e.g. 40ft ISO →
-    // warehouse_bay), we must NOT silently swap. Instead we annotate the
-    // existing dimension_sheet with class-fence fields and return a special
-    // `DELIVER_AND_PUSHBACK` errorCode. The autopilot-step handler receiving
-    // this advances the project normally (the briefed-class max-feasible
-    // sheet is already persisted from attempt 1) AND attaches the pushback
-    // payload so the PDF renders the trade-off callout.
+    // If the alternate differs in ANY way — different product class (e.g. 40ft
+    // ISO → warehouse_bay) OR same class but different size variant (e.g. 40ft
+    // ISO → 20ft ISO, both "transportable_container") — we must NOT silently
+    // swap. Instead we annotate the existing dimension_sheet with class-fence
+    // fields and return a special `DELIVER_AND_PUSHBACK` errorCode.
     //
-    // ANTI-CHEAT: areSameProductClass() is a deterministic enum compare.
+    // Loop 25 Desalination Module 3.1 failure: the solver substituted a 20ft
+    // enclosure for a briefed 40ft brief. areSameProductClass returned true
+    // (both "transportable_container") so Guard 2 did not fire. The GPT-5.5
+    // and DeepSeek council holdouts (2026-04-29) labelled this "silent dimension
+    // swap — same family of error as phantom-GREEN: the system presents
+    // feasibility by mutating the brief." Fix: switch to areSameEnvelopeVariant,
+    // which requires kind equality in ADDITION to the class tag match.
+    //
+    // ANTI-CHEAT: areSameEnvelopeVariant() is a deterministic enum compare.
     // NEVER replaced with an LLM call.
 
     let remediationEnvelopeOverride: Envelope | undefined = undefined
@@ -442,9 +449,9 @@ async function runFangSizingInternal(
 
         if (alternate?.envelope) {
             const briefedEnvelope = briefEnvelope ?? prevSheet.envelope
-            const sameClass = areSameProductClass(briefedEnvelope, alternate.envelope)
+            const sameVariant = areSameEnvelopeVariant(briefedEnvelope, alternate.envelope)
 
-            if (!sameClass) {
+            if (!sameVariant) {
                 // ── Deliver-and-pushback path ──────────────────────────────────
                 // The solver's alternate is a different product class.
                 // Annotate the existing sheet with class-fence fields so the PDF
@@ -512,17 +519,18 @@ async function runFangSizingInternal(
                 return {
                     ok: false,
                     error:
-                        `Alternate envelope (${alternate.envelope.label}) is a different product class ` +
-                        `(${alternateTag}) from the briefed envelope (${briefedEnvelope.label}, ${briefedTag}). ` +
-                        `Delivering briefed-class max-feasible result with alternate as a pushback suggestion.`,
+                        `Alternate envelope (${alternate.envelope.label}, kind=${alternate.envelope.kind}) ` +
+                        `differs from the briefed envelope (${briefedEnvelope.label}, kind=${briefedEnvelope.kind}). ` +
+                        `Class-fence or variant-fence triggered. ` +
+                        `Delivering briefed-envelope max-feasible result with alternate as a pushback suggestion.`,
                     errorCode: "DELIVER_AND_PUSHBACK",
                     runId: "",
                 }
             }
 
-            // Same product class — safe to retry with the alternate envelope.
+            // Same envelope variant — safe to retry with the alternate envelope.
             remediationEnvelopeOverride = alternate.envelope
-            console.log("[fang-sizing] remediation same-class override applied:", {
+            console.log("[fang-sizing] remediation same-variant override applied:", {
                 fromEnvelope: prevSheet.envelope?.kind ?? "(none)",
                 toEnvelope: remediationEnvelopeOverride.kind,
                 briefedClass: getEnvelopeClassificationTag(briefedEnvelope),
