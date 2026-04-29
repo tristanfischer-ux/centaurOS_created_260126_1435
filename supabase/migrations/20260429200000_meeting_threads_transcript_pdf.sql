@@ -21,6 +21,18 @@ ALTER TABLE public.meeting_threads
 COMMENT ON COLUMN public.meeting_threads.transcript_pdf_url IS
     'Signed URL to brainstorm-assets/<id>/transcript.pdf; regenerated when stale.';
 
+-- ─── brainstorm-assets bucket — allow application/pdf uploads ────────
+-- The bucket's allowed_mime_types was set at bucket-creation time to
+-- image/png, image/jpeg, audio/mpeg, audio/mp3, audio/wav. PDF uploads
+-- fail without adding application/pdf. Applied live via SQL 2026-04-29.
+UPDATE storage.buckets
+    SET allowed_mime_types = ARRAY[
+        'image/png', 'image/jpeg',
+        'audio/mpeg', 'audio/mp3', 'audio/wav',
+        'application/pdf'
+    ]
+    WHERE id = 'brainstorm-assets';
+
 -- ─── ai_usage_log — register brainstorm_pdf feature ────────────────
 -- Per MEMORY.md gotcha (forgeos_ai_usage_log_check_constraint): every
 -- new withAIGate / manual insert call site needs its feature name in
