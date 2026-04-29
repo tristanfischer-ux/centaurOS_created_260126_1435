@@ -2662,6 +2662,20 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
     // repairRiskRowFromContext uses isModuleRiskMatrixBoilerplate.
     void anyRiskMatrixIsBoilerplate(modules)
 
+    // Loop 24 Fix 4 (P1): risk register truncation root cause.
+    // Per-row wrap={false} (added in L9-P5 to keep individual risk rows
+    // from splitting mid-row) silently DROPS any row taller than the
+    // remaining page space because pdfkit treats an oversized non-wrapping
+    // View as unrendereable rather than paginating it. This produces the
+    // mid-sentence cuts observed in Loop 24 (critique: "RM-4: Cause: Epoxy
+    // bond fatigue … Consequence: I", "risking pump cavitation and
+    // downstream memb"). The fix: allow rows to wrap naturally across pages
+    // by removing wrap={false} from the per-row View. React-PDF's native
+    // page-flow ensures content is never clipped — the trade-off (a row
+    // might split mid-text) is far preferable to silent data loss.
+    // The module-level wrap={false} was already removed in L9-P5; now the
+    // per-row restriction is removed too. Both levels allow natural flow.
+
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>6. Risks register</Text>
@@ -2685,8 +2699,8 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                 // onto one page; for Vertfarm modules with 4-5 risk rows
                 // each, the block exceeded page height and Yoga either
                 // crushed line-heights (text overlap) or emitted orphan
-                // blank pages. Per-row `wrap={false}` at the inner View is
-                // sufficient to keep individual risks intact.
+                // blank pages. Per-row `wrap={false}` was also removed in
+                // Loop 24 Fix 4 — see comment above.
                 <View key={m.id} style={{ marginTop: 10 }}>
                     <Text style={styles.h4}>{m.name}</Text>
                     {m.riskMatrix.length === 0 &&
@@ -2745,6 +2759,15 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                 const renderedConsequence = repaired.consequence
                                 const renderedMitigation = repaired.mitigation
                                 return (
+                                    // Loop 24 Fix 4: wrap={false} REMOVED from this per-row View.
+                                    // It caused silent content drops: when a risk row (long
+                                    // cause + consequence + mitigation text) was taller than
+                                    // the remaining page space, pdfkit silently dropped the
+                                    // entire oversized non-wrapping View rather than paging it —
+                                    // producing mid-sentence cuts ("RM-4: Cause: Epoxy bond
+                                    // fatigue … Consequence: I", "downstream memb").
+                                    // Natural wrap means rows may split at page boundaries, but
+                                    // no content is ever silently lost.
                                     <View
                                         key={r.id || i}
                                         style={{
@@ -2753,7 +2776,6 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                             borderLeftWidth: 2,
                                             borderLeftColor: initial.color,
                                         }}
-                                        wrap={false}
                                     >
                                         {/*
                                           * L9-P5: when r.hazard wraps to 2-3 lines
@@ -4329,16 +4351,29 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
     // Loop 8 G1: when reconciliation produces findings, list a
     // "Reconciliation" entry between Cost waterfall and Risks register
     // so the TOC matches what the body delivers.
+    //
+    // Loop 24 Fix 4 (P1): hard-infeasible PDFs suppressed Modules, BOM,
+    // Cost waterfall, Risks register, and Supplier shortlist at the render
+    // level but still listed ALL of them in the TOC — so the founder saw
+    // "9. Risks register · 10. Supplier shortlist" in the contents but the
+    // pages were never emitted. TOC-vs-body invariant: only list a section
+    // when it will actually render. When isHardInfeasible is true, drop all
+    // downstream sections from the TOC so the contents page matches the
+    // document body exactly. The cover already carries the explicit
+    // "intentionally omitted" notice so the founder is not confused.
+    const hardInfeasible = isHardInfeasible(data.feasibilityVerdict)
     const reconciliationHasFindings =
         (data.reconciliation?.findings.length ?? 0) > 0
-    const fixedSections = [
-        "Modules (one page each)",
-        "BOM master",
-        "Cost waterfall",
-        ...(reconciliationHasFindings ? ["Reconciliation"] : []),
-        "Risks register",
-        "Supplier shortlist",
-    ]
+    const fixedSections = hardInfeasible
+        ? []
+        : [
+              "Modules (one page each)",
+              "BOM master",
+              "Cost waterfall",
+              ...(reconciliationHasFindings ? ["Reconciliation"] : []),
+              "Risks register",
+              "Supplier shortlist",
+          ]
     const allSections = [
         "Brief",
         "Regulatory posture",
@@ -4346,6 +4381,38 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
         ...fixedSections,
     ]
     const sections = allSections.map((label, i) => `${i + 1}. ${label}`)
+
+    // ── Pre-emit TOC-vs-body invariant ─────────────────────────────────
+    // Every section listed in the TOC must correspond to a rendered page.
+    // Log a warning when a mismatch is detected so pipeline_runs surface
+    // it rather than a silent omission reaching the founder.
+    // The hardInfeasible fix above is the primary guard; this invariant
+    // is the belt-and-suspenders diagnostic layer.
+    {
+        const BODY_SECTION_LABELS = [
+            "Brief",
+            "Regulatory posture",
+            ...(hasSheet || (!hasSheet && data.feasibilityVerdict && data.feasibilityVerdict.fails.length > 0) ? ["Sizing optimisation"] : []),
+            ...(hasPlan ? ["Spatial plan"] : []),
+            ...(!hardInfeasible ? [
+                "Modules (one page each)",
+                "BOM master",
+                "Cost waterfall",
+                ...(reconciliationHasFindings ? ["Reconciliation"] : []),
+                "Risks register",
+                "Supplier shortlist",
+            ] : []),
+        ]
+        for (const tocLabel of allSections) {
+            // Normalise: strip trailing " (N)" count suffixes added by individual sections
+            const norm = tocLabel.replace(/\s*\(\d+\)\s*$/, "")
+            if (!BODY_SECTION_LABELS.some((b) => b.startsWith(norm) || norm.startsWith(b))) {
+                console.warn(
+                    `[pdf-emit] TOC-vs-body invariant: section "${tocLabel}" is listed in the TOC but has no corresponding body section — refusing to emit would block the founder; logging instead. Review ForgeProjectPdf section gates.`,
+                )
+            }
+        }
+    }
 
     // Computed section numbers for the sections that render their own
     // header (they need to show the right "N." prefix).
