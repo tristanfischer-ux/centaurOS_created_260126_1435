@@ -151,6 +151,28 @@ export const STAGE_NARRATIVES: Record<AutopilotStage, StageNarrative> = {
         inFlight: "",
         narrative: "The engineering solver could not find a configuration that fits inside the brief's envelope and cost ceiling. The most useful next step is to revise the brief — adjust the target scale, cost ceiling, or physical constraints — and start a fresh run.",
     },
+    preflight_blocked: {
+        // v1.7 (2026-04-29 Gates Council R1+R2 P1): TERMINAL stage set when
+        // runPreflightOracle() detected a physics violation before the pipeline
+        // started. Verdict details are in feasibility_verdict column.
+        label: "Brief blocked — physics violation",
+        inFlight: "",
+        narrative: "The brief contains a physics violation detected before the pipeline ran. Review the pre-flight verdict and revise the brief before starting a new run.",
+    },
+    waiting_max_redecomposition: {
+        // v1.8: transitional stage set when Fang sizing detects a topology-level
+        // overflow requiring Max to re-decompose. NOT terminal — cron must NOT exclude.
+        label: "Requesting a revised module breakdown",
+        inFlight: "Max is reviewing the sizing constraints and producing an updated module breakdown.",
+        narrative: "The sizing solver found the current module layout cannot fit within the brief's constraints. Max is revising the decomposition to resolve the conflict.",
+    },
+    gate_1_blocked: {
+        // v1.9: terminal stage set when gate1Check() found a numeric mismatch
+        // (>= 3x) between the founder's brief and Chase's extraction at brief-lock.
+        label: "Brief blocked — numeric mismatch at gate 1",
+        inFlight: "",
+        narrative: "The pre-pipeline gate detected a significant numeric mismatch between the brief and Chase's structured extraction. Confirm or revise the brief values before starting a new run.",
+    },
 }
 
 /**

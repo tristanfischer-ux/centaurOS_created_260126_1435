@@ -46,6 +46,11 @@ import { after } from "next/server"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
+import { runPreflightOracle } from "@/lib/forge-v2/preflight-oracle"
+import type { BriefInput } from "@/lib/forge-v2/preflight-oracle"
+import { gate1Check, buildGate1Input } from "@/lib/forge-v2/stage-gates/gate-1"
+import type { CadLabDesignBrief } from "@/lib/cad-lab-types"
+import type { DimensionSheet } from "@/lib/sizing/types"
 
 // ─── Types ─────────────────────────────────────────────────────────────
 
@@ -65,6 +70,8 @@ export type BriefLockErrorCode =
     | "ALREADY_LOCKED"
     | "NOT_LOCKED"
     | "INVALID_PROJECT_ID"
+    | "PREFLIGHT_BLOCKED"
+    | "GATE_1_BLOCKED"
     | "INTERNAL"
 
 export type BriefLockResult =
@@ -113,7 +120,7 @@ export async function lockCadLabBrief(projectId: string): Promise<BriefLockResul
         // ── 1. Load + verify project ownership ────────────────────────
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, research, brief_locked_at, design_revision")
+            .select("id, foundry_id, subject, research, brief_locked_at, design_revision, dimension_sheet")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -171,6 +178,134 @@ export async function lockCadLabBrief(projectId: string): Promise<BriefLockResul
                 error:
                     "Add research to the brief before locking — Max needs something to decompose.",
                 errorCode: "NO_BRIEF_TO_LOCK",
+            }
+        }
+
+        // ── 3b. Pre-flight physics oracle — run BEFORE the pipeline starts.
+        //       A 100ms deterministic check that catches obvious physics
+        //       violations (e.g. HAPS solar cost 14×–32× the brief ceiling)
+        //       without invoking any LLM. If the oracle blocks, we persist the
+        //       verdict to feasibility_verdict, stamp the autopilot_state to
+        //       'preflight_blocked', and return PREFLIGHT_BLOCKED to the UI.
+        //
+        //       The oracle is ADVISORY on unknown domains (it will pass with a
+        //       warning). It only blocks when it finds a clear physics violation
+        //       in a recognised domain. Unknown domains are not blocked — we
+        //       never want to accidentally prevent a valid brief from locking.
+        {
+            const subject = typeof project.subject === "string" ? project.subject : ""
+            const designBrief = (research as { designBrief?: BriefInput["designBrief"] } | null)?.designBrief
+
+            const briefForOracle: BriefInput = {
+                subject,
+                reportText: typeof report === "string" ? report : undefined,
+                designBrief: designBrief ?? undefined,
+            }
+            const preflightVerdict = runPreflightOracle(briefForOracle)
+
+            if (!preflightVerdict.passed) {
+                console.warn(
+                    `[brief-lock] preflight BLOCKED project=${projectId} domain=${preflightVerdict.domain}`,
+                    preflightVerdict.blockers.map(b => `${b.axis}: ${b.explanation}`).join("; "),
+                )
+
+                // Persist the verdict to feasibility_verdict so the UI can
+                // surface the blockers without a separate fetch.
+                await admin
+                    .from("cad_lab_projects")
+                    .update({ feasibility_verdict: preflightVerdict as never })
+                    .eq("id", projectId)
+                    .eq("foundry_id", foundryId)
+
+                // Build a human-readable summary for the error message.
+                const blockerSummary = preflightVerdict.blockers
+                    .map(b => b.explanation)
+                    .join(" | ")
+
+                return {
+                    ok: false,
+                    error: `This brief cannot run: ${blockerSummary}`,
+                    errorCode: "PREFLIGHT_BLOCKED",
+                }
+            }
+            // Oracle passed — proceed to lock. Persist the verdict (with warnings)
+            // for observability even on a pass.
+            await admin
+                .from("cad_lab_projects")
+                .update({ feasibility_verdict: preflightVerdict as never })
+                .eq("id", projectId)
+                .eq("foundry_id", foundryId)
+        }
+
+        // ── 3c. Gate 1 — deterministic numeric/unit extraction check.
+        //        Catches the failure mode: founder types "1.5 MW", Chase
+        //        interprets "100 kW" — a 15× mismatch that silently corrupts
+        //        the entire downstream pipeline.
+        //
+        //        This runs AFTER the preflight oracle (which checks physics
+        //        feasibility) and BEFORE the revision is inserted (so no
+        //        pipeline work ever starts on a mismatched brief).
+        //
+        //        Gate 1 is DETERMINISTIC — zero LLM calls, ~1ms.
+        //        It only blocks on ≥3× factor mismatches. Within-10% drifts
+        //        produce warnings that are persisted but do NOT block locking.
+        {
+            const gate1Research = (research ?? null) as
+                | { report?: unknown; designBrief?: CadLabDesignBrief }
+                | null
+            const gate1Sheet = (project.dimension_sheet ?? null) as DimensionSheet | null
+            const gate1Input = buildGate1Input(gate1Research, gate1Sheet)
+            const gate1Verdict = gate1Check(gate1Input)
+
+            // Persist verdict (pass or fail) for UI / audit visibility.
+            // Nest under feasibility_verdict.gate_1_check to avoid clobbering
+            // the preflight_oracle verdict that may already be there.
+            try {
+                const { data: existingVerdictRow } = await admin
+                    .from("cad_lab_projects")
+                    .select("feasibility_verdict")
+                    .eq("id", projectId)
+                    .maybeSingle()
+                const existingVerdict =
+                    (existingVerdictRow?.feasibility_verdict as Record<string, unknown> | null) ?? {}
+                await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        feasibility_verdict: {
+                            ...existingVerdict,
+                            gate_1_check: gate1Verdict,
+                        } as never,
+                    })
+                    .eq("id", projectId)
+                    .eq("foundry_id", foundryId)
+            } catch (persistErr) {
+                // Non-fatal — the verdict write failing must not block locking.
+                console.error(
+                    "[brief-lock] gate-1 verdict persist failed (non-fatal):",
+                    persistErr instanceof Error ? persistErr.message : persistErr,
+                )
+            }
+
+            if (!gate1Verdict.passed) {
+                const blockerSummary = gate1Verdict.blockers
+                    .map((b) => b.explanation)
+                    .join(" | ")
+                console.warn(
+                    `[brief-lock] gate-1 BLOCKED project=${projectId}`,
+                    gate1Verdict.blockers.map((b) => `${b.axis}: factor=${b.factor_off.toFixed(1)}`).join("; "),
+                )
+                return {
+                    ok: false,
+                    error: `Brief interpretation mismatch: ${blockerSummary}`,
+                    errorCode: "GATE_1_BLOCKED",
+                }
+            }
+
+            if (gate1Verdict.warnings.length > 0) {
+                console.info(
+                    `[brief-lock] gate-1 PASS (with ${gate1Verdict.warnings.length} warnings) project=${projectId}`,
+                    gate1Verdict.warnings.map((w) => `${w.axis}: ${w.explanation}`).join("; "),
+                )
             }
         }
 

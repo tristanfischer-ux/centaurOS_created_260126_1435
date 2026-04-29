@@ -62,6 +62,18 @@ export type AutopilotStage =
     | "locking_brief"
     | "waiting_max"
     | "waiting_sizing"  // v1.1: Fang sizing runs between Max and BOM
+    | "waiting_max_redecomposition" // v1.8 (2026-04-29 Gates Council R1 P1):
+                        // TRANSITIONAL stage set when Fang sizing detects a
+                        // topology-level overflow — the solver's recommendations
+                        // contain a structural change (split into 2 modules,
+                        // externalise a skid, add an auxiliary subsystem) that
+                        // cannot be resolved by re-sizing the same module layout.
+                        // Max is re-fired with a structured override block
+                        // (gate_remediation_context.waiting_max) explaining what
+                        // must change. After Max produces a new decomposition the
+                        // pipeline continues normally: → waiting_sizing →
+                        // waiting_layout → … This stage is NOT terminal — the
+                        // cron filter must NOT exclude it.
     | "waiting_layout"  // v1.3: Fang spatial layout runs after sizing, before BOM
     | "waiting_bom"
     | "waiting_finn"
@@ -79,6 +91,23 @@ export type AutopilotStage =
                         // solver_error do NOT generate a PDF, do NOT advance to
                         // matching_suppliers. Cron filter must exclude this stage.
                         // Root cause: council R2 gate-3 fix — NULL hard-block.
+    | "preflight_blocked" // v1.7 (2026-04-29 Gates Council R1+R2 P1): TERMINAL stage
+                        // set when runPreflightOracle() fires before the pipeline starts
+                        // and finds a physics violation (e.g. HAPS solar cost 14×–32×
+                        // brief ceiling, BESS energy density exceeds NMC hard limit).
+                        // The verdict is persisted to feasibility_verdict for display.
+                        // The pipeline NEVER starts — Chase is never called. Saves 60+ min
+                        // of wasted pipeline execution on physically infeasible briefs.
+                        // Cron filter must exclude this stage (same shape as solver_error).
+    | "gate_1_blocked"  // v1.9 (2026-04-29 Gates Council R1 P2): TERMINAL stage set by
+                        // gate1Check() inside lockCadLabBrief() when Chase's structured
+                        // numeric interpretation diverges ≥ 3× from the founder's raw
+                        // brief text (e.g. founder wrote "1.5 MW", Chase extracted
+                        // "100 kW" — a 15× mismatch). The Gate 1 verdict is persisted
+                        // to feasibility_verdict.gate_1_check. No pipeline stage fires
+                        // after brief-lock. The founder must confirm or revise their
+                        // brief then unlock and re-lock to restart.
+                        // Cron filter MUST exclude this stage (same shape as solver_error).
 
 export interface AutopilotState {
     started_at: string
@@ -103,6 +132,7 @@ export type AutopilotStepName =
     | "waitForChase"
     | "waitForMax"
     | "waitForSizing"
+    | "waitForMaxRedecomposition" // v1.8: re-fires Max after topology overflow
     | "waitForLayout"
     | "waitForBom"
     | "waitForFinn"

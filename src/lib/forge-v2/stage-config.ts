@@ -84,7 +84,7 @@ export type StageConfig = SynchronousStageConfig | FireStageConfig
 /** Declarative state machine. The cron tick reads this; nothing else
  *  should hold a copy of stage→step or stage→nextStage knowledge. */
 export const STAGE_CONFIG: Record<
-    Exclude<AutopilotStage, "done" | "failed">,
+    Exclude<AutopilotStage, "done" | "failed" | "solver_error" | "preflight_blocked" | "gate_1_blocked">,
     StageConfig
 > = {
     waiting_chase: {
@@ -103,6 +103,19 @@ export const STAGE_CONFIG: Record<
         fireStep: "waitForMax",
         nextStage: "waiting_sizing",
         maxAttempts: 3,
+    },
+    waiting_max_redecomposition: {
+        // v1.8 (2026-04-29 Gates Council R1 P1): Max re-fired after Fang sizing
+        // detected a topology-level overflow. The cron fires waitForMaxRedecomposition
+        // which calls runMaxDecompositionBackground with the gate_remediation_context
+        // already stashed at waiting_max by triggerRemediation. On success the
+        // pipeline continues from waiting_sizing exactly as a first-pass would.
+        kind: "fire",
+        fireStep: "waitForMaxRedecomposition",
+        nextStage: "waiting_sizing",
+        // Allow 2 redecomposition attempts — if Max still can't produce a feasible
+        // topology on the second try, terminal-fail and let the founder revise the brief.
+        maxAttempts: 2,
     },
     waiting_sizing: {
         kind: "fire",
@@ -188,6 +201,7 @@ export const STEP_TO_STAGE: Record<AutopilotStepName, AutopilotStage> = {
     waitForChase: "waiting_chase",
     waitForMax: "waiting_max",
     waitForSizing: "waiting_sizing",
+    waitForMaxRedecomposition: "waiting_max_redecomposition",
     waitForLayout: "waiting_layout",
     waitForBom: "waiting_bom",
     waitForFinn: "waiting_finn",

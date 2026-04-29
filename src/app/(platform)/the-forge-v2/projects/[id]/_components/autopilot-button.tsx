@@ -55,6 +55,10 @@ const STAGE_LABELS: Record<AutopilotStage, string> = {
     generating_pdf: "generating PDF pack",
     done: "done",
     failed: "failed — retries exhausted",
+    solver_error: "blocked — solver could not find a feasible configuration",
+    preflight_blocked: "blocked — physics violation in brief",
+    waiting_max_redecomposition: "requesting revised module breakdown (Max)",
+    gate_1_blocked: "blocked — numeric mismatch at gate 1",
 }
 
 const POLL_INTERVAL_MS = 15_000
