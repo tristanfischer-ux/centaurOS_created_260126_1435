@@ -53,7 +53,7 @@ describe("MobileNav drawer navigation", () => {
 
     const forgeLink = screen.getByTestId("drawer-item-the-forge")
     expect(forgeLink).toBeInTheDocument()
-    expect(forgeLink).toHaveAttribute("href", "/the-forge")
+    expect(forgeLink).toHaveAttribute("href", "/the-forge-v2")
   })
 
   it("renders Settings link in the drawer", () => {
