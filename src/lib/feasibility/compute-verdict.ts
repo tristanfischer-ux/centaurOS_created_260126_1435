@@ -48,6 +48,20 @@ export interface FeasibilityVerdict {
     ran_at: string
     fails: VerdictFail[]
     tradeoffs: string[]
+    /**
+     * List of constraint axes the solver actually evaluated on this run.
+     *
+     * A GREEN verdict is only meaningful when this list is non-empty — it
+     * means the solver ran, checked these constraints, and found no
+     * violations. An empty `checkedConstraints` list means the solver had no
+     * inputs to check (null dimensionSheet, null briefConstraints, zero parts)
+     * and the GREEN is NOT evidence of a passing design; it is evidence of a
+     * missing data pipeline. The PDF renders this as UNREVIEWED rather than GREEN.
+     *
+     * Loop 24 P0 fix — eliminates phantom-GREEN on Hedgerow / Vertical Farm /
+     * Desalination / HAPS where the solver ran but found nothing to check.
+     */
+    checkedConstraints: string[]
 }
 
 export interface VerdictInput {
@@ -77,6 +91,10 @@ export function computeFeasibilityVerdict(
     input: VerdictInput,
 ): FeasibilityVerdict {
     const fails: VerdictFail[] = []
+    // Tracks which constraint axes the solver had real data to evaluate.
+    // Only axes with non-null, non-trivial inputs are added here.
+    // A GREEN verdict is only valid when this list is non-empty.
+    const checkedConstraints: string[] = []
 
     // ── Envelope (sizing) ────────────────────────────────────────────
     const sizingFeasible =
@@ -88,6 +106,11 @@ export function computeFeasibilityVerdict(
               (s): s is string => typeof s === "string",
           )
         : []
+    // Mark envelope as checked when the dimension sheet was present and
+    // contained a definitive feasible flag (true or false).
+    if (input.dimensionSheet !== null && sizingFeasible !== null) {
+        checkedConstraints.push("envelope")
+    }
     if (sizingFeasible === false) {
         const evidence = sizingConflicts.length
             ? sizingConflicts.slice(0, 2).join(" ")
@@ -103,12 +126,11 @@ export function computeFeasibilityVerdict(
     // ── Cost ─────────────────────────────────────────────────────────
     const costCeiling = numberOrNull(input.briefConstraints?.["unitCostCeilingGbp"])
     const totalCostGbp = computeTotalCost(input.parts, input.aiCostEstimates)
-    if (
-        costCeiling !== null &&
-        costCeiling > 0 &&
-        totalCostGbp !== null &&
-        totalCostGbp > 0
-    ) {
+    // Only treat cost as checked when both the ceiling and the total are
+    // meaningful numbers — if either is null/zero there is nothing to
+    // compare and a "no violations" result is vacuously true.
+    if (costCeiling !== null && costCeiling > 0 && totalCostGbp !== null && totalCostGbp > 0) {
+        checkedConstraints.push("cost")
         const overFactor = totalCostGbp / costCeiling
         if (overFactor > 1.5) {
             fails.push({
@@ -133,24 +155,24 @@ export function computeFeasibilityVerdict(
     const massCeiling = numberOrNull(input.briefConstraints?.["maxMassKg"])
     const totalMassKg = computeTotalMass(input.parts)
     if (totalMassKg !== null && totalMassKg > 0) {
-        if (massCeiling !== null && massCeiling > 0 && totalMassKg > massCeiling) {
-            fails.push({
-                axis: "mass",
-                severity: "blocker",
-                summary: "Estimated mass exceeds the brief ceiling.",
-                evidence: `${totalMassKg.toLocaleString("en-GB")} kg estimated vs ${massCeiling.toLocaleString("en-GB")} kg ceiling.`,
-            })
-        } else if (
-            massCeiling !== null &&
-            massCeiling > 0 &&
-            totalMassKg > massCeiling * 0.9
-        ) {
-            fails.push({
-                axis: "mass",
-                severity: "warning",
-                summary: "Estimated mass within 10% of the brief ceiling.",
-                evidence: `${totalMassKg.toLocaleString("en-GB")} kg vs ${massCeiling.toLocaleString("en-GB")} kg.`,
-            })
+        if (massCeiling !== null && massCeiling > 0) {
+            // Mass ceiling was declared AND parts have mass — real check.
+            checkedConstraints.push("mass")
+            if (totalMassKg > massCeiling) {
+                fails.push({
+                    axis: "mass",
+                    severity: "blocker",
+                    summary: "Estimated mass exceeds the brief ceiling.",
+                    evidence: `${totalMassKg.toLocaleString("en-GB")} kg estimated vs ${massCeiling.toLocaleString("en-GB")} kg ceiling.`,
+                })
+            } else if (totalMassKg > massCeiling * 0.9) {
+                fails.push({
+                    axis: "mass",
+                    severity: "warning",
+                    summary: "Estimated mass within 10% of the brief ceiling.",
+                    evidence: `${totalMassKg.toLocaleString("en-GB")} kg vs ${massCeiling.toLocaleString("en-GB")} kg.`,
+                })
+            }
         }
 
         const ukMarket =
@@ -158,21 +180,27 @@ export function computeFeasibilityVerdict(
             (input.briefConstraints!["markets"] as unknown[]).some(
                 (m) => typeof m === "string" && /^GB|UK$/i.test(m),
             )
-        if (ukMarket && totalMassKg > UK_FLATBED_LEGAL_PAYLOAD_KG) {
-            fails.push({
-                axis: "transport",
-                severity: "blocker",
-                summary:
-                    "Mass exceeds UK flatbed legal payload — cannot ship complete on a standard articulated lorry without abnormal-loads paperwork.",
-                evidence:
-                    `${totalMassKg.toLocaleString("en-GB")} kg estimated; UK flatbed legal payload ~${UK_FLATBED_LEGAL_PAYLOAD_KG.toLocaleString("en-GB")} kg. ` +
-                    "Above this the load is abnormal indivisible — STGO Category 2: marker boards, 2 days police notice, specialised heavy haulage.",
-            })
+        if (ukMarket) {
+            // Transport legality is checkable once we have mass and a UK market flag.
+            checkedConstraints.push("transport")
+            if (totalMassKg > UK_FLATBED_LEGAL_PAYLOAD_KG) {
+                fails.push({
+                    axis: "transport",
+                    severity: "blocker",
+                    summary:
+                        "Mass exceeds UK flatbed legal payload — cannot ship complete on a standard articulated lorry without abnormal-loads paperwork.",
+                    evidence:
+                        `${totalMassKg.toLocaleString("en-GB")} kg estimated; UK flatbed legal payload ~${UK_FLATBED_LEGAL_PAYLOAD_KG.toLocaleString("en-GB")} kg. ` +
+                        "Above this the load is abnormal indivisible — STGO Category 2: marker boards, 2 days police notice, specialised heavy haulage.",
+                })
+            }
         }
     }
 
     // ── Supplier coverage ───────────────────────────────────────────
     if (input.bomRowCount > 0) {
+        // A BOM with at least one row is a real coverage check.
+        checkedConstraints.push("suppliers")
         const coverage = input.shortlistCount / input.bomRowCount
         if (coverage < 0.5) {
             fails.push({
@@ -186,6 +214,11 @@ export function computeFeasibilityVerdict(
     }
 
     // ── Status ──────────────────────────────────────────────────────
+    // LOOP 24 P0: status GREEN is only valid when at least one constraint
+    // axis was actually checked. When checkedConstraints is empty, the
+    // solver had no inputs — every axis was null or trivially skipped.
+    // Callers that read "green" must also verify checkedConstraints.length > 0;
+    // the PDF layer maps empty-checked-green to UNREVIEWED.
     const hasBlocker = fails.some((f) => f.severity === "blocker")
     const status: VerdictStatus = hasBlocker
         ? "red"
@@ -222,6 +255,7 @@ export function computeFeasibilityVerdict(
         ran_at: new Date().toISOString(),
         fails,
         tradeoffs,
+        checkedConstraints,
     }
 }
 

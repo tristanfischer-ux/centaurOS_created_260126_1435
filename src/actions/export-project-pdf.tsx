@@ -866,6 +866,13 @@ interface PdfInput {
             evidence: string
         }>
         tradeoffs: string[]
+        /**
+         * Constraint axes the solver had real data to evaluate.
+         * Non-empty required for GREEN to mean "checked and passed".
+         * Empty means the solver had no inputs — treat as UNREVIEWED, not GREEN.
+         * Loop 24 P0 phantom-GREEN fix.
+         */
+        checkedConstraints: string[]
     } | null
     /**
      * Alternate envelope pushback from the class-fence guard (Loop 24 P0).
@@ -1106,6 +1113,41 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                         )
                     })()}
                 </View>
+                {/* Loop 24 P0 — Fang unvalidated-module warning badge.
+                    Mirrors the "Internal numerical inconsistency detected"
+                    banner pattern. Shows on the cover when any module was
+                    not reviewed (no review record) or had a double-empty
+                    review (review record exists but zero issues on all
+                    attempts). Founders must see this before the modules
+                    section so they know which modules are unvalidated. */}
+                {(() => {
+                    const unvalidated = data.modules.filter(
+                        (m) =>
+                            m.reviews.length === 0 ||
+                            m.reviews.every((r) => r.issues.length === 0),
+                    )
+                    if (unvalidated.length === 0) return null
+                    return (
+                        <View
+                            style={{
+                                marginTop: 14,
+                                padding: 10,
+                                backgroundColor: "#fee2e2",
+                                borderLeftWidth: 4,
+                                borderLeftColor: "#b91c1c",
+                                borderRadius: 3,
+                            }}
+                        >
+                            <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7f1d1d" }}>
+                                Engineering review incomplete — {unvalidated.length} module{unvalidated.length === 1 ? "" : "s"} not validated
+                            </Text>
+                            <Text style={{ fontSize: 9, color: "#7f1d1d", marginTop: 3 }}>
+                                {unvalidated.map((m) => m.name).join(", ")}
+                                {" "}— Fang did not complete a manufacturing review for these modules. Cost and mass figures for unvalidated modules are working estimates only. Re-run Fang before sharing this report with suppliers or investors.
+                            </Text>
+                        </View>
+                    )
+                })()}
             </View>
         </Page>
     )
@@ -1142,7 +1184,25 @@ const VERDICT_COLORS = {
     red: { bg: "#fee2e2", border: "#b91c1c", text: "#7f1d1d", label: "RED" },
     amber: { bg: "#fef3c7", border: "#b45309", text: "#7c2d12", label: "AMBER" },
     green: { bg: "#dcfce7", border: "#15803d", text: "#14532d", label: "GREEN" },
+    unreviewed: { bg: "#f3f4f6", border: "#6b7280", text: "#374151", label: "UNREVIEWED" },
 } as const
+
+/**
+ * Loop 24 P0 — Phantom-GREEN guard.
+ *
+ * A feasibility verdict with status="green" is only meaningful when the
+ * solver had real data to check (checkedConstraints non-empty). When every
+ * axis was null or trivially skipped, the engine had no inputs, and "no
+ * violations found" is vacuously true — not evidence of a passing design.
+ *
+ * Returns true when the verdict is GREEN but checkedConstraints is empty,
+ * indicating the solver ran but had nothing to evaluate. The PDF renders
+ * this as UNREVIEWED rather than GREEN.
+ */
+function isPhantomGreen(verdict: PdfInput["feasibilityVerdict"]): boolean {
+    if (!verdict) return false
+    return verdict.status === "green" && verdict.checkedConstraints.length === 0
+}
 
 /**
  * L13-P3 (2026-04-27): a "hard infeasibility" is when the verdict is red
@@ -1175,7 +1235,12 @@ function FeasibilityVerdictBanner({
 }: {
     verdict: NonNullable<PdfInput["feasibilityVerdict"]>
 }): React.ReactElement {
-    const c = VERDICT_COLORS[verdict.status]
+    // Loop 24 P0: phantom-GREEN is when the solver ran but had no inputs.
+    // Render as UNREVIEWED rather than GREEN so the founder does not
+    // treat the absence of fails as an approval signal.
+    const phantomGreen = verdict.status === "green" && verdict.checkedConstraints.length === 0
+    const colorKey: keyof typeof VERDICT_COLORS = phantomGreen ? "unreviewed" : verdict.status
+    const c = VERDICT_COLORS[colorKey]
     const blockerCount = verdict.fails.filter((f) => f.severity === "blocker").length
     const warnCount = verdict.fails.filter((f) => f.severity === "warning").length
     return (
@@ -1195,16 +1260,20 @@ function FeasibilityVerdictBanner({
                 Feasibility verdict: {c.label}
             </Text>
             <Text style={{ fontSize: 9, color: c.text, marginTop: 2 }}>
-                {blockerCount > 0
-                    ? `${blockerCount} blocker${blockerCount === 1 ? "" : "s"}`
-                    : ""}
-                {blockerCount > 0 && warnCount > 0 ? " · " : ""}
-                {warnCount > 0
+                {phantomGreen
+                    ? "Feasibility check ran but returned no findings — the solver had insufficient data (no dimension sheet, no brief cost ceiling, no parts mass). Treat as unreviewed, not approved."
+                    : blockerCount > 0
+                      ? `${blockerCount} blocker${blockerCount === 1 ? "" : "s"}`
+                      : ""}
+                {!phantomGreen && blockerCount > 0 && warnCount > 0 ? " · " : ""}
+                {!phantomGreen && warnCount > 0
                     ? `${warnCount} warning${warnCount === 1 ? "" : "s"}`
                     : ""}
-                {verdict.fails.length === 0
-                    ? "No constraint conflicts detected."
-                    : " — see Feasibility Exception page below."}
+                {!phantomGreen && verdict.fails.length === 0 && verdict.checkedConstraints.length > 0
+                    ? `No constraint conflicts detected. Constraints checked: ${verdict.checkedConstraints.join(", ")}.`
+                    : !phantomGreen && verdict.fails.length > 0
+                      ? " — see Feasibility Exception page below."
+                      : ""}
             </Text>
         </View>
     )
@@ -1215,19 +1284,19 @@ function FeasibilityExceptionPage({
 }: {
     verdict: NonNullable<PdfInput["feasibilityVerdict"]>
 }): React.ReactElement {
-    const c = VERDICT_COLORS[verdict.status]
+    // Loop 24 P0: phantom-GREEN renders as UNREVIEWED on this page.
+    const phantomGreen = verdict.status === "green" && verdict.checkedConstraints.length === 0
+    const colorKey: keyof typeof VERDICT_COLORS = phantomGreen ? "unreviewed" : verdict.status
+    const c = VERDICT_COLORS[colorKey]
     const blockers = verdict.fails.filter((f) => f.severity === "blocker")
     const warnings = verdict.fails.filter((f) => f.severity === "warning")
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>Feasibility exception</Text>
             <Text style={[styles.muted, { marginBottom: 10, fontSize: 9 }]}>
-                Before this report was assembled, the design was checked
-                against the brief constraints and against UK transport law.
-                The fails below are not opinions — each one is grounded in
-                numbers from the design itself (sizing solver, cost
-                waterfall, parts mass roll-up). Treat the downstream
-                sections as tentative until these are resolved.
+                {phantomGreen
+                    ? "The feasibility solver ran but had insufficient data to evaluate any constraint axis. This may indicate the dimension sheet was not generated, the brief has no cost ceiling, or the bill of materials has no parts with mass data. The downstream sections are present but unvalidated — treat all figures as working estimates until the solver can be re-run with complete inputs."
+                    : "Before this report was assembled, the design was checked against the brief constraints and against UK transport law. The fails below are not opinions — each one is grounded in numbers from the design itself (sizing solver, cost waterfall, parts mass roll-up). Treat the downstream sections as tentative until these are resolved."}
             </Text>
             <View
                 style={{
@@ -1243,7 +1312,13 @@ function FeasibilityExceptionPage({
             >
                 <Text style={{ fontSize: 10, fontWeight: "bold", color: c.text }}>
                     Status: {c.label}
+                    {phantomGreen ? " — insufficient solver inputs" : ""}
                 </Text>
+                {phantomGreen && (
+                    <Text style={{ fontSize: 9, color: c.text, marginTop: 3 }}>
+                        No constraint axes were checked. Re-run the proofreader once the dimension sheet, brief constraints, and bill-of-materials parts are populated.
+                    </Text>
+                )}
             </View>
             {blockers.length > 0 && (
                 <View style={{ marginBottom: 12 }}>
@@ -1437,7 +1512,14 @@ function BriefSection({ data }: { data: PdfInput }): React.ReactElement {
     return (
         <View>
             <Text style={styles.h2}>1. Brief</Text>
-            {data.feasibilityVerdict && data.feasibilityVerdict.status !== "green" && (
+            {/* Loop 24 P0: show the banner for non-green verdicts AND for
+                phantom-GREEN (solver ran, no checked constraints). Phantom-green
+                renders as UNREVIEWED rather than GREEN so founders do not treat
+                an empty-pass as an approval signal. */}
+            {data.feasibilityVerdict && (
+                data.feasibilityVerdict.status !== "green" ||
+                isPhantomGreen(data.feasibilityVerdict)
+            ) && (
                 <FeasibilityVerdictBanner verdict={data.feasibilityVerdict} />
             )}
             {/* ── Alternate envelope pushback callout (Loop 24 P0 class-fence) ──
@@ -2015,7 +2097,12 @@ function ModulePage({
                no engineering review, surface the gap so the customer
                knows it's missing rather than silently absent. Loop 13
                scoring (Hedgerow Camera + Battery — 2 of 3 highest-cost
-               modules — had no review). */}
+               modules — had no review).
+               Loop 24 P0: also catch the double-empty case where a review
+               record exists (reviews.length > 0) but has zero issues —
+               indicates Fang returned an empty result on both attempts and
+               the module was never actually validated. Render a hard RED
+               banner rather than the silent amber "no review" placeholder. */}
             {mod.reviews.length === 0 && (
                 <View
                     style={{
@@ -2031,6 +2118,28 @@ function ModulePage({
                     </Text>
                     <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 3 }}>
                         Fang did not produce a manufacturing or assembly review for this module. The other module pages carry [CRITICAL] / [WARNING] / [INFO] findings on tolerances, supplier risks, and sequence dependencies; this module is silent. Re-run Fang on this module before treating the cost / mass figures above as procurement-grade.
+                    </Text>
+                </View>
+            )}
+            {/* Loop 24 P0 — double-empty review: a review record exists but
+                every attempt returned zero issues. This is NOT a pass — it is
+                a validation failure. Render a hard RED banner so the founder
+                cannot mistake it for an approved module. */}
+            {mod.reviews.length > 0 && mod.reviews.every((r) => r.issues.length === 0) && (
+                <View
+                    style={{
+                        marginTop: 10,
+                        padding: 8,
+                        backgroundColor: "#fee2e2",
+                        borderLeftWidth: 3,
+                        borderLeftColor: "#b91c1c",
+                    }}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7f1d1d" }}>
+                        Engineering review failed to complete — this module has not been validated
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7f1d1d", marginTop: 3 }}>
+                        Fang returned a review record but produced no findings on any attempt. This is a pipeline validation failure, not a pass verdict. The module was not reviewed for DFM issues, tolerance risks, or assembly sequence problems. Do not treat the cost / mass figures above as procurement-grade. Re-run Fang on this module to obtain a real verdict.
                     </Text>
                 </View>
             )}
@@ -4281,8 +4390,16 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
                 reconciliation has alerts (the HAPS Loop 14 scenario:
                 green verdict, 11 spec mismatches surfaced on
                 Reconciliation page). Now fires on either signal so
-                the section presence is consistent across documents. */}
-            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_FEASIBILITY !== "1" && data.feasibilityVerdict && (data.feasibilityVerdict.status !== "green" || (data.reconciliation?.hasAlerts ?? false)) && (
+                the section presence is consistent across documents.
+                Loop 24 P0: also fires for phantom-GREEN (solver ran but
+                had no inputs to check — checkedConstraints empty). A
+                bare GREEN with no checked constraints is not an approval
+                signal and must be surfaced to the founder as UNREVIEWED. */}
+            {process.env.PDF_BISECT_MINIMAL !== "1" && process.env.PDF_SKIP_FEASIBILITY !== "1" && data.feasibilityVerdict && (
+                data.feasibilityVerdict.status !== "green" ||
+                (data.reconciliation?.hasAlerts ?? false) ||
+                isPhantomGreen(data.feasibilityVerdict)
+            ) && (
                 <FeasibilityExceptionPage verdict={data.feasibilityVerdict} />
             )}
 
@@ -5670,6 +5787,7 @@ async function exportProjectPdfInternal(
                           ran_at?: unknown
                           fails?: unknown
                           tradeoffs?: unknown
+                          checkedConstraints?: unknown
                       }
                     | null
                 if (!raw) return null
@@ -5695,6 +5813,13 @@ async function exportProjectPdfInternal(
                 const tradeoffs = Array.isArray(raw.tradeoffs)
                     ? raw.tradeoffs.filter((s): s is string => typeof s === "string")
                     : []
+                // Loop 24 P0: parse checkedConstraints from persisted JSONB.
+                // Older verdicts (pre-loop-24-fix) will have no checkedConstraints
+                // field — treat those as empty (phantom-GREEN eligible) so the
+                // guard still fires and forces UNREVIEWED display on legacy data.
+                const checkedConstraints = Array.isArray(raw.checkedConstraints)
+                    ? raw.checkedConstraints.filter((s): s is string => typeof s === "string")
+                    : []
                 return {
                     status,
                     ranAtIso:
@@ -5703,6 +5828,7 @@ async function exportProjectPdfInternal(
                             : new Date().toISOString(),
                     fails,
                     tradeoffs,
+                    checkedConstraints,
                 }
             })(),
             // ── Alternate envelope pushback (Loop 24 P0 class-fence) ───────────

@@ -325,7 +325,7 @@ async function runFangReviewInternal(
             )
 
             // 6. Invoke the existing specialist-review engine.
-            const reviewResult = await requestSpecialistReview({
+            const reviewRequest = {
                 projectId,
                 moduleId,
                 specialistId: SPECIALIST_ID,
@@ -334,7 +334,8 @@ async function runFangReviewInternal(
                 diagnosticAnswers: diagnosticAnswers ?? undefined,
                 projectSubject,
                 bomPartNumbersForModule,
-            }, trusted)
+            }
+            const reviewResult = await requestSpecialistReview(reviewRequest, trusted)
 
             if ("error" in reviewResult) {
                 await failPipelineRun(runId, "REVIEW_FAILED", reviewResult.error)
@@ -344,6 +345,64 @@ async function runFangReviewInternal(
                     error: reviewResult.error,
                     errorCode: "REVIEW_FAILED",
                 }
+            }
+
+            // 6b. Loop 24 P0 — empty-review guard + retry.
+            //
+            // An empty review (issues.length === 0) means Fang returned a
+            // verdict without a single finding — either the LLM skipped the
+            // structured output or the module genuinely has no DFM issues.
+            // The first case is much more common and is the root cause of the
+            // "Fang did not produce a review" placeholder pattern in Loop 24
+            // (Hedgerow / Vertical Farm / HAPS modules: electrical/control,
+            // CO₂ dosing, payload pods).
+            //
+            // GATE: retry once when issues is empty AND the verdict is not
+            // explicitly "pass" with a non-trivial summary. A second empty
+            // result after the retry triggers the hard RED banner on the
+            // module page via the `fangReviewIsEmpty` flag propagated into
+            // the PDF input. We do NOT save a second empty result — the first
+            // attempt's result (empty) is what we persist to preserve the
+            // audit trail; the PDF layer reads the issues count and applies
+            // the RED banner independently.
+            //
+            // NEVER substitute a fake review — only flag the gap so the PDF
+            // can surface it honestly.
+            let finalReview = reviewResult.review
+            let retryAttempted = false
+            if (
+                finalReview.issues.length === 0 &&
+                finalReview.verdict !== "pass"
+            ) {
+                console.info(
+                    `[run-fang-review] empty review detected for module=${moduleId} (verdict=${finalReview.verdict}, issues=0) — retrying once`,
+                )
+                retryAttempted = true
+                const retryResult = await requestSpecialistReview(reviewRequest, trusted)
+                if ("review" in retryResult && retryResult.review.issues.length > 0) {
+                    // Retry produced findings — use the retry result.
+                    finalReview = retryResult.review
+                    console.info(
+                        `[run-fang-review] retry succeeded: module=${moduleId} issues=${finalReview.issues.length}`,
+                    )
+                } else {
+                    // Both attempts empty — keep the first result for the audit
+                    // trail. The PDF layer will render the hard RED banner via
+                    // issues.length === 0 detection. Log for visibility.
+                    console.warn(
+                        `[run-fang-review] double-empty review for module=${moduleId} — PDF will show unvalidated-module RED banner`,
+                    )
+                }
+            }
+            // Attach retry metadata to the review for observability (non-schema
+            // extension — typed as any unknown field in the persistence path).
+            if (retryAttempted) {
+                // Attach as a non-schema annotation so the pipeline_runs
+                // output_ref can surface it. The SpecialistReview type does
+                // not have a retryMeta field; we cast through unknown.
+                ;(finalReview as unknown as Record<string, unknown>)["_retryAttempted"] = true
+                ;(finalReview as unknown as Record<string, unknown>)["_retryProducedFindings"] =
+                    finalReview.issues.length > 0
             }
 
             // 7. Persist the review directly via the admin client.
@@ -369,7 +428,7 @@ async function runFangReviewInternal(
                 projectId,
                 moduleId,
                 foundryId,
-                reviewResult.review,
+                finalReview,
             )
             if (!saveOk) {
                 await failPipelineRun(
@@ -527,13 +586,17 @@ async function runFangReviewInternal(
                     table: "cad_lab_projects",
                     column: "reviews",
                     moduleId,
-                    verdict: reviewResult.review.verdict,
-                    issueCount: reviewResult.review.issues.length,
-                    reviewTimeMs: reviewResult.review.reviewTimeMs,
+                    verdict: finalReview.verdict,
+                    issueCount: finalReview.issues.length,
+                    reviewTimeMs: finalReview.reviewTimeMs,
                     cascadeApplied,
                     cascadePending,
                     patchesEmitted,
                     patchesApplied,
+                    // Loop 24 P0: surface retry metadata so ops can track
+                    // how often modules need a second attempt.
+                    retryAttempted,
+                    doubleEmpty: retryAttempted && finalReview.issues.length === 0,
                 },
             })
 
@@ -541,7 +604,7 @@ async function runFangReviewInternal(
                 ok: true,
                 runId,
                 moduleId,
-                verdict: reviewResult.review.verdict,
+                verdict: finalReview.verdict,
             }
         } catch (err) {
             const message = err instanceof Error ? err.message : "Unknown review error"
