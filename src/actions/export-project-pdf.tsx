@@ -65,6 +65,7 @@ import {
     isModuleRiskMatrixBoilerplate,
     repairRiskRowFromContext,
 } from "@/lib/risk/boilerplate-detect"
+import { computeFeasibilityVerdict as computeFeasibilityVerdictFn } from "@/lib/feasibility/compute-verdict"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -691,6 +692,15 @@ interface PartRow {
     estimatedUnitCostGbp: number | null
     isPurchased: boolean
     description: string | null
+    /**
+     * A1 — Loop 26 Tier-A fix.
+     * Cost provenance from the `parts.cost_provenance` column
+     * (added in migration 20260429300000_parts_cost_provenance.sql).
+     * Values: "quoted" | "parametric" | "placeholder" | "todo" | null.
+     * Null means the column predates the migration or was never set —
+     * treat the same as "placeholder" for badge-render purposes.
+     */
+    costProvenance: "quoted" | "parametric" | "placeholder" | "todo" | null
 }
 
 interface SupplierPdf {
@@ -860,7 +870,7 @@ interface PdfInput {
         status: "green" | "amber" | "red"
         ranAtIso: string
         fails: Array<{
-            axis: "envelope" | "mass" | "cost" | "transport" | "suppliers"
+            axis: "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow"
             severity: "blocker" | "warning"
             summary: string
             evidence: string
@@ -1226,7 +1236,7 @@ function isHardInfeasible(
     return verdict.fails.some(
         (f) =>
             f.severity === "blocker" &&
-            (f.axis === "envelope" || f.axis === "mass" || f.axis === "transport"),
+            (f.axis === "envelope" || f.axis === "mass" || f.axis === "transport" || f.axis === "spatial_overflow"),
     )
 }
 
@@ -1504,6 +1514,8 @@ function axisLabel(axis: NonNullable<PdfInput["feasibilityVerdict"]>["fails"][nu
             return "Transport (UK)"
         case "suppliers":
             return "Supplier coverage"
+        case "spatial_overflow":
+            return "Spatial plan — envelope overflow"
     }
 }
 
@@ -2356,22 +2368,46 @@ function BomMasterPage({
                                 <Text style={[styles.tableCell, { width: 38, textAlign: "right", paddingRight: 8 }]}>
                                     {p.massKg != null ? `${p.massKg.toFixed(2)}kg` : "—"}
                                 </Text>
-                                <Text style={[styles.tableCell, { width: 56, textAlign: "right", paddingRight: 12 }]}>
+                                <View style={[styles.tableCell, { width: 56, textAlign: "right", paddingRight: 4, alignItems: "flex-end" }]}>
+                                    {/* A1 — Loop 26 Tier-A: cost-provenance badge inline in BOM row */}
                                     {(() => {
-                                        // L15-P3: prefer the original cost; if null, show
-                                        // parametric estimate with a "(p)" tag and a slightly
-                                        // muted colour so the founder can see it's an
-                                        // engine-assigned fallback rather than a quote.
-                                        if (p.estimatedUnitCostGbp != null && p.estimatedUnitCostGbp > 0) {
-                                            return fmtGbp(p.estimatedUnitCostGbp)
+                                        // Provenance-aware cost display. Precedence:
+                                        //   1. cost_provenance column (post-migration rows).
+                                        //   2. L15-P3 parametric fallback lookup (legacy rows).
+                                        const prov = p.costProvenance
+                                        if (prov === "placeholder" || prov === "todo") {
+                                            return (
+                                                <View style={{ alignItems: "flex-end" }}>
+                                                    <Text style={{ fontSize: 7.5, color: "#b91c1c", fontWeight: "bold" }}>No quote yet</Text>
+                                                </View>
+                                            )
                                         }
+                                        if (prov === "parametric") {
+                                            return (
+                                                <View style={{ alignItems: "flex-end" }}>
+                                                    <Text style={{ fontSize: 8 }}>{fmtGbp(p.estimatedUnitCostGbp)}</Text>
+                                                    <Text style={{ fontSize: 7, color: "#b45309", fontWeight: "bold" }}>Parametric ±30%</Text>
+                                                </View>
+                                            )
+                                        }
+                                        // prov === "quoted" or null (legacy / pre-migration) —
+                                        // render the cost value normally.
+                                        if (p.estimatedUnitCostGbp != null && p.estimatedUnitCostGbp > 0) {
+                                            return <Text style={{ fontSize: 8 }}>{fmtGbp(p.estimatedUnitCostGbp)}</Text>
+                                        }
+                                        // Last resort: L15-P3 parametric fallback (legacy rows
+                                        // that predate cost_provenance column).
                                         const fb = parametricByPartNumber.get(p.partNumber)
                                         if (fb && fb.estimatedUnitCostGbp != null) {
-                                            return `${fmtGbp(fb.estimatedUnitCostGbp)}*`
+                                            return (
+                                                <View style={{ alignItems: "flex-end" }}>
+                                                    <Text style={{ fontSize: 8 }}>{fmtGbp(fb.estimatedUnitCostGbp)}*</Text>
+                                                </View>
+                                            )
                                         }
-                                        return fmtGbp(null)
+                                        return <Text style={{ fontSize: 8 }}>{fmtGbp(null)}</Text>
                                     })()}
-                                </Text>
+                                </View>
                                 <Text style={[styles.tableCell, { flex: 1.6, paddingLeft: 8 }]}>
                                     {supplierLabel}
                                 </Text>
@@ -2512,6 +2548,96 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
                     </Text>
                 </View>
             </View>
+
+            {/* A1 — Loop 26 Tier-A fix: cost-provenance section header
+                and stat tiles split into quoted vs estimated when any
+                non-quoted rows exist. The per-module roll-up below reads
+                from parts.estimated_unit_cost_gbp regardless of provenance,
+                so this panel surfaces the quote quality so founders know
+                how load-bearing the total is before sharing with investors. */}
+            {(() => {
+                const allParts = data.parts
+                const placeholderOrTodo = allParts.filter(
+                    (p) => p.costProvenance === "placeholder" || p.costProvenance === "todo",
+                )
+                const parametric = allParts.filter((p) => p.costProvenance === "parametric")
+                const hasAnyNonQuoted = placeholderOrTodo.length > 0 || parametric.length > 0
+                if (!hasAnyNonQuoted) return null
+
+                // Compute quoted total vs estimated total. Rows with null provenance
+                // are treated as "quoted" for conservative accounting (they may be
+                // legacy rows where the column predates the migration).
+                let quotedTotal = 0
+                let estimatedTotal = 0
+                for (const p of allParts) {
+                    const c = p.estimatedUnitCostGbp ?? 0
+                    if (p.costProvenance === "placeholder" || p.costProvenance === "todo") {
+                        estimatedTotal += 0 // unquoted rows contribute £0 to quoted total
+                    } else if (p.costProvenance === "parametric") {
+                        estimatedTotal += c
+                    } else {
+                        quotedTotal += c
+                        estimatedTotal += c
+                    }
+                }
+                const total = data.cost.unitTotalGbp ?? (quotedTotal + estimatedTotal)
+                const quotedPct = total > 0 ? ((quotedTotal / total) * 100).toFixed(0) : "0"
+
+                return (
+                    <View style={{ marginBottom: 10 }} wrap={false}>
+                        {/* Unquoted-placeholder callout — shown above the roll-up when
+                            any placeholder / todo rows exist. The callout lists how
+                            many rows are unquoted and what fraction of cost is confirmed. */}
+                        {placeholderOrTodo.length > 0 && (
+                            <View
+                                style={{
+                                    marginBottom: 8,
+                                    padding: 8,
+                                    backgroundColor: "#fee2e2",
+                                    borderLeftWidth: 3,
+                                    borderLeftColor: "#b91c1c",
+                                    borderRadius: 3,
+                                }}
+                            >
+                                <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7f1d1d" }}>
+                                    {placeholderOrTodo.length} of {allParts.length} bill-of-materials rows are unquoted placeholders. Quoted cost £{fmtGbp(quotedTotal)} represents {quotedPct}% of estimated build cost.
+                                </Text>
+                                <Text style={{ fontSize: 9, color: "#7f1d1d", marginTop: 3 }}>
+                                    Rows with a "No quote yet" badge below are placeholders — their cost is £0 in the roll-up, which understates the total. Resolve before sharing with contract manufacturers or investors.
+                                </Text>
+                            </View>
+                        )}
+                        {/* Parametric-estimate callout — shown when parametric rows exist. */}
+                        {parametric.length > 0 && (
+                            <View
+                                style={{
+                                    marginBottom: 8,
+                                    padding: 8,
+                                    backgroundColor: "#fef3c7",
+                                    borderLeftWidth: 3,
+                                    borderLeftColor: "#b45309",
+                                    borderRadius: 3,
+                                }}
+                            >
+                                <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7c2d12" }}>
+                                    {parametric.length} bill-of-materials row{parametric.length === 1 ? "" : "s"} carry parametric estimates (±30% accuracy). Treat as planning-grade, not procurement-grade.
+                                </Text>
+                            </View>
+                        )}
+                        {/* Split stat tiles: quoted total + estimated total */}
+                        <View style={styles.statRow}>
+                            <View style={styles.stat}>
+                                <Text style={styles.statLabel}>Quoted total</Text>
+                                <Text style={styles.statValue}>{fmtGbp(quotedTotal)}</Text>
+                            </View>
+                            <View style={styles.stat}>
+                                <Text style={styles.statLabel}>Estimated total (incl. parametric)</Text>
+                                <Text style={styles.statValue}>{fmtGbp(estimatedTotal)}</Text>
+                            </View>
+                        </View>
+                    </View>
+                )
+            })()}
 
             <Text style={styles.h3}>Per-module roll-up</Text>
             <View style={styles.table}>
@@ -4244,9 +4370,45 @@ function SpatialPlanSection({
         </View>
     )
 
+    // A3 — Loop 26 Tier-A fix: detect overflow notes and render a red
+    // banner at the top of the section so the founder cannot miss it.
+    const OVERFLOW_NOTE_RE = /overflows?\s+envelope\s+by\s+([\d,]+)\s*mm/i
+    const overflowAnnotations = (plan.notes ?? []).filter((n) => OVERFLOW_NOTE_RE.test(n))
+    const hasOverflow = overflowAnnotations.length > 0
+
     return (
         <View>
             {header}
+            {/* A3 — spatial overflow banner. Rendered before the drawing so
+                the founder meets the failure before the diagram, not after.
+                Do NOT suppress the drawing — the plan is still useful for
+                diagnosing which module is too large. */}
+            {hasOverflow && (
+                <View
+                    style={{
+                        marginTop: 8,
+                        marginBottom: 8,
+                        padding: 10,
+                        backgroundColor: "#fee2e2",
+                        borderLeftWidth: 4,
+                        borderLeftColor: "#b91c1c",
+                        borderRadius: 3,
+                    }}
+                    wrap={false}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7f1d1d" }}>
+                        Spatial plan does not fit briefed envelope — placements exceed enclosure.
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7f1d1d", marginTop: 3 }}>
+                        The layout engine flagged overflow(s) below. Treat all downstream dimensions, costs, and supplier shortlists as tentative until the brief envelope or module dimensions are revised to resolve the conflicts.
+                    </Text>
+                    {overflowAnnotations.slice(0, 4).map((n, i) => (
+                        <Text key={`ov-${i}`} style={{ fontSize: 8.5, color: "#7f1d1d", marginTop: 2 }}>
+                            • {n}
+                        </Text>
+                    ))}
+                </View>
+            )}
             {plan.placements.length === 0 && (
                 <View
                     style={{
@@ -5057,7 +5219,7 @@ async function exportProjectPdfInternal(
         const { data: partsRaw } = await admin
             .from("parts")
             .select(
-                "part_number, name, description, source_module_id, process, material, material_spec, finish, tolerance, mass_kg, estimated_unit_cost_gbp, is_purchased",
+                "part_number, name, description, source_module_id, process, material, material_spec, finish, tolerance, mass_kg, estimated_unit_cost_gbp, is_purchased, cost_provenance",
             )
             .eq("cad_lab_project_id", projectId)
             .order("part_number", { ascending: true })
@@ -5089,6 +5251,14 @@ async function exportProjectPdfInternal(
                         : toFiniteOrNull(p.estimated_unit_cost_gbp),
                 isPurchased: Boolean(p.is_purchased),
                 description: typeof p.description === "string" ? p.description : null,
+                // A1 — cost_provenance column (migration 20260429300000).
+                // Validate against the closed set; anything unrecognised is
+                // treated as null (no badge, same as legacy rows).
+                costProvenance: (["quoted", "parametric", "placeholder", "todo"] as const).includes(
+                    p.cost_provenance as "quoted" | "parametric" | "placeholder" | "todo",
+                )
+                    ? (p.cost_provenance as "quoted" | "parametric" | "placeholder" | "todo")
+                    : null,
             }
         })
 
@@ -5196,6 +5366,62 @@ async function exportProjectPdfInternal(
         })
         let unitTotalGbp = 0
         for (const v of dedupedRollUp.effectiveCost) unitTotalGbp += v
+
+        // A2 — Loop 26 Tier-A fix: stat-tile sanity check.
+        //
+        // The cover-page "Unit cost" stat tile reads from `unitTotalGbp`
+        // (the deduped parts-table roll-up). The feasibility verdict's
+        // cost-axis evidence string was computed at pipeline time by
+        // `computeFeasibilityVerdict`, which uses a different cost source
+        // (Finn ai_cost_estimates roll-up, falling back to raw parts sum
+        // WITHOUT the dedup pass). When the BOM is updated after the
+        // verdict is persisted, the two sources diverge — BESS Loop 24
+        // showed £852,064 on the cover tile and £274,483 in the feasibility
+        // exception (same project, two different cost computation paths).
+        //
+        // Canonical source for the stat tile: `unitTotalGbp` (deduped
+        // parts-table roll-up). This is the value the cover tile,
+        // BOM master, and reconciliation gate all read from — the single
+        // source of truth in this render.
+        //
+        // When the persisted verdict's cost fail evidence references a
+        // significantly different number (>5% gap), log the inconsistency
+        // so it surfaces in Vercel logs and can be caught by the
+        // loop-critique. The verdict evidence is NOT retroactively fixed
+        // (it is a JSONB value from a previous pipeline run); the
+        // stat tile continues to read the canonical value.
+        if (project.feasibility_verdict && unitTotalGbp > 0) {
+            const persistedVerdict = project.feasibility_verdict as {
+                fails?: Array<{ axis?: unknown; evidence?: unknown }>
+            }
+            const costFail = Array.isArray(persistedVerdict.fails)
+                ? persistedVerdict.fails.find((f) => f.axis === "cost")
+                : null
+            if (costFail && typeof costFail.evidence === "string") {
+                // Extract the numeric value from the evidence string.
+                // Evidence format: "£N,NNN estimated vs £N,NNN ceiling — ..."
+                const firstGbpMatch = /£([\d,]+)/.exec(costFail.evidence)
+                if (firstGbpMatch) {
+                    const verdictCost = parseFloat(firstGbpMatch[1].replace(/,/g, ""))
+                    if (Number.isFinite(verdictCost) && verdictCost > 0) {
+                        const gap = Math.abs(unitTotalGbp - verdictCost) / verdictCost
+                        if (gap > 0.05) {
+                            console.warn(
+                                "[pdf-stats] internal inconsistency: tile=unit_cost " +
+                                "tile_value=" + Math.round(unitTotalGbp) + " " +
+                                "canonical=" + Math.round(unitTotalGbp) + " " +
+                                "verdict_evidence=" + Math.round(verdictCost) + " " +
+                                "gap_pct=" + (gap * 100).toFixed(1) + "% " +
+                                "project=" + projectId + ". " +
+                                "Cover tile uses canonical (deduped parts roll-up); " +
+                                "feasibility exception uses stale pipeline-time value. " +
+                                "Re-run the proofreader to re-compute the verdict against the current BOM.",
+                            )
+                        }
+                    }
+                }
+            }
+        }
 
         // Suppliers shortlist — join to global directory for HQ.
         // L13-P4 (2026-04-27): drop rows where the LLM matching pass
@@ -5887,8 +6113,78 @@ async function exportProjectPdfInternal(
                 const checkedConstraints = Array.isArray(raw.checkedConstraints)
                     ? raw.checkedConstraints.filter((s): s is string => typeof s === "string")
                     : []
+
+                // A3 — Loop 26 Tier-A fix: spatial overflow hard fail.
+                //
+                // At render time, scan the spatial plan notes for overflow
+                // annotations produced by the layout engine. When a placement
+                // overflows the envelope by more than 5% of the envelope's
+                // maximum dimension, inject a "spatial_overflow" BLOCKER fail
+                // into the in-memory verdict so the PDF renders a RED badge
+                // and the FeasibilityExceptionPage lists the overflow.
+                //
+                // We do NOT write this back to the DB — that would require
+                // a proofreader re-run. The injection is PDF-render-time only.
+                // When the proofreader next runs, `computeFeasibilityVerdict`
+                // will be called with spatialPlanNotes and will persist the
+                // verdict including the spatial_overflow axis natively.
+                const spatialPlanForVerdict = (project.spatial_plan ?? null) as import("@/lib/layout/types").SpatialPlan | null
+                if (
+                    spatialPlanForVerdict &&
+                    Array.isArray(spatialPlanForVerdict.notes) &&
+                    spatialPlanForVerdict.notes.length > 0
+                ) {
+                    const cvFn = computeFeasibilityVerdictFn
+                    const env = spatialPlanForVerdict.envelope
+                    // Re-run a spatial-only verdict check with the plan notes.
+                    // The other axes are set to null so they don't double-count;
+                    // we only want the spatial_overflow axis from this call.
+                    const spatialOnlyVerdict = cvFn({
+                        dimensionSheet: null,
+                        briefConstraints: null,
+                        parts: [],
+                        aiCostEstimates: null,
+                        shortlistCount: 0,
+                        bomRowCount: 0,
+                        spatialPlanNotes: spatialPlanForVerdict.notes,
+                        spatialPlanEnvelopeDimensions: env
+                            ? {
+                                  interior_w_mm: typeof env.interior_w_mm === "number" ? env.interior_w_mm : 1_000,
+                                  interior_d_mm: typeof env.interior_d_mm === "number" ? env.interior_d_mm : 1_000,
+                                  interior_h_mm: typeof env.interior_h_mm === "number" ? env.interior_h_mm : 1_000,
+                              }
+                            : null,
+                    })
+                    const overflowFails = spatialOnlyVerdict.fails.filter((f) => f.axis === "spatial_overflow")
+                    if (overflowFails.length > 0) {
+                        // Inject spatial_overflow fails into the verdict.
+                        // De-duplicate: skip if the persisted verdict already
+                        // has a spatial_overflow axis (unlikely but defensive).
+                        for (const f of overflowFails) {
+                            if (!fails.some((existing) => existing.axis === "spatial_overflow")) {
+                                fails.push(f as typeof fails[number])
+                            }
+                        }
+                        if (!checkedConstraints.includes("spatial_overflow")) {
+                            checkedConstraints.push("spatial_overflow")
+                        }
+                        // Promote status to red if not already red.
+                        if (status !== "red") {
+                            (raw as { status?: unknown }).status = "red"
+                        }
+                    }
+                }
+
+                // Recompute status after potential spatial_overflow injection.
+                const hasBlockerAfterInjection = fails.some((f) => f.severity === "blocker")
+                const finalStatus: "red" | "amber" | "green" = hasBlockerAfterInjection
+                    ? "red"
+                    : fails.length > 0
+                      ? "amber"
+                      : "green"
+
                 return {
-                    status,
+                    status: finalStatus,
                     ranAtIso:
                         typeof raw.ran_at === "string"
                             ? raw.ran_at

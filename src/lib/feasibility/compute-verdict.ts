@@ -33,7 +33,7 @@
  */
 
 export type VerdictStatus = "green" | "amber" | "red"
-export type VerdictAxis = "envelope" | "mass" | "cost" | "transport" | "suppliers"
+export type VerdictAxis = "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow"
 export type VerdictSeverity = "blocker" | "warning"
 
 export interface VerdictFail {
@@ -80,6 +80,29 @@ export interface VerdictInput {
     shortlistCount: number
     /** Number of BOM rows (so coverage threshold scales) */
     bomRowCount: number
+    /**
+     * Notes from the spatial plan that may contain overflow annotations.
+     * The layout engine writes "Port-side row overflows envelope by Nmm"
+     * style notes when a placement does not fit the declared envelope.
+     * When present, the verdict checks for overflow exceeding 5% of the
+     * relevant envelope dimension and, when found, adds a blocker fail
+     * on the "spatial_overflow" axis. This wires the spatial plan's own
+     * overflow detection into the governing feasibility verdict rather
+     * than silently emitting a note alongside a GREEN or AMBER badge.
+     *
+     * A3 — Loop 26 Tier-A fix.
+     */
+    spatialPlanNotes?: string[] | null
+    /**
+     * Envelope dimensions for the spatial plan (mm), used to compute the
+     * 5% overflow threshold in the spatial_overflow check. Supply from
+     * SpatialPlan.envelope when spatialPlanNotes is non-null.
+     */
+    spatialPlanEnvelopeDimensions?: {
+        interior_w_mm: number
+        interior_d_mm: number
+        interior_h_mm: number
+    } | null
 }
 
 /** UK 44-tonne articulated lorry legal payload, in kilograms. Beyond this,
@@ -194,6 +217,71 @@ export function computeFeasibilityVerdict(
                         "Above this the load is abnormal indivisible — STGO Category 2: marker boards, 2 days police notice, specialised heavy haulage.",
                 })
             }
+        }
+    }
+
+    // ── Spatial plan overflow ───────────────────────────────────────
+    //
+    // A3 — Loop 26 Tier-A fix.
+    //
+    // The layout engine writes notes like:
+    //   "Port-side row overflows envelope by 38914mm — consider ..."
+    // when a placement does not fit the declared envelope. Previously
+    // the note appeared on the spatial plan page alongside a GREEN or
+    // AMBER feasibility verdict — a 19.2m rack visibly outside a 10m
+    // envelope was not flagged as a blocker. This check:
+    //   1. Scans spatial plan notes for overflow annotations.
+    //   2. Extracts the overflow magnitude in mm.
+    //   3. Compares it to 5% of the largest envelope dimension.
+    //   4. When exceeded, adds a BLOCKER fail on "spatial_overflow" so
+    //      the verdict is RED and the PDF renders accordingly.
+    //
+    // Threshold: 5% of the maximum envelope dimension (w/d/h). This
+    // admits small rounding artefacts (a few mm on a 3m envelope is
+    // 150mm headroom) while catching gross physical impossibilities
+    // like the 38914mm overflow on a 10000mm envelope.
+    const SPATIAL_OVERFLOW_THRESHOLD_FRACTION = 0.05
+    if (Array.isArray(input.spatialPlanNotes) && input.spatialPlanNotes.length > 0) {
+        // The envelope threshold defaults to a generous 1m when dimensions
+        // are not supplied — callers must pass dimensions for accurate checks.
+        const envMax = input.spatialPlanEnvelopeDimensions
+            ? Math.max(
+                  input.spatialPlanEnvelopeDimensions.interior_w_mm,
+                  input.spatialPlanEnvelopeDimensions.interior_d_mm,
+                  input.spatialPlanEnvelopeDimensions.interior_h_mm,
+              )
+            : 1_000
+        const threshold = envMax * SPATIAL_OVERFLOW_THRESHOLD_FRACTION
+
+        // Parse overflow notes — pattern: "overflows envelope by Nmm"
+        // The layout engine writes this in natural language; extract
+        // the mm value with a lenient regex that handles spaces and commas.
+        const OVERFLOW_RE = /overflows?\s+envelope\s+by\s+([\d,]+)\s*mm/i
+        let maxOverflowMm = 0
+        const overflowNotes: string[] = []
+        for (const note of input.spatialPlanNotes) {
+            const m = OVERFLOW_RE.exec(note)
+            if (m) {
+                const mm = parseFloat(m[1].replace(/,/g, ""))
+                if (Number.isFinite(mm) && mm > maxOverflowMm) {
+                    maxOverflowMm = mm
+                }
+                overflowNotes.push(note.trim())
+            }
+        }
+
+        if (maxOverflowMm > threshold) {
+            checkedConstraints.push("spatial_overflow")
+            fails.push({
+                axis: "spatial_overflow",
+                severity: "blocker",
+                summary: `Spatial plan does not fit the briefed envelope — maximum overflow is ${Math.round(maxOverflowMm).toLocaleString("en-GB")} mm.`,
+                evidence:
+                    `The layout engine flagged placement(s) that exceed the declared envelope ` +
+                    `(${Math.round(envMax).toLocaleString("en-GB")} mm) by ${Math.round(maxOverflowMm).toLocaleString("en-GB")} mm ` +
+                    `(${((maxOverflowMm / envMax) * 100).toFixed(0)}% of the envelope). ` +
+                    `Spatial plan notes: ${overflowNotes.slice(0, 3).join(" | ")}`,
+            })
         }
     }
 
