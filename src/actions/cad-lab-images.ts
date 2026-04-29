@@ -642,12 +642,6 @@ export async function generateVisualStyleAction(
   documentContext?: string,
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping visual style generation")
-      return { error: "ANTHROPIC_API_KEY not configured" }
-    }
-
     const moduleList = modules.map((m) => `- ${m.name}: ${m.purpose}`).join("\n")
     const researchContext = researchExcerpt ? `\n\nResearch excerpt:\n${researchExcerpt}` : ""
     const docContext = documentContext
@@ -655,61 +649,22 @@ export async function generateVisualStyleAction(
       : ""
     const userMessage = `Product: ${subject}\n\nModules:\n${moduleList}${researchContext}${docContext}`
 
-    // INTENT: When user-uploaded reference images are available, build multimodal
-    // content so Claude can SEE the sketches while crafting visual style prompts.
-    // Cap at 3 images for token budget.
-    let messageContent: unknown
-    if (referenceImageUrls && referenceImageUrls.length > 0) {
-      const imageBlocks: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = []
-      for (const url of referenceImageUrls.slice(0, 3)) {
-        try {
-          const res = await fetch(url)
-          if (!res.ok) continue
-          const buf = Buffer.from(await res.arrayBuffer())
-          const contentType = res.headers.get("content-type") || "image/png"
-          imageBlocks.push({
-            type: "image",
-            source: { type: "base64", media_type: contentType, data: buf.toString("base64") },
-          })
-        } catch { /* Skip failed fetches */ }
-      }
-      if (imageBlocks.length > 0) {
-        messageContent = [...imageBlocks, { type: "text", text: userMessage }]
-      } else {
-        messageContent = userMessage
-      }
-    } else {
-      messageContent = userMessage
-    }
-
     try {
-      const response = await fetchWithTimeout(
-        "https://api.anthropic.com/v1/messages",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: "claude-sonnet-4-6",
-            max_tokens: 4096,
-            system: getDesignSynthesisPrompt(),
-            messages: [{ role: "user", content: messageContent }],
-          }),
-        },
-        60_000,
-      )
+      const { callOpenRouter } = await import("@/lib/ai/openrouter")
+      const orResult = await callOpenRouter({
+        model: "deepseek/deepseek-v4-flash",
+        system: getDesignSynthesisPrompt(),
+        prompt: userMessage,
+        maxTokens: 4096,
+        timeoutMs: 60_000,
+      })
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error("[CAD-LAB-IMAGES] Visual style API error:", { status: response.status, body: errText.slice(0, 200) })
-        return { error: `API error (${response.status})` }
+      if (!orResult.ok) {
+        console.error("[CAD-LAB-IMAGES] Visual style OpenRouter error:", orResult.error)
+        return { error: orResult.error }
       }
 
-      const data = await response.json()
-      const text = data.content?.[0]?.text ?? ""
+      const text = orResult.text
 
       // Parse JSON — strip any markdown fences the model might add
       const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
@@ -800,42 +755,24 @@ export async function generateProductIdentityAction(
   researchReport: string,
 ): Promise<{ visualStyle: Partial<VisualStyleSpec> } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping product identity")
-      return { error: "ANTHROPIC_API_KEY not configured" }
-    }
-
     const userMessage = `Product: ${subject}\n\nResearch Report:\n${researchReport}`
 
     try {
-      const response = await fetchWithTimeout(
-        "https://api.anthropic.com/v1/messages",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: "claude-opus-4-7",
-            max_tokens: 4096,
-            system: getProductIdentityPrompt(),
-            messages: [{ role: "user", content: userMessage }],
-          }),
-        },
-        60_000,
-      )
+      const { callOpenRouter } = await import("@/lib/ai/openrouter")
+      const orResult = await callOpenRouter({
+        model: "deepseek/deepseek-v4-pro",
+        system: getProductIdentityPrompt(),
+        prompt: userMessage,
+        maxTokens: 4096,
+        timeoutMs: 60_000,
+      })
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error("[CAD-LAB-IMAGES] Product identity API error:", { status: response.status, body: errText.slice(0, 200) })
-        return { error: `API error (${response.status})` }
+      if (!orResult.ok) {
+        console.error("[CAD-LAB-IMAGES] Product identity OpenRouter error:", orResult.error)
+        return { error: orResult.error ?? "OpenRouter error" }
       }
 
-      const data = await response.json()
-      const text = data.content?.[0]?.text ?? ""
+      const text = orResult.text
 
       const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
       const parsed = JSON.parse(jsonStr) as Partial<VisualStyleSpec>
@@ -882,12 +819,6 @@ export async function generateDesignSynthesisAction(
   referenceImageUrls?: string[],
 ): Promise<{ visualStyle: VisualStyleSpec } | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping design synthesis")
-      return { error: "ANTHROPIC_API_KEY not configured" }
-    }
-
     const moduleList = modules.map((m) =>
       `### ${m.name}\n- Purpose: ${m.purpose}\n- Description: ${m.description}\n- Key Parts: ${m.keyParts.join(", ")}\n- Inputs: ${m.inputs.join(", ")}\n- Outputs: ${m.outputs.join(", ")}`
     ).join("\n\n")
@@ -900,57 +831,22 @@ export async function generateDesignSynthesisAction(
 
     const userMessage = `Product: ${subject}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}`
 
-    // INTENT: Multimodal content with reference images for better visual style generation
-    let messageContent: unknown
-    if (referenceImageUrls && referenceImageUrls.length > 0) {
-      const imageBlocks: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = []
-      for (const url of referenceImageUrls.slice(0, 3)) {
-        try {
-          const res = await fetch(url)
-          if (!res.ok) continue
-          const buf = Buffer.from(await res.arrayBuffer())
-          const contentType = res.headers.get("content-type") || "image/png"
-          imageBlocks.push({
-            type: "image",
-            source: { type: "base64", media_type: contentType, data: buf.toString("base64") },
-          })
-        } catch { /* Skip failed fetches */ }
-      }
-      messageContent = imageBlocks.length > 0
-        ? [...imageBlocks, { type: "text", text: userMessage }]
-        : userMessage
-    } else {
-      messageContent = userMessage
-    }
-
     try {
-      const response = await fetchWithTimeout(
-        "https://api.anthropic.com/v1/messages",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: "claude-opus-4-7",
-            max_tokens: 4096,
-            system: getDesignSynthesisPrompt(),
-            messages: [{ role: "user", content: messageContent }],
-          }),
-        },
-        60_000,
-      )
+      const { callOpenRouter } = await import("@/lib/ai/openrouter")
+      const orResult = await callOpenRouter({
+        model: "deepseek/deepseek-v4-pro",
+        system: getDesignSynthesisPrompt(),
+        prompt: userMessage,
+        maxTokens: 4096,
+        timeoutMs: 60_000,
+      })
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error("[CAD-LAB-IMAGES] Design synthesis API error:", { status: response.status, body: errText.slice(0, 200) })
-        return { error: `API error (${response.status})` }
+      if (!orResult.ok) {
+        console.error("[CAD-LAB-IMAGES] Design synthesis OpenRouter error:", orResult.error)
+        return { error: orResult.error ?? "OpenRouter error" }
       }
 
-      const data = await response.json()
-      const text = data.content?.[0]?.text ?? ""
+      const text = orResult.text
 
       // Parse JSON — strip any markdown fences
       const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
@@ -1011,12 +907,6 @@ export async function reconcileDesignAction(
   illustrationStyle: IllustrationStyle = DEFAULT_ILLUSTRATION_STYLE,
 ): Promise<ReconciliationResult | { error: string }> {
   return withAIGate('cad_lab_images', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) {
-      console.warn("[CAD-LAB-IMAGES] No ANTHROPIC_API_KEY — skipping reconciliation")
-      return { error: "ANTHROPIC_API_KEY not configured" }
-    }
-
     const moduleList = modules.map((m) =>
       `### ${m.name} (id: ${m.id})\n- Purpose: ${m.purpose}\n- Description: ${m.description}\n- Key Parts: ${m.keyParts.join(", ")}\n- Inputs: ${m.inputs.join(", ")}\n- Outputs: ${m.outputs.join(", ")}`
     ).join("\n\n")
@@ -1031,14 +921,6 @@ export async function reconcileDesignAction(
       ? `\n\nProduct Design Identity:\n- Design Language: ${productIdentity.designLanguage ?? "not established"}\n- Consistency Brief: ${productIdentity.consistencyBrief ?? "not established"}\n- Spatial Principles: ${productIdentity.spatialPrinciples?.join(", ") ?? "not established"}\n- Color Palette: ${productIdentity.colorPalette ?? "not established"}\n- Material Rendering: ${productIdentity.materialRendering ?? "not established"}`
       : ""
 
-    // INTENT: Expose mirror-pair relationships to Opus so the MIRROR PAIR SYMMETRY
-    // rule in getDesignReconciliationPrompt() can actually fire. Previously the
-    // reconciliation prompt asked Opus to "assign the IDENTICAL prompt text to
-    // BOTH module IDs in perModuleImagePrompts" for mirror pairs, but the
-    // user-message never told Opus which modules were mirrors — so it treated
-    // Left Wing and Right Wing as independent modules and produced different
-    // colour/cell-layout directives for each, leaking into the hero as an
-    // asymmetric two-tone aircraft.
     const modulesById = new Map(modules.map((m) => [m.id, m]))
     const mirrorLines = modules
       .filter((m) => m.mirrorOf && modulesById.has(m.mirrorOf))
@@ -1047,49 +929,27 @@ export async function reconcileDesignAction(
       ? `\n\n## Mirror Pair Relationships (CRITICAL for symmetry)\nThe following modules are mirror pairs. Per the MIRROR PAIR SYMMETRY rule, assign IDENTICAL perModuleImagePrompts entries to each mirror pair, and ensure colourPalette decisions treat them as a single logical part (same colour, same material, same cell layout):\n${mirrorLines.join("\n")}`
       : ""
 
-    // INTENT: Project-level illustration style. Injected after mirror context so
-    // Opus treats it as the terminal visual contract — blueprint vs photoreal
-    // vs isometric vector radically change the heroImagePrompt + perModule
-    // prompts Opus writes. Default 'blueprint' preserves the historical output.
     const styleDirectives = getStyleDirectivesForReconciliation(illustrationStyle)
 
     const userMessage = `Product: ${subject}${identityContext}\n\n## Expanded Modules\n\n${moduleList}${connectionList}${researchContext}${mirrorContext}${styleDirectives}`
 
     try {
-      const response = await fetchWithTimeout(
-        "https://api.anthropic.com/v1/messages",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
-          },
-          body: JSON.stringify({
-            model: "claude-opus-4-7",
-            max_tokens: 16384,
-            // GOTCHA: Pass the project's illustration_style so the schema's
-            // heroImagePrompt + perModuleImagePrompts rendering contract is
-            // swapped at the system-prompt level rather than merely appended
-            // via the user-message directives (which Opus was blending into
-            // a blueprint-with-style-flavour compromise).
-            system: getDesignReconciliationPrompt(illustrationStyle),
-            messages: [{ role: "user", content: userMessage }],
-          }),
-        },
-        // GOTCHA: 90s and 120s both timed out for 8 modules with per-module prompts
-        // (16384 tokens structured JSON output). 240s needed. Still fits Vercel 300s cap.
-        240_000,
-      )
+      const { callOpenRouter } = await import("@/lib/ai/openrouter")
+      // DeepSeek caps max_tokens at 8192
+      const orResult = await callOpenRouter({
+        model: "deepseek/deepseek-v4-pro",
+        system: getDesignReconciliationPrompt(illustrationStyle),
+        prompt: userMessage,
+        maxTokens: 8192,
+        timeoutMs: 240_000,
+      })
 
-      if (!response.ok) {
-        const errText = await response.text()
-        console.error("[CAD-LAB-IMAGES] Reconciliation API error:", { status: response.status, body: errText.slice(0, 200) })
-        return { error: `API error (${response.status})` }
+      if (!orResult.ok) {
+        console.error("[CAD-LAB-IMAGES] Reconciliation OpenRouter error:", orResult.error)
+        return { error: orResult.error ?? "OpenRouter error" }
       }
 
-      const data = await response.json()
-      const text = data.content?.[0]?.text ?? ""
+      const text = orResult.text
 
       const jsonStr = text.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
       const parsed = JSON.parse(jsonStr) as {
