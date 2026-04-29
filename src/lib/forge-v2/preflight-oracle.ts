@@ -412,7 +412,7 @@ function checkHaps(input: BriefInput, haystack: string): CheckResult {
     const blockers: PreflightBlocker[] = []
     const warnings: PreflightWarning[] = []
 
-    let payloadKg: number = input.designBrief?.payloadKg ?? NaN
+    const payloadKg: number = input.designBrief?.payloadKg ?? NaN
     let wingspanM: number = input.designBrief?.wingspanM ?? NaN
     if (isNaN(wingspanM)) wingspanM = parseWingspanM(haystack)
 
@@ -483,7 +483,7 @@ function checkHaps(input: BriefInput, haystack: string): CheckResult {
     return { blockers, warnings }
 }
 
-function checkHydroponic(input: BriefInput, haystack: string): CheckResult {
+function checkHydroponic(input: BriefInput, _haystack: string): CheckResult {
     const blockers: PreflightBlocker[] = []
     const warnings: PreflightWarning[] = []
 
