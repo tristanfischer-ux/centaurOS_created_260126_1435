@@ -1505,39 +1505,36 @@ export async function searchInvestors(
   const _telemetryStart = Date.now()
   const baseResult = await searchInvestorsCore(filters)
 
-  // Caller opt-out: directory browse path, filter pickers etc. don't need
-  // the LLM-enriched output. Skip the auth + generation round-trip.
-  if (filters.skipMatchEnrichment) {
-    return baseResult
-  }
-
-  // Resolve user + tier so we know whether to enrich.
+  // Resolve user + foundry up front so Phase A.5 telemetry runs on EVERY
+  // path, including the `skipMatchEnrichment` opt-out used by the investor
+  // deck-search client. Without this, the deck-search call site never
+  // received a `searchQueryLogId`, so every downstream click on a result
+  // card bailed at the `if (!searchQueryLogId) return` guard, and 0 rows
+  // landed in `search_click_log`. Bug found 2026-04-29.
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) {
-    // Anonymous searches are not logged (RLS would reject); telemetry is
-    // user-scoped only. The wrapper still returns firms-only as before.
-    return { ...baseResult, resolvedTier: 'anonymous' }
-  }
 
   let foundryId: string | null = null
-  try {
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('foundry_id')
-      .eq('id', user.id)
-      .maybeSingle()
-    foundryId = profile?.foundry_id ?? null
-  } catch {
-    foundryId = null
+  if (user) {
+    try {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('foundry_id')
+        .eq('id', user.id)
+        .maybeSingle()
+      foundryId = profile?.foundry_id ?? null
+    } catch {
+      foundryId = null
+    }
   }
 
   // Phase A.5 instrumentation. Fail-open: never block on telemetry.
   // Skip when there is no query at all (filter-only browse) — the value
-  // signal is in actual user queries, not "load page" baselines.
+  // signal is in actual user queries, not "load page" baselines. Also
+  // skipped for anonymous callers because RLS requires profile_id.
   let searchQueryLogId: string | undefined
   const trimmedQuery = (filters.query ?? '').trim()
-  if (trimmedQuery.length > 0) {
+  if (user && trimmedQuery.length > 0) {
     const logId = await logSearchQuery({
       supabase,
       profileId: user.id,
@@ -1557,6 +1554,18 @@ export async function searchInvestors(
       },
     })
     searchQueryLogId = logId ?? undefined
+  }
+
+  // Caller opt-out: directory browse path, filter pickers etc. don't need
+  // the LLM-enriched output. Skip the auth + generation round-trip — but
+  // still return the queryLogId so the client can wire click telemetry.
+  if (filters.skipMatchEnrichment) {
+    return { ...baseResult, searchQueryLogId }
+  }
+
+  if (!user) {
+    // Anonymous searches do not get tier resolution or enrichment.
+    return { ...baseResult, resolvedTier: 'anonymous' }
   }
 
   const access = await getInvestorTierAccess()
