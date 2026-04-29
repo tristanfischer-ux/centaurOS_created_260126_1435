@@ -440,7 +440,7 @@ export function InvestorDataPanorama({ firm }: Props) {
             <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">
               {s.title}
             </h4>
-            <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+            <dl className="flex flex-col gap-y-3">
               {s.items.map((item, i) => (
                 <div key={i} className="border-l-2 border-border pl-3">
                   <dt className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">

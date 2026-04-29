@@ -124,10 +124,10 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
             {/* Header - Matches Strategic Objectives style exactly */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3">
                 <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-3 mb-1">
+                    <div className="flex flex-wrap items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
-                        <Badge 
-                            variant="secondary" 
+                        <Badge
+                            variant="secondary"
                             className={cn(
                                 "uppercase text-[10px] tracking-wider font-semibold",
                                 getCategoryBadgeClasses(category as MarketplaceCategory)
@@ -229,9 +229,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {/* Main content */}
-                <div className="lg:col-span-2 space-y-4">
+            <div className="space-y-4">
                     {/* Description */}
                     <section>
                         <h2 className="text-lg font-semibold text-foreground mb-2">About</h2>
@@ -239,6 +237,14 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                             {listing.description}
                         </p>
                     </section>
+
+                    {/* Key Details — previously in right-rail sidebar, now inline */}
+                    <KeyDetailsInline category={category} attrs={attrs} />
+
+                    {/* Location Map */}
+                    {(attrs.ch_registered_address || attrs.location) && (
+                        <CompanyLocationMap address={String(attrs.ch_registered_address || attrs.location)} />
+                    )}
 
                     {/* Category-specific sections */}
                     {category === 'People' && <PeopleSection attrs={attrs} />}
@@ -260,6 +266,17 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                     {/* Companies House info (directors, PSC, SIC codes) — only for non-People listings */}
                     {category !== 'People' && <CompanyInfoSection attrs={attrs} />}
 
+                    {/* Trust & Credentials Section */}
+                    {(trustSignals || ratings) && (
+                        <ProviderTrustSection
+                            ratingSummary={ratings?.summary}
+                            reviews={ratings?.reviews || []}
+                            badges={trustSignals?.badges || []}
+                            certifications={trustSignals?.certifications || []}
+                            portfolio={trustSignals?.portfolio || []}
+                        />
+                    )}
+
                     {/* Fractional Executives */}
                     {executives.length > 0 && (
                         <ExecutivesDisplay executives={executives} />
@@ -274,35 +291,89 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                         initialReviews={reviews}
                         currentUserId={currentUserId}
                     />
-                </div>
-
-                {/* Sidebar */}
-                <div className="space-y-4">
-                    {/* Key Metrics */}
-                    <KeyMetricsCard category={category} attrs={attrs} />
-
-                    {/* Location Map */}
-                    {(attrs.ch_registered_address || attrs.location) && (
-                        <CompanyLocationMap address={String(attrs.ch_registered_address || attrs.location)} />
-                    )}
-
-                    {/* Trust & Credentials Section */}
-                    {(trustSignals || ratings) && (
-                        <ProviderTrustSection
-                            ratingSummary={ratings?.summary}
-                            reviews={ratings?.reviews || []}
-                            badges={trustSignals?.badges || []}
-                            certifications={trustSignals?.certifications || []}
-                            portfolio={trustSignals?.portfolio || []}
-                        />
-                    )}
-                </div>
             </div>
         </div>
     )
 }
 
-// Key Metrics Card
+// KeyDetailsInline — same data as the old sidebar KeyMetricsCard, but rendered
+// inline as a single-column section so the layout stays one-column everywhere.
+function KeyDetailsInline({ category, attrs }: { category: string; attrs: Record<string, any> }) {
+    const metrics: { label: string; value: any; icon: React.ReactNode }[] = []
+
+    if (category === 'People') {
+        if (attrs.rate) metrics.push({ label: 'Rate', value: attrs.rate, icon: <PoundSterling className="h-4 w-4" /> })
+        if (attrs.years_experience) metrics.push({ label: 'Experience', value: `${attrs.years_experience} years`, icon: <Briefcase className="h-4 w-4" /> })
+        if (attrs.projects_completed) metrics.push({ label: 'Projects', value: attrs.projects_completed, icon: <CheckCircle2 className="h-4 w-4" /> })
+        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
+    } else if (category === 'Products') {
+        if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <PoundSterling className="h-4 w-4" /> })
+        if (attrs.lead_time) metrics.push({ label: 'Lead Time', value: attrs.lead_time, icon: <Timer className="h-4 w-4" /> })
+        if (attrs.moq) metrics.push({ label: 'MOQ', value: attrs.moq, icon: <Package className="h-4 w-4" /> })
+        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
+    } else if (category === 'Services') {
+        if (attrs.rate || attrs.pricing) metrics.push({ label: 'Rate', value: attrs.rate || attrs.pricing, icon: <PoundSterling className="h-4 w-4" /> })
+        if (attrs.turnaround) metrics.push({ label: 'Turnaround', value: attrs.turnaround, icon: <Clock className="h-4 w-4" /> })
+        if (attrs.capacity) metrics.push({ label: 'Capacity', value: attrs.capacity, icon: <Gauge className="h-4 w-4" /> })
+        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
+    }
+
+    // CH data — only for non-People listings
+    if (category !== 'People') {
+        if (attrs.ch_company_status) metrics.push({ label: 'Status', value: String(attrs.ch_company_status).replace(/\b\w/g, (c: string) => c.toUpperCase()), icon: <CheckCircle2 className="h-4 w-4" /> })
+        if (attrs.ch_company_number) metrics.push({ label: 'CH Number', value: attrs.ch_company_number, icon: <Building2 className="h-4 w-4" /> })
+        if (attrs.ch_incorporation_date) {
+            const date = new Date(attrs.ch_incorporation_date)
+            if (!isNaN(date.getTime())) {
+                metrics.push({ label: 'Incorporated', value: date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), icon: <Calendar className="h-4 w-4" /> })
+            }
+        }
+        if (attrs.ch_company_size) metrics.push({ label: 'Size', value: attrs.ch_company_size, icon: <Users className="h-4 w-4" /> })
+        if (attrs.ch_company_type) metrics.push({ label: 'Type', value: attrs.ch_company_type, icon: <Layers className="h-4 w-4" /> })
+        if (!metrics.some(m => m.label === 'Location') && attrs.ch_registered_address) {
+            metrics.push({ label: 'Address', value: attrs.ch_registered_address, icon: <MapPin className="h-4 w-4" /> })
+        }
+        if (attrs.website_url) metrics.push({ label: 'Website', value: attrs.website_url, icon: <ExternalLink className="h-4 w-4" /> })
+    }
+
+    if (metrics.length === 0) return null
+
+    return (
+        <section>
+            <h2 className="text-lg font-semibold text-foreground mb-3">Company Details</h2>
+            <Card>
+                <CardContent className="pt-4 space-y-3">
+                    {metrics.map((metric, idx) => (
+                        <div key={idx} className="flex items-start justify-between py-1 border-b border-border/40 last:border-0">
+                            <div className="flex items-center gap-2 text-muted-foreground">
+                                {metric.icon}
+                                <span className="text-sm">{metric.label}</span>
+                            </div>
+                            {metric.label === 'Website' && typeof metric.value === 'string' && isURL(metric.value) ? (
+                                <a
+                                    href={metric.value}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
+                                >
+                                    {new URL(metric.value).hostname.replace(/^www\./, '')}
+                                    <ExternalLink className="h-3 w-3" />
+                                </a>
+                            ) : (
+                                <span className="text-sm font-semibold text-foreground text-right max-w-[60%]">
+                                    {metric.value}
+                                </span>
+                            )}
+                        </div>
+                    ))}
+                </CardContent>
+            </Card>
+        </section>
+    )
+}
+
+// Key Metrics Card — kept for any future re-use but no longer rendered.
+// The sidebar layout that hosted it has been removed; use KeyDetailsInline instead.
 function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<string, any> }) {
     const metrics: { label: string; value: any; icon: React.ReactNode }[] = []
 
@@ -440,51 +511,57 @@ function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
 function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
     return (
         <div className="space-y-4">
-            {/* Certifications */}
-            {attrs.certifications && (
+            {/* Certifications — only render when there are actual entries */}
+            {Array.isArray(attrs.certifications) && attrs.certifications.length > 0 && (
                 <section>
                     <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Award className="h-5 w-5" />
                         Certifications
                     </h2>
-                    {(() => {
-                        const certs = safeStringArray(attrs.certifications)
-                        return certs.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                                {certs.map((cert, i) => (
-                                    <Badge key={i} variant="secondary" className="bg-status-success-light text-status-success-dark">
-                                        {cert}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground">{String(attrs.certifications)}</p>
-                        )
-                    })()}
+                    <div className="flex flex-wrap gap-2">
+                        {safeStringArray(attrs.certifications).map((cert, i) => (
+                            <Badge key={i} variant="secondary" className="bg-status-success-light text-status-success-dark">
+                                {cert}
+                            </Badge>
+                        ))}
+                    </div>
+                </section>
+            )}
+            {/* Non-array certifications (plain string) */}
+            {attrs.certifications && !Array.isArray(attrs.certifications) && (
+                <section>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                        <Award className="h-5 w-5" />
+                        Certifications
+                    </h2>
+                    <p className="text-muted-foreground">{String(attrs.certifications)}</p>
                 </section>
             )}
 
-            {/* Capabilities */}
-            {attrs.capabilities && (
+            {/* Capabilities — only render when there are actual entries */}
+            {Array.isArray(attrs.capabilities) && attrs.capabilities.length > 0 && (
                 <section>
                     <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Wrench className="h-5 w-5" />
                         Capabilities
                     </h2>
-                    {(() => {
-                        const caps = safeStringArray(attrs.capabilities)
-                        return caps.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                                {caps.map((cap, i) => (
-                                    <Badge key={i} variant="secondary">
-                                        {cap}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground">{String(attrs.capabilities)}</p>
-                        )
-                    })()}
+                    <div className="flex flex-wrap gap-2">
+                        {safeStringArray(attrs.capabilities).map((cap, i) => (
+                            <Badge key={i} variant="secondary">
+                                {cap}
+                            </Badge>
+                        ))}
+                    </div>
+                </section>
+            )}
+            {/* Non-array capabilities (plain string) */}
+            {attrs.capabilities && !Array.isArray(attrs.capabilities) && (
+                <section>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                        <Wrench className="h-5 w-5" />
+                        Capabilities
+                    </h2>
+                    <p className="text-muted-foreground">{String(attrs.capabilities)}</p>
                 </section>
             )}
         </div>
@@ -495,51 +572,57 @@ function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
 function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
     return (
         <div className="space-y-4">
-            {/* Specialty */}
-            {attrs.specialty && (
+            {/* Specialty — only render when there are actual entries */}
+            {Array.isArray(attrs.specialty) && attrs.specialty.length > 0 && (
                 <section>
                     <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Target className="h-5 w-5" />
                         Specialty
                     </h2>
-                    {(() => {
-                        const specs = safeStringArray(attrs.specialty)
-                        return specs.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                                {specs.map((spec, i) => (
-                                    <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
-                                        {spec}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground">{String(attrs.specialty)}</p>
-                        )
-                    })()}
+                    <div className="flex flex-wrap gap-2">
+                        {safeStringArray(attrs.specialty).map((spec, i) => (
+                            <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
+                                {spec}
+                            </Badge>
+                        ))}
+                    </div>
+                </section>
+            )}
+            {/* Non-array specialty (plain string) */}
+            {attrs.specialty && !Array.isArray(attrs.specialty) && (
+                <section>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                        <Target className="h-5 w-5" />
+                        Specialty
+                    </h2>
+                    <p className="text-muted-foreground">{String(attrs.specialty)}</p>
                 </section>
             )}
 
-            {/* Focus Areas */}
-            {attrs.focus_areas && (
+            {/* Focus Areas — only render when there are actual entries */}
+            {Array.isArray(attrs.focus_areas) && attrs.focus_areas.length > 0 && (
                 <section>
                     <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
                         <Users className="h-5 w-5" />
                         Focus Areas
                     </h2>
-                    {(() => {
-                        const areas = safeStringArray(attrs.focus_areas)
-                        return areas.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                                {areas.map((area, i) => (
-                                    <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
-                                        {area}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground">{String(attrs.focus_areas)}</p>
-                        )
-                    })()}
+                    <div className="flex flex-wrap gap-2">
+                        {safeStringArray(attrs.focus_areas).map((area, i) => (
+                            <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
+                                {area}
+                            </Badge>
+                        ))}
+                    </div>
+                </section>
+            )}
+            {/* Non-array focus areas (plain string) */}
+            {attrs.focus_areas && !Array.isArray(attrs.focus_areas) && (
+                <section>
+                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
+                        <Users className="h-5 w-5" />
+                        Focus Areas
+                    </h2>
+                    <p className="text-muted-foreground">{String(attrs.focus_areas)}</p>
                 </section>
             )}
         </div>
@@ -588,6 +671,15 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
     }
     const longText = (v: unknown): React.ReactNode | null => {
         if (v == null || v === '' || v === false) return null
+        // If the value is an object (not array), try to extract a text field; otherwise hide it
+        if (typeof v === 'object' && !Array.isArray(v)) {
+            const obj = v as Record<string, unknown>
+            const textValue = obj.summary ?? obj.text ?? obj.description ?? obj.content ?? null
+            if (textValue == null || textValue === '') return null
+            return <p className="text-sm leading-relaxed text-foreground">{String(textValue)}</p>
+        }
+        // Arrays should not be rendered via longText — hide them to avoid "[object Object]" / "[]"
+        if (Array.isArray(v)) return null
         return <p className="text-sm leading-relaxed text-foreground">{String(v)}</p>
     }
 
@@ -845,7 +937,7 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
                 {sections.map((s) => (
                     <div key={s.title}>
                         <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{s.title}</h4>
-                        <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-3">
+                        <dl className="flex flex-col gap-y-3">
                             {s.items.map((item, i) => (
                                 <div key={i} className="border-l-2 border-border pl-3">
                                     <dt className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</dt>
