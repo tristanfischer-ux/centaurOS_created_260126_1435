@@ -645,21 +645,22 @@ function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
     // Parse attributes JSONB so we can surface fields stored there
     const attrs = safeParseAttributes(listing.attributes)
 
+    // Strings that look like empty serialised data and should be hidden
+    const JUNK_STRINGS = new Set(['[]', '{}', 'null', 'undefined', ''])
+
     const arrChips = (arr: unknown): React.ReactNode | null => {
         if (!Array.isArray(arr) || arr.length === 0) return null
-        return (
-            <div className="flex flex-wrap gap-1.5">
-                {(arr as unknown[]).map((v, i) => {
-                    const text = typeof v === 'string' ? v : (v as { name?: string })?.name ?? JSON.stringify(v)
-                    if (!text) return null
-                    return (
-                        <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground">
-                            {text}
-                        </span>
-                    )
-                })}
-            </div>
-        )
+        const chips = (arr as unknown[]).map((v, i) => {
+            const text = typeof v === 'string' ? v : (v as { name?: string })?.name ?? JSON.stringify(v)
+            if (!text || JUNK_STRINGS.has(text.trim())) return null
+            return (
+                <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground">
+                    {text}
+                </span>
+            )
+        }).filter(Boolean)
+        if (chips.length === 0) return null
+        return <div className="flex flex-wrap gap-1.5">{chips}</div>
     }
     const text = (v: unknown): React.ReactNode | null => {
         if (v == null || v === '' || v === false) return null
