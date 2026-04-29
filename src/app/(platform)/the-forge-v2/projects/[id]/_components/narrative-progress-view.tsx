@@ -140,7 +140,13 @@ export function NarrativeProgressView({
     )
 
     return (
-        <div className="space-y-8">
+        // INTENT: min-h-0 + pb-16 ensure the content within the platform's
+        // overflow-y-auto MainContentArea always extends naturally. The outer
+        // platform layout uses `flex h-screen overflow-hidden` so the
+        // MainContentArea div is the real scroll container. `pb-16` gives
+        // enough breathing room at the bottom so the last card is never
+        // clipped by the fixed mobile nav or layout padding.
+        <div className="space-y-8 pb-16">
             {/* ── Heading ─────────────────────────────────────────────── */}
             <header className="space-y-2">
                 <h1 className="text-3xl font-semibold tracking-tight">

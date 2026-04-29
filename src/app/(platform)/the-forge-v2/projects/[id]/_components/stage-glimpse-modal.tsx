@@ -94,7 +94,7 @@ export function StageGlimpseModal({
                 </DialogHeader>
 
                 <div className="space-y-4 pt-2">
-                    {/* Done: show outcome summary + detail */}
+                    {/* Done: show outcome summary + structured stage artefacts */}
                     {stageState === "done" && (
                         <>
                             {outcomeSummary && (
@@ -108,13 +108,36 @@ export function StageGlimpseModal({
                             <p className="text-sm text-muted-foreground leading-relaxed">
                                 {narrative.narrative}
                             </p>
-                            {outcomeDetail && (
+                            {outcomeDetail ? (
                                 <div className="rounded-lg border bg-muted/30 px-4 py-3">
-                                    <p className="text-xs font-medium text-foreground mb-1">
-                                        From this stage
+                                    <p className="text-xs font-semibold text-foreground mb-2 uppercase tracking-wide">
+                                        What came out of this stage
                                     </p>
-                                    <p className="text-sm text-muted-foreground leading-relaxed whitespace-pre-line">
-                                        {outcomeDetail}
+                                    {/* Render each newline-separated line as its own row for legibility */}
+                                    <ul className="space-y-1">
+                                        {outcomeDetail.split("\n").map((line, i) => {
+                                            const trimmed = line.trim()
+                                            if (!trimmed) return null
+                                            // Section header lines (no leading number or bullet, ends with ":")
+                                            if (trimmed.endsWith(":")) {
+                                                return (
+                                                    <li key={i} className="text-xs font-semibold text-foreground mt-2 first:mt-0">
+                                                        {trimmed}
+                                                    </li>
+                                                )
+                                            }
+                                            return (
+                                                <li key={i} className="text-sm text-muted-foreground leading-relaxed">
+                                                    {trimmed}
+                                                </li>
+                                            )
+                                        })}
+                                    </ul>
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-dashed bg-muted/10 px-4 py-3">
+                                    <p className="text-xs text-muted-foreground italic">
+                                        No detailed artefacts recorded for this stage yet — refresh the page to pick up the latest data.
                                     </p>
                                 </div>
                             )}

@@ -142,6 +142,15 @@ export const STAGE_NARRATIVES: Record<AutopilotStage, StageNarrative> = {
         inFlight: "",
         narrative: "The autopilot stopped because a stage exhausted its retries. The most recent error is in the project's autopilot state.",
     },
+    solver_error: {
+        // v1.6 (2026-04-29 Loop 24): terminal stage set when the sizing solver
+        // returns INFEASIBLE after all retries. Projects in this state need a
+        // brief revision before the pipeline can continue.
+        // Placeholder to satisfy Record<AutopilotStage, ...> exhaustiveness.
+        label: "Sizing could not find a feasible configuration",
+        inFlight: "",
+        narrative: "The engineering solver could not find a configuration that fits inside the brief's envelope and cost ceiling. The most useful next step is to revise the brief — adjust the target scale, cost ceiling, or physical constraints — and start a fresh run.",
+    },
 }
 
 /**

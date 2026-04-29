@@ -150,11 +150,13 @@ export function ProgressTimeline({
                                     if (isClickable) setGlimpseStage(stage)
                                 }}
                                 className={cn(
-                                    "relative z-10 w-full text-left flex gap-4 py-3 px-1 rounded-lg transition-colors",
+                                    "relative z-10 w-full text-left flex gap-4 py-3 px-1 rounded-lg transition-all duration-150",
                                     isClickable
                                         ? "cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                                         : "cursor-default",
                                     stageState === "pending" && "opacity-40",
+                                    // Active stage: left accent ring to visually anchor "this is the current stage"
+                                    stageState === "active" && "bg-orange-50/60 ring-1 ring-international-orange/20 ring-inset rounded-lg pl-2",
                                 )}
                                 aria-label={
                                     isClickable
@@ -169,7 +171,19 @@ export function ProgressTimeline({
 
                                 {/* Content column */}
                                 <div className="flex-1 min-w-0 pb-1">
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        {/* Stage number prefix — lets the founder map "Stage 11 of 12" in the
+                                            header to the correct card without having to count rows manually. */}
+                                        <span
+                                            className={cn(
+                                                "text-[10px] font-semibold tabular-nums shrink-0 min-w-[44px]",
+                                                stageState === "pending"
+                                                    ? "text-muted-foreground/50"
+                                                    : "text-muted-foreground",
+                                            )}
+                                        >
+                                            Stage {idx + 1}
+                                        </span>
                                         <p
                                             className={cn(
                                                 "text-sm font-medium leading-snug",

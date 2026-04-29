@@ -236,15 +236,19 @@ export async function GET(
             // attempting to read data that hasn't been written yet.
             const completedSet = new Set<string>(completedStages)
 
-            // Supplier count — needed for matching_suppliers outcome
+            // Supplier count + shortlist — needed for matching_suppliers outcome + detail
             let supplierCount = 0
+            let supplierRows: Array<{ supplier_name: string; supplier_type: string | null; verification_tier: string | null; country: string | null }> = []
             if (completedSet.has("matching_suppliers")) {
                 try {
-                    const { count } = await admin
+                    const { count, data: suppData } = await admin
                         .from("forge_supplier_shortlist")
-                        .select("id", { count: "exact", head: true })
+                        .select("supplier_name, supplier_type, verification_tier, country", { count: "exact" })
                         .eq("project_id", projectId)
+                        .order("best_match_score", { ascending: false })
+                        .limit(5)
                     supplierCount = count ?? 0
+                    supplierRows = (suppData ?? []) as typeof supplierRows
                 } catch {
                     // non-fatal
                 }
@@ -289,38 +293,62 @@ export async function GET(
                 stageOutcomes.locking_brief = "Brief locked as a structured engineering specification"
                 if (research?.designBrief) {
                     const brief = research.designBrief as Record<string, unknown>
-                    const parts = [
-                        typeof brief.quantityTarget === "string" ? `Quantity: ${brief.quantityTarget}` : null,
-                        typeof brief.geographyTarget === "string" ? `Market: ${brief.geographyTarget}` : null,
-                    ].filter(Boolean)
+                    const parts: string[] = []
+                    if (typeof brief.quantityTarget === "string" && brief.quantityTarget.trim()) {
+                        parts.push(`Quantity target: ${brief.quantityTarget.trim()}`)
+                    }
+                    if (typeof brief.geographyTarget === "string" && brief.geographyTarget.trim()) {
+                        parts.push(`Geography: ${brief.geographyTarget.trim()}`)
+                    }
+                    if (typeof brief.marketSegment === "string" && brief.marketSegment.trim()) {
+                        parts.push(`Market segment: ${brief.marketSegment.trim()}`)
+                    }
+                    if (typeof (brief as Record<string, unknown>).targetUnitCostGbp === "number") {
+                        const ceiling = (brief as Record<string, unknown>).targetUnitCostGbp as number
+                        parts.push(`Cost ceiling: £${ceiling.toLocaleString("en-GB")}`)
+                    }
                     if (parts.length > 0) stageDetails.locking_brief = parts.join("\n")
                 }
             }
 
-            // waiting_max — module count
+            // waiting_max — module count + names
             if (completedSet.has("waiting_max") && modules.length > 0) {
                 stageOutcomes.waiting_max = `${modules.length} module${modules.length !== 1 ? "s" : ""} identified`
                 const moduleNames = modules
-                    .slice(0, 6)
                     .map(m => typeof m.name === "string" ? m.name : "")
                     .filter(Boolean)
                 if (moduleNames.length > 0) {
-                    stageDetails.waiting_max = moduleNames.join(", ") +
-                        (modules.length > 6 ? ` + ${modules.length - 6} more` : "")
+                    stageDetails.waiting_max = moduleNames
+                        .map((name, i) => `${i + 1}. ${name}`)
+                        .join("\n")
                 }
             }
 
-            // waiting_sizing
+            // waiting_sizing — module count + key parts summary
             if (completedSet.has("waiting_sizing") && modules.length > 0) {
                 stageOutcomes.waiting_sizing = `${modules.length} module${modules.length !== 1 ? "s" : ""} sized against the brief`
+                const moduleLines = modules
+                    .map(m => {
+                        const name = typeof m.name === "string" ? m.name : ""
+                        const kp = m.keyParts as unknown[]
+                        const partCount = Array.isArray(kp) ? kp.length : 0
+                        return name ? `${name} — ${partCount} part${partCount !== 1 ? "s" : ""}` : null
+                    })
+                    .filter(Boolean)
+                if (moduleLines.length > 0) {
+                    stageDetails.waiting_sizing = moduleLines.join("\n")
+                }
             }
 
             // waiting_layout
             if (completedSet.has("waiting_layout")) {
                 stageOutcomes.waiting_layout = "Physical layout confirmed — no clashes"
+                if (modules.length > 0) {
+                    stageDetails.waiting_layout = `${modules.length} module${modules.length !== 1 ? "s" : ""} placed inside the envelope with no spatial conflicts.`
+                }
             }
 
-            // waiting_bom — part count
+            // waiting_bom — part count + module breakdown
             if (completedSet.has("waiting_bom") && modules.length > 0) {
                 const partCount = modules.reduce((acc, m) => {
                     const kp = m.keyParts as unknown[]
@@ -329,9 +357,20 @@ export async function GET(
                 stageOutcomes.waiting_bom = partCount > 0
                     ? `${partCount} part${partCount !== 1 ? "s" : ""} across ${modules.length} module${modules.length !== 1 ? "s" : ""}`
                     : "Bill of materials drafted"
+                const bomLines = modules
+                    .map(m => {
+                        const name = typeof m.name === "string" ? m.name : ""
+                        const kp = m.keyParts as unknown[]
+                        const pc = Array.isArray(kp) ? kp.length : 0
+                        return name ? `${name}: ${pc} part${pc !== 1 ? "s" : ""}` : null
+                    })
+                    .filter(Boolean)
+                if (bomLines.length > 0) {
+                    stageDetails.waiting_bom = bomLines.join("\n")
+                }
             }
 
-            // waiting_finn — total cost
+            // waiting_finn — total cost + module breakdown
             if (completedSet.has("waiting_finn") && costEstimates) {
                 const rows = Object.values(costEstimates)
                 const totalCost = rows.reduce((acc, row) => {
@@ -339,13 +378,28 @@ export async function GET(
                     return acc + val
                 }, 0)
                 if (totalCost > 0) {
-                    const formatted = totalCost >= 1_000_000
-                        ? `£${(totalCost / 1_000_000).toFixed(2)}M`
-                        : totalCost >= 1_000
-                            ? `£${(totalCost / 1_000).toFixed(0)}k`
-                            : `£${totalCost.toFixed(0)}`
-                    stageOutcomes.waiting_finn = `Unit cost rolled up: ${formatted}`
-                    stageDetails.waiting_finn = `Total per unit: ${formatted} across ${rows.length} module${rows.length !== 1 ? "s" : ""}`
+                    const fmt = (n: number): string =>
+                        n >= 1_000_000
+                            ? `£${(n / 1_000_000).toFixed(2)}M`
+                            : n >= 1_000
+                                ? `£${(n / 1_000).toFixed(0)}k`
+                                : `£${n.toFixed(0)}`
+                    stageOutcomes.waiting_finn = `Unit cost rolled up: ${fmt(totalCost)}`
+                    const detailLines: string[] = [`Total per unit: ${fmt(totalCost)}`]
+                    // Module-level cost lines where available
+                    const moduleNameMap: Record<string, string> = {}
+                    for (const m of modules) {
+                        if (typeof m.id === "string" && typeof m.name === "string") {
+                            moduleNameMap[m.id] = m.name
+                        }
+                    }
+                    for (const [moduleId, row] of Object.entries(costEstimates)) {
+                        if (typeof row?.totalPerUnit === "number" && row.totalPerUnit > 0) {
+                            const name = moduleNameMap[moduleId] ?? moduleId
+                            detailLines.push(`  ${name}: ${fmt(row.totalPerUnit)}`)
+                        }
+                    }
+                    stageDetails.waiting_finn = detailLines.join("\n")
                 } else {
                     stageOutcomes.waiting_finn = "Cost waterfall complete"
                 }
@@ -354,28 +408,45 @@ export async function GET(
             // generating_illustration
             if (completedSet.has("generating_illustration")) {
                 stageOutcomes.generating_illustration = "Hero illustration generated for the report cover"
+                stageDetails.generating_illustration = "A cover illustration of the product has been generated and will appear on the report front page and in the executive summary."
             }
 
-            // matching_suppliers
+            // matching_suppliers — shortlist top 5
             if (completedSet.has("matching_suppliers")) {
                 stageOutcomes.matching_suppliers = supplierCount > 0
                     ? `${supplierCount} supplier${supplierCount !== 1 ? "s" : ""} matched to the bill of materials`
                     : "Supplier shortlist complete"
+                if (supplierRows.length > 0) {
+                    const lines = supplierRows.map(s => {
+                        const country = s.country ?? ""
+                        const tier = s.verification_tier ? ` [${s.verification_tier}]` : ""
+                        return `${s.supplier_name}${country ? " · " + country : ""}${tier}`
+                    })
+                    stageDetails.matching_suppliers = `Top ${supplierRows.length} by match score:\n${lines.join("\n")}`
+                }
             }
 
-            // running_fang_reviews — module review count
+            // running_fang_reviews — module review list
             if (completedSet.has("running_fang_reviews") && modules.length > 0) {
                 stageOutcomes.running_fang_reviews = `${modules.length} module${modules.length !== 1 ? "s" : ""} reviewed for engineering assumptions and risks`
+                const reviewedNames = modules
+                    .map(m => typeof m.name === "string" ? m.name : "")
+                    .filter(Boolean)
+                if (reviewedNames.length > 0) {
+                    stageDetails.running_fang_reviews = `Modules reviewed:\n${reviewedNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}`
+                }
             }
 
             // proofreading
             if (completedSet.has("proofreading")) {
                 stageOutcomes.proofreading = "Report read end-to-end — contradictions resolved, numbers reconciled"
+                stageDetails.proofreading = "The full report was read end-to-end. Contradictions between sections were resolved, numbers were reconciled across the bill of materials, cost waterfall, and module pages, and writing was tightened throughout."
             }
 
             // generating_pdf
             if (completedSet.has("generating_pdf") || pdfUrl) {
                 stageOutcomes.generating_pdf = "PDF report compiled and ready to download"
+                stageDetails.generating_pdf = "The final report has been compiled as a downloadable PDF — cover summary, brief, modules, bill of materials, suppliers, risks, regulatory matrix, and the audit log of what the engine did and why."
             }
 
         } catch (err) {
