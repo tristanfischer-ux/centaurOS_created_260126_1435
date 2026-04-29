@@ -66,6 +66,7 @@ import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { checkDecompositionCompleteness } from "@/lib/product-class-checklists"
 import {
     consumeRemediationContext,
     buildRemediationPromptBlock,
@@ -566,6 +567,28 @@ async function runMaxDecompositionInternal(
                 buildCadLabModule(sk, expansionById.get(sk.id)),
             )
 
+            // 7b. Item 6 (2026-04-29): product-class completeness check.
+            //     After modules are built, cross-check against the heuristic
+            //     checklist for the detected product class. Missing modules
+            //     are logged and stored in the pipeline_run output_ref so
+            //     the proofreader stage can pass them to computeFeasibilityVerdict
+            //     as WARNING-level decomposition_gaps findings.
+            //
+            //     Non-fatal: a gap is a heuristic signal, not an error. Max
+            //     may have legitimately renamed or merged modules. We surface
+            //     it as a warning so the founder can verify before procurement.
+            const moduleNames = modules.map((m) => m.name ?? "")
+            const decompositionGap = checkDecompositionCompleteness(description, moduleNames)
+            if (decompositionGap) {
+                console.warn(
+                    `[run-max-decomposition] Product-class completeness check: project=${projectId} class="${decompositionGap.productClass}" confidence=${Math.round(decompositionGap.confidence * 100)}% missing=${decompositionGap.missingModules.join(", ")}`,
+                )
+            } else {
+                console.log(
+                    `[run-max-decomposition] Product-class completeness check: project=${projectId} no product class detected or all expected modules present`,
+                )
+            }
+
             // 8. Persist modules. Use the Background variant so cookies-less
             //    autopilot hop contexts can write — saveCadLabModules (withAuth)
             //    returns "Unauthorized" here and fails the whole run despite
@@ -713,6 +736,9 @@ async function runMaxDecompositionInternal(
 
             // 9. Done. Record final token counts + output pointer. cost_gbp_pence
             //    stays null — see file header for why.
+            //    Item 6: decompositionGap (if any) is stored in output_ref so
+            //    run-proofreader.ts can read it when computing the feasibility
+            //    verdict without re-running the detection logic.
             await completePipelineRun(runId, {
                 input_tokens: tokensIn,
                 output_tokens: tokensOut,
@@ -726,7 +752,11 @@ async function runMaxDecompositionInternal(
                     moduleCount: modules.length,
                     expansionsOk: successfulExpansions,
                     expansionsTotal: skeletonModules.length,
-                },
+                    // Item 6: decomposition gap stored for proofreader to consume.
+                    // Cast as unknown → Json because Supabase's Json typedef is
+                    // recursive and doesn't accept typed nested objects directly.
+                    decompositionGap: (decompositionGap ?? null) as unknown,
+                } as unknown as import("@/types/database.types").Json,
             })
 
             return {

@@ -37,6 +37,7 @@ import {
 } from "@/lib/feasibility/compute-verdict"
 import { dedupedUnitTotalGbp } from "@/lib/bom/assembly-dedup"
 import { runCrossModalCheck } from "@/lib/forge-v2/cross-modal-consistency"
+import { checkDecompositionCompleteness } from "@/lib/product-class-checklists"
 
 /**
  * V4-Pro is the preferred proofreader (frontier reasoning at half-Haiku
@@ -476,6 +477,21 @@ export async function runProofreaderBackground(
         )
     }
 
+    // Item 6 (2026-04-29): product-class completeness check.
+    // Re-run the heuristic detection here (pure computation, no I/O)
+    // so the feasibility verdict captures any module gaps found by Max.
+    // The decomposition gap was also stored in the pipeline_run output_ref
+    // by run-max-decomposition.ts, but reading it here via a DB query
+    // would add latency and complexity for a lightweight check.
+    const proofreaderModuleNames = modules.map((m) =>
+        typeof m.name === "string" ? m.name : "",
+    )
+    const proofreaderSubject = typeof project.subject === "string" ? project.subject : ""
+    const decompositionGapsForVerdict = checkDecompositionCompleteness(
+        proofreaderSubject,
+        proofreaderModuleNames,
+    )
+
     const verdict: FeasibilityVerdict = computeFeasibilityVerdict({
         dimensionSheet,
         briefConstraints: briefConstraints ?? null,
@@ -497,6 +513,8 @@ export async function runProofreaderBackground(
         // Fix 3: Fang CRITICAL findings escalated to feasibility verdict blockers.
         fangModuleReviews: fangModuleReviews.length > 0 ? fangModuleReviews : null,
         fangModuleCoverage,
+        // Item 6: product-class completeness gaps from checklist matching.
+        decompositionGaps: decompositionGapsForVerdict ?? null,
     })
 
     // Merge cross-modal blockers into the verdict.
