@@ -2711,6 +2711,34 @@ function BomMasterPage({
     const unpricedBuyRows = parts.filter(
         (p) => p.isPurchased && (p.estimatedUnitCostGbp == null || p.estimatedUnitCostGbp <= 0),
     )
+
+    // Loop 26 P2: graduated BOM confidence label, computed from actual data
+    // coverage. Previously ALL BOMs were labelled TENTATIVE when verdict===red
+    // (a proxy for design feasibility, not BOM completeness). The new logic
+    // measures cost coverage and supplier coverage across purchased rows so
+    // the label reflects what the BOM actually contains.
+    //
+    // VALIDATED   — no red verdict, ≥70% purchased rows have a cost, ≥70% have a supplier
+    // PRELIMINARY — no red verdict, 50–70% cost coverage OR 50–70% supplier coverage
+    // TENTATIVE   — red verdict OR <50% cost coverage on purchased rows
+    const purchasedRows = parts.filter((p) => p.isPurchased)
+    const pricedPurchasedRows = purchasedRows.filter(
+        (p) => p.estimatedUnitCostGbp != null && p.estimatedUnitCostGbp > 0,
+    )
+    const purchasedWithSupplier = purchasedRows.filter(
+        (p) => (suppliersByPart.get(p.partNumber) ?? []).length > 0,
+    )
+    const costCoverage =
+        purchasedRows.length > 0 ? pricedPurchasedRows.length / purchasedRows.length : 1
+    const supplierCoverage =
+        purchasedRows.length > 0 ? purchasedWithSupplier.length / purchasedRows.length : 1
+
+    type BomConfidenceLabel = "VALIDATED" | "PRELIMINARY" | "TENTATIVE"
+    const bomConfidenceLabel: BomConfidenceLabel = ((): BomConfidenceLabel => {
+        if (isRed || costCoverage < 0.5) return "TENTATIVE"
+        if (costCoverage >= 0.7 && supplierCoverage >= 0.7) return "VALIDATED"
+        return "PRELIMINARY"
+    })()
     // L15-P3: parametric fallback for unpriced buy rows. The cost specialist
     // sometimes returns null on niche aerospace lines (HAPS PWA-001 to
     // PWA-007 — primary wing structure — were all unpriced in Loop 14). Run
@@ -2741,7 +2769,11 @@ function BomMasterPage({
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>
-                4. BOM master {isRed ? "— TENTATIVE " : ""}({parts.length} rows{isRed ? "; design not yet feasible" : ""})
+                4. BOM master
+                {bomConfidenceLabel !== "VALIDATED" ? ` — ${bomConfidenceLabel}` : ""}
+                {" "}({parts.length} rows
+                {isRed ? "; design not yet feasible" : costCoverage < 0.7 ? `; ${Math.round(costCoverage * 100)}% priced` : ""}
+                )
             </Text>
             {isRed && <RedStateBanner verdict={verdict!} sectionKind="bom" />}
             <Text style={[styles.muted, { marginBottom: 6, fontSize: 9 }]}>
@@ -2979,10 +3011,33 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
     const hasCeiling = typeof data.cost.ceilingGbp === "number"
     const hasUnit = typeof data.cost.unitTotalGbp === "number"
     const headroom = hasCeiling && hasUnit ? data.cost.ceilingGbp! - data.cost.unitTotalGbp! : null
+
+    // Loop 26 P2: graduated cost waterfall confidence label, computed from
+    // actual data rather than using feasibility verdict as a blanket proxy.
+    //
+    // VALIDATED          — unit cost exists, no red verdict, no critical cost-tree findings
+    // PRELIMINARY        — unit cost exists but non-critical validation findings present
+    //                      OR cost is partially estimated (placeholder/todo rows exist)
+    // INVALIDATED ESTIMATE — red verdict OR critical cost-tree findings OR no unit cost
+    const hasCriticalCostFindings = data.cost.costTreeValidation?.hasCritical === true
+    const hasAnyNonQuoted = data.parts.some(
+        (p) => p.costProvenance === "placeholder" || p.costProvenance === "todo",
+    )
+    const hasNonCriticalFindings =
+        (data.cost.costTreeValidation?.hasFindings === true) && !hasCriticalCostFindings
+
+    type CostConfidenceLabel = "VALIDATED" | "PRELIMINARY" | "INVALIDATED ESTIMATE"
+    const costConfidenceLabel: CostConfidenceLabel = ((): CostConfidenceLabel => {
+        if (isRed || hasCriticalCostFindings || !hasUnit) return "INVALIDATED ESTIMATE"
+        if (hasNonCriticalFindings || hasAnyNonQuoted) return "PRELIMINARY"
+        return "VALIDATED"
+    })()
+
     return (
         <Page size="A4" style={styles.page} wrap>
             <Text style={styles.h2}>
-                5. Cost waterfall{isRed ? " — INVALIDATED ESTIMATE" : ""}
+                5. Cost waterfall
+                {costConfidenceLabel !== "VALIDATED" ? ` — ${costConfidenceLabel}` : ""}
             </Text>
             {isRed && (
                 <RedStateBanner verdict={data.feasibilityVerdict!} sectionKind="cost" />
