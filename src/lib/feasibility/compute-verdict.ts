@@ -219,14 +219,18 @@ export function computeFeasibilityVerdict(
         checkedConstraints.push("envelope")
     }
     if (sizingFeasible === false) {
-        const evidence = sizingConflicts.length
+        const conflictSummary = sizingConflicts.length
             ? sizingConflicts.slice(0, 2).join(" ")
             : "Sizing solver returned feasible=false."
+        const actionGuidance =
+            sizingConflicts.length
+                ? "Review the dimension-sheet conflicts above. The solver must return feasible=true before this blocker clears — re-run the sizing stage after adjusting the design parameters flagged in the conflicts."
+                : "The dimension-sheet solver could not find a valid configuration within the declared envelope. Re-run the sizing stage with revised envelope constraints or a reduced component count."
         fails.push({
             axis: "envelope",
             severity: "blocker",
             summary: "Design does not fit the declared envelope.",
-            evidence,
+            evidence: `${conflictSummary} ${actionGuidance}`,
         })
     }
 
@@ -311,7 +315,10 @@ export function computeFeasibilityVerdict(
                         summary: `Estimated unit manufacturing cost is ${overFactor.toFixed(1)}× the brief ceiling.`,
                         evidence:
                             `£${formatGbp(totalCostGbp)} estimated vs £${formatGbp(ceiling.gbp)} unit cost ceiling — ` +
-                            `over by £${formatGbp(totalCostGbp - ceiling.gbp)}. Brief source: "${ceiling.source}".`,
+                            `over by £${formatGbp(totalCostGbp - ceiling.gbp)}. Brief source: "${ceiling.source}". ` +
+                            `To reach AMBER: reduce unit cost to ≤£${formatGbp(ceiling.gbp * 1.5)} (1.5× ceiling). ` +
+                            `To reach GREEN: reduce unit cost to ≤£${formatGbp(ceiling.gbp)} (ceiling). ` +
+                            `Suggested approach: re-scope the BOM for lower-cost alternatives, reduce module count, or revisit the brief cost target against an independent industry benchmark.`,
                     })
                 } else if (overFactor > 1.0) {
                     fails.push({
@@ -319,7 +326,9 @@ export function computeFeasibilityVerdict(
                         severity: "warning",
                         summary: "Estimated unit manufacturing cost exceeds the brief ceiling.",
                         evidence:
-                            `£${formatGbp(totalCostGbp)} vs £${formatGbp(ceiling.gbp)} ceiling (over by ${((overFactor - 1) * 100).toFixed(0)}%). Brief source: "${ceiling.source}".`,
+                            `£${formatGbp(totalCostGbp)} vs £${formatGbp(ceiling.gbp)} ceiling (over by ${((overFactor - 1) * 100).toFixed(0)}%). Brief source: "${ceiling.source}". ` +
+                            `To reach GREEN: reduce unit cost by £${formatGbp(totalCostGbp - ceiling.gbp)} to ≤£${formatGbp(ceiling.gbp)}. ` +
+                            `At this stage cost is within the AMBER band (≤1.5× ceiling); targeted value-engineering or supplier negotiation may close the gap.`,
                     })
                 }
             }
@@ -360,18 +369,29 @@ export function computeFeasibilityVerdict(
             // Mass ceiling was declared AND parts have mass — real check.
             checkedConstraints.push("mass")
             if (totalMassKg > massCeiling) {
+                const overKg = totalMassKg - massCeiling
+                const overPct = ((overKg / massCeiling) * 100).toFixed(0)
                 fails.push({
                     axis: "mass",
                     severity: "blocker",
                     summary: "Estimated mass exceeds the brief ceiling.",
-                    evidence: `${totalMassKg.toLocaleString("en-GB")} kg estimated vs ${massCeiling.toLocaleString("en-GB")} kg ceiling.`,
+                    evidence:
+                        `${totalMassKg.toLocaleString("en-GB")} kg estimated vs ${massCeiling.toLocaleString("en-GB")} kg ceiling — ` +
+                        `over by ${overKg.toLocaleString("en-GB")} kg (${overPct}%). ` +
+                        `To reach GREEN: reduce total assembly mass by ${overKg.toLocaleString("en-GB")} kg. ` +
+                        `Consider lighter structural materials, reduced redundancy, or splitting into sub-assemblies.`,
                 })
             } else if (totalMassKg > massCeiling * 0.9) {
+                const headroomKg = massCeiling - totalMassKg
+                const usedPct = ((totalMassKg / massCeiling) * 100).toFixed(0)
                 fails.push({
                     axis: "mass",
                     severity: "warning",
                     summary: "Estimated mass within 10% of the brief ceiling.",
-                    evidence: `${totalMassKg.toLocaleString("en-GB")} kg vs ${massCeiling.toLocaleString("en-GB")} kg.`,
+                    evidence:
+                        `${totalMassKg.toLocaleString("en-GB")} kg vs ${massCeiling.toLocaleString("en-GB")} kg ceiling (${usedPct}% used) — ` +
+                        `only ${headroomKg.toLocaleString("en-GB")} kg of headroom remains. ` +
+                        `Review growth allowances and assembly tolerance stack-up to confirm the ceiling will not be breached at final build.`,
                 })
             }
         }
@@ -385,14 +405,19 @@ export function computeFeasibilityVerdict(
             // Transport legality is checkable once we have mass and a UK market flag.
             checkedConstraints.push("transport")
             if (totalMassKg > UK_FLATBED_LEGAL_PAYLOAD_KG) {
+                const overPayloadKg = totalMassKg - UK_FLATBED_LEGAL_PAYLOAD_KG
                 fails.push({
                     axis: "transport",
                     severity: "blocker",
                     summary:
                         "Mass exceeds UK flatbed legal payload — cannot ship complete on a standard articulated lorry without abnormal-loads paperwork.",
                     evidence:
-                        `${totalMassKg.toLocaleString("en-GB")} kg estimated; UK flatbed legal payload ~${UK_FLATBED_LEGAL_PAYLOAD_KG.toLocaleString("en-GB")} kg. ` +
-                        "Above this the load is abnormal indivisible — STGO Category 2: marker boards, 2 days police notice, specialised heavy haulage.",
+                        `${totalMassKg.toLocaleString("en-GB")} kg estimated; UK flatbed legal payload ~${UK_FLATBED_LEGAL_PAYLOAD_KG.toLocaleString("en-GB")} kg — ` +
+                        `over by ${overPayloadKg.toLocaleString("en-GB")} kg. ` +
+                        "Above this the load is abnormal indivisible — STGO Category 2: marker boards, 2 days police notice, specialised heavy haulage. " +
+                        `To reach GREEN on this axis: either (a) reduce the shipped assembly mass to ≤${UK_FLATBED_LEGAL_PAYLOAD_KG.toLocaleString("en-GB")} kg, ` +
+                        "(b) design for modular field assembly so individual modules each ship within the legal payload limit, " +
+                        "or (c) scope abnormal-loads transport (STGO Category 2) into the cost and lead-time plan.",
                 })
             }
         }
@@ -561,12 +586,18 @@ export function computeFeasibilityVerdict(
         checkedConstraints.push("suppliers")
         const coverage = input.shortlistCount / input.bomRowCount
         if (coverage < 0.5) {
+            const coveragePct = (coverage * 100).toFixed(0)
+            const rowsNeededForAmber = Math.ceil(input.bomRowCount * 0.5)
+            const rowsNeededForGreen = Math.ceil(input.bomRowCount * 0.8)
             fails.push({
                 axis: "suppliers",
                 severity: "warning",
                 summary:
                     "Supplier shortlist covers under half the bill of materials.",
-                evidence: `${input.shortlistCount} candidates against ${input.bomRowCount} rows — directory may be too thin for this domain.`,
+                evidence:
+                    `${input.shortlistCount} of ${input.bomRowCount} bill of materials rows have supplier coverage (${coveragePct}%). ` +
+                    `Target: ≥${rowsNeededForAmber} rows covered (50%) to clear AMBER; ≥${rowsNeededForGreen} rows covered (80%) for GREEN. ` +
+                    "The supplier directory may be too thin for this product domain — expand the search with additional categories or broaden the geographic scope.",
             })
         }
     }
