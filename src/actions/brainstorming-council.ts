@@ -152,7 +152,7 @@ async function getGroundedFundContext(question: string): Promise<string> {
             .select('id, title, description, country_iso, attributes')
             .in('id', listingIds)
             .eq('category', 'Finance')
-            .eq('country_iso', 'GB')
+            .or('country_iso.eq.GB,country_iso.is.null')
             .limit(20)
 
         if (listingError || !listings || listings.length === 0) {

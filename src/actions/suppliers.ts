@@ -156,17 +156,53 @@ export async function searchSuppliers(
       const PER_CATEGORY = 250
       const supplierCategories = ['Services', 'Products'] as const
       const queryEmbStr = JSON.stringify(queryEmbedding) as unknown as string
-      const pageResults = await Promise.all(
-        supplierCategories.map(cat =>
-          supabase.rpc('match_marketplace_listings_v2', {
-            query_embedding: queryEmbStr,
-            filter_category: cat,
-            match_threshold: 0.0,
-            match_count: PER_CATEGORY,
-            p_offset: 0,
-          }),
+      const trimmedQuery = filters.query.trim()
+      // Phase A of the raw-pages search proposal (2026-04-28). In parallel
+      // with the vector RPC, fire match_listings_pages_fts for each supplier
+      // category which returns listing IDs whose scraped page text matches
+      // the user query via Postgres full-text search. Naive merge below —
+      // Phase C will replace this with Reciprocal Rank Fusion. Same pattern
+      // as searchInvestorsCore in investors.ts; FTS catches exact-string
+      // needles ("ISO 13485", "G99 EREC", postcodes, tradenames) the
+      // structured-fields embedding misses.
+      const ftsRpc = (cat: string) =>
+        // Cast as never — match_listings_pages_fts was added in the
+        // 2026-04-28 migration but database.types.ts hasn't been
+        // regenerated yet. Runtime call is correct; types will catch
+        // up on next `npx supabase gen types`.
+        (supabase as unknown as {
+          rpc: (
+            name: string,
+            args: Record<string, unknown>
+          ) => Promise<{
+            data: Array<{
+              listing_id: string
+              best_rank: number
+              page_count: number
+              best_page_url: string | null
+            }> | null
+            error: { message: string } | null
+          }>
+        }).rpc('match_listings_pages_fts', {
+          p_query: trimmedQuery,
+          p_category: cat,
+          p_limit: 200,
+        })
+
+      const [pageResults, ftsResults] = await Promise.all([
+        Promise.all(
+          supplierCategories.map(cat =>
+            supabase.rpc('match_marketplace_listings_v2', {
+              query_embedding: queryEmbStr,
+              filter_category: cat,
+              match_threshold: 0.0,
+              match_count: PER_CATEGORY,
+              p_offset: 0,
+            }),
+          ),
         ),
-      )
+        Promise.all(supplierCategories.map(cat => ftsRpc(cat))),
+      ])
       const firstError = pageResults.find(r => r.error)?.error
       if (firstError) throw firstError
 
@@ -183,6 +219,85 @@ export async function searchSuppliers(
           supplierMatches.push(row)
         }
       }
+
+      // Phase A merge: collect FTS results across both supplier categories.
+      // Errors are non-fatal — fall back to vector-only if FTS fails.
+      const ftsById = new Map<string, { best_rank: number; page_count: number; best_page_url: string | null }>()
+      for (const ftsResult of ftsResults) {
+        if (ftsResult?.error) {
+          console.warn('[searchSuppliers] FTS RPC error (non-fatal):', ftsResult.error.message)
+          continue
+        }
+        for (const r of (ftsResult?.data ?? [])) {
+          if (!r.listing_id) continue
+          // Keep the highest rank if a listing appears under both Services and
+          // Products (shouldn't happen but guard anyway).
+          const existing = ftsById.get(r.listing_id)
+          if (!existing || (r.best_rank ?? 0) > existing.best_rank) {
+            ftsById.set(r.listing_id, {
+              best_rank: r.best_rank ?? 0,
+              page_count: r.page_count ?? 0,
+              best_page_url: r.best_page_url ?? null,
+            })
+          }
+        }
+      }
+
+      // For listings that ONLY surfaced via FTS (no cosine similarity),
+      // fetch the minimal id+category projection so we can join them into
+      // the supplierMatches pool. The full row re-fetch happens later via
+      // the existing .in('id', matchIds) call, so we don't need attributes
+      // here — just enough to assign a synthetic similarity and ride the
+      // existing pipeline.
+      const ftsOnlyIds = Array.from(ftsById.keys()).filter(id => !seen.has(id))
+      if (ftsOnlyIds.length > 0) {
+        // Cap at 200 to bound the round-trip; FTS already returns ≤200 per category.
+        const safeIds = ftsOnlyIds.slice(0, 200)
+        const { data: ftsListings, error: ftsListingsError } = await supabase
+          .from('marketplace_listings')
+          .select('id, category')
+          .in('category', supplierCategories as unknown as ('Services' | 'Products')[])
+          .in('id', safeIds)
+        if (ftsListingsError) {
+          console.warn('[searchSuppliers] FTS-only fetch failed (non-fatal):', ftsListingsError.message)
+        } else if (ftsListings) {
+          for (const row of ftsListings as Array<Record<string, unknown>>) {
+            const id = String(row.id)
+            if (seen.has(id)) continue
+            // Synthesise a similarity from FTS rank. ts_rank_cd values are
+            // small (~0.001-0.05 typically); normalise into a reasonable
+            // cosine-equivalent band [0.3, 0.7] using log-scale. Mirrors
+            // searchInvestorsCore (investors.ts). Phase C will replace
+            // with Reciprocal Rank Fusion.
+            const ftsMeta = ftsById.get(id)
+            const rank = ftsMeta?.best_rank ?? 0
+            const synthSim = Math.min(0.7, Math.max(0.3, 0.3 + Math.log1p(rank * 100) * 0.1))
+            ;(row as Record<string, unknown>).similarity = synthSim
+            ;(row as Record<string, unknown>)._fts_rank = rank
+            ;(row as Record<string, unknown>)._fts_page_count = ftsMeta?.page_count
+            seen.add(id)
+            supplierMatches.push(row)
+          }
+        }
+      }
+
+      // For listings that appeared in BOTH vector + FTS, give a small boost
+      // via Math.max(vector_cosine, log-scaled-ts_rank * 0.7). Naive Phase A
+      // merge — Phase C will replace with proper RRF.
+      for (const m of supplierMatches) {
+        const id = String(m.id)
+        const ftsMeta = ftsById.get(id)
+        if (!ftsMeta) continue
+        const rank = ftsMeta.best_rank
+        const synthFromFts = Math.min(0.7, Math.max(0.3, 0.3 + Math.log1p(rank * 100) * 0.1)) * 0.7
+        const currentSim = Number(m.similarity) || 0
+        if (synthFromFts > currentSim) {
+          ;(m as Record<string, unknown>).similarity = synthFromFts
+        }
+        ;(m as Record<string, unknown>)._fts_rank = rank
+        ;(m as Record<string, unknown>)._fts_page_count = ftsMeta.page_count
+      }
+
       supplierMatches.sort((a, b) =>
         (Number(b.similarity) || 0) - (Number(a.similarity) || 0)
       )
