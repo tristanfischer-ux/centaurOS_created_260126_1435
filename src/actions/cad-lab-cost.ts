@@ -410,11 +410,20 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
         }
       }
 
-      if (typeof est.labourCost !== "number") est.labourCost = 0
+      // DECISION (Council fix 2C): null means "not estimated" (unknown),
+      // zero means "actually zero cost". Preserving null prevents uncosted
+      // modules from silently contributing £0 to the total rollup.
+      if (typeof est.labourCost !== "number") est.labourCost = null
       if (typeof est.labourReasoning !== "string") est.labourReasoning = ""
-      if (typeof est.totalPerUnit !== "number" || est.totalPerUnit <= 0) {
-        const partsCost = est.parts.reduce((s, p) => s + p.cost, 0)
-        est.totalPerUnit = partsCost + (est.labourCost ?? 0)
+      if (typeof est.totalPerUnit !== "number" || est.totalPerUnit < 0) {
+        if (est.parts.length === 0) {
+          // No parts at all — cost is genuinely unknown, not zero
+          est.totalPerUnit = null
+        } else {
+          const partsCost = est.parts.reduce((s, p) => s + p.cost, 0)
+          const labour = typeof est.labourCost === "number" ? est.labourCost : 0
+          est.totalPerUnit = partsCost + labour
+        }
       }
     }
 

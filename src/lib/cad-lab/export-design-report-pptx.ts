@@ -688,7 +688,7 @@ export async function exportDesignReportAsPPTX(data: DesignReportData): Promise<
       const est = data.aiCostEstimates[moduleId]
       return [
         { text: mod?.name ?? moduleId, options: { fontSize: 9, color: DARK_TEXT } },
-        { text: est ? `£${est.totalPerUnit.toFixed(2)}` : '—', options: { fontSize: 9, color: DARK_TEXT, align: 'center' as const } },
+        { text: est ? (est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : 'Not estimated') : '—', options: { fontSize: 9, color: DARK_TEXT, align: 'center' as const } },
         { text: est?.confidence ?? '—', options: { fontSize: 9, color: DARK_TEXT, align: 'center' as const } },
       ]
     })
@@ -1708,7 +1708,7 @@ function buildTableSlide(
         const est = data.aiCostEstimates[moduleId]
         return [
           { text: mod?.name ?? moduleId, options: { fontSize: 9, color: DARK_TEXT } },
-          { text: est ? `£${est.totalPerUnit.toFixed(2)}` : '—', options: { fontSize: 9, color: DARK_TEXT, align: 'center' as const } },
+          { text: est ? (est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : 'Not estimated') : '—', options: { fontSize: 9, color: DARK_TEXT, align: 'center' as const } },
           { text: est?.confidence ?? '—', options: { fontSize: 9, color: DARK_TEXT, align: 'center' as const } },
         ]
       })

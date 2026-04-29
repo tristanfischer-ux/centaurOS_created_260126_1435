@@ -374,7 +374,7 @@ function renderCostTable(data: DesignReportData): string {
       if (!mod || !est) return ''
       return `<tr>
         <td>${escapeHtml(mod.name)}</td>
-        <td>£${est.totalPerUnit.toFixed(2)}</td>
+        <td>${est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : 'Not estimated'}</td>
         <td>${escapeHtml(est.confidence)}</td>
         <td>${escapeHtml(est.assumptions?.join('; ') ?? '—')}</td>
       </tr>`

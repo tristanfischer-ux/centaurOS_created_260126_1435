@@ -115,7 +115,7 @@ export interface CeilingCheck {
 
 /** The four data sources fed into reconciliation, with availability flags. */
 export interface CostReconciliationSources {
-    /** Sum of AiCostEstimate.totalPerUnit across all modules. */
+    /** Sum of AiCostEstimate.totalPerUnit across costed modules. */
     canonicalTotalGbp: number | null
     /** Sum of (bom_lines.quantity × parts.estimated_unit_cost_gbp) for all lines. */
     bomDerivedTotalGbp: number | null
@@ -131,6 +131,10 @@ export interface CostReconciliationSources {
     supplierLineCount: number
     /** Coverage ratio (0–1): supplierLineCount / bomLineCount. Null when bomLineCount is 0. */
     supplierCoverageRatio: number | null
+    /** Module IDs where Finn returned null totalPerUnit (cost not estimated).
+     *  Council fix 2C: these are listed separately rather than contributing
+     *  £0 to the canonical total. */
+    uncostedModuleIds: string[]
 }
 
 /** Aggregated reconciliation result written to cad_lab_projects.cost_reconciliation. */
@@ -218,8 +222,10 @@ export interface SupplierLineForReconciliation {
 
 export interface AiCostEstimateForReconciliation {
     moduleId: string
-    /** Finn's canonical total per unit for this module (includes labour). */
-    totalPerUnit: number
+    /** Finn's canonical total per unit for this module (includes labour).
+     *  null means "not estimated" — distinct from 0 which means "actually
+     *  zero cost" (Council fix 2C). */
+    totalPerUnit: number | null
 }
 
 export interface ReconciliationInputs {
@@ -252,10 +258,22 @@ export function reconcileCosts(inputs: ReconciliationInputs): CostReconciliation
     // ── Source totals ────────────────────────────────────────────────────
 
     // 1. Canonical total: sum of Finn's per-module estimates.
+    //    DECISION (Council fix 2C): null totalPerUnit means "not estimated"
+    //    — these modules are tracked separately as uncosted rather than
+    //    contributing £0 to the sum. This prevents uncosted modules from
+    //    silently deflating the canonical total.
+    const costedEstimates = finnEstimates.filter(
+        (e) => typeof e.totalPerUnit === "number",
+    )
+    const uncostedModuleIds = finnEstimates
+        .filter((e) => e.totalPerUnit === null || e.totalPerUnit === undefined)
+        .map((e) => e.moduleId)
     const canonicalTotalGbp =
-        finnEstimates.length > 0
-            ? finnEstimates.reduce((acc, e) => acc + (e.totalPerUnit ?? 0), 0)
-            : null
+        costedEstimates.length > 0
+            ? costedEstimates.reduce((acc, e) => acc + (e.totalPerUnit as number), 0)
+            : finnEstimates.length > 0
+              ? null // All modules are uncosted — total is unknown, not zero
+              : null
 
     // 2. BOM-derived total: parts-only (no labour).
     //    Count lines with missing costs separately for transparency.
@@ -295,6 +313,7 @@ export function reconcileCosts(inputs: ReconciliationInputs): CostReconciliation
         bomLinesWithMissingCost,
         supplierLineCount,
         supplierCoverageRatio,
+        uncostedModuleIds,
     }
 
     // ── Pairwise checks ──────────────────────────────────────────────────
@@ -568,7 +587,22 @@ function buildSummaryMessage(
     }
 
     if (ceilingCheck.nearCeiling) {
-        return "All cost sources agree — note the estimate is close to the brief's cost ceiling."
+        const uncostedSuffix =
+            sources.uncostedModuleIds.length > 0
+                ? ` (${sources.uncostedModuleIds.length} module${sources.uncostedModuleIds.length === 1 ? "" : "s"} not yet costed — actual total may be higher.)`
+                : ""
+        return `All cost sources agree — note the estimate is close to the brief's cost ceiling.${uncostedSuffix}`
+    }
+
+    // Council fix 2C: surface uncosted modules in the summary so founders
+    // see that the total is incomplete rather than assuming all modules are
+    // covered at their displayed cost.
+    if (sources.uncostedModuleIds.length > 0) {
+        return (
+            `Cost sources within range, but ${sources.uncostedModuleIds.length} ` +
+            `module${sources.uncostedModuleIds.length === 1 ? " has" : "s have"} ` +
+            `not been costed yet — the total reflects only costed modules.`
+        )
     }
 
     return "All available cost sources are within acceptable range of each other."

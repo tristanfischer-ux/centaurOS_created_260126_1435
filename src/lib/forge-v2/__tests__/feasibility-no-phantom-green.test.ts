@@ -45,6 +45,8 @@ const FULL_INPUT: VerdictInput = {
     aiCostEstimates: null,
     shortlistCount: 3,
     bomRowCount: 3,
+    fangModuleReviews: [{ moduleName: "Module 1", issues: [] }],
+    fangModuleCoverage: { totalModules: 1, reviewedModuleIds: ["m1"], unreviewedModules: [] },
 }
 
 /** Input where ALL inputs are null — the solver has nothing to check. */
@@ -98,51 +100,47 @@ describe("computeFeasibilityVerdict — phantom-GREEN guard (Loop 24 P0)", () =>
      * checkedConstraints is empty — this is the phantom-GREEN condition.
      * The PDF layer maps this to UNREVIEWED.
      */
-    it("(b) all inputs null => GREEN but checkedConstraints empty (phantom-GREEN)", () => {
+    it("(b) all inputs null => AMBER due to data_completeness warning", () => {
         const verdict = computeFeasibilityVerdict(EMPTY_INPUT)
 
-        // Status is GREEN because there are no fails — but this is phantom-GREEN.
-        expect(verdict.status).toBe("green")
-        expect(verdict.fails).toHaveLength(0)
-
-        // THE KEY ASSERTION: checkedConstraints must be empty.
-        // This is what the PDF layer uses to detect phantom-GREEN.
-        expect(verdict.checkedConstraints).toHaveLength(0)
+        // With the data_completeness check, null inputs trigger a warning → amber.
+        expect(verdict.status).toBe("amber")
+        expect(verdict.fails.some((f) => f.axis === "data_completeness")).toBe(true)
+        expect(verdict.checkedConstraints).toContain("data_completeness")
     })
 
     /**
      * (c) Valid GREEN is only possible when checkedConstraints.length > 0.
      * Status GREEN with empty checkedConstraints is the phantom pattern.
      */
-    it("(c) GREEN without checkedConstraints is NOT valid approval — it is phantom-GREEN", () => {
+    it("(c) null-input verdict is AMBER (data_completeness), full-input verdict is GREEN", () => {
         const phantomVerdict = computeFeasibilityVerdict(EMPTY_INPUT)
         const validVerdict = computeFeasibilityVerdict(FULL_INPUT)
 
-        // Both are "green" in the raw status field...
-        expect(phantomVerdict.status).toBe("green")
+        // Null inputs now produce amber (data_completeness warning).
+        expect(phantomVerdict.status).toBe("amber")
+        // Full inputs produce green.
         expect(validVerdict.status).toBe("green")
 
-        // ...but only the valid one has checkedConstraints.
-        const isPhantomGreen = (v: typeof phantomVerdict) =>
-            v.status === "green" && v.checkedConstraints.length === 0
-
-        expect(isPhantomGreen(phantomVerdict)).toBe(true)
-        expect(isPhantomGreen(validVerdict)).toBe(false)
+        // The valid verdict has real constraint checks; the null one only has data_completeness.
+        expect(validVerdict.checkedConstraints.length).toBeGreaterThan(1)
+        expect(phantomVerdict.checkedConstraints).toContain("data_completeness")
     })
 
     /**
      * Partial input (dimension sheet only, no costs / mass) — envelope
      * axis is checked, others are not. GREEN is partial, not full.
      */
-    it("sheet-only input checks only the envelope axis", () => {
+    it("sheet-only input checks envelope axis + data_completeness warning", () => {
         const verdict = computeFeasibilityVerdict(PARTIAL_SHEET_ONLY)
 
-        expect(verdict.status).toBe("green")
+        // Amber because most inputs are null (data_completeness fires).
+        expect(verdict.status).toBe("amber")
         expect(verdict.checkedConstraints).toContain("envelope")
+        expect(verdict.checkedConstraints).toContain("data_completeness")
         expect(verdict.checkedConstraints).not.toContain("cost")
         expect(verdict.checkedConstraints).not.toContain("mass")
         expect(verdict.checkedConstraints).not.toContain("transport")
-        // bomRowCount === 0 so suppliers not checked either.
         expect(verdict.checkedConstraints).not.toContain("suppliers")
     })
 

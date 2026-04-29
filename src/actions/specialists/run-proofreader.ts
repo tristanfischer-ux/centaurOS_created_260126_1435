@@ -67,6 +67,32 @@ export interface ProofreadFinding {
     confidence: "high" | "medium" | "low"
 }
 
+/**
+ * Fix 5B — council 3/6 (GPT-5.5 + DeepSeek + Mistral): annotator mode.
+ *
+ * Each finding is also projected into the user-facing annotation schema
+ * with `error/warning/info` severity. The internal `blocker → error`,
+ * `content → warning`, `cosmetic → info` mapping preserves the existing
+ * blocking behaviour (any error = block) while surfacing a clean,
+ * section-scoped annotation stream for the PDF appendix and UI.
+ */
+export interface ProofreadAnnotation {
+    section: string
+    severity: "error" | "warning" | "info"
+    finding: string
+    suggestion: string
+}
+
+export interface ProofreadAnnotationSummary {
+    errorCount: number
+    warningCount: number
+    infoCount: number
+    annotations: ProofreadAnnotation[]
+    /** True when any error-level annotation exists — same blocking
+     *  semantics as the original blocker count. */
+    shouldBlock: boolean
+}
+
 export interface ProofreadFindings {
     ran_at: string
     model: string
@@ -74,6 +100,52 @@ export interface ProofreadFindings {
     finding_count: number
     blocker_count: number
     findings: ProofreadFinding[]
+    /**
+     * Fix 5B: structured annotations projected from findings with the
+     * user-facing `error/warning/info` severity and count summary. Null
+     * only on legacy rows that pre-date this field.
+     */
+    annotations?: ProofreadAnnotationSummary | null
+}
+
+// ─── Annotator helpers ─────────────────────────────────────────────────
+
+/** Map internal LLM severity to user-facing annotation severity. */
+function mapSeverityToAnnotation(
+    severity: ProofreadFinding["severity"],
+): ProofreadAnnotation["severity"] {
+    switch (severity) {
+        case "blocker":
+            return "error"
+        case "content":
+            return "warning"
+        case "cosmetic":
+            return "info"
+    }
+}
+
+/** Build the annotator summary from raw findings. */
+function buildAnnotationSummary(
+    findings: ProofreadFinding[],
+): ProofreadAnnotationSummary {
+    const annotations: ProofreadAnnotation[] = findings.map((f) => ({
+        section: f.section,
+        severity: mapSeverityToAnnotation(f.severity),
+        finding: f.issue,
+        suggestion: f.suggested_fix,
+    }))
+
+    const errorCount = annotations.filter((a) => a.severity === "error").length
+    const warningCount = annotations.filter((a) => a.severity === "warning").length
+    const infoCount = annotations.filter((a) => a.severity === "info").length
+
+    return {
+        errorCount,
+        warningCount,
+        infoCount,
+        annotations,
+        shouldBlock: errorCount > 0,
+    }
 }
 
 /** Background entry — called from the autopilot fire endpoint. */
@@ -231,6 +303,9 @@ export async function runProofreaderBackground(
         (result.outputTokens / 1_000_000) * 2.2
     const costPence = Math.round(usdEstimate * 80)
 
+    // Fix 5B: build annotator-mode summary from findings.
+    const annotationSummary = buildAnnotationSummary(findings)
+
     const payload: ProofreadFindings = {
         ran_at: new Date().toISOString(),
         model: result.modelUsed,
@@ -238,6 +313,7 @@ export async function runProofreaderBackground(
         finding_count: findings.length,
         blocker_count: blockerCount,
         findings,
+        annotations: annotationSummary,
     }
 
     // Loop 3 P1 (council-unanimous, 2026-04-25 NIGHT): compute the

@@ -137,7 +137,7 @@ function buildDataSummary(data: DesignReportData): string {
       const mod = data.modules.find((m) => m.id === moduleId)
       const est = data.aiCostEstimates[moduleId]
       if (!mod || !est) continue
-      lines.push(`  ${mod.name}: £${est.totalPerUnit.toFixed(2)} (${est.confidence} confidence)`)
+      lines.push(`  ${mod.name}: ${est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : "Cost not estimated"} (${est.confidence} confidence)`)
       if (est.assumptions?.length) lines.push(`    Assumptions: ${est.assumptions.join("; ")}`)
     }
   }
@@ -492,7 +492,7 @@ function buildSectionDataSlice(section: ReportSectionOutline, data: DesignReport
         const mod = data.modules.find((m) => m.id === moduleId)
         const est = data.aiCostEstimates[moduleId]
         if (!mod || !est) continue
-        lines.push(`${mod.name}: £${est.totalPerUnit.toFixed(2)} (${est.confidence})`)
+        lines.push(`${mod.name}: ${est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : "Cost not estimated"} (${est.confidence})`)
         if (est.assumptions?.length) lines.push(`  Assumptions: ${est.assumptions.join("; ")}`)
       }
       break

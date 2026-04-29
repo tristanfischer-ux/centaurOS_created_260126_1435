@@ -102,6 +102,8 @@ import type { TemplateMatchResult, TemplateMatch } from "@/actions/step-template
 import type { ModuleConnection, PreExecValidationResult } from "@/lib/cad-lab-types"
 import { verifyInterfaceArithmetic, trackDimensionProvenance, checkComponentCoverage, validateInterfaceStructure, detectDimensionConflicts, checkInterfaceCompleteness, validateInterfaceContracts } from "@/lib/cad-lab/interface-validators"
 import { checkPythonSyntax, scanParametricIntegrity, validateZStack, analyzeCadQueryCode, checkFunctionInvocations, checkLibraryUsage, categorizeModalError, stripUnsafeCode, checkPhysicsPlausibility } from "@/lib/cad-lab/code-validators"
+import { z } from "zod"
+import { validateDecompositionTopology } from "@/lib/cad-lab/topology-validation"
 import { estimateDimensions, validateEstimatedDimensions } from "@/lib/cad-lab/dimension-estimator"
 import { scoreRenderVision, type VisionScoreResult } from "@/lib/cad-lab/vision-scorer"
 import { detectIndustryDomain, extractProductKeywords } from "@/lib/cad-lab/industry-domains"
@@ -109,6 +111,35 @@ import { retrieveStandardsForPrompt } from "@/lib/cad-lab/standards-retriever"
 import { generateAndStoreStandards } from "@/lib/cad-lab/standards-auto-learn"
 import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
 import { retrieveProductDimensionsForPrompt } from "@/lib/cad-lab/product-dimensions-retriever"
+
+// ─── Zod Schemas for Decomposition Validation ─────────────────────
+// INTENT: Council fix 2A (4/6 majority: GPT-5.5 + Gemini + Mistral + Grok-3).
+// Validates Max's decomposition output BEFORE storing, so malformed data
+// (missing parts, invalid quantities, empty modules) is caught immediately
+// instead of silently propagating through BOM → Finn → PDF.
+
+const DecompositionPartSchema = z.object({
+  name: z.string().min(1, "Part name cannot be empty"),
+  quantity: z.number().positive("Part quantity must be positive"),
+  material: z.string().min(1, "Part material cannot be empty"),
+})
+
+const DecompositionModuleSchema = z.object({
+  id: z.string().min(1, "Module id cannot be empty"),
+  name: z.string().min(1, "Module name cannot be empty"),
+  description: z.string().default(""),
+  parts: z.array(DecompositionPartSchema).min(1, "Each module must have at least one part"),
+})
+
+const DecompositionOutputSchema = z.object({
+  modules: z.array(DecompositionModuleSchema).min(1, "Decomposition must contain at least one module"),
+  connections: z.array(z.object({
+    from: z.string(),
+    output: z.string(),
+    to: z.string(),
+    input: z.string(),
+  })).optional(),
+})
 
 // ─── AI Usage Limit Enforcement ────────────────────────────────────
 // SECURITY: CAD Lab functions were previously unmetered — no limit checks,
@@ -2614,6 +2645,55 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       }
     }
 
+    // ── Zod schema validation (Council fix 2A) ──────────────────────
+    // INTENT: Validate structural integrity of Max's decomposition output
+    // BEFORE any normalisation or storage. Catches malformed data (missing
+    // parts, invalid quantities, empty modules) at the source.
+    const zodPayload = {
+      modules: rawModules.map((raw) => {
+        const m = raw as Record<string, unknown>
+        return {
+          id: m.id != null ? String(m.id) : "",
+          name: m.name != null ? String(m.name) : "",
+          description: m.description != null ? String(m.description) : "",
+          parts: Array.isArray(m.keyParts)
+            ? m.keyParts.map((p: unknown) => {
+                if (typeof p === "string") return { name: p, quantity: 1, material: "unspecified" }
+                if (p && typeof p === "object") {
+                  const po = p as Record<string, unknown>
+                  return {
+                    name: po.name != null ? String(po.name) : "",
+                    quantity: typeof po.quantity === "number" ? po.quantity : 1,
+                    material: po.material != null ? String(po.material) : "unspecified",
+                  }
+                }
+                return { name: String(p), quantity: 1, material: "unspecified" }
+              })
+            : [],
+        }
+      }),
+      connections: rawConnections ?? undefined,
+    }
+
+    const zodResult = DecompositionOutputSchema.safeParse(zodPayload)
+    if (!zodResult.success) {
+      const zodErrors = zodResult.error.issues
+        .slice(0, 5)
+        .map((i) => `${i.path.join(".")}: ${i.message}`)
+        .join("; ")
+      console.error(
+        `[THE-FORGE] Decomposition Zod validation failed (${zodResult.error.issues.length} issues): ${zodErrors}`,
+      )
+      return {
+        success: false,
+        error: `Decomposition output failed structural validation: ${zodErrors}`,
+        modules: [],
+        decompositionTime: Date.now() - start,
+        tokensIn,
+        tokensOut,
+      }
+    }
+
     // Validate and clean each module
     const modules: CadLabModule[] = rawModules.map((raw) => {
       const m = raw as Record<string, unknown>
@@ -2676,6 +2756,30 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       }
       if (connections.length === 0) connections = undefined
       dlog(`Validated ${connections?.length ?? 0}/${rawConnections.length} connections`)
+    }
+
+    // ── Topology validation (Council fix 2B) ────────────────────────
+    // INTENT: Catch structural issues in the decomposition graph before
+    // downstream stages consume it. Duplicate IDs block; orphans warn.
+    const topologyResult = validateDecompositionTopology(modules, connections)
+    if (!topologyResult.valid) {
+      console.error(
+        `[THE-FORGE] Decomposition topology validation failed: ${topologyResult.errors.join("; ")}`,
+      )
+      return {
+        success: false,
+        error: `Decomposition topology invalid: ${topologyResult.errors.join("; ")}`,
+        modules: [],
+        decompositionTime: Date.now() - start,
+        tokensIn,
+        tokensOut,
+      }
+    }
+    if (topologyResult.warnings.length > 0) {
+      for (const w of topologyResult.warnings) {
+        console.warn(`[THE-FORGE] Topology warning: ${w}`)
+      }
+      dlog(`Topology warnings: ${topologyResult.warnings.join("; ")}`)
     }
 
     const totalMs = Date.now() - start

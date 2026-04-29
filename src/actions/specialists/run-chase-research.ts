@@ -74,6 +74,7 @@ import type {
     CadLabResearchResult,
 } from "@/lib/cad-lab-types"
 import { triageRegulatoryMatrix } from "@/lib/regulatory-triage"
+import { validateStandards, formatStandardsWarnings } from "@/lib/regulatory/standards-validator"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import {

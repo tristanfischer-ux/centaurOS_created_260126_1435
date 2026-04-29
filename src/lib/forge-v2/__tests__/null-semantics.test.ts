@@ -1,5 +1,3 @@
-import { describe, expect, it, vi } from 'vitest';
-
 import {
   absent,
   countMissing,
@@ -133,22 +131,22 @@ describe('null-semantics helpers', () => {
     });
 
     it('calls warnFn with a descriptive message when falling back', () => {
-      const warn = vi.fn();
+      const warn = jest.fn();
       unwrapOrDefault(absent('no supplier quote'), 0, warn);
-      expect(warn).toHaveBeenCalledOnce();
+      expect(warn).toHaveBeenCalledTimes(1);
       expect(warn).toHaveBeenCalledWith(
         '[null-semantics] falling back to default: absent — no supplier quote'
       );
     });
 
     it('does not call warnFn when value is present', () => {
-      const warn = vi.fn();
+      const warn = jest.fn();
       unwrapOrDefault(present(10), 0, warn);
       expect(warn).not.toHaveBeenCalled();
     });
 
     it('calls warnFn with error detail for error status', () => {
-      const warn = vi.fn();
+      const warn = jest.fn();
       unwrapOrDefault(dataError('timeout'), 0, warn);
       expect(warn).toHaveBeenCalledWith(
         '[null-semantics] falling back to default: error — timeout'

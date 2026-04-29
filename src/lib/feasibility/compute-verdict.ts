@@ -33,7 +33,7 @@
  */
 
 export type VerdictStatus = "green" | "amber" | "red"
-export type VerdictAxis = "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency" | "decomposition_gaps"
+export type VerdictAxis = "envelope" | "mass" | "cost" | "cost_type_mismatch" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings" | "fang_review_coverage" | "cross_modal_consistency" | "decomposition_gaps" | "data_completeness"
 export type VerdictSeverity = "blocker" | "warning"
 
 export interface VerdictFail {
@@ -588,6 +588,35 @@ export function computeFeasibilityVerdict(
             severity: "warning",
             summary: `${gaps.productClass} decomposition may be missing expected modules.`,
             evidence: `Module checklist gap (confidence ${Math.round(gaps.confidence * 100)}%): the following expected modules were not found — ${missingList}. Max may have renamed or merged these; review the module list before proceeding to procurement.`,
+        })
+    }
+
+    // ── Data completeness (X4 — null-semantics council fix) ─────────
+    //
+    // When critical pipeline inputs are null/undefined, the verdict
+    // should surface this as a WARNING rather than silently producing
+    // a GREEN pass. A GREEN verdict with missing inputs is misleading —
+    // it looks like the design passed when in fact key checks were skipped.
+    const expectedInputs: Array<[string, unknown]> = [
+        ["dimensionSheet", input.dimensionSheet],
+        ["briefConstraints", input.briefConstraints],
+        ["parts", input.parts.length > 0 ? input.parts : null],
+        ["fangModuleReviews", input.fangModuleReviews],
+        ["fangModuleCoverage", input.fangModuleCoverage],
+    ]
+    const missingInputs = expectedInputs
+        .filter(([, v]) => v === null || v === undefined)
+        .map(([name]) => name)
+    if (missingInputs.length > 0) {
+        checkedConstraints.push("data_completeness")
+        fails.push({
+            axis: "data_completeness",
+            severity: "warning",
+            summary: `${missingInputs.length} of ${expectedInputs.length} expected pipeline inputs are missing.`,
+            evidence:
+                `Missing: ${missingInputs.join(", ")}. ` +
+                "The verdict may be incomplete — constraints that depend on these inputs were not evaluated. " +
+                "A GREEN verdict with missing inputs is not evidence of a passing design.",
         })
     }
 

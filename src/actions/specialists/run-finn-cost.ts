@@ -523,14 +523,26 @@ async function runFinnCostInternal(
                     .reduce((sum, est) => sum + (est.totalPerUnit ?? 0), 0)
 
                 const productClassHint =
-                    (project.product_overview as string) ??
-                    (project.diagnostic_answers as DiagnosticAnswers | null)?.productType ??
-                    ""
+                    typeof project.product_overview === "string"
+                        ? project.product_overview
+                        : ""
+
+                // Geography defaults to United Kingdom — the brief constraints
+                // may contain a markets array, but the NRE heuristic only needs
+                // a broad geography band, not a per-market breakdown.
+                const briefConstraints =
+                    ((research as { designBrief?: { constraints?: { markets?: unknown[] } } } | null)
+                        ?.designBrief?.constraints)
+                const geographyHint =
+                    Array.isArray(briefConstraints?.markets) &&
+                    briefConstraints.markets.some((m) => typeof m === "string" && /GB|UK/i.test(m as string))
+                        ? "United Kingdom"
+                        : "global"
 
                 const nreBreakdown = estimateNreCosts(
                     bomTotal,
                     productClassHint,
-                    (project.diagnostic_answers as DiagnosticAnswers | null)?.geography ?? "United Kingdom",
+                    geographyHint,
                 )
 
                 await admin

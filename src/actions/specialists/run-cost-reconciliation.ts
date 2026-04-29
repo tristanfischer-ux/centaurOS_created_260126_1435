@@ -101,11 +101,18 @@ export async function runCostReconciliation(
 
     // ── 2a. Canonical total from ai_cost_estimates ───────────────────
 
+    // DECISION (Council fix 2C): pass ALL estimates through to reconciliation,
+    // including those with null totalPerUnit. The reconcileCosts function
+    // separates costed from uncosted modules and tracks uncosted ones
+    // explicitly rather than silently dropping them.
     const aiEstimatesRaw = project.ai_cost_estimates as Record<string, AiCostEstimate> | null
     const finnEstimates: AiCostEstimateForReconciliation[] = aiEstimatesRaw
         ? Object.values(aiEstimatesRaw)
-              .filter((e): e is AiCostEstimate => e != null && typeof e.totalPerUnit === "number")
-              .map((e) => ({ moduleId: e.moduleId, totalPerUnit: e.totalPerUnit }))
+              .filter((e): e is AiCostEstimate => e != null)
+              .map((e) => ({
+                  moduleId: e.moduleId,
+                  totalPerUnit: typeof e.totalPerUnit === "number" ? e.totalPerUnit : null,
+              }))
         : []
 
     // ── 2b. BOM-derived total from parts + bom_lines JOIN ────────────

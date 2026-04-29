@@ -867,6 +867,14 @@ interface PdfInput {
          * the canonical cost and clear this flag.
          */
         costMismatchPct: number | null
+        /**
+         * Loop 26 P3 / A2: cost-tree arithmetic validation gate.
+         * Populated after the cost waterfall is assembled. Null when the
+         * validator did not run (older projects, empty BOM). Non-null when
+         * at least one arithmetic check was attempted — check hasFindings
+         * before rendering annotations.
+         */
+        costTreeValidation: import("@/lib/cost/cost-tree-validation").CostTreeValidationResult | null
     }
     suppliers: SupplierPdf[]
     /**
@@ -3188,6 +3196,56 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
                                 <Text style={[styles.tableCell, { width: 70, textAlign: "right" }]}>{makePct.toFixed(1)}%</Text>
                             </View>
                         </View>
+                    </View>
+                )
+            })()}
+
+            {/* Loop 26 P3 / A2: cost-tree arithmetic validation annotations.
+                Rendered AFTER all cost tables so the founder first sees the
+                numbers, then sees which ones cannot be relied upon. Each
+                finding is a coloured callout with a plain-English description.
+                Data is never suppressed — the wrong number stays visible
+                alongside the explanation so the founder can judge for themselves. */}
+            {data.cost.costTreeValidation?.hasFindings && (() => {
+                const result = data.cost.costTreeValidation!
+                return (
+                    <View style={{ marginTop: 16 }} wrap={false}>
+                        <Text style={[styles.h3, { color: result.hasCritical ? "#b91c1c" : "#a16207" }]}>
+                            {result.hasCritical ? "⚠ Cost arithmetic errors detected" : "⚠ Cost consistency warnings"}
+                        </Text>
+                        <Text style={[styles.muted, { fontSize: 8.5, marginBottom: 8 }]}>
+                            {result.summaryMessage}
+                        </Text>
+                        {result.findings.map((finding, idx) => (
+                            <View
+                                key={idx}
+                                style={{
+                                    marginBottom: 6,
+                                    padding: 8,
+                                    backgroundColor: finding.severity === "critical" ? "#fee2e2" : "#fef3c7",
+                                    borderLeftWidth: 3,
+                                    borderLeftColor: finding.severity === "critical" ? "#b91c1c" : "#b45309",
+                                    borderRadius: 3,
+                                }}
+                                wrap={false}
+                            >
+                                <Text style={{
+                                    fontSize: 9,
+                                    fontWeight: "bold",
+                                    color: finding.severity === "critical" ? "#7f1d1d" : "#7c2d12",
+                                    marginBottom: 3,
+                                }}>
+                                    {finding.severity === "critical" ? "Critical" : "Warning"}: {finding.code.replace(/_/g, " ").toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())}
+                                </Text>
+                                <Text style={{
+                                    fontSize: 8.5,
+                                    color: finding.severity === "critical" ? "#7f1d1d" : "#7c2d12",
+                                    lineHeight: 1.4,
+                                }}>
+                                    {finding.message}
+                                </Text>
+                            </View>
+                        ))}
                     </View>
                 )
             })()}
@@ -5899,10 +5957,64 @@ async function exportProjectPdfInternal(
             return {
                 moduleName: m.name,
                 totalGbp: typeof partsTotal === "number" ? partsTotal : finnTotal,
+                // finnTotalGbp kept separately so the cost-tree validation
+                // gate (below) can cross-check the two sources even when the
+                // parts-table roll-up wins the display race.
+                finnTotalGbp: finnTotal,
             }
         })
         let unitTotalGbp = 0
         for (const v of dedupedRollUp.effectiveCost) unitTotalGbp += v
+
+        // Loop 26 P3 / A2: cost-tree arithmetic validation gate.
+        //
+        // Runs AFTER the cost waterfall is assembled (perModuleCost +
+        // unitTotalGbp) and BEFORE PDF rendering. Catches four failure classes:
+        //   (1) A single subsystem exceeds 100% of the unit total (the HAPS
+        //       Wing-Integrated Solar Array at 104.8% in Loop 26).
+        //   (2) Sum of module costs diverges from unitTotalGbp by more than 1%.
+        //   (3) Finn line-item names embedding "N × £P = £E" expressions where
+        //       the arithmetic is wrong (6,800 × £60 = £430,560 is false —
+        //       correct is £408,000).
+        //   (4) Parts-table roll-up vs Finn per-module estimate disagree by
+        //       more than 10% (propulsion motor £320 vs £3,000 in Loop 26).
+        //
+        // On failure: findings are annotated as ⚠ blocks on the cost
+        // waterfall page. Data is never suppressed — founders need to see
+        // the wrong number alongside the explanation.
+        let costTreeValidation: import("@/lib/cost/cost-tree-validation").CostTreeValidationResult | null = null
+        try {
+            const { validateCostTree } = await import("@/lib/cost/cost-tree-validation")
+            // Line items from Finn's per-module cost breakdown — names may
+            // embed "N × £P = £E" expressions that the validator parses.
+            const costLineItems = modules.flatMap((m) =>
+                ((m.cost as { parts?: Array<{ name: string; cost: number }> } | null)?.parts ?? []).map(
+                    (p: { name: string; cost: number }) => ({
+                        name: p.name,
+                        cost: typeof p.cost === "number" ? p.cost : 0,
+                        moduleName: m.name,
+                    }),
+                ),
+            )
+            costTreeValidation = validateCostTree(
+                perModuleCost,
+                unitTotalGbp,
+                costLineItems,
+            )
+            if (costTreeValidation.hasFindings) {
+                console.warn(
+                    `[pdf-cost-validation] project=${projectId} ` +
+                    `findings=${costTreeValidation.findings.length} ` +
+                    `hasCritical=${costTreeValidation.hasCritical} ` +
+                    `summary="${costTreeValidation.summaryMessage}"`,
+                )
+            }
+        } catch (err) {
+            console.warn(
+                "[pdf-cost-validation] threw (non-fatal):",
+                err instanceof Error ? err.message : err,
+            )
+        }
 
         // Fix 2 — Loop 26 WARNING-level: build-time cost-mismatch detection
         // and in-place healing. Replaces the old "amber banner" approach.
@@ -6370,6 +6482,10 @@ async function exportProjectPdfInternal(
                 // The cover renders an amber banner so the founder sees
                 // the inconsistency before relying on any cost number.
                 costMismatchPct,
+                // Loop 26 P3 / A2: cost-tree arithmetic validation result.
+                // Findings are rendered as ⚠ annotations below the per-module
+                // roll-up table. Null when the validator did not run.
+                costTreeValidation,
             },
             // Loop 8 P3 — cost-realism reframe via Oracle benchmark band.
             oracleProjectBand: await (async () => {

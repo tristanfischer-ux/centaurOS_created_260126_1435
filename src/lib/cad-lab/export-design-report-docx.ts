@@ -508,7 +508,7 @@ export async function exportDesignReportAsDOCX(data: DesignReportData): Promise<
         new TableRow({
           children: [
             dataCell(mod.name, 30),
-            dataCell(`£${est.totalPerUnit.toFixed(2)}`, 20),
+            dataCell(est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : 'Not estimated', 20),
             dataCell(est.confidence, 15),
             dataCell(est.assumptions?.join('; ') ?? '—', 35),
           ],
@@ -987,7 +987,7 @@ function buildCostTable(data: DesignReportData): Table | null {
       new TableRow({
         children: [
           dataCell(mod.name, 30),
-          dataCell(`£${est.totalPerUnit.toFixed(2)}`, 20),
+          dataCell(est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : 'Not estimated', 20),
           dataCell(est.confidence, 15),
           dataCell(est.assumptions?.join('; ') ?? '—', 35),
         ],

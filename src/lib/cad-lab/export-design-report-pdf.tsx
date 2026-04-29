@@ -629,7 +629,7 @@ function CostTable({ data }: { data: DesignReportData }) {
           return (
             <View key={moduleId} style={idx === costIds.length - 1 ? s.tableRowLast : s.tableRow}>
               <Text style={s.tableCell}>{mod.name}</Text>
-              <Text style={s.tableCell}>£{est.totalPerUnit.toFixed(2)}</Text>
+              <Text style={s.tableCell}>{est.totalPerUnit != null ? `£${est.totalPerUnit.toFixed(2)}` : 'Not estimated'}</Text>
               <Text style={s.tableCellMuted}>{est.confidence}</Text>
             </View>
           )

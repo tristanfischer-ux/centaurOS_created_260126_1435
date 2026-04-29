@@ -247,11 +247,9 @@ describe("computeFeasibilityVerdict — Fix 3: HAPS phantom-GREEN closure (Loop 
         }
         const verdict = computeFeasibilityVerdict(input)
 
-        // phantom-GREEN: status=green + checkedConstraints empty.
-        expect(verdict.status).toBe("green")
-        expect(verdict.checkedConstraints).toHaveLength(0)
-        // The PDF layer (isPhantomGreen) maps this to UNREVIEWED — that is
-        // the CORRECT behaviour for a project where no solver has run yet.
+        // With data_completeness check, null inputs trigger amber.
+        expect(verdict.status).toBe("amber")
+        expect(verdict.checkedConstraints).toContain("data_completeness")
     })
 
     /**

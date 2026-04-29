@@ -1012,15 +1012,18 @@ export interface PartCostEstimate {
  */
 export interface AiCostEstimate {
   moduleId: string
-  totalPerUnit: number
+  /** Per-unit cost in GBP. null means "not estimated" (unknown) — distinct
+   *  from 0 which means "actually zero cost". Council fix 2C (3/6:
+   *  GPT-5.5 + Gemini + DeepSeek). */
+  totalPerUnit: number | null
   confidence: "low" | "medium" | "high"
   assumptions: string[]
 
   // ── V2: Parts-level breakdown ──
   /** Individual part cost estimates */
   parts?: PartCostEstimate[]
-  /** Assembly/integration labour cost in GBP */
-  labourCost?: number
+  /** Assembly/integration labour cost in GBP. null = not estimated. */
+  labourCost?: number | null
   /** Reasoning for the labour estimate */
   labourReasoning?: string
   /** Overall reasoning / summary for the estimate */

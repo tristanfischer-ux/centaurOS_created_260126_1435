@@ -203,7 +203,8 @@ describe("A3 — spatial overflow hard fail", () => {
         })
 
         expect(verdict.fails.some((f) => f.axis === "spatial_overflow")).toBe(false)
-        expect(verdict.status).toBe("green")
+        // Amber from data_completeness (EMPTY_BASE has null inputs), not from spatial_overflow.
+        expect(verdict.status).toBe("amber")
     })
 
     it("(d.4) null spatialPlanNotes does not trigger spatial_overflow check", () => {
