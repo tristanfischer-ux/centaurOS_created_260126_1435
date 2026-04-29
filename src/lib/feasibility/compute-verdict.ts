@@ -33,7 +33,7 @@
  */
 
 export type VerdictStatus = "green" | "amber" | "red"
-export type VerdictAxis = "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow"
+export type VerdictAxis = "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings"
 export type VerdictSeverity = "blocker" | "warning"
 
 export interface VerdictFail {
@@ -103,6 +103,46 @@ export interface VerdictInput {
         interior_d_mm: number
         interior_h_mm: number
     } | null
+    /**
+     * Canonical pre-computed unit cost in GBP, from the de-duplicated
+     * BOM parts roll-up (dedupedUnitTotalGbp). When supplied, this REPLACES
+     * the aiCostEstimates + parts.estimated_unit_cost_gbp computation so
+     * the verdict uses the IDENTICAL cost source that the PDF stat tile uses.
+     *
+     * Fix 1 — Loop 25 P0: unified cost roll-up.
+     * The root cause of the stat-tile vs feasibility-exception gap was that
+     * computeFeasibilityVerdict was called at pipeline time (proofreader stage)
+     * using aiCostEstimates (Finn's coarse per-module numbers), while the PDF
+     * stat tile is computed at render time using dedupAssemblyRollUp (granular
+     * parts table, assembly-parent rows de-duplicated). Passing the same
+     * dedupedUnitTotalGbp value here closes the gap: a single canonical source
+     * feeds both the persisted verdict and the cover tile.
+     *
+     * callers: run-proofreader.ts (pipeline time), export-project-pdf.tsx
+     * (render time re-compute for assertion).
+     */
+    canonicalUnitCostGbp?: number | null
+    /**
+     * Fang manufacturing review outputs, one entry per module. Used to
+     * escalate CRITICAL manufacturing findings into the feasibility verdict
+     * as blockers — previously they appeared only on individual module pages.
+     *
+     * Fix 3 — Loop 25 P0: HAPS phantom-GREEN via Fang CRITICAL escalation.
+     * HAPS solar array had CRITICAL findings (£35M–£80M cell cost against a
+     * £2.5M brief) that were visible on the module review page but not wired
+     * into the feasibility verdict. Without a blocker in fails[], the verdict
+     * had status=GREEN with empty checkedConstraints (phantom-GREEN). Adding
+     * the fang_critical_findings axis ensures any module with CRITICAL findings
+     * produces RED, not phantom-GREEN.
+     *
+     * Severity values that count as CRITICAL: "CRITICAL", "critical". Any
+     * module with at least one such issue adds a blocker fail on the
+     * fang_critical_findings axis.
+     */
+    fangModuleReviews?: Array<{
+        moduleName: string
+        issues: Array<{ severity: string; message: string }>
+    }> | null
 }
 
 /** UK 44-tonne articulated lorry legal payload, in kilograms. Beyond this,
@@ -147,8 +187,18 @@ export function computeFeasibilityVerdict(
     }
 
     // ── Cost ─────────────────────────────────────────────────────────
+    //
+    // Fix 1 — Loop 25 P0: unified cost source.
+    // When canonicalUnitCostGbp is supplied (the de-duplicated BOM
+    // parts roll-up), use it directly. This is the IDENTICAL value the
+    // PDF stat tile reads, so the verdict evidence and the cover tile
+    // always agree. Fall back to aiCostEstimates + parts sum only when
+    // the canonical value is absent (legacy / re-run paths).
     const costCeiling = numberOrNull(input.briefConstraints?.["unitCostCeilingGbp"])
-    const totalCostGbp = computeTotalCost(input.parts, input.aiCostEstimates)
+    const totalCostGbp =
+        input.canonicalUnitCostGbp != null && input.canonicalUnitCostGbp > 0
+            ? input.canonicalUnitCostGbp
+            : computeTotalCost(input.parts, input.aiCostEstimates)
     // Only treat cost as checked when both the ceiling and the total are
     // meaningful numbers — if either is null/zero there is nothing to
     // compare and a "no violations" result is vacuously true.
@@ -282,6 +332,63 @@ export function computeFeasibilityVerdict(
                     `(${((maxOverflowMm / envMax) * 100).toFixed(0)}% of the envelope). ` +
                     `Spatial plan notes: ${overflowNotes.slice(0, 3).join(" | ")}`,
             })
+        }
+    }
+
+    // ── Fang CRITICAL manufacturing findings ────────────────────────
+    //
+    // Fix 3 — Loop 25 P0: HAPS phantom-GREEN closure.
+    //
+    // Fang's CRITICAL findings (e.g. solar array cell cost £35M–£80M
+    // against a £2.5M brief) appeared only on module review pages and
+    // were NOT wired into the feasibility verdict. The result was a
+    // verdict with status=GREEN and empty checkedConstraints — phantom-GREEN.
+    //
+    // This check scans fangModuleReviews for any issue with
+    // severity="CRITICAL" (case-insensitive). When found, it adds a
+    // BLOCKER fail on the fang_critical_findings axis. This means:
+    //   (a) checkedConstraints becomes non-empty → phantom-GREEN cannot fire.
+    //   (b) fails[] is non-empty → status becomes RED.
+    //   (c) The feasibility exception page lists the CRITICAL findings
+    //       as blockers, not silent module footnotes.
+    if (Array.isArray(input.fangModuleReviews) && input.fangModuleReviews.length > 0) {
+        // Collect all CRITICAL issues across all modules.
+        const criticalFindings: Array<{ moduleName: string; message: string }> = []
+        for (const mod of input.fangModuleReviews) {
+            if (!Array.isArray(mod.issues)) continue
+            for (const issue of mod.issues) {
+                if (
+                    typeof issue.severity === "string" &&
+                    issue.severity.toUpperCase() === "CRITICAL"
+                ) {
+                    criticalFindings.push({
+                        moduleName: mod.moduleName,
+                        message: typeof issue.message === "string" ? issue.message : "(no message)",
+                    })
+                }
+            }
+        }
+        if (criticalFindings.length > 0) {
+            // Mark fang_critical_findings as a checked axis — the solver
+            // had reviews with CRITICAL findings, so the constraint is real.
+            checkedConstraints.push("fang_critical_findings")
+            // Emit one blocker per module that has CRITICAL findings.
+            // Group by module so a module with multiple CRITICAL issues
+            // appears as a single blocker (avoids flooding the exception page).
+            const byModule = new Map<string, string[]>()
+            for (const f of criticalFindings) {
+                const existing = byModule.get(f.moduleName) ?? []
+                existing.push(f.message)
+                byModule.set(f.moduleName, existing)
+            }
+            for (const [moduleName, messages] of byModule) {
+                fails.push({
+                    axis: "fang_critical_findings",
+                    severity: "blocker",
+                    summary: `${moduleName}: Fang raised CRITICAL manufacturing finding${messages.length > 1 ? "s" : ""}.`,
+                    evidence: messages.slice(0, 3).join(" | "),
+                })
+            }
         }
     }
 

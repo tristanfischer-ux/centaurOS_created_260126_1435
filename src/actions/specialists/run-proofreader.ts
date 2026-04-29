@@ -34,6 +34,7 @@ import {
     computeFeasibilityVerdict,
     type FeasibilityVerdict,
 } from "@/lib/feasibility/compute-verdict"
+import { dedupedUnitTotalGbp } from "@/lib/bom/assembly-dedup"
 
 /**
  * V4-Pro is the preferred proofreader (frontier reasoning at half-Haiku
@@ -245,6 +246,69 @@ export async function runProofreaderBackground(
         ((research as Record<string, unknown> | null)?.designBrief as
             | Record<string, unknown>
             | undefined)?.constraints as Record<string, unknown> | undefined
+
+    // Fix 1 — Loop 25 P0: canonical cost source.
+    // Compute the de-duplicated BOM parts roll-up (same path the PDF stat
+    // tile uses) and pass it as canonicalUnitCostGbp so the persisted
+    // verdict and the cover tile share one source of truth.
+    const partsForDedup = parts.map((p) => ({
+        estimatedUnitCostGbp:
+            typeof p.estimated_unit_cost_gbp === "number" ? p.estimated_unit_cost_gbp : null,
+        massKg: typeof p.mass_kg === "number" ? p.mass_kg : null,
+        partNumber: null as string | null,
+        name: null as string | null,
+        sourceModuleName: null as string | null,
+    }))
+    const canonicalUnitCostGbp = dedupedUnitTotalGbp(partsForDedup)
+
+    // Fix 3 — Loop 25 P0: parse Fang CRITICAL findings from reviews JSONB.
+    // The reviews JSONB is keyed by module ID. Each value has an `issues`
+    // array where each issue has a `severity` string. We extract the module
+    // name from the modules array to produce human-readable blocker evidence.
+    const fangModuleReviews: Array<{
+        moduleName: string
+        issues: Array<{ severity: string; message: string }>
+    }> = []
+    if (reviews && typeof reviews === "object") {
+        for (const [moduleKey, reviewData] of Object.entries(reviews)) {
+            // Each key is a module ID; resolve to name from modules array.
+            const moduleObj = modules.find(
+                (m) =>
+                    (m as Record<string, unknown>).id === moduleKey ||
+                    (m as Record<string, unknown>).name === moduleKey,
+            )
+            const moduleName =
+                typeof (moduleObj as Record<string, unknown> | undefined)?.name === "string"
+                    ? ((moduleObj as Record<string, unknown>).name as string)
+                    : moduleKey
+            // reviewData is an array of review rounds (Fang can run multiple).
+            const reviewRounds = Array.isArray(reviewData) ? reviewData : [reviewData]
+            const allIssues: Array<{ severity: string; message: string }> = []
+            for (const round of reviewRounds) {
+                if (!round || typeof round !== "object") continue
+                const roundIssues = (round as Record<string, unknown>).issues
+                if (!Array.isArray(roundIssues)) continue
+                for (const issue of roundIssues) {
+                    if (!issue || typeof issue !== "object") continue
+                    const sev = (issue as Record<string, unknown>).severity
+                    const msg =
+                        (issue as Record<string, unknown>).message ??
+                        (issue as Record<string, unknown>).description ??
+                        ""
+                    if (typeof sev === "string") {
+                        allIssues.push({
+                            severity: sev,
+                            message: typeof msg === "string" ? msg : "",
+                        })
+                    }
+                }
+            }
+            if (allIssues.length > 0) {
+                fangModuleReviews.push({ moduleName, issues: allIssues })
+            }
+        }
+    }
+
     const verdict: FeasibilityVerdict = computeFeasibilityVerdict({
         dimensionSheet,
         briefConstraints: briefConstraints ?? null,
@@ -261,6 +325,10 @@ export async function runProofreaderBackground(
             | null,
         shortlistCount: shortlist.length,
         bomRowCount: parts.length,
+        // Fix 1: unified cost source — deduped BOM roll-up matches the PDF tile.
+        canonicalUnitCostGbp: canonicalUnitCostGbp > 0 ? canonicalUnitCostGbp : null,
+        // Fix 3: Fang CRITICAL findings escalated to feasibility verdict blockers.
+        fangModuleReviews: fangModuleReviews.length > 0 ? fangModuleReviews : null,
     })
 
     const { error: updateErr } = await admin

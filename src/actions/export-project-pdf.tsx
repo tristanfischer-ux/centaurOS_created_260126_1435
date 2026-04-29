@@ -777,6 +777,17 @@ interface PdfInput {
         unitTotalGbp: number | null
         ceilingGbp: number | null
         perModule: Array<{ moduleName: string; totalGbp: number | null }>
+        /**
+         * Fix 1 — Loop 25 P0: build-time cost-mismatch assertion.
+         * When the persisted feasibility verdict's cost evidence references
+         * a value that differs from the canonical deduped BOM roll-up by
+         * more than 1%, this field is set to the gap percentage (0–100).
+         * The cover renders an amber warning banner so the founder sees
+         * the stale verdict before proceeding. Null means no mismatch.
+         * Re-running the proofreader will re-compute the verdict with
+         * the canonical cost and clear this flag.
+         */
+        costMismatchPct: number | null
     }
     suppliers: SupplierPdf[]
     auditLog: AuditRowPdf[]
@@ -870,7 +881,7 @@ interface PdfInput {
         status: "green" | "amber" | "red"
         ranAtIso: string
         fails: Array<{
-            axis: "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow"
+            axis: "envelope" | "mass" | "cost" | "transport" | "suppliers" | "spatial_overflow" | "fang_critical_findings"
             severity: "blocker" | "warning"
             summary: string
             evidence: string
@@ -1008,6 +1019,31 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                     </View>
                 )}
 
+                {/* Fix 1 — Loop 25 P0: cost-mismatch assertion banner.
+                    Fires when the persisted feasibility-verdict cost evidence
+                    and the canonical deduped BOM roll-up differ by more than
+                    1%. The founder sees this BEFORE any cost number on the
+                    cover, prompting a proofreader re-run to sync the verdict. */}
+                {data.cost.costMismatchPct != null && !isHardInfeasible(data.feasibilityVerdict) && (
+                    <View
+                        style={{
+                            marginTop: 14,
+                            padding: 8,
+                            borderRadius: 4,
+                            backgroundColor: "#fef3c7",
+                            borderLeftWidth: 3,
+                            borderLeftColor: "#b45309",
+                        }}
+                    >
+                        <Text style={{ fontSize: 10, color: "#7c2d12", fontWeight: "bold" }}>
+                            {`Cost figures may be stale — ${data.cost.costMismatchPct.toFixed(0)}% gap between the cover tile and the feasibility verdict`}
+                        </Text>
+                        <Text style={{ fontSize: 9, color: "#7c2d12", marginTop: 3 }}>
+                            The feasibility exception page shows a cost figure from an earlier pipeline run. The cover tile uses the current bill of materials (de-duplicated roll-up). Re-run the proofreader to sync the feasibility verdict against the current bill of materials.
+                        </Text>
+                    </View>
+                )}
+
                 {/* L13-P3 (2026-04-27): hard-infeasibility banner on the
                     cover. When the design fails an envelope / mass /
                     transport blocker, modules + bill of materials + cost
@@ -1086,7 +1122,14 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                      * "Not declared" instead of "—" when ceiling is missing
                      * so the gap is named, not hidden. */}
                     {(() => {
-                        const unit = data.cost.unitTotalGbp
+                        // Fix 1 — Loop 25 P0: for hard-infeasible PDFs, the design
+                        // does not have a valid procurement-ready cost — suppress
+                        // the UNIT COST tile to prevent a misleading number appearing
+                        // alongside "BRIEF INFEASIBLE — DO NOT PROCEED". Show "—"
+                        // with an "Infeasible" label instead. The ceiling is still
+                        // shown so the founder understands the gap they need to close.
+                        const hardInfeasibleCover = isHardInfeasible(data.feasibilityVerdict)
+                        const unit = hardInfeasibleCover ? null : data.cost.unitTotalGbp
                         const ceiling = data.cost.ceilingGbp
                         const headroom =
                             unit != null && ceiling != null ? ceiling - unit : null
@@ -1095,7 +1138,14 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                             <View style={styles.statRow}>
                                 <View style={styles.stat}>
                                     <Text style={styles.statLabel}>Unit cost</Text>
-                                    <Text style={styles.statValue}>{fmtGbp(unit)}</Text>
+                                    <Text style={styles.statValue}>
+                                        {hardInfeasibleCover ? "—" : fmtGbp(unit)}
+                                    </Text>
+                                    {hardInfeasibleCover && (
+                                        <Text style={{ fontSize: 7, color: "#b91c1c", marginTop: 1 }}>
+                                            Not computed — design infeasible
+                                        </Text>
+                                    )}
                                 </View>
                                 <View style={styles.stat}>
                                     <Text style={styles.statLabel}>Ceiling</Text>
@@ -1114,9 +1164,11 @@ function CoverPage({ data }: { data: PdfInput }): React.ReactElement {
                                                 : styles.statValue
                                         }
                                     >
-                                        {headroom != null
-                                            ? `${isOver ? "−" : "+"}${fmtGbp(Math.abs(headroom))}${isOver ? " OVER" : ""}`
-                                            : "—"}
+                                        {hardInfeasibleCover
+                                            ? "—"
+                                            : headroom != null
+                                              ? `${isOver ? "−" : "+"}${fmtGbp(Math.abs(headroom))}${isOver ? " OVER" : ""}`
+                                              : "—"}
                                     </Text>
                                 </View>
                             </View>
@@ -1516,6 +1568,8 @@ function axisLabel(axis: NonNullable<PdfInput["feasibilityVerdict"]>["fails"][nu
             return "Supplier coverage"
         case "spatial_overflow":
             return "Spatial plan — envelope overflow"
+        case "fang_critical_findings":
+            return "Manufacturing review — CRITICAL findings"
     }
 }
 
@@ -5367,29 +5421,27 @@ async function exportProjectPdfInternal(
         let unitTotalGbp = 0
         for (const v of dedupedRollUp.effectiveCost) unitTotalGbp += v
 
-        // A2 — Loop 26 Tier-A fix: stat-tile sanity check.
+        // A2 / Fix 1 — Loop 25+26 P0: build-time cost-mismatch assertion.
         //
         // The cover-page "Unit cost" stat tile reads from `unitTotalGbp`
         // (the deduped parts-table roll-up). The feasibility verdict's
         // cost-axis evidence string was computed at pipeline time by
-        // `computeFeasibilityVerdict`, which uses a different cost source
-        // (Finn ai_cost_estimates roll-up, falling back to raw parts sum
-        // WITHOUT the dedup pass). When the BOM is updated after the
-        // verdict is persisted, the two sources diverge — BESS Loop 24
-        // showed £852,064 on the cover tile and £274,483 in the feasibility
-        // exception (same project, two different cost computation paths).
+        // `computeFeasibilityVerdict`. After Fix 1 (Loop 25 P0), the
+        // proofreader now passes `canonicalUnitCostGbp` so the persisted
+        // verdict uses the same deduped source. However, projects proofread
+        // BEFORE the fix was deployed still carry stale evidence strings.
         //
-        // Canonical source for the stat tile: `unitTotalGbp` (deduped
-        // parts-table roll-up). This is the value the cover tile,
-        // BOM master, and reconciliation gate all read from — the single
-        // source of truth in this render.
+        // This assertion computes the gap at PDF render time and:
+        //   (a) Logs the inconsistency (Vercel logs, loop-critique).
+        //   (b) Exposes `costMismatchPct` in the data object so the cover
+        //       can render an amber banner when gap > 1%.
         //
-        // When the persisted verdict's cost fail evidence references a
-        // significantly different number (>5% gap), log the inconsistency
-        // so it surfaces in Vercel logs and can be caught by the
-        // loop-critique. The verdict evidence is NOT retroactively fixed
-        // (it is a JSONB value from a previous pipeline run); the
-        // stat tile continues to read the canonical value.
+        // The 1% threshold is tight by design: a "—" em dash for stub
+        // PDFs and a real GBP number for feasible PDFs must agree within
+        // rounding noise. Any gap > 1% indicates the verdict was persisted
+        // before the dedup pass was wired in and the proofreader needs
+        // a re-run.
+        let costMismatchPct: number | null = null
         if (project.feasibility_verdict && unitTotalGbp > 0) {
             const persistedVerdict = project.feasibility_verdict as {
                 fails?: Array<{ axis?: unknown; evidence?: unknown }>
@@ -5405,17 +5457,18 @@ async function exportProjectPdfInternal(
                     const verdictCost = parseFloat(firstGbpMatch[1].replace(/,/g, ""))
                     if (Number.isFinite(verdictCost) && verdictCost > 0) {
                         const gap = Math.abs(unitTotalGbp - verdictCost) / verdictCost
-                        if (gap > 0.05) {
+                        if (gap > 0.01) {
+                            // Assert: gap > 1% is a data-pipeline inconsistency.
+                            costMismatchPct = parseFloat((gap * 100).toFixed(1))
                             console.warn(
-                                "[pdf-stats] internal inconsistency: tile=unit_cost " +
-                                "tile_value=" + Math.round(unitTotalGbp) + " " +
-                                "canonical=" + Math.round(unitTotalGbp) + " " +
-                                "verdict_evidence=" + Math.round(verdictCost) + " " +
-                                "gap_pct=" + (gap * 100).toFixed(1) + "% " +
+                                "[pdf-stats] COST-MISMATCH (Fix 1 assertion): tile=unit_cost " +
+                                "tile_value=£" + Math.round(unitTotalGbp) + " " +
+                                "verdict_evidence=£" + Math.round(verdictCost) + " " +
+                                "gap_pct=" + costMismatchPct.toFixed(1) + "% " +
                                 "project=" + projectId + ". " +
-                                "Cover tile uses canonical (deduped parts roll-up); " +
-                                "feasibility exception uses stale pipeline-time value. " +
-                                "Re-run the proofreader to re-compute the verdict against the current BOM.",
+                                "Cover tile uses canonical (deduped parts roll-up). " +
+                                "Feasibility exception uses pipeline-time verdict. " +
+                                "Re-run the proofreader to sync the verdict against the current BOM.",
                             )
                         }
                     }
@@ -5770,6 +5823,12 @@ async function exportProjectPdfInternal(
                     typeof designBrief?.constraints?.unitCostCeilingGbp === "number"
                         ? designBrief!.constraints!.unitCostCeilingGbp
                         : null,
+                // Fix 1 — Loop 25 P0: cost-mismatch assertion result.
+                // Non-null when the persisted verdict cost evidence differs
+                // from the canonical deduped BOM roll-up by more than 1%.
+                // The cover renders an amber banner so the founder sees
+                // the inconsistency before relying on any cost number.
+                costMismatchPct,
             },
             // Loop 8 P3 — cost-realism reframe via Oracle benchmark band.
             oracleProjectBand: await (async () => {
