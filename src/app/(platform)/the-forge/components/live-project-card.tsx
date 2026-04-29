@@ -30,7 +30,9 @@ import { Clock, Flame, CheckCircle2 } from "lucide-react"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { cadLabProjectUrl } from "@/lib/forge-routes"
+// cadLabProjectUrl intentionally NOT imported here — this card is used on the
+// /the-forge-v2 hub, so project tiles must link to the V2 detail page, not the
+// legacy /the-forge/cad-lab workbench. See loop-25 fix (commit following 4119a72d).
 import { PromoteToProductButton } from "./promote-to-product-button"
 import { STAGE_NARRATIVES } from "@/lib/forge-narrative/stage-narratives"
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
@@ -254,7 +256,7 @@ export function LiveProjectCard({ project, canPromote }: LiveProjectCardProps): 
     // ─── Card JSX ─────────────────────────────────────────────────────────────
 
     return (
-        <Link href={cadLabProjectUrl(project.id)}>
+        <Link href={`/the-forge-v2/projects/${project.id}`}>
             <Card className="group cursor-pointer transition-all hover:shadow-lg hover:-translate-y-0.5">
                 {/* Thumbnail */}
                 <div className="h-32 rounded-t-xl overflow-hidden bg-gradient-to-br from-international-orange/5 to-muted relative">
