@@ -273,9 +273,6 @@ export async function structureReportOutline(
   audience: ReportAudience = DEFAULT_AUDIENCE,
 ): Promise<{ outline: ReportOutline; tokensIn: number; tokensOut: number }> {
   return withAIGate('cad_lab_report', async ({ trackUsage }) => {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
-
   const data = stripForServer(rawData)
   const dataSummary = buildDataSummary(data)
   const stageContext = STAGE_CONTEXT[data.stage] ?? ""
@@ -360,51 +357,23 @@ slideData shapes by layout:
 DATA:
 ${dataSummary}`
 
-  const response = await withRetry(
-    () => fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          // Loop 8 cost cut (2026-04-26): claude-opus-4-7 → claude-sonnet-4-6
-          // for the PDF report synthesis. This runs once per project per
-          // regen × 6 projects. Opus → Sonnet ≈ 5× cheaper without quality
-          // risk on prose synthesis (Sonnet is already used for Chase + Max
-          // research at this fidelity bar).
-          model: "claude-sonnet-4-6",
-          max_tokens: 12288,
-          temperature: 0.3,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
-      },
-      90_000,
-    ),
-    {
-      maxRetries: 2,
-      baseDelay: 2000,
-      shouldRetry: (error) => {
-        const msg = error.message.toLowerCase()
-        return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
-          msg.includes('network') || msg.includes('timeout') || msg.includes('529')
-      },
-    },
-  )
+  const { callOpenRouter } = await import("@/lib/ai/openrouter")
+  const orResult = await callOpenRouter({
+    model: "deepseek/deepseek-v4-pro",
+    system: systemPrompt,
+    prompt: userPrompt,
+    maxTokens: 12288,
+    temperature: 0.3,
+    timeoutMs: 90_000,
+  })
 
-  if (!response.ok) {
-    const errText = await response.text()
-    throw new Error(`Opus API error (${response.status}): ${errText.slice(0, 300)}`)
+  if (!orResult.ok) {
+    throw new Error(`Report outline failed: ${orResult.error}`)
   }
 
-  const result = await response.json()
-  const text: string = result.content?.[0]?.text ?? ""
-  const tokensIn: number = result.usage?.input_tokens ?? 0
-  const tokensOut: number = result.usage?.output_tokens ?? 0
+  const text: string = orResult.text
+  const tokensIn: number = orResult.inputTokens
+  const tokensOut: number = orResult.outputTokens
 
   const jsonStr = extractJson(text)
   let outline: ReportOutline
@@ -439,7 +408,7 @@ ${dataSummary}`
   outline.executiveSummary ??= ''
   outline.narrativeThread ??= ''
 
-  await trackUsage({ model: 'claude-opus-4-7', promptTokens: tokensIn, completionTokens: tokensOut })
+  await trackUsage({ model: 'deepseek-v4-pro', promptTokens: tokensIn, completionTokens: tokensOut })
 
   return { outline, tokensIn, tokensOut }
   }) // end withAIGate
