@@ -226,6 +226,38 @@ export interface MarketplaceListing {
     average_rating: number | null
     /** Denormalised review count from marketplace_reviews. */
     review_count: number | null
+    /** Lead time text (Nightshift enrichment). */
+    lead_time: string | null
+    /** Minimum order requirement (Nightshift enrichment). */
+    minimum_order: string | null
+    /** Production capacity description (Nightshift enrichment). */
+    production_capacity: string | null
+    /** Quality systems description (Nightshift enrichment). */
+    quality_systems: string | null
+    /** Products offered as JSONB string array (Nightshift enrichment). */
+    products: unknown[] | null
+    /** Specialties as JSONB string array (Nightshift enrichment). */
+    specialties: unknown[] | null
+    /** Full registered or location address (Nightshift enrichment). */
+    address: string | null
+    /** Website URL (Nightshift enrichment). */
+    website_url: string | null
+    /** Founded year (Nightshift enrichment). */
+    founded_year: number | null
+    /** Exact employee count (Nightshift enrichment). */
+    employee_count_exact: number | null
+    /** Data quality score 0–100. */
+    data_quality_score: number | null
+    /** ISO 14001 certification (Nightshift enrichment). */
+    iso_14001: boolean | null
+    /** Carbon disclosure status (Nightshift enrichment). */
+    carbon_disclosed: boolean | null
+    /** Key people (Nightshift enrichment). */
+    key_people: unknown[] | null
+    /** Geocoded latitude (persisted after first Nominatim call). */
+    latitude: number | null
+    /** Geocoded longitude (persisted after first Nominatim call). */
+    longitude: number | null
 }
 
 /**
@@ -241,6 +273,10 @@ const LISTING_COLUMNS = [
     'enrichment_quality', 'security_clearances', 'created_at',
     'data_quality_score', 'average_rating', 'review_count',
     'country', 'city', 'company_size', 'contact_email',
+    'lead_time', 'minimum_order', 'production_capacity', 'quality_systems',
+    'products', 'specialties', 'address', 'website_url',
+    'founded_year', 'employee_count_exact', 'iso_14001', 'carbon_disclosed',
+    'key_people', 'latitude', 'longitude',
 ].join(', ')
 
 import { MARKETPLACE_PAGE_SIZE } from '@/lib/marketplace-constants'

@@ -12,31 +12,6 @@ export type Database = {
   __InternalSupabase: {
     PostgrestVersion: "14.1"
   }
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
-  }
   public: {
     Tables: {
       account_balances: {
@@ -12314,7 +12289,9 @@ export type Database = {
           key_people: Json | null
           last_contacted_at: string | null
           last_enriched_at: string | null
+          latitude: number | null
           lead_time: string | null
+          longitude: number | null
           materials: Json | null
           minimum_order: string | null
           outreach_contact_id: string | null
@@ -12383,7 +12360,9 @@ export type Database = {
           key_people?: Json | null
           last_contacted_at?: string | null
           last_enriched_at?: string | null
+          latitude?: number | null
           lead_time?: string | null
+          longitude?: number | null
           materials?: Json | null
           minimum_order?: string | null
           outreach_contact_id?: string | null
@@ -12452,7 +12431,9 @@ export type Database = {
           key_people?: Json | null
           last_contacted_at?: string | null
           last_enriched_at?: string | null
+          latitude?: number | null
           lead_time?: string | null
+          longitude?: number | null
           materials?: Json | null
           minimum_order?: string | null
           outreach_contact_id?: string | null
@@ -15354,6 +15335,7 @@ export type Database = {
           ai_generated: boolean
           cad_lab_project_id: string
           cost_justification: string | null
+          cost_provenance: string
           created_at: string
           description: string | null
           drawing_url: string | null
@@ -15384,6 +15366,7 @@ export type Database = {
           ai_generated?: boolean
           cad_lab_project_id: string
           cost_justification?: string | null
+          cost_provenance?: string
           created_at?: string
           description?: string | null
           drawing_url?: string | null
@@ -15414,6 +15397,7 @@ export type Database = {
           ai_generated?: boolean
           cad_lab_project_id?: string
           cost_justification?: string | null
+          cost_provenance?: string
           created_at?: string
           description?: string | null
           drawing_url?: string | null
@@ -27896,9 +27880,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       account_type: ["team_builder", "supplier"],

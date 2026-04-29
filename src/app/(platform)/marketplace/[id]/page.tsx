@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { createClient } from "@/lib/supabase/server"
+import { createAdminClient } from "@/lib/supabase/admin"
 import { notFound } from "next/navigation"
 import { MarketplaceListingDetail } from "./listing-detail"
 import { MarketplaceListing } from "@/actions/marketplace"
@@ -7,6 +8,8 @@ import { getProviderTrustSignals } from "@/actions/trust-signals"
 import { getProviderRatings } from "@/actions/ratings"
 import { getListingExecutives } from "@/actions/listing-executives"
 import { getReviewsForListing } from "@/actions/marketplace-reviews"
+import { geocodeAddress } from "@/lib/geocoding"
+import { hasValue } from "@/lib/has-value"
 
 interface PageProps {
     params: Promise<{ id: string }>
@@ -49,6 +52,39 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
     // Get the current user (may be null for unauthenticated visitors)
     const { data: { user } } = await supabase.auth.getUser()
 
+    // Geocoding — lazy. If the row already has lat/lng, skip the API call.
+    // If not, attempt Nominatim and persist the result so the next render
+    // is free. Fails silently on any error (map simply won't render).
+    let listingWithGeo = listing as MarketplaceListing
+    if (listingWithGeo.latitude == null || listingWithGeo.longitude == null) {
+        // Build the geocoding query from the best available address data
+        const geoQuery = [listing.address, listing.city, listing.country]
+            .filter((v) => hasValue(v))
+            .join(', ')
+
+        if (geoQuery.trim().length > 0) {
+            try {
+                const geo = await geocodeAddress(geoQuery)
+                if (geo) {
+                    // Persist to the row so future renders skip the geocode
+                    const admin = createAdminClient()
+                    await admin
+                        .from('marketplace_listings')
+                        .update({ latitude: geo.lat, longitude: geo.lon })
+                        .eq('id', id)
+
+                    listingWithGeo = {
+                        ...listingWithGeo,
+                        latitude: geo.lat,
+                        longitude: geo.lon,
+                    } as MarketplaceListing
+                }
+            } catch {
+                // Geocoding failure must never break the page
+            }
+        }
+    }
+
     // Fetch trust signals, ratings, executives, and reviews in parallel
     let trustSignals = null
     let ratings = null
@@ -83,7 +119,7 @@ export default async function MarketplaceListingPage({ params }: PageProps) {
 
     return (
         <MarketplaceListingDetail
-            listing={listing as MarketplaceListing}
+            listing={listingWithGeo}
             trustSignals={trustSignals}
             ratings={ratings}
             executives={executives}

@@ -109,6 +109,14 @@ function mapToSupplierCard(row: Record<string, unknown>): SupplierCard {
     ...(row.founded_year != null && { founded_year: row.founded_year, year_founded: row.founded_year }),
     ...(row.relevance_score != null && { relevance_score: row.relevance_score }),
     ...(row.enrichment_quality != null && { enrichment_quality: row.enrichment_quality }),
+    // Fields previously unreachable from the detail page — added 2026-04-29
+    ...(row.lead_time != null && { lead_time: row.lead_time }),
+    ...(row.minimum_order != null && { minimum_order: row.minimum_order }),
+    ...(row.production_capacity != null && { production_capacity: row.production_capacity }),
+    ...(row.financial_health != null && { financial_health: row.financial_health }),
+    ...(row.quality_systems != null && { quality_systems: row.quality_systems }),
+    ...(row.products != null && { products: row.products }),
+    ...(row.specialties != null && { specialties: row.specialties }),
   }
 
   return {

@@ -5,52 +5,37 @@ import { MarketplaceListing } from "@/actions/marketplace"
 import { contactExpert } from "@/actions/messaging"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { cn } from "@/lib/utils"
-import {
-    safeParseAttributes,
-    safeStringArray,
-    HIDDEN_ATTRIBUTES,
-    ATTRIBUTE_GROUP_ORDER,
-    formatAttributeLabel,
-    isURL,
-} from "@/lib/marketplace-utils"
+import { safeParseAttributes, safeStringArray } from "@/lib/marketplace-utils"
 import { getCategoryBadgeClasses, type MarketplaceCategory } from "@/lib/marketplace-colors"
+import { hasValue } from "@/lib/has-value"
+import { buildOsmEmbedUrl, buildOsmViewUrl } from "@/lib/geocoding"
 import {
     ShieldCheck,
     MapPin,
     Clock,
-    GraduationCap,
     Briefcase,
     Building2,
-    PoundSterling,
     Zap,
-    Target,
     Award,
-    Gauge,
     Layers,
     Timer,
     Package,
     Wrench,
     Users,
-    Brain,
-    Cpu,
     BarChart3,
     CheckCircle2,
-    Star,
     Calendar,
     MessageSquare,
     Loader2,
     ExternalLink,
     Globe,
-    Mail,
     Send,
     ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
 import { QuoteRequestDialog } from "@/components/marketplace/quote-request-dialog"
-import { ProviderTrustSection } from "@/components/marketplace/ProviderTrustSection"
-import { CompanyLocationMap } from "@/components/marketplace/CompanyLocationMap"
 import { VerificationBadge } from "@/components/marketplace/VerificationBadge"
 import type { PortfolioItem, Certification, ProviderBadge } from "@/actions/trust-signals"
 import type { RatingsSummary, ProviderRating } from "@/actions/ratings"
@@ -58,7 +43,8 @@ import type { PublicExecutive } from "@/actions/listing-executives"
 import type { MarketplaceReview } from "@/actions/marketplace-reviews"
 import { ListingReviewsSection, ListingRatingSummary } from "@/components/marketplace/listing-reviews"
 import { toast } from "sonner"
-import { AvailabilityMiniCalendar } from "@/components/marketplace/availability-mini-calendar"
+
+// ── Types ────────────────────────────────────────────────────────────────────
 
 interface TrustSignalsData {
     portfolio: PortfolioItem[]
@@ -81,21 +67,71 @@ interface MarketplaceListingDetailProps {
     currentUserId?: string | null
 }
 
-export function MarketplaceListingDetail({ listing, trustSignals, ratings, executives = [], reviews = [], currentUserId = null }: MarketplaceListingDetailProps) {
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+/** Render a string array as chip pills, or null if empty. */
+function ChipList({ items, className }: { items: unknown; className?: string }) {
+    const arr = safeStringArray(items)
+    const valid = arr.filter((s) => hasValue(s))
+    if (valid.length === 0) return null
+    return (
+        <div className={cn("flex flex-wrap gap-1.5", className)}>
+            {valid.map((s, i) => (
+                <span
+                    key={i}
+                    className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted text-foreground"
+                >
+                    {s}
+                </span>
+            ))}
+        </div>
+    )
+}
+
+/** Section header with mono eyebrow + thin divider below. */
+function SectionHeader({ label }: { label: string }) {
+    return (
+        <>
+            <h2 className="text-xs font-mono uppercase tracking-widest text-muted-foreground">
+                {label}
+            </h2>
+            <div className="border-t border-border/40" />
+        </>
+    )
+}
+
+/** A single field row: label + value. Renders nothing if value has no content. */
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="flex flex-col gap-0.5 py-2 border-b border-border/30 last:border-0">
+            <dt className="text-[10px] text-muted-foreground uppercase tracking-wider">
+                {label}
+            </dt>
+            <dd>{children}</dd>
+        </div>
+    )
+}
+
+// ── Main component ────────────────────────────────────────────────────────────
+
+export function MarketplaceListingDetail({
+    listing,
+    trustSignals,
+    ratings,
+    executives = [],
+    reviews = [],
+    currentUserId = null,
+}: MarketplaceListingDetailProps) {
     const attrs = safeParseAttributes(listing.attributes)
     const category = listing.category
     const [isContacting, setIsContacting] = useState(false)
 
-    // Handle contacting the expert/provider
     const handleContact = async () => {
-        // Get the provider ID from the listing attributes
         const providerId = attrs.provider_id as string
-        
         if (!providerId) {
             toast.error('Unable to contact this provider')
             return
         }
-
         setIsContacting(true)
         try {
             const result = await contactExpert(providerId, listing.id)
@@ -104,7 +140,7 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
             } else {
                 toast.error(result.error || 'Failed to start conversation')
             }
-        } catch (error) {
+        } catch {
             toast.error('Failed to contact expert')
         } finally {
             setIsContacting(false)
@@ -112,8 +148,8 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
     }
 
     return (
-        <div className="space-y-4">
-            {/* Breadcrumb — Forge Capital pattern: Home › Suppliers › <name> */}
+        <div className="space-y-6">
+            {/* Breadcrumb */}
             <nav aria-label="Breadcrumb" className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Link href="/today" className="hover:text-foreground transition-colors">Home</Link>
                 <ChevronRight className="h-3 w-3" />
@@ -121,8 +157,9 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                 <ChevronRight className="h-3 w-3" />
                 <span className="text-foreground font-medium truncate max-w-[280px]">{listing.title}</span>
             </nav>
-            {/* Header - Matches Strategic Objectives style exactly */}
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-3">
+
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4 pb-2">
                 <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-3 mb-1">
                         <div className="h-8 w-1 bg-international-orange rounded-full shadow-[0_0_8px_rgba(234,88,12,0.6)]" />
@@ -136,68 +173,18 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                             {listing.subcategory}
                         </Badge>
                         <VerificationBadge tier={listing.verification_tier} size="md" showLabel />
-                        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight">
-                            {listing.title}
-                        </h1>
-                        {category === 'People' && attrs.role && (
-                            <span className="text-lg text-muted-foreground">
-                                {attrs.role}
-                            </span>
-                        )}
                     </div>
-                    {/* Star rating summary */}
+                    <h1 className="text-2xl sm:text-3xl font-display font-semibold text-foreground tracking-tight mt-1">
+                        {listing.title}
+                    </h1>
                     <ListingRatingSummary
                         averageRating={listing.average_rating != null ? Number(listing.average_rating) : null}
                         reviewCount={listing.review_count ?? 0}
                     />
                 </div>
 
-                <div className="flex items-center gap-2">
-                    {category === 'People' ? (
-                        <Button variant="secondary" asChild>
-                            <Link href={`/marketplace/${listing.id}/book`}>
-                                <Calendar className="h-4 w-4 mr-2" />
-                                Book Consultation
-                            </Link>
-                        </Button>
-                    ) : attrs.provider_id ? (
-                        <Button
-                            variant="secondary"
-                            onClick={handleContact}
-                            disabled={isContacting}
-                        >
-                            {isContacting ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Sending...
-                                </>
-                            ) : (
-                                <>
-                                    <MessageSquare className="h-4 w-4 mr-2" />
-                                    Send Enquiry
-                                </>
-                            )}
-                        </Button>
-                    ) : attrs.contact_email ? (
-                        <Button variant="secondary" asChild>
-                            <a href={`mailto:${attrs.contact_email}?subject=Enquiry about ${listing.title}`}>
-                                <Mail className="h-4 w-4 mr-2" />
-                                Send Enquiry
-                            </a>
-                        </Button>
-                    ) : attrs.website_url ? (
-                        <Button variant="secondary" asChild>
-                            <a href={String(attrs.website_url)} target="_blank" rel="noopener noreferrer">
-                                <Globe className="h-4 w-4 mr-2" />
-                                Visit Website
-                            </a>
-                        </Button>
-                    ) : null}
-                    {/* Request Quote — available for any non-People listing.
-                        Falls back to attrs.contact_email when the top-level
-                        contact_email column is unpopulated (common for CH-only
-                        enriched rows like EUROLINK where the email lives in
-                        the attributes JSONB rather than the top-level column). */}
+                {/* CTA buttons */}
+                <div className="flex items-center gap-2 flex-shrink-0">
                     {category !== 'People' && (listing.contact_email || attrs.contact_email) && (
                         <QuoteRequestDialog
                             listings={listing}
@@ -209,800 +196,463 @@ export function MarketplaceListingDetail({ listing, trustSignals, ratings, execu
                             }
                         />
                     )}
-                    {attrs.provider_id && (
+                    {attrs.provider_id ? (
                         <Button
-                            variant="default"
+                            variant="secondary"
                             onClick={handleContact}
                             disabled={isContacting}
-                            className="bg-international-orange hover:bg-international-orange-hover"
                         >
                             {isContacting ? (
-                                <>
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                    Connecting...
-                                </>
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Connecting...</>
                             ) : (
-                                <MessageSquare className="h-4 w-4" />
+                                <><MessageSquare className="h-4 w-4 mr-2" />Send Enquiry</>
                             )}
                         </Button>
-                    )}
+                    ) : hasValue(listing.website_url) ? (
+                        <Button variant="secondary" asChild>
+                            <a href={String(listing.website_url)} target="_blank" rel="noopener noreferrer">
+                                <Globe className="h-4 w-4 mr-2" />
+                                Visit Website
+                            </a>
+                        </Button>
+                    ) : null}
                 </div>
             </div>
 
-            <div className="space-y-4">
-                    {/* Description */}
-                    <section>
-                        <h2 className="text-lg font-semibold text-foreground mb-2">About</h2>
-                        <p className="text-muted-foreground leading-relaxed">
-                            {listing.description}
-                        </p>
-                    </section>
+            {/* ── Section 1: What they make ─────────────────────────────────── */}
+            <WhatTheyMakeSection listing={listing} attrs={attrs} />
 
-                    {/* Key Details — previously in right-rail sidebar, now inline */}
-                    <KeyDetailsInline category={category} attrs={attrs} />
+            {/* ── Section 2: Manufacturing specifics ───────────────────────── */}
+            <ManufacturingSpecificsSection listing={listing} attrs={attrs} />
 
-                    {/* Location Map */}
-                    {(attrs.ch_registered_address || attrs.location) && (
-                        <CompanyLocationMap address={String(attrs.ch_registered_address || attrs.location)} />
-                    )}
+            {/* ── Section 3: Project fit and trust ─────────────────────────── */}
+            <ProjectFitAndTrustSection listing={listing} attrs={attrs} />
 
-                    {/* Category-specific sections */}
-                    {category === 'People' && <PeopleSection attrs={attrs} />}
-                    {category === 'People' && attrs.provider_id && (
-                        <AvailabilityMiniCalendar providerId={attrs.provider_id as string} />
-                    )}
-                    {/* Featured Work — surface portfolio items prominently for People */}
-                    {category === 'People' && trustSignals?.portfolio && trustSignals.portfolio.length > 0 && (
-                        <FeaturedWorkPreview portfolio={trustSignals.portfolio} />
-                    )}
-                    {category === 'Products' && <ProductsSection attrs={attrs} />}
-                    {category === 'Services' && <ServicesSection attrs={attrs} />}
+            {/* ── Section 4: Company background ────────────────────────────── */}
+            <CompanyBackgroundSection listing={listing} attrs={attrs} />
 
-                    {/* Top-level supplier data — surfaces ~20 columns the prior page ignored.
-                        Tristan's call 2026-04-26: "the database on suppliers and investors is enormous,
-                        no point having lots of fields if they're not actually being revealed". */}
-                    {category !== 'People' && <SupplierDataPanorama listing={listing} />}
+            {/* Fractional executives (People listings only) */}
+            {executives.length > 0 && <ExecutivesDisplay executives={executives} />}
 
-                    {/* Companies House info (directors, PSC, SIC codes) — only for non-People listings */}
-                    {category !== 'People' && <CompanyInfoSection attrs={attrs} />}
+            {/* ── Section 5: Engage ─────────────────────────────────────────── */}
+            <EngageSection listing={listing} attrs={attrs} onContact={handleContact} isContacting={isContacting} />
 
-                    {/* Trust & Credentials Section */}
-                    {(trustSignals || ratings) && (
-                        <ProviderTrustSection
-                            ratingSummary={ratings?.summary}
-                            reviews={ratings?.reviews || []}
-                            badges={trustSignals?.badges || []}
-                            certifications={trustSignals?.certifications || []}
-                            portfolio={trustSignals?.portfolio || []}
-                        />
-                    )}
-
-                    {/* Fractional Executives */}
-                    {executives.length > 0 && (
-                        <ExecutivesDisplay executives={executives} />
-                    )}
-
-                    {/* All Attributes */}
-                    <AttributesSection attrs={attrs} category={category} />
-
-                    {/* Reviews Section */}
-                    <ListingReviewsSection
-                        listingId={listing.id}
-                        initialReviews={reviews}
-                        currentUserId={currentUserId}
-                    />
-            </div>
+            {/* Reviews */}
+            <ListingReviewsSection
+                listingId={listing.id}
+                initialReviews={reviews}
+                currentUserId={currentUserId}
+            />
         </div>
     )
 }
 
-// KeyDetailsInline — same data as the old sidebar KeyMetricsCard, but rendered
-// inline as a single-column section so the layout stays one-column everywhere.
-function KeyDetailsInline({ category, attrs }: { category: string; attrs: Record<string, any> }) {
-    const metrics: { label: string; value: any; icon: React.ReactNode }[] = []
+// ── Section 1: What they make ─────────────────────────────────────────────────
 
-    if (category === 'People') {
-        if (attrs.rate) metrics.push({ label: 'Rate', value: attrs.rate, icon: <PoundSterling className="h-4 w-4" /> })
-        if (attrs.years_experience) metrics.push({ label: 'Experience', value: `${attrs.years_experience} years`, icon: <Briefcase className="h-4 w-4" /> })
-        if (attrs.projects_completed) metrics.push({ label: 'Projects', value: attrs.projects_completed, icon: <CheckCircle2 className="h-4 w-4" /> })
-        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
-    } else if (category === 'Products') {
-        if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <PoundSterling className="h-4 w-4" /> })
-        if (attrs.lead_time) metrics.push({ label: 'Lead Time', value: attrs.lead_time, icon: <Timer className="h-4 w-4" /> })
-        if (attrs.moq) metrics.push({ label: 'MOQ', value: attrs.moq, icon: <Package className="h-4 w-4" /> })
-        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
-    } else if (category === 'Services') {
-        if (attrs.rate || attrs.pricing) metrics.push({ label: 'Rate', value: attrs.rate || attrs.pricing, icon: <PoundSterling className="h-4 w-4" /> })
-        if (attrs.turnaround) metrics.push({ label: 'Turnaround', value: attrs.turnaround, icon: <Clock className="h-4 w-4" /> })
-        if (attrs.capacity) metrics.push({ label: 'Capacity', value: attrs.capacity, icon: <Gauge className="h-4 w-4" /> })
-        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
-    }
+function WhatTheyMakeSection({
+    listing,
+    attrs,
+}: {
+    listing: MarketplaceListing
+    attrs: Record<string, unknown>
+}) {
+    const capSummary = attrs.capability_summary ?? listing.description
+    const processCaps = Array.isArray(listing.process_capabilities) ? listing.process_capabilities : []
+    const products = listing.products ?? attrs.products
+    const specialties = listing.specialties ?? attrs.specialties
 
-    // CH data — only for non-People listings
-    if (category !== 'People') {
-        if (attrs.ch_company_status) metrics.push({ label: 'Status', value: String(attrs.ch_company_status).replace(/\b\w/g, (c: string) => c.toUpperCase()), icon: <CheckCircle2 className="h-4 w-4" /> })
-        if (attrs.ch_company_number) metrics.push({ label: 'CH Number', value: attrs.ch_company_number, icon: <Building2 className="h-4 w-4" /> })
-        if (attrs.ch_incorporation_date) {
-            const date = new Date(attrs.ch_incorporation_date)
-            if (!isNaN(date.getTime())) {
-                metrics.push({ label: 'Incorporated', value: date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), icon: <Calendar className="h-4 w-4" /> })
-            }
-        }
-        if (attrs.ch_company_size) metrics.push({ label: 'Size', value: attrs.ch_company_size, icon: <Users className="h-4 w-4" /> })
-        if (attrs.ch_company_type) metrics.push({ label: 'Type', value: attrs.ch_company_type, icon: <Layers className="h-4 w-4" /> })
-        if (!metrics.some(m => m.label === 'Location') && attrs.ch_registered_address) {
-            metrics.push({ label: 'Address', value: attrs.ch_registered_address, icon: <MapPin className="h-4 w-4" /> })
-        }
-        if (attrs.website_url) metrics.push({ label: 'Website', value: attrs.website_url, icon: <ExternalLink className="h-4 w-4" /> })
-    }
+    const hasAnything =
+        hasValue(capSummary) ||
+        (processCaps.length > 0) ||
+        hasValue(products) ||
+        hasValue(specialties) ||
+        hasValue(listing.subcategory)
 
-    if (metrics.length === 0) return null
+    if (!hasAnything) return null
 
     return (
-        <section>
-            <h2 className="text-lg font-semibold text-foreground mb-3">Company Details</h2>
-            <Card>
-                <CardContent className="pt-4 space-y-3">
-                    {metrics.map((metric, idx) => (
-                        <div key={idx} className="flex items-start justify-between py-1 border-b border-border/40 last:border-0">
-                            <div className="flex items-center gap-2 text-muted-foreground">
-                                {metric.icon}
-                                <span className="text-sm">{metric.label}</span>
-                            </div>
-                            {metric.label === 'Website' && typeof metric.value === 'string' && isURL(metric.value) ? (
-                                <a
-                                    href={metric.value}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                                >
-                                    {new URL(metric.value).hostname.replace(/^www\./, '')}
-                                    <ExternalLink className="h-3 w-3" />
-                                </a>
-                            ) : (
-                                <span className="text-sm font-semibold text-foreground text-right max-w-[60%]">
-                                    {metric.value}
-                                </span>
-                            )}
+        <section className="space-y-4">
+            <SectionHeader label="What they make" />
+            <div className="space-y-4">
+                {/* Capability summary paragraph */}
+                {hasValue(capSummary) && (
+                    <p className="text-sm leading-relaxed text-foreground">
+                        {String(capSummary)}
+                    </p>
+                )}
+
+                {/* Process capabilities */}
+                {processCaps.length > 0 && (() => {
+                    const chips = processCaps.map((c, i) => {
+                        const name = typeof c === 'string' ? c : (c as { process_name?: string })?.process_name
+                        if (!hasValue(name)) return null
+                        return (
+                            <span key={i} className="text-[11px] px-2.5 py-0.5 rounded-full bg-muted text-foreground">
+                                {name}
+                            </span>
+                        )
+                    }).filter(Boolean)
+                    if (chips.length === 0) return null
+                    return (
+                        <div>
+                            <p className="text-xs text-muted-foreground mb-2">Processes</p>
+                            <div className="flex flex-wrap gap-1.5">{chips}</div>
                         </div>
-                    ))}
-                </CardContent>
-            </Card>
+                    )
+                })()}
+
+                {/* Products */}
+                {hasValue(products) && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Products</p>
+                        <ChipList items={products} />
+                    </div>
+                )}
+
+                {/* Specialties */}
+                {hasValue(specialties) && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Specialties</p>
+                        <ChipList items={specialties} />
+                    </div>
+                )}
+
+                {/* Subcategory as a contextual tag */}
+                {hasValue(listing.subcategory) && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Sector</p>
+                        <span className="text-[11px] px-2.5 py-0.5 rounded-full border border-border text-muted-foreground">
+                            {listing.subcategory}
+                        </span>
+                    </div>
+                )}
+            </div>
         </section>
     )
 }
 
-// Key Metrics Card — kept for any future re-use but no longer rendered.
-// The sidebar layout that hosted it has been removed; use KeyDetailsInline instead.
-function KeyMetricsCard({ category, attrs }: { category: string; attrs: Record<string, any> }) {
-    const metrics: { label: string; value: any; icon: React.ReactNode }[] = []
+// ── Section 2: Manufacturing specifics ───────────────────────────────────────
 
-    if (category === 'People') {
-        if (attrs.rate) metrics.push({ label: 'Rate', value: attrs.rate, icon: <PoundSterling className="h-4 w-4" /> })
-        if (attrs.years_experience) metrics.push({ label: 'Experience', value: `${attrs.years_experience} years`, icon: <Briefcase className="h-4 w-4" /> })
-        if (attrs.projects_completed) metrics.push({ label: 'Projects', value: attrs.projects_completed, icon: <CheckCircle2 className="h-4 w-4" /> })
-        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
-    } else if (category === 'Products') {
-        if (attrs.cost || attrs.price) metrics.push({ label: 'Price', value: attrs.cost || attrs.price, icon: <PoundSterling className="h-4 w-4" /> })
-        if (attrs.lead_time) metrics.push({ label: 'Lead Time', value: attrs.lead_time, icon: <Timer className="h-4 w-4" /> })
-        if (attrs.moq) metrics.push({ label: 'MOQ', value: attrs.moq, icon: <Package className="h-4 w-4" /> })
-        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
-    } else if (category === 'Services') {
-        if (attrs.rate || attrs.pricing) metrics.push({ label: 'Rate', value: attrs.rate || attrs.pricing, icon: <PoundSterling className="h-4 w-4" /> })
-        if (attrs.turnaround) metrics.push({ label: 'Turnaround', value: attrs.turnaround, icon: <Clock className="h-4 w-4" /> })
-        if (attrs.capacity) metrics.push({ label: 'Capacity', value: attrs.capacity, icon: <Gauge className="h-4 w-4" /> })
-        if (attrs.location) metrics.push({ label: 'Location', value: attrs.location, icon: <MapPin className="h-4 w-4" /> })
-    }
+function ManufacturingSpecificsSection({
+    listing,
+    attrs,
+}: {
+    listing: MarketplaceListing
+    attrs: Record<string, unknown>
+}) {
+    const materials = listing.materials ?? attrs.materials
+    const industries = listing.industries ?? attrs.industries
+    const equipment = listing.key_equipment ?? attrs.key_equipment
 
-    // CH data fallbacks — only for non-People listings (company data, not recruit profiles)
-    if (category !== 'People') {
-        if (attrs.ch_company_status) metrics.push({ label: 'Status', value: String(attrs.ch_company_status).replace(/\b\w/g, (c: string) => c.toUpperCase()), icon: <CheckCircle2 className="h-4 w-4" /> })
-        if (attrs.ch_company_number) metrics.push({ label: 'CH Number', value: attrs.ch_company_number, icon: <Building2 className="h-4 w-4" /> })
-        if (attrs.ch_incorporation_date) {
-            const date = new Date(attrs.ch_incorporation_date)
-            if (!isNaN(date.getTime())) {
-                metrics.push({ label: 'Incorporated', value: date.toLocaleDateString('en-GB', { month: 'short', year: 'numeric' }), icon: <Calendar className="h-4 w-4" /> })
-            }
-        }
-        if (attrs.ch_company_size) metrics.push({ label: 'Size', value: attrs.ch_company_size, icon: <Users className="h-4 w-4" /> })
-        if (attrs.ch_company_type) metrics.push({ label: 'Type', value: attrs.ch_company_type, icon: <Layers className="h-4 w-4" /> })
-        if (!metrics.some(m => m.label === 'Location') && attrs.ch_registered_address) {
-            metrics.push({ label: 'Address', value: attrs.ch_registered_address, icon: <MapPin className="h-4 w-4" /> })
-        }
-        if (attrs.website_url) metrics.push({ label: 'Website', value: attrs.website_url, icon: <ExternalLink className="h-4 w-4" /> })
-    }
-
-    if (metrics.length === 0) return null
+    const hasAnything = hasValue(materials) || hasValue(industries) || hasValue(equipment)
+    if (!hasAnything) return null
 
     return (
-        <Card>
-            <CardHeader>
-                <h3 className="font-semibold text-foreground">Key Details</h3>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {metrics.map((metric, idx) => (
-                    <div key={idx} className="flex items-start justify-between">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            {metric.icon}
-                            <span className="text-sm">{metric.label}</span>
+        <section className="space-y-4">
+            <SectionHeader label="Manufacturing specifics" />
+            <div className="space-y-4">
+                {hasValue(materials) && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Materials</p>
+                        <ChipList items={materials} />
+                    </div>
+                )}
+                {hasValue(industries) && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Industries served</p>
+                        <ChipList items={industries} />
+                    </div>
+                )}
+                {hasValue(equipment) && (
+                    <div>
+                        <p className="text-xs text-muted-foreground mb-2">Key equipment</p>
+                        <ChipList items={equipment} />
+                    </div>
+                )}
+            </div>
+        </section>
+    )
+}
+
+// ── Section 3: Project fit and trust ─────────────────────────────────────────
+
+function ProjectFitAndTrustSection({
+    listing,
+    attrs,
+}: {
+    listing: MarketplaceListing
+    attrs: Record<string, unknown>
+}) {
+    const leadTime = listing.lead_time ?? attrs.lead_time
+    const minOrder = listing.minimum_order ?? attrs.minimum_order
+    const finHealth = listing.financial_health ?? attrs.financial_health
+    const prodCapacity = listing.production_capacity ?? attrs.production_capacity
+    const certifications = listing.certifications ?? attrs.certifications
+    const qualitySystems = listing.quality_systems ?? attrs.quality_systems
+    const dqs = listing.data_quality_score
+    const iso14001 = listing.iso_14001
+    const carbonDisclosed = listing.carbon_disclosed
+    const securityClr = listing.security_clearances ?? attrs.security_clearances
+    const verTier = listing.verification_tier
+
+    const hasAnything =
+        hasValue(leadTime) || hasValue(minOrder) || hasValue(finHealth) ||
+        hasValue(prodCapacity) || hasValue(certifications) || hasValue(qualitySystems) ||
+        (dqs != null) || (iso14001 === true) || (carbonDisclosed === true) ||
+        hasValue(securityClr) || hasValue(verTier)
+
+    if (!hasAnything) return null
+
+    const healthColour = (h: string) => {
+        const lower = h.toLowerCase()
+        if (lower === 'good') return 'text-success'
+        if (lower === 'at-risk' || lower === 'caution') return 'text-warning'
+        if (lower === 'insolvent' || lower === 'risk') return 'text-destructive'
+        return 'text-foreground'
+    }
+
+    return (
+        <section className="space-y-4">
+            <SectionHeader label="Project fit and trust" />
+            <dl className="space-y-0">
+                {hasValue(leadTime) && (
+                    <FieldRow label="Lead time">
+                        <span className="text-sm text-foreground flex items-center gap-1.5">
+                            <Timer className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            {String(leadTime)}
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(minOrder) && (
+                    <FieldRow label="Minimum order">
+                        <span className="text-sm text-foreground flex items-center gap-1.5">
+                            <Package className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            {String(minOrder)}
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(finHealth) && (
+                    <FieldRow label="Financial health">
+                        <span className={cn("text-sm font-medium capitalize", healthColour(String(finHealth)))}>
+                            {String(finHealth)}
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(prodCapacity) && (
+                    <FieldRow label="Production capacity">
+                        <span className="text-sm text-foreground">{String(prodCapacity)}</span>
+                    </FieldRow>
+                )}
+                {hasValue(certifications) && (
+                    <FieldRow label="Certifications">
+                        <ChipList items={certifications} />
+                    </FieldRow>
+                )}
+                {hasValue(verTier) && (
+                    <FieldRow label="Verification">
+                        <span className="text-sm text-foreground capitalize">{verTier}</span>
+                    </FieldRow>
+                )}
+                {hasValue(qualitySystems) && (
+                    <FieldRow label="Quality systems">
+                        <span className="text-sm text-foreground">{String(qualitySystems)}</span>
+                    </FieldRow>
+                )}
+                {dqs != null && (
+                    <FieldRow label="Data quality score">
+                        <span className={cn(
+                            "text-sm font-semibold tabular-nums",
+                            dqs >= 80 ? 'text-success' : dqs >= 50 ? 'text-warning' : 'text-destructive'
+                        )}>
+                            {dqs} / 100
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(securityClr) && (
+                    <FieldRow label="Security clearances">
+                        <ChipList items={securityClr} />
+                    </FieldRow>
+                )}
+                {/* Sustainability flags — only shown when true */}
+                {(iso14001 === true || carbonDisclosed === true) && (
+                    <FieldRow label="Sustainability">
+                        <div className="flex flex-wrap gap-2">
+                            {iso14001 === true && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">
+                                    ISO 14001
+                                </span>
+                            )}
+                            {carbonDisclosed === true && (
+                                <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">
+                                    Carbon disclosed
+                                </span>
+                            )}
                         </div>
-                        {metric.label === 'Website' && typeof metric.value === 'string' && isURL(metric.value) ? (
-                            <a
-                                href={metric.value}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm font-semibold text-international-orange hover:underline inline-flex items-center gap-1"
-                            >
-                                {new URL(metric.value).hostname.replace(/^www\./, '')}
-                                <ExternalLink className="h-3 w-3" />
-                            </a>
-                        ) : (
-                            <span className="text-sm font-semibold text-foreground text-right max-w-[60%]">
-                                {metric.value}
-                            </span>
-                        )}
-                    </div>
-                ))}
-            </CardContent>
-        </Card>
+                    </FieldRow>
+                )}
+            </dl>
+        </section>
     )
 }
 
-// People-specific section
-function PeopleSection({ attrs }: { attrs: Record<string, any> }) {
-    return (
-        <div className="space-y-4">
-            {/* Education */}
-            {attrs.education && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <GraduationCap className="h-5 w-5" />
-                        Education
-                    </h2>
-                    <p className="text-muted-foreground">{attrs.education}</p>
-                </section>
-            )}
+// ── Section 4: Company background ────────────────────────────────────────────
 
-            {/* Previous Companies */}
-            {attrs.previous_companies && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Building2 className="h-5 w-5" />
-                        Previous Experience
-                    </h2>
-                    {(() => {
-                        const companies = safeStringArray(attrs.previous_companies)
-                        return companies.length > 0 ? (
-                            <div className="flex flex-wrap gap-2">
-                                {companies.map((company, i) => (
-                                    <Badge key={i} variant="secondary">
-                                        {company}
-                                    </Badge>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted-foreground">{String(attrs.previous_companies)}</p>
-                        )
-                    })()}
-                </section>
-            )}
-
-            {/* Skills/Expertise */}
-            {(attrs.skills || attrs.expertise) && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Star className="h-5 w-5" />
-                        Skills & Expertise
-                    </h2>
-                    <div className="flex flex-wrap gap-2">
-                        {safeStringArray(attrs.skills || attrs.expertise).map((skill, i) => (
-                            <Badge key={i} variant="secondary" className="bg-secondary text-secondary-foreground">
-                                {skill}
-                            </Badge>
-                        ))}
-                    </div>
-                </section>
-            )}
-        </div>
-    )
-}
-
-// Products-specific section
-function ProductsSection({ attrs }: { attrs: Record<string, any> }) {
-    return (
-        <div className="space-y-4">
-            {/* Certifications — only render when there are actual entries */}
-            {Array.isArray(attrs.certifications) && attrs.certifications.length > 0 && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Award className="h-5 w-5" />
-                        Certifications
-                    </h2>
-                    <div className="flex flex-wrap gap-2">
-                        {safeStringArray(attrs.certifications).map((cert, i) => (
-                            <Badge key={i} variant="secondary" className="bg-status-success-light text-status-success-dark">
-                                {cert}
-                            </Badge>
-                        ))}
-                    </div>
-                </section>
-            )}
-            {/* Non-array certifications (plain string) */}
-            {attrs.certifications && !Array.isArray(attrs.certifications) && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Award className="h-5 w-5" />
-                        Certifications
-                    </h2>
-                    <p className="text-muted-foreground">{String(attrs.certifications)}</p>
-                </section>
-            )}
-
-            {/* Capabilities — only render when there are actual entries */}
-            {Array.isArray(attrs.capabilities) && attrs.capabilities.length > 0 && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Wrench className="h-5 w-5" />
-                        Capabilities
-                    </h2>
-                    <div className="flex flex-wrap gap-2">
-                        {safeStringArray(attrs.capabilities).map((cap, i) => (
-                            <Badge key={i} variant="secondary">
-                                {cap}
-                            </Badge>
-                        ))}
-                    </div>
-                </section>
-            )}
-            {/* Non-array capabilities (plain string) */}
-            {attrs.capabilities && !Array.isArray(attrs.capabilities) && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Wrench className="h-5 w-5" />
-                        Capabilities
-                    </h2>
-                    <p className="text-muted-foreground">{String(attrs.capabilities)}</p>
-                </section>
-            )}
-        </div>
-    )
-}
-
-// Services-specific section
-function ServicesSection({ attrs }: { attrs: Record<string, any> }) {
-    return (
-        <div className="space-y-4">
-            {/* Specialty — only render when there are actual entries */}
-            {Array.isArray(attrs.specialty) && attrs.specialty.length > 0 && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Target className="h-5 w-5" />
-                        Specialty
-                    </h2>
-                    <div className="flex flex-wrap gap-2">
-                        {safeStringArray(attrs.specialty).map((spec, i) => (
-                            <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
-                                {spec}
-                            </Badge>
-                        ))}
-                    </div>
-                </section>
-            )}
-            {/* Non-array specialty (plain string) */}
-            {attrs.specialty && !Array.isArray(attrs.specialty) && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Target className="h-5 w-5" />
-                        Specialty
-                    </h2>
-                    <p className="text-muted-foreground">{String(attrs.specialty)}</p>
-                </section>
-            )}
-
-            {/* Focus Areas — only render when there are actual entries */}
-            {Array.isArray(attrs.focus_areas) && attrs.focus_areas.length > 0 && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Users className="h-5 w-5" />
-                        Focus Areas
-                    </h2>
-                    <div className="flex flex-wrap gap-2">
-                        {safeStringArray(attrs.focus_areas).map((area, i) => (
-                            <Badge key={i} variant="secondary" className="bg-status-info-light text-status-info-dark">
-                                {area}
-                            </Badge>
-                        ))}
-                    </div>
-                </section>
-            )}
-            {/* Non-array focus areas (plain string) */}
-            {attrs.focus_areas && !Array.isArray(attrs.focus_areas) && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Users className="h-5 w-5" />
-                        Focus Areas
-                    </h2>
-                    <p className="text-muted-foreground">{String(attrs.focus_areas)}</p>
-                </section>
-            )}
-        </div>
-    )
-}
-
-// SupplierDataPanorama — surfaces every populated top-level column on
-// marketplace_listings that the prior page wasn't rendering. Council
-// 2026-04-26 + Tristan's direct ask:
-// "the database on suppliers and investors is enormous, no point having lots
-//  of fields in those databases if all of those fields are not actually being
-//  revealed to the user."
-//
-// Strategy: enumerate every meaningful column, pull it off `listing`,
-// auto-skip when empty, render in a categorised grid (Capability /
-// Compliance & sustainability / Company snapshot / Trust signals).
-function SupplierDataPanorama({ listing }: { listing: MarketplaceListing }) {
-    type Item = { label: string; value: React.ReactNode }
-
-    // Parse attributes JSONB so we can surface fields stored there
-    const attrs = safeParseAttributes(listing.attributes)
-
-    // Strings that look like empty serialised data and should be hidden
-    const JUNK_STRINGS = new Set(['[]', '{}', 'null', 'undefined', ''])
-
-    const arrChips = (arr: unknown): React.ReactNode | null => {
-        if (!Array.isArray(arr) || arr.length === 0) return null
-        const chips = (arr as unknown[]).map((v, i) => {
-            const text = typeof v === 'string' ? v : (v as { name?: string })?.name ?? JSON.stringify(v)
-            if (!text || JUNK_STRINGS.has(text.trim())) return null
-            return (
-                <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground">
-                    {text}
-                </span>
-            )
-        }).filter(Boolean)
-        if (chips.length === 0) return null
-        return <div className="flex flex-wrap gap-1.5">{chips}</div>
-    }
-    const text = (v: unknown): React.ReactNode | null => {
-        if (v == null || v === '' || v === false) return null
-        return <span className="text-sm text-foreground">{String(v)}</span>
-    }
-    const bool = (v: unknown, label: string): React.ReactNode | null => {
-        if (v == null) return null
-        return v ? <span className="text-xs px-2 py-0.5 rounded-full bg-success/10 text-success font-medium">✓ {label}</span> : null
-    }
-    const longText = (v: unknown): React.ReactNode | null => {
-        if (v == null || v === '' || v === false) return null
-        // If the value is an object (not array), try to extract a text field; otherwise hide it
-        if (typeof v === 'object' && !Array.isArray(v)) {
-            const obj = v as Record<string, unknown>
-            const textValue = obj.summary ?? obj.text ?? obj.description ?? obj.content ?? null
-            if (textValue == null || textValue === '') return null
-            return <p className="text-sm leading-relaxed text-foreground">{String(textValue)}</p>
-        }
-        // Arrays should not be rendered via longText — hide them to avoid "[object Object]" / "[]"
-        if (Array.isArray(v)) return null
-        return <p className="text-sm leading-relaxed text-foreground">{String(v)}</p>
-    }
-
-    // ── Capability profile ───────────────────────────────────────────────
-    const capability: Item[] = []
-    const industries = arrChips(listing.industries)
-    if (industries) capability.push({ label: 'Industries served', value: industries })
-    const materials = arrChips(listing.materials)
-    if (materials) capability.push({ label: 'Materials handled', value: materials })
-    const specialties = arrChips((listing as unknown as { specialties?: unknown }).specialties)
-    if (specialties) capability.push({ label: 'Specialties', value: specialties })
-    const processCaps = listing.process_capabilities
-    if (Array.isArray(processCaps) && processCaps.length > 0) {
-        capability.push({
-            label: 'Process capabilities',
-            value: (
-                <div className="flex flex-wrap gap-1.5">
-                    {processCaps.map((c, i) => {
-                        const name = typeof c === 'string' ? c : (c as { process_name?: string })?.process_name
-                        return name ? (
-                            <span key={i} className="text-[11px] px-2 py-0.5 rounded-full bg-muted text-foreground">{name}</span>
-                        ) : null
-                    })}
-                </div>
-            ),
-        })
-    }
-    const equipment = arrChips(listing.key_equipment)
-    if (equipment) capability.push({ label: 'Key equipment', value: equipment })
-    const products = arrChips((listing as unknown as { products?: unknown }).products)
-    if (products) capability.push({ label: 'Products', value: products })
-    const leadTime = text((listing as unknown as { lead_time?: string }).lead_time)
-    if (leadTime) capability.push({ label: 'Lead time', value: leadTime })
-    const capacity = text((listing as unknown as { production_capacity?: string }).production_capacity)
-    if (capacity) capability.push({ label: 'Production capacity', value: capacity })
-    const moq = text((listing as unknown as { minimum_order?: string }).minimum_order)
-    if (moq) capability.push({ label: 'Minimum order', value: moq })
-
-    // attributes.capability_summary — long text (11,342 rows)
-    const capSummary = longText(attrs.capability_summary)
-    if (capSummary) capability.push({ label: 'Capability summary', value: capSummary })
-
-    // attributes.competitive_positioning — long text (11,342 rows)
-    const compPos = longText(attrs.competitive_positioning)
-    if (compPos) capability.push({ label: 'Competitive positioning', value: compPos })
-
-    // attributes.marketplace_tags — array (11,342 rows)
-    const mktTags = arrChips(attrs.marketplace_tags)
-    if (mktTags) capability.push({ label: 'Tags', value: mktTags })
-
-    // attributes.company_type — text (6,181 rows)
-    const companyType = text(attrs.company_type)
-    if (companyType) capability.push({ label: 'Company type', value: companyType })
-
-    // ── Compliance & sustainability ──────────────────────────────────────
-    const compliance: Item[] = []
-    const certs = arrChips(listing.certifications)
-    if (certs) compliance.push({ label: 'Certifications', value: certs })
-    const isoBadge = bool((listing as unknown as { iso_14001?: boolean }).iso_14001, 'ISO 14001')
-    const carbonBadge = bool((listing as unknown as { carbon_disclosed?: boolean }).carbon_disclosed, 'Carbon disclosed')
-    if (isoBadge || carbonBadge) {
-        compliance.push({ label: 'Sustainability badges', value: <div className="flex gap-2 flex-wrap">{isoBadge}{carbonBadge}</div> })
-    }
-    const ecoVadis = (listing as unknown as { ecovadis_score?: number }).ecovadis_score
-    if (typeof ecoVadis === 'number') compliance.push({ label: 'EcoVadis score', value: <span className="text-sm font-semibold text-foreground">{ecoVadis} / 100</span> })
-    const recycled = (listing as unknown as { recycled_content_percent?: number }).recycled_content_percent
-    if (typeof recycled === 'number') compliance.push({ label: 'Recycled content', value: <span className="text-sm">{recycled}%</span> })
-    const sustainNotes = text((listing as unknown as { sustainability_notes?: string }).sustainability_notes)
-    if (sustainNotes) compliance.push({ label: 'Sustainability notes', value: sustainNotes })
-    const qualitySys = text((listing as unknown as { quality_systems?: string }).quality_systems)
-    if (qualitySys) compliance.push({ label: 'Quality systems', value: qualitySys })
-    const exportCtl = text((listing as unknown as { export_controls?: string }).export_controls)
-    if (exportCtl) compliance.push({ label: 'Export controls', value: exportCtl })
-    const securityClr = arrChips((listing as unknown as { security_clearances?: unknown }).security_clearances)
-    if (securityClr) compliance.push({ label: 'Security clearances', value: securityClr })
-
-    // attributes.ch_company_status — e.g. "active" (5,680 rows)
-    const chStatus = attrs.ch_company_status
-    if (chStatus) {
-        const statusStr = String(chStatus)
-        const variant = statusStr === 'active' ? 'bg-success/10 text-success' : statusStr === 'dissolved' ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
-        compliance.push({
-            label: 'Companies House status',
-            value: <span className={`text-xs px-2 py-0.5 rounded-full font-medium capitalize ${variant}`}>{statusStr}</span>,
-        })
-    }
-
-    // ── Company snapshot ──────────────────────────────────────────────────
-    const company: Item[] = []
-    // founded_year (top-level column) — with fallback to attributes.year_founded (5,071 rows)
-    const founded = (listing as unknown as { founded_year?: number }).founded_year
-        ?? (typeof attrs.year_founded === 'number' ? attrs.year_founded : null)
-    if (typeof founded === 'number') company.push({ label: 'Founded', value: <span className="text-sm font-semibold">{founded} <span className="text-xs text-muted-foreground font-normal">({new Date().getFullYear() - founded} years)</span></span> })
-    const employees = (listing as unknown as { employee_count_exact?: number }).employee_count_exact
-    if (typeof employees === 'number') company.push({ label: 'Employees', value: <span className="text-sm">{employees.toLocaleString()}</span> })
-    const size = text((listing as unknown as { company_size?: string }).company_size)
-        ?? text(attrs.ch_company_size)
-    if (size && employees == null) company.push({ label: 'Company size', value: size })
-    const finHealth = text((listing as unknown as { financial_health?: string }).financial_health)
-    if (finHealth) company.push({ label: 'Financial health', value: finHealth })
-
-    // attributes.financial_signals — can be string or object (4,837 rows)
-    const finSig = attrs.financial_signals
-    if (finSig != null && finSig !== '') {
-        if (typeof finSig === 'string') {
-            company.push({ label: 'Financial signals', value: longText(finSig) })
-        } else if (typeof finSig === 'object' && !Array.isArray(finSig)) {
-            const entries = Object.entries(finSig as Record<string, unknown>).filter(([, v]) => v != null && v !== '')
-            if (entries.length > 0) {
-                company.push({
-                    label: 'Financial signals',
-                    value: (
-                        <div className="bg-muted/50 rounded-lg p-3 space-y-0">
-                            {entries.map(([k, v]) => (
-                                <div key={k} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
-                                    <span className="text-sm text-muted-foreground capitalize">{k.replace(/_/g, ' ')}</span>
-                                    <span className="text-sm font-medium text-foreground">{String(v)}</span>
-                                </div>
-                            ))}
-                        </div>
-                    ),
-                })
-            }
-        }
-    }
-
-    // attributes.ch_company_type — e.g. "ltd" (5,503 rows)
-    const chType = text(attrs.ch_company_type)
-    if (chType) company.push({ label: 'Companies House type', value: chType })
-
-    const country = text((listing as unknown as { country?: string }).country)
-    if (country) company.push({ label: 'Country', value: country })
-    const address = text((listing as unknown as { address?: string }).address)
-    if (address) company.push({ label: 'Address', value: address })
-    const website = (listing as unknown as { website_url?: string }).website_url
-    if (website) company.push({
-        label: 'Website',
-        value: <a href={website} target="_blank" rel="noopener noreferrer" className="text-international-orange hover:underline text-sm inline-flex items-center gap-1">{website.replace(/^https?:\/\//, '')} <ExternalLink className="h-3 w-3" /></a>,
-    })
-    const phone = text((listing as unknown as { contact_phone?: string }).contact_phone)
-    if (phone) company.push({ label: 'Phone', value: phone })
-    const linkedin = (listing as unknown as { contact_linkedin?: string }).contact_linkedin
-    if (linkedin) company.push({
-        label: 'LinkedIn',
-        value: <a href={linkedin} target="_blank" rel="noopener noreferrer" className="text-international-orange hover:underline text-sm inline-flex items-center gap-1">View profile <ExternalLink className="h-3 w-3" /></a>,
-    })
-
-    // attributes.social_media — object keyed by platform name (2,377 rows)
-    const socialMedia = attrs.social_media
-    if (socialMedia != null && typeof socialMedia === 'object' && !Array.isArray(socialMedia)) {
-        const socialEntries = Object.entries(socialMedia as Record<string, unknown>)
-            .filter(([, url]) => url && typeof url === 'string')
-        if (socialEntries.length > 0) {
-            company.push({
-                label: 'Social media',
-                value: (
-                    <div className="flex flex-wrap gap-2">
-                        {socialEntries.map(([platform, url]) => {
-                            const safeUrl = /^https?:\/\//i.test(String(url)) ? String(url) : `https://${url}`
-                            return (
-                                <a key={platform} href={safeUrl} target="_blank" rel="noopener noreferrer"
-                                    className="text-international-orange hover:underline text-sm inline-flex items-center gap-1 capitalize">
-                                    {platform} <ExternalLink className="h-3 w-3" />
-                                </a>
-                            )
-                        })}
-                    </div>
-                ),
-            })
-        }
-    }
-
-    const keyPeople = (listing as unknown as { key_people?: unknown[] }).key_people
-    if (Array.isArray(keyPeople) && keyPeople.length > 0) {
-        company.push({
-            label: 'Key people',
-            value: (
-                <div className="space-y-1">
-                    {keyPeople.map((p, i) => {
-                        const person = p as { name?: string; role?: string; title?: string; nationality?: string }
-                        const name = person?.name
-                        const role = person?.role || person?.title
-                        if (!name) return null
-                        return (
-                            <div key={i} className="text-sm">
-                                <strong className="text-foreground">{name}</strong>
-                                {role && <span className="text-muted-foreground"> — {role}</span>}
-                                {person.nationality && <span className="text-xs text-muted-foreground ml-2">{person.nationality}</span>}
-                            </div>
-                        )
-                    })}
-                </div>
-            ),
-        })
-    }
-
-    // ── Trust & data quality ──────────────────────────────────────────────
-    const trust: Item[] = []
-
-    // attributes.nightshift_score — internal Forge supplier score (15,559 rows)
-    const nightshiftScore = attrs.nightshift_score
-    if (typeof nightshiftScore === 'number') {
-        const colour = nightshiftScore >= 70 ? 'text-success' : nightshiftScore >= 40 ? 'text-warning' : 'text-destructive'
-        trust.push({
-            label: 'Forge supplier score',
-            value: <span className={cn('text-sm font-semibold tabular-nums', colour)}>{nightshiftScore}</span>,
-        })
-    }
-
-    const dqs = (listing as unknown as { data_quality_score?: number }).data_quality_score
-    if (typeof dqs === 'number') {
-        const colour = dqs >= 80 ? 'text-success' : dqs >= 50 ? 'text-warning' : 'text-destructive'
-        trust.push({ label: 'Data quality score', value: <span className={cn('text-sm font-semibold tabular-nums', colour)}>{dqs} / 100</span> })
-    }
-    const lastEnriched = (listing as unknown as { last_enriched_at?: string }).last_enriched_at
-    if (lastEnriched) {
-        const d = new Date(lastEnriched)
-        if (!isNaN(d.getTime())) {
-            trust.push({ label: 'Last enriched', value: <span className="text-sm text-muted-foreground">{d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span> })
-        }
-    }
-    const enrichSrc = (listing as unknown as { enrichment_sources?: unknown[] }).enrichment_sources
-    if (Array.isArray(enrichSrc) && enrichSrc.length > 0) {
-        const sources = enrichSrc.map((s) => (s as { source?: string })?.source).filter(Boolean)
-        if (sources.length > 0) {
-            trust.push({
-                label: 'Enrichment sources',
-                value: (
-                    <div className="flex flex-wrap gap-1.5">
-                        {sources.map((s, i) => (
-                            <span key={i} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">{s}</span>
-                        ))}
-                    </div>
-                ),
-            })
-        }
-    }
-
-    const sections: Array<{ title: string; items: Item[] }> = [
-        { title: 'Capability profile', items: capability },
-        { title: 'Compliance & sustainability', items: compliance },
-        { title: 'Company snapshot', items: company },
-        { title: 'Trust & data quality', items: trust },
-    ].filter((s) => s.items.length > 0)
-
-    if (sections.length === 0) return null
-
-    return (
-        <Card>
-            <CardHeader>
-                <h3 className="text-base font-semibold">Everything we know about this supplier</h3>
-                <p className="text-xs text-muted-foreground mt-1">All fields populated for this record. Empty fields hidden automatically.</p>
-            </CardHeader>
-            <CardContent className="space-y-6">
-                {sections.map((s) => (
-                    <div key={s.title}>
-                        <h4 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-3">{s.title}</h4>
-                        <dl className="flex flex-col gap-y-3">
-                            {s.items.map((item, i) => (
-                                <div key={i} className="border-l-2 border-border pl-3">
-                                    <dt className="text-[10px] text-muted-foreground uppercase tracking-wider mb-1">{item.label}</dt>
-                                    <dd>{item.value}</dd>
-                                </div>
-                            ))}
-                        </dl>
-                    </div>
-                ))}
-            </CardContent>
-        </Card>
-    )
-}
-
-// Companies House info section — directors, PSC, SIC codes
-function CompanyInfoSection({ attrs }: { attrs: Record<string, any> }) {
+function CompanyBackgroundSection({
+    listing,
+    attrs,
+}: {
+    listing: MarketplaceListing
+    attrs: Record<string, unknown>
+}) {
+    const city = listing.city ?? attrs.city
+    const country = listing.country ?? attrs.country
+    const address = listing.address ?? attrs.address ?? attrs.ch_registered_address
+    const companySize = listing.company_size ?? attrs.company_size
+    const employeeCountExact = listing.employee_count_exact ?? attrs.employee_count_exact
+    const foundedYear = listing.founded_year ?? attrs.founded_year ?? attrs.year_founded
+    const keyPeople = listing.key_people ?? attrs.key_people
     const directors = Array.isArray(attrs.ch_directors) ? attrs.ch_directors : []
     const pscs = Array.isArray(attrs.ch_psc) ? attrs.ch_psc : []
     const sicCodes = Array.isArray(attrs.ch_sic_codes) ? attrs.ch_sic_codes : []
+    const chNumber = attrs.ch_company_number
+    const chStatus = attrs.ch_company_status
+    const chType = attrs.ch_company_type
 
-    if (directors.length === 0 && pscs.length === 0 && sicCodes.length === 0) return null
+    const locationStr = [city, country].filter((v) => hasValue(v)).join(', ')
+
+    const hasAnything =
+        hasValue(locationStr) || hasValue(address) ||
+        hasValue(companySize) || hasValue(employeeCountExact) ||
+        hasValue(foundedYear) || hasValue(keyPeople) ||
+        directors.length > 0 || pscs.length > 0 || sicCodes.length > 0 ||
+        hasValue(chNumber) || hasValue(chStatus) || hasValue(chType)
+
+    if (!hasAnything) return null
 
     return (
-        <div className="space-y-4">
-            {directors.length > 0 && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <Users className="h-5 w-5" />
-                        Directors
-                    </h2>
-                    <Card>
-                        <CardContent className="pt-4">
-                            <div className="space-y-1">
-                                {directors.map((d: { name?: string; appointed_on?: string }, i: number) => (
-                                    <div key={i} className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
-                                        <span className="text-sm font-medium text-foreground">{d.name || 'Unknown'}</span>
-                                        {d.appointed_on && (
+        <section className="space-y-4">
+            <SectionHeader label="Company background" />
+            <dl className="space-y-0">
+                {hasValue(locationStr) && (
+                    <FieldRow label="Location">
+                        <span className="text-sm text-foreground flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            {locationStr}
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(address) && !hasValue(locationStr) && (
+                    <FieldRow label="Address">
+                        <span className="text-sm text-foreground">{String(address)}</span>
+                    </FieldRow>
+                )}
+                {hasValue(address) && hasValue(locationStr) && String(address) !== locationStr && (
+                    <FieldRow label="Registered address">
+                        <span className="text-sm text-foreground">{String(address)}</span>
+                    </FieldRow>
+                )}
+                {hasValue(employeeCountExact) && (
+                    <FieldRow label="Employees">
+                        <span className="text-sm text-foreground flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            {Number(employeeCountExact).toLocaleString()}
+                        </span>
+                    </FieldRow>
+                )}
+                {!hasValue(employeeCountExact) && hasValue(companySize) && (
+                    <FieldRow label="Company size">
+                        <span className="text-sm text-foreground flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            {String(companySize)}
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(foundedYear) && (
+                    <FieldRow label="Founded">
+                        <span className="text-sm text-foreground flex items-center gap-1.5">
+                            <Calendar className="h-3.5 w-3.5 text-muted-foreground flex-shrink-0" />
+                            {String(foundedYear)}
+                            <span className="text-xs text-muted-foreground">
+                                ({new Date().getFullYear() - Number(foundedYear)} years)
+                            </span>
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(chStatus) && (
+                    <FieldRow label="Companies House status">
+                        <span className={cn(
+                            "text-xs px-2 py-0.5 rounded-full font-medium capitalize",
+                            String(chStatus) === 'active' ? 'bg-success/10 text-success'
+                                : String(chStatus) === 'dissolved' ? 'bg-destructive/10 text-destructive'
+                                : 'bg-muted text-muted-foreground'
+                        )}>
+                            {String(chStatus)}
+                        </span>
+                    </FieldRow>
+                )}
+                {hasValue(chNumber) && (
+                    <FieldRow label="Companies House number">
+                        <span className="text-sm text-foreground font-mono">{String(chNumber)}</span>
+                    </FieldRow>
+                )}
+                {hasValue(chType) && (
+                    <FieldRow label="Companies House type">
+                        <span className="text-sm text-foreground capitalize">{String(chType)}</span>
+                    </FieldRow>
+                )}
+
+                {/* Key people */}
+                {hasValue(keyPeople) && Array.isArray(keyPeople) && keyPeople.length > 0 && (
+                    <FieldRow label="Key people">
+                        <div className="space-y-1">
+                            {(keyPeople as Array<{ name?: string; role?: string; title?: string }>).map((p, i) => {
+                                if (!hasValue(p?.name)) return null
+                                return (
+                                    <div key={i} className="text-sm">
+                                        <strong className="text-foreground">{p.name}</strong>
+                                        {hasValue(p.role || p.title) && (
+                                            <span className="text-muted-foreground"> — {p.role || p.title}</span>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </FieldRow>
+                )}
+
+                {/* CH Directors */}
+                {directors.length > 0 && (
+                    <FieldRow label="Directors">
+                        <div className="space-y-1">
+                            {(directors as Array<{ name?: string; appointed_on?: string }>).map((d, i) => {
+                                if (!hasValue(d?.name)) return null
+                                return (
+                                    <div key={i} className="flex items-center justify-between text-sm">
+                                        <span className="text-foreground font-medium">{d.name}</span>
+                                        {hasValue(d.appointed_on) && (
                                             <span className="text-xs text-muted-foreground">
-                                                Appointed {new Date(d.appointed_on).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
+                                                Appointed {new Date(d.appointed_on!).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}
                                             </span>
                                         )}
                                     </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </section>
-            )}
+                                )
+                            })}
+                        </div>
+                    </FieldRow>
+                )}
 
-            {pscs.length > 0 && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <ShieldCheck className="h-5 w-5" />
-                        Persons of Significant Control
-                    </h2>
-                    <Card>
-                        <CardContent className="pt-4">
-                            <div className="space-y-1">
-                                {pscs.map((p: { name?: string; natures_of_control?: string[] }, i: number) => (
-                                    <div key={i} className="py-2 border-b border-border/40 last:border-0">
-                                        <span className="text-sm font-medium text-foreground">{p.name || 'Unknown'}</span>
+                {/* PSC */}
+                {pscs.length > 0 && (
+                    <FieldRow label="Persons of significant control">
+                        <div className="space-y-1">
+                            {(pscs as Array<{ name?: string; natures_of_control?: string[] }>).map((p, i) => {
+                                if (!hasValue(p?.name)) return null
+                                return (
+                                    <div key={i} className="text-sm">
+                                        <span className="text-foreground font-medium">{p.name}</span>
                                         {p.natures_of_control && p.natures_of_control.length > 0 && (
-                                            <div className="flex flex-wrap gap-1 mt-1">
-                                                {p.natures_of_control.map((n: string, j: number) => (
+                                            <div className="flex flex-wrap gap-1 mt-0.5">
+                                                {p.natures_of_control.map((n, j) => (
                                                     <Badge key={j} variant="secondary" className="text-[10px]">
                                                         {n.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
                                                     </Badge>
@@ -1010,251 +660,140 @@ function CompanyInfoSection({ attrs }: { attrs: Record<string, any> }) {
                                             </div>
                                         )}
                                     </div>
-                                ))}
-                            </div>
-                        </CardContent>
-                    </Card>
-                </section>
-            )}
+                                )
+                            })}
+                        </div>
+                    </FieldRow>
+                )}
 
-            {sicCodes.length > 0 && (
-                <section>
-                    <h2 className="text-lg font-semibold text-foreground flex items-center gap-2 mb-2">
-                        <BarChart3 className="h-5 w-5" />
-                        SIC Codes
-                    </h2>
-                    <div className="flex flex-wrap gap-2">
-                        {sicCodes.map((code: string, i: number) => (
-                            <Badge key={i} variant="secondary">{code}</Badge>
-                        ))}
-                    </div>
-                </section>
-            )}
-        </div>
-    )
-}
-
-// Attributes Section - renders all remaining attributes
-function AttributesSection({ attrs, category }: { attrs: Record<string, any>; category: string }) {
-    // Keys already shown in category-specific sections, key metrics, or company info
-    const shownKeys = new Set([
-        'role', 'rate', 'pricing', 'cost', 'price',
-        'years_experience', 'projects_completed', 'education',
-        'previous_companies', 'skills', 'expertise',
-        'integrations', 'use_cases', 'model', 'provider',
-        'accuracy', 'latency', 'throughput',
-        'certifications', 'capabilities', 'lead_time', 'moq',
-        'specialty', 'focus_areas', 'turnaround', 'capacity',
-        'location', 'availability',
-        // CH fields shown in KeyMetricsCard or CompanyInfoSection
-        'ch_company_status', 'ch_company_number', 'ch_incorporation_date',
-        'ch_company_size', 'ch_company_type', 'ch_registered_address',
-        'ch_directors', 'ch_psc', 'ch_sic_codes', 'website_url',
-    ])
-
-    const remainingAttrs = Object.entries(attrs)
-        .filter(([key]) => !shownKeys.has(key) && !HIDDEN_ATTRIBUTES.has(key))
-        .filter(([key]) => category !== 'People' || !key.startsWith('ch_'))
-
-    if (remainingAttrs.length === 0) return null
-
-    // Sort: known keys in ATTRIBUTE_GROUP_ORDER first, then unknown keys alphabetically
-    const orderIndex = new Map(ATTRIBUTE_GROUP_ORDER.map((k, i) => [k, i]))
-    remainingAttrs.sort(([a], [b]) => {
-        const ia = orderIndex.get(a) ?? Infinity
-        const ib = orderIndex.get(b) ?? Infinity
-        if (ia !== ib) return ia - ib
-        return a.localeCompare(b)
-    })
-
-    return (
-        <section>
-            <h2 className="text-lg font-semibold text-foreground mb-2">
-                Additional Details
-            </h2>
-            <Card>
-                <CardContent className="pt-6">
-                    <div className="space-y-3">
-                        {remainingAttrs.map(([key, value]) => (
-                            <AttributeRow key={key} attrKey={key} value={value} />
-                        ))}
-                    </div>
-                </CardContent>
-            </Card>
+                {/* SIC codes */}
+                {sicCodes.length > 0 && (
+                    <FieldRow label="SIC codes">
+                        <div className="flex flex-wrap gap-1.5">
+                            {(sicCodes as string[]).map((code, i) => (
+                                <Badge key={i} variant="secondary" className="text-xs font-mono">{code}</Badge>
+                            ))}
+                        </div>
+                    </FieldRow>
+                )}
+            </dl>
         </section>
     )
 }
 
-function AttributeRow({ attrKey, value }: { attrKey: string; value: any }) {
-    const label = formatAttributeLabel(attrKey)
+// ── Section 5: Engage ─────────────────────────────────────────────────────────
 
-    if (value === undefined || value === null) return null
+function EngageSection({
+    listing,
+    attrs,
+    onContact,
+    isContacting,
+}: {
+    listing: MarketplaceListing
+    attrs: Record<string, unknown>
+    onContact: () => void
+    isContacting: boolean
+}) {
+    const websiteUrl = listing.website_url ?? attrs.website_url
+    const linkedinUrl = attrs.linkedin_url ?? attrs.contact_linkedin
 
-    // Render arrays — handle objects (directors, PSCs) vs simple strings
-    if (Array.isArray(value)) {
-        const hasObjects = value.some(item => item && typeof item === 'object')
+    // Map — only shown if geocoding succeeded
+    const lat = listing.latitude
+    const lon = listing.longitude
+    const hasMap = lat != null && lon != null
 
-        if (hasObjects) {
-            return (
-                <div>
-                    <p className="text-sm text-muted-foreground mb-2">{label}</p>
-                    <div className="space-y-2">
-                        {value.map((item, i) => {
-                            if (item && typeof item === 'object') {
-                                const name = item.name || item.title || 'Unknown'
-                                const detail = item.appointed_on
-                                    ? `Appointed ${new Date(item.appointed_on).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}`
-                                    : item.natures_of_control
-                                        ? (Array.isArray(item.natures_of_control)
-                                            ? item.natures_of_control.map((n: string) => n.replace(/-/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase())).join(', ')
-                                            : String(item.natures_of_control))
-                                        : null
-                                return (
-                                    <div key={i} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
-                                        <span className="text-sm font-medium text-foreground">{name}</span>
-                                        {detail && <span className="text-xs text-muted-foreground">{detail}</span>}
-                                    </div>
-                                )
-                            }
-                            return (
-                                <Badge key={i} variant="secondary" className="text-xs">
-                                    {String(item)}
-                                </Badge>
-                            )
-                        })}
-                    </div>
-                </div>
-            )
-        }
+    const hasAnything =
+        hasValue(websiteUrl) || hasValue(linkedinUrl) ||
+        hasValue(listing.contact_email) || hasValue(attrs.contact_email) ||
+        hasValue(attrs.provider_id) || hasMap
 
-        return (
-            <div>
-                <p className="text-sm text-muted-foreground mb-2">{label}</p>
-                <div className="flex flex-wrap gap-2">
-                    {value.map((item, i) => (
-                        <Badge key={i} variant="secondary" className="text-xs">
-                            {String(item)}
-                        </Badge>
-                    ))}
-                </div>
-            </div>
-        )
-    }
+    if (!hasAnything) return null
 
-    // Render booleans
-    if (typeof value === 'boolean') {
-        return (
-            <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <Badge variant={value ? "success" : "secondary"} className="text-xs">
-                    {value ? 'Yes' : 'No'}
-                </Badge>
-            </div>
-        )
-    }
-
-    // Render objects as structured key-value rows
-    if (typeof value === 'object') {
-        const entries = Object.entries(value as Record<string, unknown>).filter(
-            ([, v]) => v !== null && v !== undefined && v !== ''
-        )
-        if (entries.length === 0) return null
-
-        const formatKey = (key: string) =>
-            key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
-
-        const renderValue = (k: string, v: unknown) => {
-            if (typeof v === 'boolean') {
-                return (
-                    <Badge variant={v ? 'success' : 'secondary'} className="text-xs">
-                        {v ? 'Yes' : 'No'}
-                    </Badge>
-                )
-            }
-            if (k === 'health' && typeof v === 'string') {
-                const variant = v === 'good' ? 'success' : v === 'caution' ? 'warning' : v === 'risk' ? 'destructive' : 'secondary'
-                return (
-                    <Badge variant={variant} className="text-xs capitalize">
-                        {v}
-                    </Badge>
-                )
-            }
-            if (k === 'company_status' && typeof v === 'string') {
-                const variant = v === 'active' ? 'success' : v === 'dissolved' ? 'destructive' : 'secondary'
-                return (
-                    <Badge variant={variant} className="text-xs capitalize">
-                        {v}
-                    </Badge>
-                )
-            }
-            return <span className="text-sm font-medium text-foreground">{String(v)}</span>
-        }
-
-        return (
-            <div>
-                <p className="text-sm text-muted-foreground mb-2">{label}</p>
-                <div className="bg-muted/50 rounded-lg p-3 space-y-0">
-                    {entries.map(([k, v]) => (
-                        <div key={k} className="flex items-center justify-between py-1.5 border-b border-border/40 last:border-0">
-                            <span className="text-sm text-muted-foreground">{formatKey(k)}</span>
-                            {renderValue(k, v)}
-                        </div>
-                    ))}
-                </div>
-            </div>
-        )
-    }
-
-    const strValue = String(value)
-
-    // Render URLs as clickable links
-    if (typeof value === 'string' && isURL(value)) {
-        return (
-            <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
-                <span className="text-sm text-muted-foreground">{label}</span>
-                <a
-                    href={value}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-sm font-medium text-international-orange hover:underline inline-flex items-center gap-1"
-                >
-                    {new URL(value).hostname.replace(/^www\./, '')}
-                    <ExternalLink className="h-3 w-3" />
-                </a>
-            </div>
-        )
-    }
-
-    // Render ISO dates as human-readable
-    if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}(T|\s)/.test(value)) {
-        const date = new Date(value)
-        if (!isNaN(date.getTime())) {
-            const formatted = date.toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-            })
-            return (
-                <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
-                    <span className="text-sm text-muted-foreground">{label}</span>
-                    <span className="text-sm font-medium text-foreground">{formatted}</span>
-                </div>
-            )
-        }
-    }
-
-    // Render strings/numbers
     return (
-        <div className="flex items-center justify-between py-2 border-b border-border/40 last:border-0">
-            <span className="text-sm text-muted-foreground">{label}</span>
-            <span className="text-sm font-medium text-foreground">
-                {strValue}
-            </span>
-        </div>
+        <section className="space-y-4">
+            <SectionHeader label="Engage" />
+            <div className="space-y-4">
+                {/* Primary CTAs */}
+                <div className="flex flex-wrap gap-3">
+                    {(hasValue(listing.contact_email) || hasValue(attrs.contact_email)) && (
+                        <QuoteRequestDialog
+                            listings={listing}
+                            trigger={
+                                <Button variant="default" className="bg-international-orange hover:bg-international-orange-hover">
+                                    <Send className="h-4 w-4 mr-2" />
+                                    Request Quote
+                                </Button>
+                            }
+                        />
+                    )}
+                    {hasValue(attrs.provider_id) && (
+                        <Button variant="secondary" onClick={onContact} disabled={isContacting}>
+                            {isContacting ? (
+                                <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Connecting...</>
+                            ) : (
+                                <><MessageSquare className="h-4 w-4 mr-2" />Send Enquiry</>
+                            )}
+                        </Button>
+                    )}
+                    {hasValue(websiteUrl) && (
+                        <Button variant="outline" asChild>
+                            <a href={String(websiteUrl)} target="_blank" rel="noopener noreferrer">
+                                <Globe className="h-4 w-4 mr-2" />
+                                Visit website
+                                <ExternalLink className="h-3 w-3 ml-1.5 opacity-60" />
+                            </a>
+                        </Button>
+                    )}
+                    {hasValue(linkedinUrl) && (
+                        <Button variant="outline" asChild>
+                            <a href={String(linkedinUrl)} target="_blank" rel="noopener noreferrer">
+                                <ExternalLink className="h-4 w-4 mr-2" />
+                                LinkedIn profile
+                            </a>
+                        </Button>
+                    )}
+                </div>
+
+                {/* Map — only rendered when geocoding succeeded */}
+                {hasMap && (
+                    <div className="space-y-1.5">
+                        <iframe
+                            src={buildOsmEmbedUrl(lat!, lon!)}
+                            width="100%"
+                            height={320}
+                            style={{ border: 0, borderRadius: 8 }}
+                            loading="lazy"
+                            title={`${listing.title} location`}
+                        />
+                        <div className="flex items-center justify-between text-xs text-muted-foreground px-0.5">
+                            <span>
+                                © <a
+                                    href="https://www.openstreetmap.org/copyright"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="underline hover:text-foreground"
+                                >
+                                    OpenStreetMap contributors
+                                </a>
+                            </span>
+                            <a
+                                href={buildOsmViewUrl(lat!, lon!)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="hover:text-foreground underline inline-flex items-center gap-1"
+                            >
+                                View on OpenStreetMap
+                                <ExternalLink className="h-3 w-3" />
+                            </a>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </section>
     )
 }
 
-// ── Executives Display ──────────────────────────────────────────────────────
+// ── Executives Display (People listings) ─────────────────────────────────────
 
 const AVAILABILITY_LABELS: Record<string, string> = {
     full_time: 'Full-Time',
@@ -1264,41 +803,30 @@ const AVAILABILITY_LABELS: Record<string, string> = {
 }
 
 const CURRENCY_SYMBOLS: Record<string, string> = {
-    GBP: '\u00a3',
+    GBP: '£',
     USD: '$',
-    EUR: '\u20ac',
+    EUR: '€',
 }
 
 function formatDayRate(rate: number, currency: string | null): string {
-    const symbol = CURRENCY_SYMBOLS[currency ?? 'GBP'] ?? currency ?? '\u00a3'
+    const symbol = CURRENCY_SYMBOLS[currency ?? 'GBP'] ?? currency ?? '£'
     return `${symbol}${rate.toLocaleString()}/day`
 }
 
 function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
     return (
         <Card>
-            <CardHeader>
-                <div className="flex items-center gap-2">
+            <CardContent className="pt-4 space-y-3">
+                <div className="flex items-center gap-2 mb-2">
                     <Users className="h-5 w-5 text-international-orange" />
-                    <h2 className="text-lg font-semibold text-foreground">
-                        Fractional Executives
-                    </h2>
+                    <h2 className="text-base font-semibold text-foreground">Fractional Executives</h2>
                 </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
                 {executives.map((exec) => (
-                    <div
-                        key={exec.id}
-                        className="rounded-lg bg-muted/40 p-4"
-                    >
+                    <div key={exec.id} className="rounded-lg bg-muted/40 p-4">
                         <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-medium text-foreground">
-                                {exec.full_name}
-                            </span>
+                            <span className="font-medium text-foreground">{exec.full_name}</span>
                             {exec.title && (
-                                <span className="text-sm text-muted-foreground">
-                                    &middot; {exec.title}
-                                </span>
+                                <span className="text-sm text-muted-foreground">&middot; {exec.title}</span>
                             )}
                             <Badge variant="secondary" className="text-xs">
                                 {AVAILABILITY_LABELS[exec.availability] ?? exec.availability}
@@ -1310,16 +838,12 @@ function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
                             )}
                         </div>
                         {exec.bio && (
-                            <p className="text-sm text-muted-foreground mt-1">
-                                {exec.bio}
-                            </p>
+                            <p className="text-sm text-muted-foreground mt-1">{exec.bio}</p>
                         )}
                         {exec.specializations && exec.specializations.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-2">
                                 {exec.specializations.map((s) => (
-                                    <Badge key={s} variant="outline" className="text-xs">
-                                        {s}
-                                    </Badge>
+                                    <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
                                 ))}
                             </div>
                         )}
@@ -1338,51 +862,5 @@ function ExecutivesDisplay({ executives }: { executives: PublicExecutive[] }) {
                 ))}
             </CardContent>
         </Card>
-    )
-}
-
-// Featured Work preview for People listings — shows first 3 portfolio items
-function FeaturedWorkPreview({ portfolio }: { portfolio: PortfolioItem[] }) {
-    const featured = portfolio.filter(p => p.is_featured).slice(0, 3)
-    const items = featured.length > 0 ? featured : portfolio.slice(0, 3)
-    if (items.length === 0) return null
-
-    return (
-        <section className="space-y-3">
-            <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
-                <Briefcase className="h-5 w-5" />
-                Featured Work
-            </h2>
-            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {items.map((item) => (
-                    <Card key={item.id} className="overflow-hidden">
-                        {item.image_urls?.[0] && (
-                            <div className="h-32 bg-muted">
-                                <img
-                                    src={item.image_urls[0]}
-                                    alt={item.title}
-                                    className="h-full w-full object-cover"
-                                />
-                            </div>
-                        )}
-                        <CardContent className="p-3 space-y-1">
-                            <p className="text-sm font-medium text-foreground line-clamp-1">
-                                {item.title}
-                            </p>
-                            {item.client_name && (
-                                <p className="text-xs text-muted-foreground">
-                                    {item.client_name}
-                                </p>
-                            )}
-                            {item.description && (
-                                <p className="text-xs text-muted-foreground line-clamp-2">
-                                    {item.description}
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-                ))}
-            </div>
-        </section>
     )
 }
