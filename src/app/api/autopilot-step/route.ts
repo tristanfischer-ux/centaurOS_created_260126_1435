@@ -822,8 +822,15 @@ async function runStep(
         case "generatePdf": {
             // Brief render-readiness wait — gives per-module renders that
             // were kicked off in `generateIllustration` time to land before
-            // PDF gen. Cap 90s; PDF degrades gracefully on missing renders.
-            await waitForRenders(projectId, 90_000)
+            // PDF gen. Cap 360s (6 min); the render chain signals completion
+            // via image_render_state.finished_at so waitForRenders exits
+            // early when all renders are done. Sequential module renders
+            // (one per /api/render-stage hop) can take 30-90s each, so
+            // 8-9 modules × ~60s = up to ~9 min worst case. 360s covers
+            // most real-world projects (6-8 modules at 30-60s typical).
+            // The generatePdf step runs on an 800s Vercel container budget
+            // so 360s headroom before PDF render still fits comfortably.
+            await waitForRenders(projectId, 360_000)
             const { exportProjectPdfBackground } = await import(
                 "@/actions/export-project-pdf"
             )
@@ -1144,13 +1151,27 @@ async function waitForRenders(
     projectId: string,
     maxMs: number,
 ): Promise<void> {
+    // GOTCHA (2026-04-29, Loop 26 missing module images): The original
+    // implementation polled `modules[].imageStatus` for "generating" /
+    // "pending" values and exited immediately when inFlight === 0. But
+    // the background render chain (forge-v2-render-all-modules.ts) NEVER
+    // sets imageStatus on individual modules — it only writes imageUrl
+    // directly and tracks progress via the `image_render_state` JSONB
+    // column. So inFlight was always 0 from the first poll, waitForRenders
+    // returned instantly, and the PDF rendered before any module image landed.
+    //
+    // Fix: poll `image_render_state` (which the chain DOES update) to detect
+    // "chain is running" (finished_at === null) and "chain is done"
+    // (finished_at !== null). Also check all moduleUrls as a secondary
+    // termination condition. Retain the imageStatus check as a fallback for
+    // any future path that does set those statuses.
     const admin = createAdminClient()
     const POLL_MS = 5_000
     const startedAt = Date.now()
     while (Date.now() - startedAt < maxMs) {
         const { data } = await admin
             .from("cad_lab_projects")
-            .select("modules")
+            .select("modules, image_render_state")
             .eq("id", projectId)
             .maybeSingle()
         const mods = (data?.modules ?? []) as Array<{
@@ -1158,14 +1179,31 @@ async function waitForRenders(
             imageStatus?: string | null
         }>
         if (mods.length === 0) return
+
+        // Primary termination: all modules have an imageUrl.
         const ready = mods.filter(
             (m) => typeof m.imageUrl === "string" && m.imageUrl.length > 0,
         ).length
-        const inFlight = mods.filter(
-            (m) =>
-                m.imageStatus === "generating" || m.imageStatus === "pending",
-        ).length
-        if (ready === mods.length || inFlight === 0) return
+        if (ready === mods.length) return
+
+        // Secondary: check the image_render_state chain. If the chain has
+        // finished (finished_at is set) OR never started (state is null),
+        // don't wait for more renders — whatever is ready is what we've got.
+        const renderState = data?.image_render_state as {
+            finished_at: string | null
+            started_at?: string | null
+            current_id?: string | null
+        } | null
+        const chainRunning =
+            renderState !== null &&
+            renderState.finished_at === null
+        if (!chainRunning) {
+            // Either the chain finished (finished_at set) or was never
+            // started (renderState null). Either way: stop waiting.
+            return
+        }
+
+        // Chain is still running — poll until it finishes or we hit maxMs.
         await new Promise((resolve) => setTimeout(resolve, POLL_MS))
     }
 }
