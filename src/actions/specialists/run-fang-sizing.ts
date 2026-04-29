@@ -327,6 +327,8 @@ async function runFangSizingInternal(
     // Infer envelope from the brief text BEFORE invoking the solver — this
     // is the VF demo regression fix (brief said "40-foot containerised"
     // but the rule library hardcoded WAREHOUSE_BAY_100 → spatial overflow).
+    // Gate-3 remediation may override this with closest_feasible_alternate.envelope
+    // (computed below after consumeRemediationContext); see effectiveEnvelope at step 4.
     const briefEnvelope =
         overrides?.envelope ?? inferEnvelopeFromBriefText(briefTextHaystack) ?? undefined
 
@@ -336,15 +338,13 @@ async function runFangSizingInternal(
     //     triggers remediation, it stashes a structured context string at
     //     cad_lab_projects.gate_remediation_context["waiting_sizing"].
     //
-    //     For Fang sizing specifically, the context carries the Gate 3
-    //     failure summary (conflicts, recommendations, failure pattern) and
-    //     a REMEDIATION REQUEST block instructing the solver to relax
-    //     constraints or use the next-larger envelope.
+    //     For Fang sizing specifically, the context signals that attempt 1
+    //     was INFEASIBLE. The structured remediation is applied via
+    //     closest_feasible_alternate.envelope (computed by the solver on
+    //     attempt 1 and stored on dimension_sheet). See remediationEnvelopeOverride
+    //     below and effectiveEnvelope at step 4.
     //
-    //     DECISION: The sizing engine is deterministic — it cannot read
-    //     narrative remediation instructions. The auto-adjust loop in step 4
-    //     already handles constraint relaxation via `decideAutoAdjustment`.
-    //     So the remediation context's main value here is:
+    //     Additionally the context provides:
     //       (a) Audit trail: recorded in pipeline_runs.input_ref so the
     //           handover log shows "this run was a gate-remediation re-fire".
     //       (b) Context clearing: the consume-once semantics ensure the
@@ -357,12 +357,31 @@ async function runFangSizingInternal(
         projectId,
         "waiting_sizing",
     )
+
+    // Gate 3 remediation: when a previous run was INFEASIBLE and the gate
+    // stashed a remediation context, the solver already computed the best
+    // feasible alternate on attempt 1 — it lives at
+    // dimension_sheet.closest_feasible_alternate.envelope.
+    //
+    // DECISION: feed that alternate envelope back in as the starting envelope
+    // for this retry run. The solver's own feasibility sweep proves it fits;
+    // this is legitimate engineering trade-off (pick the alternate the solver
+    // already computed feasible), NOT tolerance relaxation.
+    //
+    // SAFETY: if closest_feasible_alternate is absent (attempt 1 found no
+    // feasible alternate at all), keep briefEnvelope unchanged — the solver
+    // will INFEASIBLE again and surface the right escalation path.
+    let remediationEnvelopeOverride: import("@/lib/sizing/types").Envelope | undefined = undefined
     if (gateSizingRemediationCtx) {
-        console.info(
-            `[run-fang-sizing] gate remediation re-fire detected for project=${projectId}. ` +
-            `Context length: ${gateSizingRemediationCtx.length} chars. ` +
-            `Auto-adjust loop will attempt constraint relaxation.`,
-        )
+        const prevSheet = (project.dimension_sheet as DimensionSheet | null) ?? null
+        const alternate = prevSheet?.closest_feasible_alternate ?? null
+        remediationEnvelopeOverride = alternate?.envelope ?? undefined
+        console.log("[fang-sizing] remediation override applied:", {
+            fromEnvelope: prevSheet?.envelope?.kind ?? "(none)",
+            toEnvelope: remediationEnvelopeOverride?.kind ?? "(no alternate — keeping current)",
+            attempt: "gate-remediation-retry",
+            contextChars: gateSizingRemediationCtx.length,
+        })
     }
 
     // 3. Open pipeline_run row.
@@ -378,10 +397,14 @@ async function runFangSizingInternal(
             input_ref: {
                 industryDomain,
                 targets,
-                envelopeKind: overrides?.envelope?.kind ?? "default",
+                envelopeKind: remediationEnvelopeOverride?.kind ?? overrides?.envelope?.kind ?? "default",
                 // Audit trail: record whether this was a gate-remediation re-fire
                 ...(gateSizingRemediationCtx
-                    ? { gate_remediation: true, gate_context_chars: gateSizingRemediationCtx.length }
+                    ? {
+                          gate_remediation: true,
+                          gate_context_chars: gateSizingRemediationCtx.length,
+                          remediation_envelope_kind: remediationEnvelopeOverride?.kind ?? "none",
+                      }
                     : {}),
             },
         })
@@ -409,10 +432,16 @@ async function runFangSizingInternal(
         const briefAutoAdjustments: BriefAutoAdjustment[] =
             (((project as { research?: { _brief_auto_adjustments?: BriefAutoAdjustment[] } }).research)?._brief_auto_adjustments) ?? []
         let workingTargets = targets
+        // When a gate-remediation retry is in flight, prefer the solver's
+        // own closest_feasible_alternate.envelope over the brief-inferred
+        // envelope — that alternate was already proven feasible by the
+        // solver on attempt 1, so this is a legitimate engineering choice,
+        // not tolerance relaxation.
+        const effectiveEnvelope = remediationEnvelopeOverride ?? briefEnvelope
         let outcome = runSizing({
             industryDomain,
             domainOverride: overrides?.domainOverride,
-            envelope: briefEnvelope,
+            envelope: effectiveEnvelope,
             targets: workingTargets,
             modules,
         })
@@ -459,7 +488,7 @@ async function runFangSizingInternal(
             outcome = runSizing({
                 industryDomain,
                 domainOverride: overrides?.domainOverride,
-                envelope: briefEnvelope,
+                envelope: effectiveEnvelope,
                 targets: workingTargets,
                 modules,
             })
