@@ -125,14 +125,15 @@ const SCORECARD_DIMS: Array<{ key: keyof FirmMatchResult['pillars']; label: stri
   { key: 'geo',        label: 'Geo' },
   { key: 'cheque',     label: 'Cheque' },
   { key: 'activity',   label: 'Activity' },
-  { key: 'confidence', label: 'Confidence' },
+  { key: 'data',       label: 'Data' },
+  { key: 'hardware',   label: 'Hardware' },
 ]
 
 function MatchScorecard({ pillars }: { pillars: FirmMatchResult['pillars'] }) {
   return (
     <div>
       <SectionHeading>Match Scorecard</SectionHeading>
-      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+      <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
         {SCORECARD_DIMS.map(({ key, label }) => {
           const value = pillars[key]
           const isNA = value == null

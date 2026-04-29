@@ -4,7 +4,7 @@
  * @description Deterministic 0–100 match scoring for investor firms against a user's
  * foundry profile. Pure functions — no "use server", no DB calls. All data passed in.
  *
- * Scoring factors:
+ * Scoring factors (internal point system for `total`):
  *   Stage alignment     (25pts) — user's stage vs investor stage_focus
  *   Sector overlap      (25pts) — user's sector+industry vs investor sectors
  *   Product readiness   (15pts) — best product's margin, market size, traction scores
@@ -12,6 +12,10 @@
  *   Cheque range        (15pts) — typical raise for stage vs investor cheque range
  *   Geo focus            (5pts) — UK presence in investor geo_focus
  *   Active deploying     (5pts) — is_active_deploying flag
+ *
+ * Pillar display system (aligned with forge-capital-app's 7-dimension model):
+ *   thesis×20 + stage×20 + geo×15 + cheque×15 + activity×15 + data×10 + hardware×15
+ *   = /110 (normalised to 0-100)
  */
 
 import type { InvestorFirm } from '@/actions/investors'
@@ -50,9 +54,10 @@ export interface MatchBreakdown {
   productReadinessScore: number
   topFactors: string[]
   /**
-   * 6-pillar breakdown ported from Forge-Capital-Dashboard.html:1172-1237.
+   * 7-pillar breakdown aligned with forge-capital-app's `dimAverage()`.
    * Each pillar is 0-100. The `composite` total weights them as:
-   *   thesis 55% · geo 15% · stage 10% · cheque 10% · activity 3% · confidence 2%
+   *   thesis×20 + stage×20 + geo×15 + cheque×15 + activity×15 + data×10 + hardware×15
+   *   = /110 (normalised to 0-100).
    * Used by MatchPillarBars component — gives a consistent visual rationale
    * across the table and matches views.
    */
@@ -62,7 +67,8 @@ export interface MatchBreakdown {
     geo: number
     cheque: number
     activity: number
-    confidence: number
+    data: number
+    hardware: number
   }
 }
 
@@ -245,8 +251,9 @@ export function calculateMatchScore(
   const thesisPoints = Math.max(structuredThesisPoints, cosineThesisPoints)
   const total = Math.min(100, stageScore + hardwareScore + chequeScore + geoScore + activeScore + productReadinessScore + thesisPoints)
 
-  // ── 6-pillar breakdown (dashboard parity, Forge-Capital-Dashboard.html:1172-1237)
-  //    Each pillar is 0-100. Map internal 8-factor points to the pillar scale.
+  // ── 7-pillar breakdown (aligned with forge-capital-app's dimAverage)
+  //    Each pillar is 0-100. Weighted rollup: thesis×20 + stage×20 + geo×15 +
+  //    cheque×15 + activity×15 + data×10 + hardware×15 = /110.
   // INTENT: Free-text queries (no structured profile.sector / profile.industry)
   // historically left `sectorScore = 0` and `thesisBonus = 0`, dragging the
   // thesis pillar to 0 and the composite match % to ~50% — even when pgvector
@@ -264,7 +271,9 @@ export function calculateMatchScore(
   const chequePillar = (chequeScore / 15) * 100
   const activityPillar = attrs.is_active_deploying ? 100 : 50
   const dataQuality = typeof attrs.data_quality_score === 'number' ? attrs.data_quality_score : 0
-  const confidencePillar = Math.min(100, Math.max(0, dataQuality * 10))
+  const dataPillar = Math.min(100, Math.max(0, dataQuality * 10))
+  // Hardware pillar: 0-10 raw → 0-100 pillar. Null = 50 (neutral, non-penalising).
+  const hardwarePillar = hwClamped != null ? Math.round(hwClamped * 10) : 50
 
   return {
     total,
@@ -282,27 +291,33 @@ export function calculateMatchScore(
       geo: Math.round(geoPillar),
       cheque: Math.round(chequePillar),
       activity: Math.round(activityPillar),
-      confidence: Math.round(confidencePillar),
+      data: Math.round(dataPillar),
+      hardware: Math.round(hardwarePillar),
     },
   }
 }
 
 /**
- * Composite match % using the Forge-Capital-Dashboard.html weighting
- * (thesis 55%, geo 15%, stage 10%, cheque 10%, activity 3%, confidence 2%).
+ * Composite match % using forge-capital-app's 7-dimension weighting:
+ *   thesis×20 + stage×20 + geo×15 + cheque×15 + activity×15 + data×10 + hardware×15
+ *   = /110 (normalised to 0-100).
  * Returned as 0-100 integer, separate from the 8-factor `total`.
  *
- * Mirrors the dashboard's behaviour: if a pillar is "inapplicable" (zero with
- * no signal present, e.g. the firm's geo_focus isn't known) we skip it AND
- * reduce the total weight, then renormalise. This prevents missing data from
- * dragging the composite down. Thesis and confidence always apply.
+ * If a pillar is 0 with no signal present (e.g. the firm's geo_focus isn't
+ * known) we skip it AND reduce the total weight, then renormalise. This
+ * prevents missing data from dragging the composite down. Thesis and data
+ * always apply (they represent the core signal and profile completeness).
  */
 export function compositePillarScore(pillars: MatchBreakdown['pillars']): number {
-  let score = pillars.thesis * 0.55 + pillars.confidence * 0.02 + pillars.activity * 0.03
-  let weight = 0.55 + 0.02 + 0.03
-  if (pillars.geo > 0) { score += pillars.geo * 0.15; weight += 0.15 }
-  if (pillars.stage > 0) { score += pillars.stage * 0.10; weight += 0.10 }
-  if (pillars.cheque > 0) { score += pillars.cheque * 0.10; weight += 0.10 }
+  // Always-on dimensions
+  let score = pillars.thesis * 20 + pillars.data * 10
+  let weight = 20 + 10
+  // Skippable dimensions — skip when 0 (no signal)
+  if (pillars.stage > 0) { score += pillars.stage * 20; weight += 20 }
+  if (pillars.geo > 0) { score += pillars.geo * 15; weight += 15 }
+  if (pillars.cheque > 0) { score += pillars.cheque * 15; weight += 15 }
+  if (pillars.activity > 0) { score += pillars.activity * 15; weight += 15 }
+  if (pillars.hardware > 0) { score += pillars.hardware * 15; weight += 15 }
   return Math.round(score / weight)
 }
 

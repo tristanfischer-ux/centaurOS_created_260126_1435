@@ -40,27 +40,18 @@ import { InvestorBreadcrumb } from '../components/InvestorBreadcrumb'
 import { InvestorDataPanorama } from '../components/InvestorDataPanorama'
 import { InvestorDetailActions } from '../components/InvestorDetailActions'
 import { ViewCapOverlay } from '../components/ViewCapOverlay'
+import { CollapsibleSection } from './components/CollapsibleSection'
+import { FactStrip } from './components/FactStrip'
 import {
   ArrowLeft,
-  BarChart3,
   Briefcase,
   Building2,
-  Calendar,
   CheckCircle2,
   Circle,
-  Database,
   Eye,
-  Globe,
-  Lightbulb,
-  Link2,
-  Linkedin,
   Lock,
-  Mail,
   MapPin,
-  Shield,
   Target,
-  TrendingUp,
-  Users,
 } from 'lucide-react'
 
 export const revalidate = 60
@@ -123,13 +114,6 @@ function priorityVariant(priority: string | undefined): 'destructive' | 'warning
   if (priority === 'B') return 'warning'
   if (priority === 'C') return 'secondary'
   return 'outline'
-}
-
-function ensureProtocol(url: string): string {
-  if (/^https?:\/\//i.test(url)) return url
-  // SECURITY: Block non-http(s) schemes (javascript:, data:, etc.)
-  if (/^[a-z][a-z0-9+.-]*:/i.test(url)) return ''
-  return `https://${url}`
 }
 
 const PRIORITY_DESCRIPTIONS: Record<string, string> = {
@@ -442,8 +426,8 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                   </h2>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
-                    {(['thesis', 'stage', 'geo', 'cheque', 'activity', 'confidence'] as const).map((key) => {
+                  <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+                    {(['thesis', 'stage', 'geo', 'cheque', 'activity', 'data', 'hardware'] as const).map((key) => {
                       const value = matchResult.pillars[key]
                       const isNA = value == null
                       // Tristan 2026-04-28 (design audit cross-cutting fix #2):
@@ -492,175 +476,98 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Investment Thesis — Prominent section */}
+            {/* FactStrip — 3-column key facts / focus / provenance cards.
+                Replaces the standalone Key Details + Links cards. */}
+            <FactStrip
+              attrs={attrs}
+              fundSizeLabel={fundSizeLabel}
+              aumLabel={aumLabel}
+            />
+
+            {/* §1 — Recent News (Phase 2 placeholder) */}
+            <CollapsibleSection number={1} title="Recent News" previewLines={2}>
+              <p className="text-sm text-muted-foreground italic">
+                Coming soon — recent news and press mentions for this investor will appear here in Phase 2.
+              </p>
+            </CollapsibleSection>
+
+            {/* §2 Investment Thesis */}
             {attrs.investment_thesis && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                    Investment Thesis
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.investment_thesis}</p>
-                </CardContent>
-              </Card>
+              <CollapsibleSection number={2} title="Investment Thesis" defaultOpen previewLines={4}>
+                <p className="text-sm text-foreground leading-relaxed">{attrs.investment_thesis}</p>
+              </CollapsibleSection>
             )}
 
-            {/* Key Details Card */}
-            {(attrs.fund_size_gbp || attrs.cheque_range_gbp || attrs.stage_focus?.length || attrs.sectors?.length || attrs.geo_focus?.length || attrs.firm_type) && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Briefcase className="h-4 w-4 text-muted-foreground" />
-                    Key Details
-                  </h2>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  {attrs.fund_size_gbp && (
+            {/* §3 Ideal Company Profile + Value-Add + Team Expertise (combined) */}
+            {(attrs.ideal_company_profile || attrs.value_add || (access.intelligenceAccess && attrs.team_expertise)) ? (
+              <CollapsibleSection number={3} title="Ideal Company Profile" subtitle="& Value-Add" previewLines={4}>
+                <div className="space-y-4">
+                  {attrs.ideal_company_profile && (
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Fund Size</p>
-                      <p className="text-sm font-semibold text-foreground">{fundSizeLabel}</p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">What they look for</p>
+                      <p className="text-sm text-foreground leading-relaxed">{attrs.ideal_company_profile}</p>
                     </div>
                   )}
-                  {attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null) && (
+                  {attrs.value_add && (
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Cheque Range</p>
-                      <p className="text-sm font-semibold text-foreground">
-                        {formatFundSize(attrs.cheque_range_gbp.min) ?? '?'} — {formatFundSize(attrs.cheque_range_gbp.max) ?? '?'}
-                      </p>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Value-add beyond capital</p>
+                      <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
                     </div>
                   )}
-
-                  {/* Stage Focus */}
-                  {attrs.stage_focus && attrs.stage_focus.length > 0 && (
+                  {access.intelligenceAccess && attrs.team_expertise && (
                     <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Stage Focus</p>
-                      <div className="flex flex-wrap gap-2">
-                        {attrs.stage_focus.map(s => (
-                          <Badge key={s} variant="outline">{s}</Badge>
-                        ))}
-                      </div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Team expertise</p>
+                      <p className="text-sm text-foreground leading-relaxed">{attrs.team_expertise}</p>
                     </div>
                   )}
-
-                  {/* Sector Focus */}
-                  {Array.isArray(attrs.sectors) && attrs.sectors.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Sector Focus</p>
-                      <div className="flex flex-wrap gap-2">
-                        {attrs.sectors.slice(0, 6).map(s => (
-                          <Badge key={s} variant="secondary">{s}</Badge>
-                        ))}
-                        {attrs.sectors.length > 6 && (
-                          <Badge variant="outline">+{attrs.sectors.length - 6}</Badge>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Geographic Focus */}
-                  {attrs.geo_focus && attrs.geo_focus.length > 0 && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-2">Geographic Focus</p>
-                      <div className="flex flex-wrap gap-2">
-                        {attrs.geo_focus.map(g => (
-                          <Badge key={g} variant="outline">{g}</Badge>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Entity Type */}
-                  {attrs.firm_type && (
-                    <div>
-                      <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Entity Type</p>
-                      <p className="text-sm text-foreground">{attrs.firm_type}</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Ideal Company Profile */}
-            {attrs.ideal_company_profile && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Target className="h-4 w-4 text-muted-foreground" />
-                    Ideal Company Profile
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.ideal_company_profile}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Investment Pattern (professional+) — moved up per Forge Capital
-                order: Investment Thesis → Ideal Company Profile → Investment
-                Pattern → Team Expertise → Connection Brief → Value Add. */}
-            {access.intelligenceAccess && attrs.investment_pattern ? (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <BarChart3 className="h-4 w-4 text-muted-foreground" />
-                    Investment Pattern
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.investment_pattern}</p>
-                </CardContent>
-              </Card>
+                </div>
+              </CollapsibleSection>
             ) : !access.intelligenceAccess && (
               <LockedSection
-                title="Investment Pattern"
+                title="§3 Ideal Company Profile & Value-Add"
                 requiredTier="professional"
-                featureDescription="Synthesized investment behavior analysis from portfolio data."
+                featureDescription="What this investor looks for, their value-add, and team expertise analysis."
               >
                 <div className="h-16 bg-muted/50 rounded" />
               </LockedSection>
             )}
 
-            {/* Team Expertise (professional+) */}
-            {access.intelligenceAccess && attrs.team_expertise ? (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Users className="h-4 w-4 text-muted-foreground" />
-                    Team Expertise
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.team_expertise}</p>
-                </CardContent>
-              </Card>
+            {/* §4 Investment Pattern + Recent Activity (combined, professional+) */}
+            {access.intelligenceAccess && (attrs.investment_pattern || attrs.recent_deals_summary) ? (
+              <CollapsibleSection number={4} title="Investment Pattern" subtitle="& Recent Activity" previewLines={4}>
+                <div className="space-y-4">
+                  {attrs.investment_pattern && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Pattern</p>
+                      <p className="text-sm text-foreground leading-relaxed">{attrs.investment_pattern}</p>
+                    </div>
+                  )}
+                  {attrs.recent_deals_summary && (
+                    <div>
+                      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-1">Recent activity</p>
+                      <p className="text-sm text-foreground leading-relaxed">{attrs.recent_deals_summary}</p>
+                    </div>
+                  )}
+                </div>
+              </CollapsibleSection>
             ) : !access.intelligenceAccess && (
               <LockedSection
-                title="Team Expertise"
+                title="§4 Investment Pattern & Recent Activity"
                 requiredTier="professional"
-                featureDescription="Analysis of the team's domain expertise and track record."
+                featureDescription="Synthesised investment behaviour analysis and recent deal activity."
               >
                 <div className="h-16 bg-muted/50 rounded" />
               </LockedSection>
             )}
 
-            {/* Connection Brief (professional+) */}
+            {/* §5 Connection Brief (professional+) */}
             {access.intelligenceAccess && attrs.connection_brief ? (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Link2 className="h-4 w-4 text-muted-foreground" />
-                    Connection Brief
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.connection_brief}</p>
-                </CardContent>
-              </Card>
+              <CollapsibleSection number={5} title="Connection Brief" previewLines={3}>
+                <p className="text-sm text-foreground leading-relaxed">{attrs.connection_brief}</p>
+              </CollapsibleSection>
             ) : !access.intelligenceAccess && (
               <LockedSection
-                title="Connection Brief"
+                title="§5 Connection Brief"
                 requiredTier="professional"
                 featureDescription="Outreach intelligence — warm intro paths, networking context, and approach strategy."
               >
@@ -668,49 +575,14 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </LockedSection>
             )}
 
-            {/* Value-Add — moved here after Connection Brief per Forge Capital
-                order. */}
-            {attrs.value_add && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <Lightbulb className="h-4 w-4 text-muted-foreground" />
-                    Value-Add
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Synthesis Dossier card removed 2026-04-27 — the placeholder
-                "No dossier yet" rendered for every investor and looked like
-                a blank section. The real dossier table doesn't exist on the
-                ForgeOS Supabase project yet; when it lands, re-add a card
-                here that ONLY renders when attrs.deep_profile is populated. */}
-
-            {/* Recent Activity */}
-            {attrs.recent_deals_summary && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                    Recent Activity
-                  </h2>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-foreground leading-relaxed">{attrs.recent_deals_summary}</p>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Key People — click a partner to see full detail + link to firm */}
+            {/* §6 Key People — click a partner to see full detail + link to firm */}
             {contacts.length > 0 ? (
-              <KeyPeopleSection contacts={contacts} access={contactAccess} />
+              <CollapsibleSection number={6} title="Key People" defaultOpen previewLines={5}>
+                <KeyPeopleSection contacts={contacts} access={contactAccess} />
+              </CollapsibleSection>
             ) : access.contactsVisible ? null : (
               <LockedSection
-                title="Key People"
+                title="§6 Key People"
                 requiredTier="starter"
                 featureDescription="See partner names, titles, LinkedIn profiles, and more."
               >
@@ -727,6 +599,26 @@ export default async function InvestorDetailPage({ params }: PageProps) {
                 </div>
               </LockedSection>
             )}
+
+            {/* §7 — Deep Dossier (Phase 2 placeholder) */}
+            <CollapsibleSection number={7} title="Deep Dossier" previewLines={2}>
+              <p className="text-sm text-muted-foreground italic">
+                Coming soon — a comprehensive deep dossier synthesising all intelligence on this investor will appear here in Phase 2.
+              </p>
+            </CollapsibleSection>
+
+            {/* §8 — Source Evidence (Phase 2 placeholder) */}
+            <CollapsibleSection number={8} title="Source Evidence" previewLines={2}>
+              <p className="text-sm text-muted-foreground italic">
+                Coming soon — source evidence with citations, links, and confidence scores will appear here in Phase 2.
+              </p>
+            </CollapsibleSection>
+
+            {/* ================================================================
+                REMAINING SECTIONS (not §-numbered)
+                Portfolio, Co-Investment Network, Fund Performance, Data Panorama,
+                Notes, Similar Investors, Fund Details, Outreach, Links, etc.
+                ================================================================ */}
 
             {/* Portfolio companies (starter+, overlap highlights for professional+) */}
             {attrs.portfolio_companies && attrs.portfolio_companies.length > 0 ? (
@@ -894,38 +786,7 @@ export default async function InvestorDetailPage({ params }: PageProps) {
               </Card>
             )}
 
-            {/* Links — moved from sidebar into single-column flow */}
-            {(attrs.website_url || attrs.linkedin_company_url) && (
-              <Card>
-                <CardHeader>
-                  <h2 className="text-base font-semibold text-foreground">Links</h2>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  {attrs.website_url && ensureProtocol(attrs.website_url) && (
-                    <a
-                      href={ensureProtocol(attrs.website_url)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-international-orange hover:underline"
-                    >
-                      <Globe className="h-4 w-4 shrink-0" />
-                      Website
-                    </a>
-                  )}
-                  {attrs.linkedin_company_url && ensureProtocol(attrs.linkedin_company_url) && (
-                    <a
-                      href={ensureProtocol(attrs.linkedin_company_url)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-2 text-sm text-international-orange hover:underline"
-                    >
-                      <Linkedin className="h-4 w-4 shrink-0" />
-                      LinkedIn
-                    </a>
-                  )}
-                </CardContent>
-              </Card>
-            )}
+            {/* Links card removed — data now in FactStrip Provenance card */}
 
             {/* Verification footer — Tristan 2026-04-27: skip Data Quality
                 (quality_score, data_source) — internal-only fields. Keep the
