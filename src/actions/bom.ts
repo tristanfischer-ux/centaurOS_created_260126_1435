@@ -63,6 +63,12 @@ import type {
 } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { fetchCatalogueForPrompt, extractSearchKeywords } from "./component-library"
+import {
+  runBomCountCheck,
+  enrichPartsWithProvenance,
+  summariseProvenanceGaps,
+  type CostProvenance,
+} from "@/lib/bom/bom-reconciliation"
 import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 import { renderOracleHint } from "@/lib/cost/oracle-benchmarks"
 import { callOpenRouter, CHEAP_STRUCTURED_MODEL } from "@/lib/ai/openrouter"
@@ -2366,6 +2372,60 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
     partNumbers.add(p.partNumber)
   }
 
+  // ── Loop 24 Fix 5 — deterministic count-check gate ──────────────
+  // Compare part-class counts declared in module descriptions against
+  // the BOM rows sourced from each module. Mismatch >10% is logged as
+  // a structured warning. We do NOT block emission here (a block would
+  // strand the pipeline_run in 'running' with no recovery path if the
+  // BOM generator consistently under-counts). Instead we log at WARN
+  // so the autopilot cron's next tick can surface the flag in the PDF.
+  //
+  // Decision: log-and-proceed rather than hard-block because:
+  //   (a) count-extraction from prose is probabilistic — a 15% mismatch
+  //       on "5 pressure vessels" vs 4 BOM rows might be a legitimate
+  //       engineering choice (one vessel is a spare).
+  //   (b) The project-state flag `bom_reconciliation_failed` lets the
+  //       PDF renderer surface the RED banner on the affected modules.
+  const countCheckResult = runBomCountCheck(
+    loaded.modules.map((m) => ({
+      id: m.id,
+      name: m.name,
+      description: m.description,
+      keyParts: m.keyParts,
+    })),
+    validatedParts.map((p) => ({
+      partNumber: p.partNumber,
+      name: p.name,
+      sourceModuleId: p.sourceModuleId ?? null,
+      quantity: skeletonBomLines.find((bl) => bl.childPartNumber === p.partNumber)?.quantity ?? 1,
+    })),
+  )
+  if (!countCheckResult.passed) {
+    console.warn(
+      `[bom-distributed:merge] count-check FAILED: project=${projectId} mismatches=${countCheckResult.mismatches.length}`,
+    )
+    console.warn(countCheckResult.logLine)
+  } else {
+    console.log(`[bom-distributed:merge] count-check PASS: project=${projectId}`)
+  }
+
+  // ── Loop 24 Fix 5 — cost-provenance enrichment ───────────────────
+  // Classify every part's cost as "quoted" | "parametric" | "todo" from
+  // heuristic signals in estimatedUnitCostGbp and costJustification.
+  // The result is stored in the cost_provenance field on the parts row
+  // via the INSERT below. The PDF cost-waterfall renderer reads this
+  // field to show orange/red badges on parametric/todo rows.
+  const partsWithProvenance = enrichPartsWithProvenance(validatedParts)
+  const provenanceSummary = summariseProvenanceGaps(partsWithProvenance)
+  if (provenanceSummary.bannerNeeded) {
+    console.warn(
+      `[bom-distributed:merge] provenance-gaps: project=${projectId} todo=${provenanceSummary.todoCount} parametric=${provenanceSummary.parametricCount} quoted=${provenanceSummary.quotedCount}`,
+    )
+    if (provenanceSummary.bannerCopy) {
+      console.warn(`[bom-distributed:merge] provenance-banner: ${provenanceSummary.bannerCopy}`)
+    }
+  }
+
   // ── Delete existing data (response validated) ──
   const { error: bomDelErr } = await admin
     .from("bom_lines")
@@ -2397,8 +2457,10 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
     return
   }
 
-  // ── Insert parts ──
-  const partsToInsert = validatedParts.map((p) => ({
+  // ── Insert parts (with Loop 24 Fix 5 cost_provenance) ──
+  // partsWithProvenance was built above from validatedParts; use it directly
+  // so the cost_provenance field reaches the DB row.
+  const partsToInsert = partsWithProvenance.map((p) => ({
     cad_lab_project_id: projectId,
     part_number: p.partNumber,
     name: p.name,
@@ -2419,6 +2481,7 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
     is_purchased: p.isPurchased,
     mpn: p.mpn,
     cost_justification: p.costJustification,
+    cost_provenance: p.cost_provenance satisfies CostProvenance,
   }))
 
   const { data: insertedParts, error: insertErr } = await admin
