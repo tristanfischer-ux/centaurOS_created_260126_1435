@@ -719,31 +719,123 @@ function parseReviewFromMarkdown(
         }
     }
 
-    // Extract issues — try multiple bracket/bold formats
+    // Extract issues — try multiple bracket/bold formats.
+    //
+    // Loop 26 inverse-phantom-GREEN fix (2026-04-29):
+    // Qwen3-235B (Fang model since 2026-04-25 swap) writes issues in a
+    // paragraph-break format rather than an inline format:
+    //
+    //   **[CRITICAL] [Tag] Title**
+    //
+    //   Description paragraph on the NEXT line (possibly after a blank line
+    //   or a --- separator). None of the original 3 patterns matched this
+    //   because all 3 require description text on the SAME line as the
+    //   severity header. Result: issues.length === 0 was stored even when
+    //   reviewMarkdown contained real findings — triggering the unvalidated
+    //   module banner incorrectly (inverse of the Loop 24 phantom-GREEN bug).
+    //
+    // Fix: add a 4th pattern that matches the Qwen3-235B standalone-header
+    // format and walks forward for the first non-empty, non-separator
+    // description line. Severity normalisation and [TAG] prefix stripping
+    // applied uniformly so mixed-case variants never cause false negatives.
     const issues: ReviewIssue[] = []
-    const issuePatterns = [
+
+    // Helper: normalise severity to lowercase ReviewIssue union.
+    // Handles "Critical" / "CRITICAL" / "critical" / "WARNING" etc.
+    function normaliseSeverity(raw: string): ReviewIssue["severity"] {
+        const lower = raw.toLowerCase()
+        if (lower === "critical" || lower === "warning" || lower === "info") return lower
+        return "info"
+    }
+
+    // Helper: strip a leading [TAG] prefix from the category string.
+    // e.g. "[Pressure] Victaulic coupling" -> "Victaulic coupling"
+    function stripTagPrefix(raw: string): string {
+        return raw.replace(/^\[[^\]]+\]\s*/, "").trim() || raw.trim()
+    }
+
+    // ── Inline patterns (original 3 — description on same line as header) ──
+
+    const inlineIssuePatterns = [
+        // **[CRITICAL] [Tag] Category:** description
         /\*\*\[(CRITICAL|WARNING|INFO)\]\s*([^:*]+):\*\*\s*(.+)/gi,
+        // [CRITICAL] **Category:** description
         /\[(CRITICAL|WARNING|INFO)\]\s*\*\*([^:*]+):\*\*\s*(.+)/gi,
+        // - **CRITICAL** Category: description
         /-\s*\*\*(CRITICAL|WARNING|INFO)\*\*:?\s*([^:]+):\s*(.+)/gi,
     ]
-    for (const issuePattern of issuePatterns) {
+    for (const issuePattern of inlineIssuePatterns) {
         let issueMatch
         while ((issueMatch = issuePattern.exec(markdown)) !== null) {
-            // Avoid duplicates if multiple patterns match the same issue
-            const message = issueMatch[3].trim()
-            if (issues.some(i => i.message === message)) continue
+            const rawMessage = issueMatch[3].trim()
+            if (issues.some(i => i.message === rawMessage)) continue
 
             const issue: ReviewIssue = {
-                severity: issueMatch[1].toLowerCase() as ReviewIssue["severity"],
-                category: issueMatch[2].trim(),
-                message,
+                severity: normaliseSeverity(issueMatch[1]),
+                category: stripTagPrefix(issueMatch[2]),
+                message: rawMessage,
             }
-            // Look for suggestion on next line
-            const afterIssue = markdown.slice(issueMatch.index + issueMatch[0].length, issueMatch.index + issueMatch[0].length + 500)
+            // Look for suggestion in the 500 chars immediately following this match
+            const afterIssue = markdown.slice(
+                issueMatch.index + issueMatch[0].length,
+                issueMatch.index + issueMatch[0].length + 500,
+            )
             const sugMatch = afterIssue.match(/\*Suggestion:\*\s*(.+)/i)
             if (sugMatch) {
                 issue.suggestion = sugMatch[1].trim()
             }
+            issues.push(issue)
+        }
+    }
+
+    // ── Paragraph-break pattern (Pattern 4 — Qwen3-235B standalone-header format) ──
+    //
+    // Matches: **[CRITICAL] [Tag] Title**  (standalone line, optionally with
+    // an em-dash + reference suffix). Description lives on the NEXT non-empty,
+    // non-separator line (skipping blank lines and horizontal rules).
+    //
+    // This pattern fires AFTER the inline patterns to avoid double-counting
+    // issues already captured by an inline match.
+    {
+        const standaloneHeaderPattern =
+            /\*\*\[(CRITICAL|WARNING|INFO)\]\s*(\[[^\]]+\][^*]*)\*\*[ \t]*$/gim
+        let headerMatch
+        while ((headerMatch = standaloneHeaderPattern.exec(markdown)) !== null) {
+            const sev = normaliseSeverity(headerMatch[1])
+            const category = stripTagPrefix(headerMatch[2])
+
+            // Walk forward past blank lines and horizontal-rule separators
+            const rest = markdown.slice(headerMatch.index + headerMatch[0].length)
+            const lines = rest.split("\n")
+            let description = ""
+            for (const line of lines) {
+                const trimmed = line.trim()
+                if (trimmed === "" || /^[-*]{3,}$/.test(trimmed)) continue
+                description = trimmed.replace(/^[-*]\s+/, "")
+                break
+            }
+
+            if (!description) continue
+
+            // Deduplicate: skip if an inline pattern already captured this
+            if (issues.some(
+                i =>
+                    i.severity === sev &&
+                    (i.category === category ||
+                        i.message.startsWith(description.slice(0, 40))),
+            )) {
+                continue
+            }
+
+            const issue: ReviewIssue = { severity: sev, category, message: description }
+
+            // Suggestion: look for "*Suggestion:*" within 800 chars of the header
+            const context = rest.slice(0, 800)
+            const sugMatch = context.match(/[-*]\s+\*Suggestion:\*\s*(.+)/i)
+            if (sugMatch) {
+                issue.suggestion = sugMatch[1].trim()
+            }
+
             issues.push(issue)
         }
     }

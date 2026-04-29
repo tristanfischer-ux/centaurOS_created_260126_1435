@@ -368,7 +368,19 @@ async function runFangReviewInternal(
             //
             // NEVER substitute a fake review — only flag the gap so the PDF
             // can surface it honestly.
-            let finalReview = reviewResult.review
+            //
+            // Loop 26 inverse-phantom-GREEN fix (2026-04-29):
+            // Defensively normalise the review before the emptiness check.
+            // Some response shapes (future model swaps, direct OpenRouter
+            // JSON responses) may store findings under a `findings` key
+            // rather than the canonical `issues` key. If `issues` is empty
+            // but `findings` is non-empty, promote `findings` → `issues` so
+            // the emptiness gate does NOT fire a false retry on a review
+            // that actually delivered structured findings. Severity strings
+            // are normalised to lowercase to match ReviewIssue["severity"].
+            // This is a belt-and-braces guard on top of the primary fix in
+            // parseReviewFromMarkdown (cad-lab-reviews.ts).
+            let finalReview = normaliseFangReview(reviewResult.review)
             let retryAttempted = false
             if (
                 finalReview.issues.length === 0 &&
@@ -379,19 +391,22 @@ async function runFangReviewInternal(
                 )
                 retryAttempted = true
                 const retryResult = await requestSpecialistReview(reviewRequest, trusted)
-                if ("review" in retryResult && retryResult.review.issues.length > 0) {
-                    // Retry produced findings — use the retry result.
-                    finalReview = retryResult.review
-                    console.info(
-                        `[run-fang-review] retry succeeded: module=${moduleId} issues=${finalReview.issues.length}`,
-                    )
-                } else {
-                    // Both attempts empty — keep the first result for the audit
-                    // trail. The PDF layer will render the hard RED banner via
-                    // issues.length === 0 detection. Log for visibility.
-                    console.warn(
-                        `[run-fang-review] double-empty review for module=${moduleId} — PDF will show unvalidated-module RED banner`,
-                    )
+                if ("review" in retryResult) {
+                    const retryNormalised = normaliseFangReview(retryResult.review)
+                    if (retryNormalised.issues.length > 0) {
+                        // Retry produced findings — use the retry result.
+                        finalReview = retryNormalised
+                        console.info(
+                            `[run-fang-review] retry succeeded: module=${moduleId} issues=${finalReview.issues.length}`,
+                        )
+                    } else {
+                        // Both attempts empty — keep the first result for the audit
+                        // trail. The PDF layer will render the hard RED banner via
+                        // issues.length === 0 detection. Log for visibility.
+                        console.warn(
+                            `[run-fang-review] double-empty review for module=${moduleId} — PDF will show unvalidated-module RED banner`,
+                        )
+                    }
                 }
             }
             // Attach retry metadata to the review for observability (non-schema
@@ -1285,4 +1300,64 @@ function mapDbStatusToChip(dbStatus: string): FangRunStatusChip {
         default:
             return "not-started"
     }
+}
+
+/**
+ * Loop 26 inverse-phantom-GREEN fix (2026-04-29).
+ *
+ * Normalises a raw SpecialistReview coming off `requestSpecialistReview`
+ * before the emptiness gate runs. Two defensive corrections:
+ *
+ * 1. **findings → issues promotion**: Some future model configurations may
+ *    return structured findings under a `findings` key rather than the
+ *    canonical `issues` key. If `issues` is empty but a `findings` array
+ *    exists on the raw object, promote `findings` → `issues` so the
+ *    emptiness gate does NOT trigger a spurious retry or double-empty flag.
+ *
+ * 2. **Severity normalisation**: The `ReviewIssue.severity` union only
+ *    accepts `"critical" | "warning" | "info"` (lowercase). A model that
+ *    emits `"Critical"` or `"CRITICAL"` would survive TypeScript (cast
+ *    through `unknown`) but would break severity-based downstream logic
+ *    (e.g. the fang_critical_findings feasibility axis added in 12fe4191).
+ *    Normalise every issue's severity to lowercase here so callers can
+ *    rely on the type invariant.
+ *
+ * This function is intentionally defensive — it returns the input unchanged
+ * when neither correction applies.
+ */
+function normaliseFangReview(review: SpecialistReview): SpecialistReview {
+    const raw = review as unknown as Record<string, unknown>
+
+    // 1. findings → issues promotion
+    let issues = review.issues
+    if (issues.length === 0 && Array.isArray(raw["findings"]) && (raw["findings"] as unknown[]).length > 0) {
+        issues = (raw["findings"] as unknown[])
+            .filter((f): f is Record<string, unknown> => f !== null && typeof f === "object")
+            .map((f) => ({
+                severity: normaliseSeverityString(String(f["severity"] ?? "info")),
+                category: String(f["category"] ?? ""),
+                message: String(f["message"] ?? f["description"] ?? ""),
+                suggestion: typeof f["suggestion"] === "string" ? f["suggestion"] : undefined,
+            }))
+    }
+
+    // 2. Severity normalisation on the canonical issues array
+    const normalisedIssues = issues.map((i) => ({
+        ...i,
+        severity: normaliseSeverityString(i.severity),
+    }))
+
+    if (normalisedIssues === review.issues && normalisedIssues.every((i, idx) => i.severity === review.issues[idx]?.severity)) {
+        // Nothing changed — return the original to avoid creating a new object unnecessarily
+        return review
+    }
+
+    return { ...review, issues: normalisedIssues }
+}
+
+function normaliseSeverityString(raw: string): SpecialistReview["issues"][number]["severity"] {
+    const lower = raw.toLowerCase()
+    if (lower === "critical" || lower === "warning" || lower === "info") return lower
+    if (lower === "warn") return "warning"
+    return "info"
 }
