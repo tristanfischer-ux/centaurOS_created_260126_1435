@@ -141,18 +141,12 @@ export const STAGE_CONFIG: Record<
     waiting_finn: {
         kind: "fire",
         fireStep: "waitForFinn",
-        nextStage: "generating_illustration",
+        nextStage: "matching_suppliers",
         // Finn precondition is `parts` table populated by BOM merge stage.
         // Merge runs via after() chain after BOM autopilot row is already
         // marked done — Finn will see "Generate a BOM first" until merge
         // lands. Budget 5 retries (~5 min) to absorb that lag.
         maxAttempts: 5,
-    },
-    generating_illustration: {
-        kind: "fire",
-        fireStep: "generateIllustration",
-        nextStage: "matching_suppliers",
-        maxAttempts: 2,
     },
     matching_suppliers: {
         kind: "fire",
@@ -179,10 +173,16 @@ export const STAGE_CONFIG: Record<
     proofreading: {
         kind: "fire",
         fireStep: "runProofreader",
-        nextStage: "generating_pdf",
+        nextStage: "generating_illustration",
         // Single V4-Pro fact-check call; transient OpenRouter 429/5xx
         // covered by 3 retries.
         maxAttempts: 3,
+    },
+    generating_illustration: {
+        kind: "fire",
+        fireStep: "generateIllustration",
+        nextStage: "generating_pdf",
+        maxAttempts: 2,
     },
     generating_pdf: {
         kind: "fire",

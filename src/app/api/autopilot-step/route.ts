@@ -593,6 +593,47 @@ async function runStep(
                 : { ok: false, error: result.error ?? "Finn failed" }
         }
 
+        case "matchSuppliers": {
+            const { matchSuppliersForProjectBackground } = await import(
+                "@/actions/forge-v2-supplier-match"
+            )
+            const result = await matchSuppliersForProjectBackground(
+                projectId,
+                foundryId,
+            )
+            return result.ok
+                ? { ok: true }
+                : {
+                      ok: false,
+                      error: result.error ?? "Supplier match failed",
+                  }
+        }
+
+        case "runFangReviews": {
+            return await runFangReviewsForAllModules(projectId, foundryId)
+        }
+
+        case "runProofreader": {
+            const { runProofreaderBackground } = await import(
+                "@/actions/specialists/run-proofreader"
+            )
+            const result = await runProofreaderBackground(
+                projectId,
+                foundryId,
+                null,
+            )
+            // Proofreader is non-blocking by design (Phase 1) — it appends
+            // findings to a JSONB column the PDF appendix renders. A
+            // failure here should NOT block PDF emission. Log + advance.
+            if (!result.ok) {
+                console.warn(
+                    "[autopilot-step] proofreader failed (non-blocking):",
+                    result.error,
+                )
+            }
+            return { ok: true }
+        }
+
         case "generateIllustration": {
             const [
                 { generateSystemIllustrationForProjectBackground },
@@ -642,9 +683,8 @@ async function runStep(
                 )
             }
 
-            // Kick off per-module renders parallel-fire-and-forget. They run
-            // during supplier-match + Fang-review stages and are awaited
-            // by the PDF stage at the end. Failures here are non-fatal.
+            // Kick off per-module renders parallel. They are awaited
+            // by the PDF stage immediately after. Failures here are non-fatal.
             try {
                 const { startRenderAllRemainingModuleImagesBackground } =
                     await import("@/actions/forge-v2-render-all-modules")
@@ -661,9 +701,9 @@ async function runStep(
 
             // ── Cross-modal consistency gate (council R1 P1) ──────────
             //
-            // Runs AFTER illustration generation, BEFORE supplier matching.
-            // Catches BOM-vs-module divergences before the engine spends
-            // time matching suppliers for parts that don't actually exist.
+            // Runs AFTER illustration generation, BEFORE PDF render.
+            // Catches BOM-vs-module divergences before the engine renders
+            // a PDF containing parts that don't actually exist.
             //
             // Loop 24 evidence: BOM count and keyParts count diverged on
             // 4 of 5 demos. Vertical Farm showed 4 tiers in illustration
@@ -672,8 +712,7 @@ async function runStep(
             //
             // When blockers are found the step returns ok:false so the
             // autopilot stops at generating_illustration and the founder
-            // sees the inconsistency rather than a fabricated supplier
-            // shortlist for parts that don't exist.
+            // sees the inconsistency rather than a PDF with fabricated data.
             try {
                 const { runCrossModalCheck } = await import(
                     "@/lib/forge-v2/cross-modal-consistency"
@@ -759,7 +798,7 @@ async function runStep(
                             ok: false,
                             error:
                                 `Cross-modal consistency gate: ${cmVerdict.blockers.length} blocker(s) found. ` +
-                                `Fix the BOM-vs-module divergences before supplier matching. ` +
+                                `Fix the BOM-vs-module divergences before PDF render. ` +
                                 summary,
                         }
                     }
@@ -768,56 +807,15 @@ async function runStep(
                     )
                 }
             } catch (cmErr) {
-                // Non-fatal: log and continue. The proofreader runs the same
-                // check and will surface blockers in the verdict. The gate
-                // here is an early-stop optimisation, not a hard dependency.
+                // Non-fatal: log and continue. The proofreader already ran
+                // the same check. The gate here is a final safety net before
+                // PDF render, not a hard dependency.
                 console.warn(
                     "[autopilot-step] cross-modal gate threw (non-fatal):",
                     cmErr instanceof Error ? cmErr.message : cmErr,
                 )
             }
 
-            return { ok: true }
-        }
-
-        case "matchSuppliers": {
-            const { matchSuppliersForProjectBackground } = await import(
-                "@/actions/forge-v2-supplier-match"
-            )
-            const result = await matchSuppliersForProjectBackground(
-                projectId,
-                foundryId,
-            )
-            return result.ok
-                ? { ok: true }
-                : {
-                      ok: false,
-                      error: result.error ?? "Supplier match failed",
-                  }
-        }
-
-        case "runFangReviews": {
-            return await runFangReviewsForAllModules(projectId, foundryId)
-        }
-
-        case "runProofreader": {
-            const { runProofreaderBackground } = await import(
-                "@/actions/specialists/run-proofreader"
-            )
-            const result = await runProofreaderBackground(
-                projectId,
-                foundryId,
-                null,
-            )
-            // Proofreader is non-blocking by design (Phase 1) — it appends
-            // findings to a JSONB column the PDF appendix renders. A
-            // failure here should NOT block PDF emission. Log + advance.
-            if (!result.ok) {
-                console.warn(
-                    "[autopilot-step] proofreader failed (non-blocking):",
-                    result.error,
-                )
-            }
             return { ok: true }
         }
 

@@ -7,8 +7,9 @@
  * a brief on `/the-forge-v2/new` and walks the WHOLE pipeline for them
  * without further clicks:
  *
- *     chase.research → brief.lock → max.decompose → bom.generate →
- *     finn.cost → system.illustration → supplier.match → fang.review×N
+ *     chase.research → brief.lock → max.decompose → sizing → layout →
+ *     bom.generate → finn.cost → supplier.match → fang.review×N →
+ *     proofreader → system.illustration → pdf.render
  *
  * The terminal ship step is deliberately NOT automated — shipping is a
  * deliberate decision (see CLAUDE.md §"Walking a User Flow"). When the

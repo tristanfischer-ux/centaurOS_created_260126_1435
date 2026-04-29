@@ -46,10 +46,10 @@ export const NARRATIVE_STAGE_ORDER: AutopilotStage[] = [
     "waiting_layout",
     "waiting_bom",
     "waiting_finn",
-    "generating_illustration",
     "matching_suppliers",
     "running_fang_reviews",
     "proofreading",
+    "generating_illustration",
     "generating_pdf",
 ]
 
@@ -98,9 +98,9 @@ export const STAGE_NARRATIVES: Record<AutopilotStage, StageNarrative> = {
     },
     generating_illustration: {
         label: "Drawing the system",
-        inFlight: "Generating a hero illustration of the product so the report has something to look at.",
+        inFlight: "Generating a hero illustration and per-module renders so the report has visuals throughout.",
         narrative:
-            "Generated a hero illustration of the product so the report has a clean visual on the cover and the executive summary.",
+            "Generated a hero illustration and per-module renders so the report has clean visuals on the cover, the executive summary, and the module pages.",
     },
     matching_suppliers: {
         label: "Finding suppliers",
