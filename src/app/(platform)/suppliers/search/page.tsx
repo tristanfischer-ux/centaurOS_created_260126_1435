@@ -12,6 +12,7 @@ import { Suspense } from 'react'
 import { Skeleton } from '@/components/ui/skeleton'
 import { searchSuppliers } from '@/actions/suppliers'
 import { SupplierSearchClient } from './SupplierSearchClient'
+import { typography } from '@/lib/design-system'
 
 export const revalidate = 60
 
@@ -40,11 +41,12 @@ export default async function SupplierSearchPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="max-w-7xl mx-auto py-8">
-        <h1 className="text-3xl font-bold text-foreground mb-2">
-          Supplier Directory
-        </h1>
-        <p className="text-muted-foreground mb-8 max-w-2xl">
+      <div className="max-w-7xl py-8">
+        <div className={`${typography.pageHeader} mb-1`}>
+          <div className={typography.pageHeaderAccent} />
+          <h1 className={typography.h1}>Supplier Directory</h1>
+        </div>
+        <p className={typography.pageSubtitle + " mb-8"}>
           Describe what you need — we&apos;ll find the best suppliers using semantic search.
         </p>
 

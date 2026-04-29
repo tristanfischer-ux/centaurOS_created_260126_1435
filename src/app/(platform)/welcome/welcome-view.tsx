@@ -36,6 +36,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { markWelcomeComplete } from "@/actions/welcome"
+import { typography } from "@/lib/design-system"
 
 // INTENT: Trimmed roster — the four key leaders the founder will speak to most
 // in the post-pivot product. Forge pole (Fang + Chase) + Investors pole (Fiona)
@@ -77,13 +78,13 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
                         <p className="text-xs font-mono uppercase tracking-widest text-muted-foreground mb-5">
                             {firstName ? `Welcome, ${firstName}` : "Welcome"}
                         </p>
-                        <div className="flex items-center gap-3 mb-4">
-                            <div className="h-8 w-1.5 bg-international-orange rounded-full shadow-[0_0_10px_rgba(255,69,0,0.5)]" />
-                            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight text-foreground">
+                        <div className={`${typography.pageHeader} mb-4`}>
+                            <div className={typography.pageHeaderAccent} />
+                            <h1 className={typography.h1}>
                                 Welcome to <span className="text-international-orange">ForgeOS</span>.
                             </h1>
                         </div>
-                        <p className="text-lg sm:text-xl text-muted-foreground font-light">
+                        <p className="text-lg sm:text-xl text-muted-foreground font-light pl-[18px]">
                             The operating system for hardware startups.
                         </p>
                     </div>
@@ -250,9 +251,9 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             {/* Trimmed key-leaders roster                              */}
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-0 pt-14 lg:pt-16 max-w-4xl">
-                <div className="flex items-center gap-3 mb-5">
-                    <div className="h-8 w-1.5 bg-international-orange rounded-full" />
-                    <h2 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight">
+                <div className={`${typography.pageHeader} mb-5`}>
+                    <div className={typography.pageHeaderAccent} />
+                    <h2 className={typography.h2}>
                         Your four key leaders
                     </h2>
                 </div>

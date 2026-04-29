@@ -891,8 +891,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             {/* ── CSS custom properties scoped to this component ── */}
             <style>{`
                 .bc-page {
-                    max-width: 1200px;
-                    margin: 0 auto;
                     padding: 28px 0 80px;
                     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
                     --bc-fg: #292524;
