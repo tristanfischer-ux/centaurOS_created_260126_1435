@@ -2176,8 +2176,10 @@ export async function skeletonDecompose(
     // each + schema overhead. Industrial BESS with 9 modules hit the 2048
     // ceiling and Claude returned truncated JSON → parse failed → pipeline
     // wedge. Observed run 9 2026-04-24. Doubled to 4096 for 2× headroom.
+    // GPT-5.5 is a reasoning model — needs extended timeout for internal
+    // chain-of-thought before emitting structured JSON.
     const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 4096, 60_000, 1,
+      systemPrompt, userPrompt, modelId, 4096, 180_000, 1,
     )
 
     // Parse JSON response
