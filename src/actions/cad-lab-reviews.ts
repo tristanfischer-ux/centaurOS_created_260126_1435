@@ -50,6 +50,7 @@ import { withLlmPermit } from "@/lib/ai/llm-permit"
 import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
 import { embedQuery } from "@/lib/embeddings"
+import { runParallelAndCompare, loadGroundingData } from "@/lib/forge-v2/parallel-llm"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // ─── Constants ──────────────────────────────────────────────────────
@@ -378,19 +379,73 @@ ${reviewContext}${assemblyNotesInstructions}${refDossierBlock}`
         // ── Get tools for this specialist (included in prompt as JSON schemas) ──
         const tools = getToolsForSpecialist(req.specialistId)
 
-        // Route selection: OpenRouter (Qwen 3 235B, default) or callOpenAI (GPT-5.4 fallback).
-        // The OpenRouter path remains the primary Fang review route per benchmark
-        // (forgeos_specialist_model_swap_findings_20260425 memory:
-        // "Qwen 3 235B = best Fang ever measured").
+        // Load DB grounding data for Fang reviews (material_properties, design_standards,
+        // process_capabilities, marketplace_listings). Enhances review accuracy with
+        // verified data. Non-fatal — review proceeds without grounding if it fails.
+        let fangGroundingSection = ""
+        try {
+            fangGroundingSection = await loadGroundingData("running_fang_reviews", req.projectId)
+            if (fangGroundingSection) {
+                console.info(`[CAD-REVIEWS] Fang review grounded with DB data for module="${targetModule.name}"`)
+            }
+        } catch (groundingErr) {
+            console.warn("[CAD-REVIEWS] DB grounding failed (non-fatal):", groundingErr instanceof Error ? groundingErr.message : groundingErr)
+        }
+        const groundedSystemPrompt = fangGroundingSection
+            ? systemPrompt + "\n\n" + fangGroundingSection
+            : systemPrompt
+
+        // Route selection: parallel-and-compare (default) → OpenRouter single model → callOpenAI fallback.
+        // The parallel-and-compare path runs 3 models from different lineages (Qwen 3 235B,
+        // DeepSeek V4-Pro, Gemini 3.1 Pro) and uses gpt-4.1-mini to judge the best review.
         const reviewRoute = process.env.FANG_REVIEW_VIA ?? "openrouter"
         const calculationsPerformed: ReviewCalculation[] = []
+
+        // Try parallel-and-compare first for Fang (vp-manufacturing) reviews — most benefit
+        // from lineage diversity since manufacturing assessment is highly domain-specific.
+        if (req.specialistId === "vp-manufacturing" && reviewRoute !== "openai") {
+            const userMsg = `Review the module "${targetModule.name}" and provide your structured assessment in the markdown format described above. Engineering claims should be grounded in your domain expertise — show your work in calculations sections.`
+            try {
+                const parallelResult = await runParallelAndCompare(
+                    groundedSystemPrompt,
+                    userMsg,
+                    "running_fang_reviews",
+                    "Pick the review with the most specific engineering findings, quantified issues (dimensions, tolerances, forces), actionable recommendations, and highest adherence to the required markdown structure.",
+                )
+                console.info(`[CAD-REVIEWS] Fang parallel-and-compare winner: ${parallelResult.winnerModel} — ${parallelResult.selectionReason}`)
+                const reviewParallel = parseReviewFromMarkdown(
+                    parallelResult.bestOutput,
+                    req.specialistId,
+                    specialist.name,
+                    calculationsPerformed,
+                    Date.now() - startTime,
+                )
+                try {
+                    const { error: rpcError } = await supabase.rpc("upsert_cad_lab_review", {
+                        p_project_id: req.projectId,
+                        p_foundry_id: foundryId,
+                        p_module_id: req.moduleId,
+                        p_specialist_id: req.specialistId,
+                        p_review: reviewParallel as unknown as Json,
+                    })
+                    if (rpcError) {
+                        console.error("[CAD-REVIEWS] Failed to save parallel review:", rpcError)
+                    }
+                } catch (err) {
+                    console.error("[CAD-REVIEWS] Failed to save parallel review:", err)
+                }
+                return { review: reviewParallel }
+            } catch (parallelErr) {
+                console.warn("[CAD-REVIEWS] Fang parallel-and-compare failed, falling back to single-model:", parallelErr instanceof Error ? parallelErr.message : parallelErr)
+            }
+        }
 
         if (reviewRoute === "openrouter") {
             const { callOpenRouter } = await import("@/lib/ai/openrouter")
             const userMsg = `Review the module "${targetModule.name}" and provide your structured assessment in the markdown format described above. Engineering claims should be grounded in your domain expertise — show your work in calculations sections.`
             const or = await callOpenRouter({
                 model: process.env.FANG_REVIEW_MODEL ?? "qwen/qwen3-235b-a22b",
-                system: systemPrompt,
+                system: groundedSystemPrompt,
                 prompt: userMsg,
                 maxTokens: OPENROUTER_MAX_TOKENS,
                 temperature: 0.2,
@@ -455,7 +510,7 @@ ${reviewContext}${assemblyNotesInstructions}${refDossierBlock}`
             ? `\n\n## Available Engineering Tools\nYou have access to the following tools. To call a tool, output a JSON block:\n\`\`\`json\n{"tool_calls": [{"name": "<tool_name>", "arguments": {...}}]}\n\`\`\`\n\nTools:\n${tools.map(t => `- **${t.name}**: ${t.description}\n  Parameters: ${JSON.stringify(t.parameters)}`).join("\n")}\n\nAfter you receive tool results, incorporate them into your final review. If you do not need tools, proceed directly with your review.`
             : ""
 
-        const fullSystemPrompt = systemPrompt + toolSchemaBlock
+        const fullSystemPrompt = groundedSystemPrompt + toolSchemaBlock
 
         // Build conversation with memory history
         const memoryHistoryBlock = memoryHistory.length > 0
