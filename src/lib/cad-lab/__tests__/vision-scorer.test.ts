@@ -120,7 +120,7 @@ describe("scoreRenderVision", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"score": 15, "issues": [], "summary": "ok"}' }],
+        choices: [{ message: { content: '{"score": 15, "issues": [], "summary": "ok"}' } }],
       }),
     })
 
@@ -139,7 +139,7 @@ describe("scoreRenderVision", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"score": 7.5, "issues": [], "summary": "ok"}' }],
+        choices: [{ message: { content: '{"score": 7.5, "issues": [], "summary": "ok"}' } }],
       }),
     })
 
@@ -151,7 +151,7 @@ describe("scoreRenderVision", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"score": 9, "issues": [], "summary": "great"}' }],
+        choices: [{ message: { content: '{"score": 9, "issues": [], "summary": "great"}' } }],
       }),
     })
 
