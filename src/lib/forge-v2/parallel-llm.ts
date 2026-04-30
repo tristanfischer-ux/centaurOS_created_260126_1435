@@ -365,7 +365,7 @@ If the best output can be significantly improved by incorporating specific eleme
 Be decisive. Pick one winner. Only synthesise if the combination is clearly better than any individual.`
 
     const judgeUser = successfulOutputs
-        .map((o, i) => `--- OUTPUT ${i + 1} (${o.model}, lineage: ${o.lineage}) ---\n${o.output.slice(0, 5000)}\n`)
+        .map((o, i) => `--- OUTPUT ${i + 1} (${o.model}, lineage: ${o.lineage}) ---\n${o.output.slice(0, 12000)}\n`)
         .join("\n")
 
     try {
@@ -613,19 +613,23 @@ async function judgeGroup(
 ): Promise<{ model: string; lineage: string; output: string }> {
     if (candidates.length === 1) return candidates[0]
 
-    const judgeSystem = `You are comparing ${candidates.length} research synthesis outputs for a hardware product development pipeline.
-Your job: select the BEST output based on this criteria: ${selectionCriteria}
+    const judgeSystem = `You are comparing ${candidates.length} research outputs for a hardware product development pipeline.
 
-Return ONLY valid JSON with no markdown fences:
-{
-  "winner": <1-based index of the best output>,
-  "reason": "<1-2 sentences explaining the selection>"
-}
+Evaluate each output on these 5 dimensions:
+1. SOURCE DIVERSITY — Does it include academic papers (with DOIs), patents (with patent numbers), government/standards documents, company primary sources, and market reports? More source categories = better.
+2. COMPETITOR ANALYSIS — Are there 8+ named competitors with measurable differentiators (quantitative specs, not generic adjectives)? Is the competitor table complete (not truncated)?
+3. REGULATORY COVERAGE — Are specific standard numbers cited (e.g. IEC 62619, UL 9540A)? Are certification pathways named with test labs, timelines, and cost estimates?
+4. MARKET SIZING — Are TAM/SAM/SOM figures sourced (not invented)? Are growth rates cited from named reports?
+5. RESEARCH DEPTH — Are claims backed by evidence, or are they generic statements? Does it read like a literature review or a blog post?
 
-Be decisive. Pick one winner.`
+Additional criteria: ${selectionCriteria}
+
+Pick the candidate that scores highest ACROSS ALL 5 dimensions. If one candidate has clearly better sources but weaker analysis, prefer the one with better sources — downstream stages can improve analysis but cannot invent sources.
+
+Return ONLY a JSON object with no markdown fences: { "winner": <1-based index>, "reason": "<1-2 sentences citing which dimensions decided it>" }`
 
     const judgeUser = candidates
-        .map((c, i) => `--- OUTPUT ${i + 1} (${c.model}, lineage: ${c.lineage}) ---\n${c.output.slice(0, 4000)}\n`)
+        .map((c, i) => `--- OUTPUT ${i + 1} (${c.model}, lineage: ${c.lineage}) ---\n${c.output.slice(0, 12000)}\n`)
         .join("\n")
 
     try {
