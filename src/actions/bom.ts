@@ -696,6 +696,37 @@ Respond with ONLY valid JSON:
 
   const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
 
+  // Parallel-and-compare: run 3 models from different lineages for the BOM
+  // skeleton, then use a judge to select the best. Falls back to the existing
+  // retry chain (V4-Flash → Gemini 2.5 Flash) if the parallel path fails.
+  let orResult: Awaited<ReturnType<typeof callOpenRouter>> | null = null
+  let parallelSkeletonText: string | null = null
+  try {
+    const { runParallelAndCompare, loadGroundingData } = await import("@/lib/forge-v2/parallel-llm")
+    // Inject DB grounding (material_properties, marketplace_listings, process_capabilities)
+    let bomGrounding = ""
+    try {
+      bomGrounding = await loadGroundingData("waiting_bom", projectId)
+    } catch {
+      // non-fatal
+    }
+    const groundedSystemPrompt = bomGrounding
+      ? systemPromptWithConstraints + "\n\n" + bomGrounding
+      : systemPromptWithConstraints
+    const parallelResult = await runParallelAndCompare(
+      groundedSystemPrompt,
+      userPrompt,
+      "waiting_bom",
+      "Pick the BOM skeleton with the most complete part coverage, correct module IDs, realistic part numbers, and clear buy/make classification.",
+    )
+    parallelSkeletonText = parallelResult.bestOutput
+    console.info(`[bom:skeleton] parallel-and-compare winner: ${parallelResult.winnerModel} — ${parallelResult.selectionReason}`)
+    // Wrap the parallel output in the same shape callOpenRouter returns
+    orResult = { ok: true as const, text: parallelSkeletonText, finishReason: "stop", outputTokens: 0, inputTokens: 0, modelUsed: "parallel-and-compare" }
+  } catch (parallelErr) {
+    console.warn("[bom:skeleton] parallel-and-compare failed, falling back to retry chain:", parallelErr instanceof Error ? parallelErr.message : parallelErr)
+  }
+
   // FIX-3 (Loop 28): retry with exponential backoff + model escalation on
   // timeout/transient failure. V4-Flash is cheap and fast but occasionally
   // times out on dense 60-70 part industrial projects. On first failure we
@@ -710,41 +741,42 @@ Respond with ONLY valid JSON:
   //
   // If all three attempts fail we fall through to the fallback skeleton below.
 
-  const SKELETON_RETRY_MODELS = [
-    { model: BOM_MODEL, timeoutMs: 120_000 },
-    { model: BOM_MODEL, timeoutMs: 180_000 },
-    { model: CHEAP_PROSE_MODEL, timeoutMs: 180_000 },
-  ] as const
+  if (!orResult?.ok) {
+    const SKELETON_RETRY_MODELS = [
+      { model: BOM_MODEL, timeoutMs: 120_000 },
+      { model: BOM_MODEL, timeoutMs: 180_000 },
+      { model: CHEAP_PROSE_MODEL, timeoutMs: 180_000 },
+    ] as const
 
-  let orResult: Awaited<ReturnType<typeof callOpenRouter>> | null = null
-  for (let attempt = 0; attempt < SKELETON_RETRY_MODELS.length; attempt++) {
-    if (attempt > 0) {
-      // Exponential backoff: 2s, 4s, ...
-      await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt))
-    }
-    const { model: retryModel, timeoutMs: retryTimeout } = SKELETON_RETRY_MODELS[attempt]
-    console.info(
-      `[bom:skeleton] attempt ${attempt + 1}/${SKELETON_RETRY_MODELS.length} model=${retryModel} timeout=${retryTimeout}ms`,
-    )
-    orResult = await callOpenRouter({
-      model: retryModel,
-      system: systemPromptWithConstraints,
-      prompt: userPrompt,
-      maxTokens: BOM_MAX_TOKENS,
-      timeoutMs: retryTimeout,
-    })
-    if (orResult.ok) break
-    // Non-retriable failures (e.g. auth, bad request) should not retry.
-    if (!orResult.retriable) {
-      console.error(
-        `[bom:skeleton] attempt ${attempt + 1} non-retriable error: ${orResult.error}`,
+    for (let attempt = 0; attempt < SKELETON_RETRY_MODELS.length; attempt++) {
+      if (attempt > 0) {
+        // Exponential backoff: 2s, 4s, ...
+        await new Promise((resolve) => setTimeout(resolve, 2_000 * attempt))
+      }
+      const { model: retryModel, timeoutMs: retryTimeout } = SKELETON_RETRY_MODELS[attempt]
+      console.info(
+        `[bom:skeleton] attempt ${attempt + 1}/${SKELETON_RETRY_MODELS.length} model=${retryModel} timeout=${retryTimeout}ms`,
       )
-      break
+      orResult = await callOpenRouter({
+        model: retryModel,
+        system: systemPromptWithConstraints,
+        prompt: userPrompt,
+        maxTokens: BOM_MAX_TOKENS,
+        timeoutMs: retryTimeout,
+      })
+      if (orResult.ok) break
+      // Non-retriable failures (e.g. auth, bad request) should not retry.
+      if (!orResult.retriable) {
+        console.error(
+          `[bom:skeleton] attempt ${attempt + 1} non-retriable error: ${orResult.error}`,
+        )
+        break
+      }
+      console.warn(
+        `[bom:skeleton] attempt ${attempt + 1} failed (retriable): ${orResult.error}`,
+      )
     }
-    console.warn(
-      `[bom:skeleton] attempt ${attempt + 1} failed (retriable): ${orResult.error}`,
-    )
-  }
+  } // end if (!orResult?.ok) — retry chain
 
   if (!orResult || !orResult.ok) {
     // All LLM attempts failed. Build a minimal fallback skeleton from the
