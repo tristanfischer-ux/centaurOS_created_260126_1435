@@ -53,7 +53,7 @@ export type GoogleModelId = (typeof GOOGLE_MODELS)[keyof typeof GOOGLE_MODELS]
 
 /** OpenAI model IDs. Used as final-fallback in CAD Lab breakdown. */
 export const OPENAI_MODELS = {
-  gpt5: "gpt-5.4",
+  gpt5: "gpt-5.5",
   /** GPT-4.1 mini — Sal (sales-lead) primary as of 2026-04-25 swap. */
   gpt41_mini: "gpt-4.1-mini",
 } as const
@@ -100,6 +100,7 @@ export const MODEL_METADATA = {
   "claude-haiku-4-5-20251001": { provider: "anthropic", family: "claude-haiku", version: [4, 5] },
   "gemini-3.1-pro-preview":    { provider: "google",    family: "gemini-pro", version: [3, 1] },
   "gemini-2.5-flash":          { provider: "google",    family: "gemini-flash", version: [2, 5] },
+  "gpt-5.5":                   { provider: "openai",    family: "gpt-5", version: [5, 5] },
   "gpt-5.4":                   { provider: "openai",    family: "gpt-5", version: [5, 4] },
   "gpt-4.1-mini":              { provider: "openai",    family: "gpt-4.1-mini", version: [4, 1] },
   "deepseek-v4":               { provider: "deepseek",  family: "deepseek-v", version: [4, 0] },

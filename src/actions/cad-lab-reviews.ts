@@ -53,10 +53,10 @@ import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data
 // ─── Constants ──────────────────────────────────────────────────────
 
 // Anthropic SDK fully removed 2026-04-30. All review calls now route
-// through callOpenAI (gpt-5.4 for complex reviews, gpt-4.1-mini for
+// through callOpenAI (gpt-5.5 for complex reviews, gpt-4.1-mini for
 // quick/lightweight calls). The OpenRouter path for Qwen 3 235B remains
 // as the primary Fang review route via FANG_REVIEW_VIA=openrouter.
-const REVIEW_MODEL = "gpt-5.4"
+const REVIEW_MODEL = "gpt-5.5"
 const REVIEW_MODEL_LIGHTWEIGHT = "gpt-4.1-mini"
 const MAX_TOOL_LOOPS = 5
 // Loop 7 critique fix A7 (LOOP-7-CRITIQUE.md): reviews were truncating

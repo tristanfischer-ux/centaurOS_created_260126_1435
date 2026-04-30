@@ -5,7 +5,7 @@
  *
  * @description Two LLM calls:
  *   1. `getNextInterviewQuestion()` — gpt-4.1-mini generates dynamic follow-up questions
- *   2. `synthesizeDesignBrief()` — gpt-5.4 synthesizes conversation into a structured brief
+ *   2. `synthesizeDesignBrief()` — gpt-5.5 synthesizes conversation into a structured brief
  *
  * @security Server-side only, uses OPENAI_API_KEY via callOpenAI helper.
  */
@@ -187,7 +187,7 @@ export async function getNextInterviewQuestion(
 }
 
 /**
- * Synthesizes the full conversation into a structured design brief using gpt-5.4.
+ * Synthesizes the full conversation into a structured design brief using gpt-5.5.
  *
  * @param subject - The original product subject
  * @param conversation - Full conversation history
@@ -217,7 +217,7 @@ export async function synthesizeDesignBrief(
   const text = await callOpenAIForInterview(
     SYNTHESIS_SYSTEM_PROMPT,
     userPrompt,
-    "gpt-5.4",
+    "gpt-5.5",
     4096, // Generous — brief fields + summary need room for specific engineering detail
     60_000, // 60s — synthesis needs more time
   )

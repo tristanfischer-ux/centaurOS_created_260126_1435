@@ -126,7 +126,7 @@ export async function runObserver(
   }
 
   const completion = await openai.chat.completions.create({
-    model: config?.model ?? 'gpt-5.4',
+    model: config?.model ?? 'gpt-5.5',
     temperature: config?.temperature ?? 0.3,
     max_tokens: 8192,
     messages: [

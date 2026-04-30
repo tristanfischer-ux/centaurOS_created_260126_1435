@@ -255,10 +255,10 @@ Do NOT:
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 120_000)
 
-    // DECISION: GPT-5.4 for high-judgment specialists AND data-heavy specialists.
+    // DECISION: GPT-5.5 for high-judgment specialists AND data-heavy specialists.
     // GPT-4.1-mini is faster/cheaper for marketing content (Mia, Cal, Max, etc.).
     const taskDelegationModel = ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist', 'sales-lead'].includes(specialistId)
-      ? 'gpt-5.4'
+      ? 'gpt-5.5'
       : 'gpt-4.1-mini'
 
     try {

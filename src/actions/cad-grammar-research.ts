@@ -42,14 +42,14 @@ export interface GrammarResearchResult {
   tokensOut: number
 }
 
-// ─── AI Call (OpenAI — gpt-5.4 for research synthesis) ──────────────
+// ─── AI Call (OpenAI — gpt-5.5 for research synthesis) ──────────────
 
 async function callResearchAI(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 16384,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  return callOpenAI(systemPrompt, userPrompt, "gpt-5.4", maxTokens, 280_000)
+  return callOpenAI(systemPrompt, userPrompt, "gpt-5.5", maxTokens, 280_000)
 }
 
 // ─── Grammar Template ───────────────────────────────────────────────

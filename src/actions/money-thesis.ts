@@ -196,7 +196,7 @@ export async function saveThesisVersion(
 // Business-plan → thesis extraction
 // ============================================================================
 
-const THESIS_EXTRACTION_MODEL = 'gpt-5.4'
+const THESIS_EXTRACTION_MODEL = 'gpt-5.5'
 const THESIS_EXTRACTION_MAX_TOKENS = 2048
 const THESIS_EXTRACTION_MAX_CHARS = 20_000
 

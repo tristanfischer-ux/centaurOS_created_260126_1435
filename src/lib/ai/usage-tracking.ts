@@ -180,6 +180,7 @@ export interface MonthlyUsage {
  * Updated Mar 2026. Check OpenAI pricing page for current rates.
  */
 const MODEL_COSTS_PER_1M_TOKENS: Record<string, { input: number; output: number }> = {
+  'gpt-5.5': { input: 3.75, output: 15.00 },
   'gpt-5.4': { input: 2.50, output: 15.00 },
   'gpt-4.1': { input: 2.00, output: 8.00 },
   // GPT-4.1-mini — fast, cost-efficient sibling of GPT-4.1 (per OpenAI pricing 2026)
@@ -294,11 +295,11 @@ export function estimateAICost(
 ): number {
   const costs = MODEL_COSTS_PER_1M_TOKENS[model]
   if (!costs) {
-    // AUDIT: Unknown model — falling back to gpt-5.4 pricing which may over/under-estimate.
+    // AUDIT: Unknown model — falling back to gpt-5.5 pricing which may over/under-estimate.
     // This should be caught and the cost table updated before the model goes to production.
-    console.warn(`[ai-usage] Unknown model "${model}" — using gpt-5.4 fallback pricing. Add it to MODEL_COSTS_PER_1M_TOKENS.`)
+    console.warn(`[ai-usage] Unknown model "${model}" — using gpt-5.5 fallback pricing. Add it to MODEL_COSTS_PER_1M_TOKENS.`)
   }
-  const effectiveCosts = costs || MODEL_COSTS_PER_1M_TOKENS['gpt-5.4']
+  const effectiveCosts = costs || MODEL_COSTS_PER_1M_TOKENS['gpt-5.5']
   const inputCost = (promptTokens / 1_000_000) * effectiveCosts.input
   const outputCost = (completionTokens / 1_000_000) * effectiveCosts.output
   return Number((inputCost + outputCost).toFixed(6))

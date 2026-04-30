@@ -30,7 +30,7 @@ export const DEBATE_PERSONAS: DebatePersona[] = [
     label: "BEAR",
     position: "Argues AGAINST the proposition",
     providerId: "openai",
-    modelId: "gpt-5.4",
+    modelId: "gpt-5.5",
     color: "text-destructive",
   },
   {

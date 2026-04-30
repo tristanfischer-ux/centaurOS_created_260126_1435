@@ -1,9 +1,9 @@
 /**
- * @file claude-client.ts — Centralized LLM API client routed through OpenAI GPT-5.4.
+ * @file claude-client.ts — Centralized LLM API client routed through OpenAI GPT-5.5.
  *
  * @description Single source of truth for all non-streaming LLM API calls.
  * Originally called Anthropic's Claude API; now routes through OpenAI's
- * GPT-5.4 to eliminate the Anthropic dependency from the production pipeline.
+ * GPT-5.5 to eliminate the Anthropic dependency from the production pipeline.
  *
  * The function name (`callClaudeCentral`) and return type (`ClaudeCallResult`)
  * are preserved so that all ~25+ downstream call sites continue to work
@@ -13,7 +13,7 @@
  * - API key read from env, trimmed to prevent whitespace-related 401s
  * - No secrets in error messages
  *
- * @audit Migrated from Anthropic to OpenAI GPT-5.4 on 2026-04-30.
+ * @audit Migrated from Anthropic to OpenAI GPT-5.5 on 2026-04-30.
  */
 
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
@@ -79,14 +79,14 @@ export interface ClaudeCallResult {
 // ==========================================
 
 /** The OpenAI model all calls are routed through. */
-const OPENAI_MODEL = 'gpt-5.4'
+const OPENAI_MODEL = 'gpt-5.5'
 
 // ==========================================
 // MAIN FUNCTION
 // ==========================================
 
 /**
- * Call GPT-5.4 via the OpenAI chat-completions API and return the response
+ * Call GPT-5.5 via the OpenAI chat-completions API and return the response
  * text with token counts.
  *
  * @description Centralized, non-streaming LLM client. Supports:

@@ -23,8 +23,8 @@ import { createClient } from "@/lib/supabase/server"
 import { isValidUUID } from "@/lib/validations"
 import type { DesignAlternative } from "@/lib/cad-lab/design-iteration-types"
 
-// Use GPT-5.4 for reasoning quality on design trade-offs.
-const GENERATOR_MODEL = "gpt-5.4"
+// Use GPT-5.5 for reasoning quality on design trade-offs.
+const GENERATOR_MODEL = "gpt-5.5"
 const GENERATOR_MAX_TOKENS = 4096
 const GENERATOR_TIMEOUT_MS = 240_000
 

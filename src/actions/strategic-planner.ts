@@ -362,7 +362,7 @@ Respond with ONLY valid JSON matching this schema (no markdown, no code fences):
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-5.4',
+        model: 'gpt-5.5',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `My strategic goal: ${goal}\n\nTarget deadline: ${deadline}` },

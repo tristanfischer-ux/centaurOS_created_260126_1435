@@ -95,7 +95,7 @@ Identify 3-5 real engineering standards relevant to this product. Focus on stand
   try {
     const { callOpenAI } = await import("@/lib/cad-lab/api-helpers")
 
-    const result = await callOpenAI(systemPrompt, userPrompt, "gpt-5.4", 16384, 240_000)
+    const result = await callOpenAI(systemPrompt, userPrompt, "gpt-5.5", 16384, 240_000)
 
     const text = result.text
 

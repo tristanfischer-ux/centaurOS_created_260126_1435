@@ -100,7 +100,7 @@ async function inferThermalConfig(module: ModuleSpec): Promise<ThermalConfig> {
     .join("\n")
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.4",
+    model: "gpt-5.5",
     temperature: 0.3,
     response_format: { type: "json_object" },
     messages: [

@@ -133,7 +133,7 @@ const MODEL_TIERS = {
     sonnet: { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
     deepseek: { providerId: "deepseek", modelId: "deepseek-chat" },
     google: { providerId: "google", modelId: "gemini-3.1-pro-preview" },
-    openai: { providerId: "openai", modelId: "gpt-5.4" },
+    openai: { providerId: "openai", modelId: "gpt-5.5" },
     qwen: { providerId: "qwen", modelId: "qwen3.5-plus" },
     "qwen-local": { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
     minimax: { providerId: "minimax", modelId: "MiniMax-M2.7" },

@@ -32,7 +32,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
  *
  * GBP-denominated guidance from the pricing brief was converted to USD at
  * roughly 1.25 USD/GBP for this map. Update whenever a provider changes
- * pricing. Unknown models fall back to a `gpt-5.4`-equivalent default.
+ * pricing. Unknown models fall back to a `gpt-5.5`-equivalent default.
  *
  * The keys are LLM model strings as they appear in API responses / config.
  * Aliases that resolve to the same SKU (e.g. `claude-haiku-4-5` and the
@@ -51,6 +51,7 @@ export const MODEL_COSTS_PER_1M_TOKENS: Record<
   'claude-opus-4-7': { input: 18.75, output: 93.75 },
 
   // OpenAI
+  'gpt-5.5': { input: 3.75, output: 15.0 },
   'gpt-5.4': { input: 3.125, output: 12.5 },
   'gpt-4.1': { input: 2.0, output: 8.0 },
   'gpt-4.1-mini': { input: 0.625, output: 1.875 },
@@ -97,7 +98,7 @@ export const MODEL_COSTS_PER_1M_TOKENS: Record<
 }
 
 /** Fallback price used when an unknown model string is logged. */
-const FALLBACK_PRICE = MODEL_COSTS_PER_1M_TOKENS['gpt-5.4']
+const FALLBACK_PRICE = MODEL_COSTS_PER_1M_TOKENS['gpt-5.5']
 
 // ==========================================
 // COST CALCULATION
@@ -121,7 +122,7 @@ export function computeCostUsd(
     // GOTCHA: Unknown model — log once so future runs can add the entry.
     // We still return a fallback cost so the logger never blocks the call.
     console.warn(
-      `[llm-usage] Unknown model "${model}" — using gpt-5.4 fallback pricing. Add to MODEL_COSTS_PER_1M_TOKENS.`,
+      `[llm-usage] Unknown model "${model}" — using gpt-5.5 fallback pricing. Add to MODEL_COSTS_PER_1M_TOKENS.`,
     )
   }
   const effective = price ?? FALLBACK_PRICE

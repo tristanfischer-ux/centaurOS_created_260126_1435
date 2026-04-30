@@ -140,23 +140,21 @@ const EXECUTION_MAX_TOKENS = 8192
  * DECISION: Execution uses the same model the specialist was benchmarked on for
  * interactive mode. This ensures output quality matches what was measured.
  */
-const EXECUTION_MODEL_MAP: Record<string, { model: string; provider: 'anthropic' | 'openai-compat'; baseURL?: string; apiKeyEnv: string }> = {
-  'claude': { model: 'claude-opus-4-20250514', provider: 'anthropic', apiKeyEnv: 'ANTHROPIC_API_KEY' },
-  'sonnet': { model: 'claude-sonnet-4-20250514', provider: 'anthropic', apiKeyEnv: 'ANTHROPIC_API_KEY' },
+const EXECUTION_MODEL_MAP: Record<string, { model: string; provider: 'openai-compat'; baseURL: string; apiKeyEnv: string }> = {
+  'claude': { model: 'gpt-5.5', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
+  'sonnet': { model: 'deepseek-chat', provider: 'openai-compat', baseURL: 'https://api.deepseek.com/v1', apiKeyEnv: 'DEEPSEEK_API_KEY' },
   'deepseek': { model: 'deepseek-chat', provider: 'openai-compat', baseURL: 'https://api.deepseek.com/v1', apiKeyEnv: 'DEEPSEEK_API_KEY' },
   'google': { model: 'gemini-3.1-pro-preview', provider: 'openai-compat', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKeyEnv: 'GOOGLE_AI_API_KEY' },
-  'openai': { model: 'gpt-5.4', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
+  'openai': { model: 'gpt-5.5', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
   'minimax': { model: 'MiniMax-M2.7', provider: 'openai-compat', baseURL: 'https://api.minimax.io/v1', apiKeyEnv: 'MINIMAX_API_KEY' },
-  // 2026-04-25 swap tiers — specialist execution sweeps must honour the new model assignments,
-  // otherwise sweeps silently fall back to Sonnet and contradict the validated swap.
-  'haiku': { model: 'claude-haiku-4-5-20251001', provider: 'anthropic', apiKeyEnv: 'ANTHROPIC_API_KEY' },
+  'haiku': { model: 'gemini-2.5-flash', provider: 'openai-compat', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKeyEnv: 'GOOGLE_AI_API_KEY' },
   'gpt-mini': { model: 'gpt-4.1-mini', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
   'qwen-235b': { model: 'qwen3-235b-a22b', provider: 'openai-compat', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', apiKeyEnv: 'DASHSCOPE_API_KEY' },
   'deepseek-v4-pro': { model: 'deepseek-ai/DeepSeek-V4-Pro', provider: 'openai-compat', baseURL: 'https://api.together.xyz/v1', apiKeyEnv: 'TOGETHER_API_KEY' },
 }
 
 /** Fallback execution model when specialist's model is unavailable */
-const EXECUTION_FALLBACK_MODEL = { model: 'claude-sonnet-4-20250514', provider: 'anthropic' as const, apiKeyEnv: 'ANTHROPIC_API_KEY' }
+const EXECUTION_FALLBACK_MODEL = { model: 'gpt-4.1-mini', provider: 'openai-compat' as const, baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' }
 
 // ─── Sweep Data Tool Mapping ────────────────────────────────────────
 
@@ -802,49 +800,49 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
         const apiKey = process.env[modelConfig.apiKeyEnv]
 
         if (!apiKey) {
-          console.warn(`[SweepOrchestrator] ${modelConfig.apiKeyEnv} not set — falling back to Anthropic Sonnet`)
+          console.warn(`[SweepOrchestrator] ${modelConfig.apiKeyEnv} not set — falling back to gpt-4.1-mini`)
         }
 
         const effectiveModelConfig = apiKey ? modelConfig : EXECUTION_FALLBACK_MODEL
-        const effectiveApiKey = apiKey || process.env.ANTHROPIC_API_KEY
+        const effectiveApiKey = apiKey || process.env.OPENAI_API_KEY
 
         if (!effectiveApiKey) {
           console.warn('[SweepOrchestrator] No API key available for execution sweep — skipping')
         } else {
           let executionText = ''
 
-          if (effectiveModelConfig.provider === 'anthropic') {
-            // Use Anthropic SDK
-            const Anthropic = (await import('@anthropic-ai/sdk')).default
-            const anthropic = new Anthropic({ apiKey: effectiveApiKey })
+          try {
+            const OpenAILib = await getOpenAIClient()
+            const client = new OpenAILib({
+              apiKey: effectiveApiKey,
+              baseURL: effectiveModelConfig.baseURL,
+            })
 
-            const executionResponse = await anthropic.messages.create({
+            const completion = await client.chat.completions.create({
               model: effectiveModelConfig.model,
               max_tokens: EXECUTION_MAX_TOKENS,
               temperature: 0.4,
               messages: [
-                { role: 'user', content: executionSystemPrompt + '\n\nExecute your assigned tasks now. Respond with ONLY valid JSON.' },
+                { role: 'system', content: executionSystemPrompt },
+                { role: 'user', content: 'Execute your assigned tasks now. Respond with ONLY valid JSON.' },
               ],
             })
 
-            executionText = executionResponse.content
-              .filter(b => b.type === 'text')
-              .map(b => (b as unknown as { text: string }).text)
-              .join('')
+            executionText = completion.choices[0]?.message?.content ?? ''
+            executionTokensIn = completion.usage?.prompt_tokens ?? 0
+            executionTokensOut = completion.usage?.completion_tokens ?? 0
+          } catch (modelErr) {
+            console.warn(`[SweepOrchestrator] ${effectiveModelConfig.model} failed for ${config.specialistId}, falling back to gpt-4.1-mini:`, modelErr instanceof Error ? modelErr.message : modelErr)
 
-            executionTokensIn = executionResponse.usage?.input_tokens ?? 0
-            executionTokensOut = executionResponse.usage?.output_tokens ?? 0
-          } else {
-            // Use OpenAI-compatible SDK (DeepSeek, Google, OpenAI, MiniMax)
-            try {
+            const fallbackKey = process.env.OPENAI_API_KEY
+            if (fallbackKey) {
               const OpenAILib = await getOpenAIClient()
-              const client = new OpenAILib({
-                apiKey: effectiveApiKey,
-                baseURL: effectiveModelConfig.baseURL,
+              const fallbackClient = new OpenAILib({
+                apiKey: fallbackKey,
+                baseURL: 'https://api.openai.com/v1',
               })
-
-              const completion = await client.chat.completions.create({
-                model: effectiveModelConfig.model,
+              const fallbackCompletion = await fallbackClient.chat.completions.create({
+                model: 'gpt-4.1-mini',
                 max_tokens: EXECUTION_MAX_TOKENS,
                 temperature: 0.4,
                 messages: [
@@ -852,33 +850,9 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
                   { role: 'user', content: 'Execute your assigned tasks now. Respond with ONLY valid JSON.' },
                 ],
               })
-
-              executionText = completion.choices[0]?.message?.content ?? ''
-              executionTokensIn = completion.usage?.prompt_tokens ?? 0
-              executionTokensOut = completion.usage?.completion_tokens ?? 0
-            } catch (modelErr) {
-              // FALLBACK: If primary model fails, try Anthropic Sonnet
-              console.warn(`[SweepOrchestrator] ${effectiveModelConfig.model} failed for ${config.specialistId}, falling back to Sonnet:`, modelErr instanceof Error ? modelErr.message : modelErr)
-
-              const Anthropic = (await import('@anthropic-ai/sdk')).default
-              const fallbackKey = process.env.ANTHROPIC_API_KEY
-              if (fallbackKey) {
-                const anthropic = new Anthropic({ apiKey: fallbackKey })
-                const fallbackResponse = await anthropic.messages.create({
-                  model: 'claude-sonnet-4-20250514',
-                  max_tokens: EXECUTION_MAX_TOKENS,
-                  temperature: 0.4,
-                  messages: [
-                    { role: 'user', content: executionSystemPrompt + '\n\nExecute your assigned tasks now. Respond with ONLY valid JSON.' },
-                  ],
-                })
-                executionText = fallbackResponse.content
-                  .filter(b => b.type === 'text')
-                  .map(b => (b as unknown as { text: string }).text)
-                  .join('')
-                executionTokensIn = fallbackResponse.usage?.input_tokens ?? 0
-                executionTokensOut = fallbackResponse.usage?.output_tokens ?? 0
-              }
+              executionText = fallbackCompletion.choices[0]?.message?.content ?? ''
+              executionTokensIn = fallbackCompletion.usage?.prompt_tokens ?? 0
+              executionTokensOut = fallbackCompletion.usage?.completion_tokens ?? 0
             }
           }
 

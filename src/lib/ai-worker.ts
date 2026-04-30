@@ -133,7 +133,7 @@ Your goal: Execute this task directly. Provide a concrete output, draft, or solu
 Do not say "I will do this". DO IT.`
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-5.4",
+            model: "gpt-5.5",
             max_completion_tokens: 4096,
             messages: [
                 { role: "system", content: systemPrompt },
@@ -151,7 +151,7 @@ Do not say "I will do this". DO IT.`
             foundryId: task.foundry_id,
             userId: assigneeId,
             feature: 'ghost_agent',
-            model: 'gpt-5.4',
+            model: 'gpt-5.5',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
             metadata: { taskId },

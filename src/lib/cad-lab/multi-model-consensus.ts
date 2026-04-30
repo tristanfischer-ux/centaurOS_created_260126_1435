@@ -54,7 +54,7 @@ async function callOpenAIConsensus(systemPrompt: string, userPrompt: string): Pr
   const timer = setTimeout(() => controller.abort(), 30_000)
   try {
     const completion = await openai.chat.completions.create({
-      model: "gpt-5.4",
+      model: "gpt-5.5",
       max_completion_tokens: 256,
       messages: [
         { role: "system", content: systemPrompt },

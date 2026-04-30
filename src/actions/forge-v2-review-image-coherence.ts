@@ -98,7 +98,7 @@ async function fetchImageAsBase64(
 
 // ─── Action ────────────────────────────────────────────────────────────
 
-const MODEL = "gpt-5.4"
+const MODEL = "gpt-5.5"
 const MAX_REGENS_PER_INVOCATION = 3
 
 export async function reviewImageCoherence(

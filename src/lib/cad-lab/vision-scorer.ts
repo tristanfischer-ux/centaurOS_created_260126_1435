@@ -118,7 +118,7 @@ Do not include any text outside the JSON.`
             "Authorization": `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-5.4",
+            model: "gpt-5.5",
             max_completion_tokens: 1024,
             messages: [
               { role: "system", content: systemPrompt },

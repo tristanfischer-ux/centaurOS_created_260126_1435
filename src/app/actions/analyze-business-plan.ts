@@ -74,7 +74,7 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
         }
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-5.4',
+            model: 'gpt-5.5',
             messages: [
                 {
                     role: 'system',
@@ -113,7 +113,7 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
         })
 
         await trackUsage({
-            model: 'gpt-5.4',
+            model: 'gpt-5.5',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
         })

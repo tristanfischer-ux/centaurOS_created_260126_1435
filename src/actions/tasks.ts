@@ -423,7 +423,7 @@ export async function createTask(formData: FormData) {
           const rl = await rateLimit('aiWorker', foundryId)
           if (limitCheck.allowed && rl.success) {
               await runAIWorker(data.id, validatedAssigneeIds[0])
-              trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.4' }).catch(() => {})
+              trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.5' }).catch(() => {})
           } else {
               console.info('[TaskService] AI worker skipped (quota/rate limit):', { foundryId, allowed: limitCheck.allowed, rateLimited: !rl.success })
           }
@@ -719,7 +719,7 @@ export async function forwardTask(taskId: string, newAssigneeId: string, reason:
             const rl = await rateLimit('aiWorker', foundryId)
             if (limitCheck.allowed && rl.success) {
                 await runAIWorker(taskId, newAssigneeId)
-                trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.4' }).catch(() => {})
+                trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.5' }).catch(() => {})
             } else {
                 console.info('[TaskService] AI worker skipped on forward (quota/rate limit):', { foundryId })
             }
@@ -1589,7 +1589,7 @@ export async function triggerAIWorker(taskId: string) {
         // Run the AI worker
         try {
             await runAIWorker(taskId, task.assignee_id)
-            trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.4' }).catch(() => {})
+            trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.5' }).catch(() => {})
         } catch (workerError) {
             console.error('[TaskService] Failed to trigger AI worker:', { error: workerError instanceof Error ? workerError.message : 'Unknown error' })
             return { error: 'Failed to trigger AI worker' }
@@ -1909,7 +1909,7 @@ export async function updateTaskAssignees(taskId: string, assigneeIds: string[])
             const rl = await rateLimit('aiWorker', foundryId)
             if (limitCheck.allowed && rl.success) {
                 await runAIWorker(taskId, primaryAssigneeId)
-                trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.4' }).catch(() => {})
+                trackAIUsage({ foundryId, userId: user.id, feature: 'ai_worker', model: 'gpt-5.5' }).catch(() => {})
             } else {
                 console.info('[TaskService] AI worker skipped on assignee update (quota/rate limit):', { foundryId })
             }

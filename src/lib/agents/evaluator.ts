@@ -65,7 +65,7 @@ No other text. Example: {"relevance":0.9,"completeness":0.8,"actionability":0.85
 
   try {
     const res = await client.chat.completions.create({
-      model: 'gpt-5.4',
+      model: 'gpt-5.5',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
@@ -153,7 +153,7 @@ const ENGINEERING_WEIGHTS = {
   toleranceStackUp: 0.15,
 }
 
-const ENGINEERING_EVAL_MODEL = 'gpt-5.4'
+const ENGINEERING_EVAL_MODEL = 'gpt-5.5'
 
 /**
  * Scores an engineering recommendation (research report, module decomposition,

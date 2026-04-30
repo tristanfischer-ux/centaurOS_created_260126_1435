@@ -2622,11 +2622,11 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
       }
 
       // 3. Send raw data + internal DB context to OpenAI for synthesis
-      console.info("[Forge] Concept research: Synthesizing report with GPT-5.4...")
+      console.info("[Forge] Concept research: Synthesizing report with GPT-5.5...")
       const openaiKey = process.env.OPENAI_API_KEY?.trim()
       if (!openaiKey) throw new Error("OPENAI_API_KEY not configured")
 
-      const xrayModel = "gpt-5.4"
+      const xrayModel = "gpt-5.5"
       const claudeData = await withRetry(async () => {
         let resp: Response
         try {

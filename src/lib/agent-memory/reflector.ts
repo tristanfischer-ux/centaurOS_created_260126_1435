@@ -97,7 +97,7 @@ export async function runReflector(
     `\n\n## TARGET\nConsolidate these observations to fit within approximately ${targetTokens} tokens while preserving all critical information.`
 
   const completion = await openai.chat.completions.create({
-    model: config?.model ?? 'gpt-5.4',
+    model: config?.model ?? 'gpt-5.5',
     temperature: config?.temperature ?? 0,
     max_tokens: 8192,
     messages: [

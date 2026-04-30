@@ -20,7 +20,7 @@ import { callOpenAI } from '@/lib/cad-lab/api-helpers'
 
 // DECISION: Objectives extraction needs a strong model — Sonnet returned empty
 // arrays on complex action plans. Other sections are simpler extraction tasks.
-const OBJECTIVES_MODEL = 'gpt-5.4'
+const OBJECTIVES_MODEL = 'gpt-5.5'
 const SECTION_MODEL = 'gpt-4.1-mini'
 const OBJECTIVES_MAX_TOKENS = 8192
 const SECTION_MAX_TOKENS = 4096
