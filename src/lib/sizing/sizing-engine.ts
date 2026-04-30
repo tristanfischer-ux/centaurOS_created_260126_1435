@@ -424,9 +424,10 @@ export function inferEnvelopeFromBriefText(
     if (!text) return null
     const haystack = text.toLowerCase()
 
-    // 40ft high-cube reefer — must match before generic 40ft
+    // 40ft high-cube reefer — requires BOTH "high-cube/hc" AND "reefer"
     if ((/\b(?:40[\s-]?ft|40[\s-]?foot|forty[\s-]?foot)\b/.test(haystack))
-        && (/\b(?:high[\s-]?cube|hc)\b/.test(haystack) || /\breefer\b/.test(haystack))) {
+        && /\b(?:high[\s-]?cube|hc)\b/.test(haystack)
+        && /\breefer\b/.test(haystack)) {
         return CONTAINER_40FT_HC_REEFER
     }
 
