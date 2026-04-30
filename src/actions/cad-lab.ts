@@ -2460,8 +2460,18 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
     // across both projects, started_at clusters around the same
     // re-fire intervals. 6144 leaves comfortable headroom for the
     // typical 4-failure-mode + 4-row-riskMatrix expansion JSON.
+    //
+    // 2026-04-30: bumped timeout 90_000 → 180_000. GPT-5.5 (used when
+    // model_id falls through to the claude-central failover chain) is a
+    // reasoning model that routinely takes 90-150s for structured JSON
+    // expansion. At 90s it always hit "Request timeout" causing every
+    // module expansion to fail → EXPAND_ALL_FAILED → waiting_max retry
+    // loop. 180s gives reasoning models comfortable headroom while
+    // staying well inside the Vercel 300s function cap for a 3-module
+    // concurrent batch (3 × 180s sequential worst case = 540s, but
+    // concurrency means wall-clock is ~180s worst case per batch).
     const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 6144, 90_000, 2,
+      systemPrompt, userPrompt, modelId, 6144, 180_000, 2,
     )
 
     // Parse expansion JSON

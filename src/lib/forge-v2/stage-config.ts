@@ -102,7 +102,20 @@ export const STAGE_CONFIG: Record<
         kind: "fire",
         fireStep: "waitForMax",
         nextStage: "waiting_sizing",
-        maxAttempts: 3,
+        // 2026-04-30: bumped 3 → 5. Module expansion was timing out at 90s
+        // (reasoning model needs 90-150s) causing all expansions to fail →
+        // EXPAND_ALL_FAILED → retry loop. With the 180s timeout fix, attempts
+        // should succeed, but 5 retries gives headroom for transient failures
+        // and the gate-remediation loop (gate resets stage → Max reruns →
+        // needs to succeed before gate advances). 5 attempts = ~25 min total
+        // window before terminal-fail, enough for the gate to exhaust its 2
+        // FAIL cycles and advance with uncertainty marker.
+        maxAttempts: 5,
+        // 2026-04-30: skeleton (~50s) + N modules × 180s / concurrency 3.
+        // For 9 modules worst case: 3 batches × 180s = 540s + skeleton = ~10min.
+        // The 9-min default STALE_RUNNING_MS would mark the tracking row
+        // STALE_ABANDONED mid-decomposition and re-fire. Bump to 20 min.
+        staleMsOverride: 20 * 60 * 1000,
     },
     waiting_max_redecomposition: {
         // v1.8 (2026-04-29 Gates Council R1 P1): Max re-fired after Fang sizing
