@@ -283,14 +283,20 @@ async function runFinnCostInternal(
                 // rather than hard-blocking. A 2% floor-area shortfall
                 // shouldn't prevent costing — the founder needs to see the
                 // numbers to make an informed trade-off.
+                // NOTE: Enclosure/envelope entries in module_dimensions
+                // represent the building shell itself, not floor-consuming
+                // modules — they are excluded from the usedFloor sum below.
                 const MARGINAL_THRESHOLD = 0.05
                 let marginal = false
                 if (solverFailed && !oracleFailed && dimensionSheet) {
                     const floorBudget = (dimensionSheet as { floor_budget_m2?: number }).floor_budget_m2
                     const moduleDims = (dimensionSheet as { module_dimensions?: Record<string, { floor_m2?: number }> }).module_dimensions
                     if (floorBudget && floorBudget > 0 && moduleDims) {
-                        const usedFloor = Object.values(moduleDims).reduce(
-                            (sum, m) => sum + (m.floor_m2 ?? 0), 0
+                        const usedFloor = Object.entries(moduleDims).reduce(
+                            (sum, [key, m]) => {
+                                if (/enclosure|envelope|building_shell/i.test(key)) return sum
+                                return sum + (m.floor_m2 ?? 0)
+                            }, 0
                         )
                         const overFraction = (usedFloor - floorBudget) / floorBudget
                         if (overFraction > 0 && overFraction <= MARGINAL_THRESHOLD) {
