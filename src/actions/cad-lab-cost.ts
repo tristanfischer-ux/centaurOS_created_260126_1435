@@ -23,6 +23,9 @@ import type { ProcessInsights } from "@/actions/manufacturing-techniques"
 import { classifyPart } from "@/lib/part-classification"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import type { TrustedContext } from '@/lib/server-action-utils'
+import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
+import { embedQuery } from "@/lib/embeddings"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // ─── Batching constants ───────────────────────────────────────────────
 //
@@ -132,30 +135,132 @@ export async function estimateModuleCostsAi(
 
   // DECISION: Query internal material_properties + process_capabilities for
   // verified pricing and tolerances instead of relying on hardcoded estimates.
+  //
+  // FIX 1 (2026-04-30): Use retrieveEngineeringDataForPrompt(description) to
+  // filter material/process rows by what's actually relevant to this project
+  // rather than dumping all 47 material rows + 20 process rows unfiltered.
+  // Fang and Chase already use this function. Falls back to the generic LIMIT
+  // query if the filtered call returns nothing (e.g. no material families detected).
   let materialPricingContext = ""
   try {
-    const { createClient } = await import("@/lib/supabase/server")
-    const supabase = await createClient()
-    const [matRes, procRes] = await Promise.all([
-      supabase.from("material_properties").select("material_name, cost_per_kg_usd, density_kg_m3, yield_strength_mpa").limit(30),
-      supabase.from("process_capabilities").select("display_name, tolerance_typical_mm, min_wall_thickness_mm, setup_cost_usd_typical, per_part_cost_multiplier, typical_lead_time_days").limit(20),
-    ])
-    const mats = matRes.data ?? []
-    const procs = procRes.data ?? []
-    if (mats.length > 0) {
-      materialPricingContext += "\n\nVERIFIED MATERIAL PRICES (from internal database — use these over generic estimates):\n" +
-        mats.filter(m => m.cost_per_kg_usd).map(m =>
-          `- ${m.material_name}: $${m.cost_per_kg_usd}/kg (≈£${((m.cost_per_kg_usd ?? 0) * 0.79).toFixed(2)}/kg), density=${m.density_kg_m3 ?? "?"}kg/m3, yield=${m.yield_strength_mpa ?? "?"}MPa`
-        ).join("\n")
-    }
-    if (procs.length > 0) {
-      materialPricingContext += "\n\nMANUFACTURING PROCESS DATA (verified):\n" +
-        procs.map(p =>
-          `- ${p.display_name}: tolerance=±${p.tolerance_typical_mm ?? "?"}mm, min wall=${p.min_wall_thickness_mm ?? "?"}mm, setup≈$${p.setup_cost_usd_typical ?? "?"}, lead=${p.typical_lead_time_days ?? "?"}d`
-        ).join("\n")
+    // Build a combined description from all modules to maximise detection coverage.
+    const combinedDescription = modules.map(m =>
+      [m.name, ...(m.keyParts ?? [])].join(" ")
+    ).join(". ")
+
+    // FIX 1: Filtered query via engineering data retriever
+    const engData = await retrieveEngineeringDataForPrompt(combinedDescription)
+
+    if (engData.content && engData.materialsCount > 0) {
+      // Filtered path — inject the richly-formatted output directly.
+      // The function returns a section header + material/process lines
+      // already formatted for prompt injection.
+      materialPricingContext = "\n\n" + engData.content
+      console.info(
+        `[CAD-COST] Filtered engineering data: ${engData.materialsCount} materials, ${engData.processesCount} processes`,
+        `families=${engData.materialFamilies.join(",")}`,
+      )
+    } else {
+      // Fallback: no material families detected — use generic LIMIT dump so
+      // Finn always has at least some pricing anchors.
+      console.info("[CAD-COST] No material families detected — falling back to generic material dump")
+      const admin = createAdminClient()
+      const [matRes, procRes] = await Promise.all([
+        admin.from("material_properties").select("material_name, cost_per_kg_usd, density_kg_m3, yield_strength_mpa").limit(30),
+        admin.from("process_capabilities").select("display_name, tolerance_typical_mm, min_wall_thickness_mm, setup_cost_usd_typical, per_part_cost_multiplier, typical_lead_time_days").limit(20),
+      ])
+      const mats = matRes.data ?? []
+      const procs = procRes.data ?? []
+      if (mats.length > 0) {
+        materialPricingContext += "\n\nVERIFIED MATERIAL PRICES (from internal database — use these over generic estimates):\n" +
+          mats.filter(m => m.cost_per_kg_usd).map(m =>
+            `- ${m.material_name}: $${m.cost_per_kg_usd}/kg (≈£${((m.cost_per_kg_usd ?? 0) * 0.79).toFixed(2)}/kg), density=${m.density_kg_m3 ?? "?"}kg/m3, yield=${m.yield_strength_mpa ?? "?"}MPa`
+          ).join("\n")
+      }
+      if (procs.length > 0) {
+        materialPricingContext += "\n\nMANUFACTURING PROCESS DATA (verified):\n" +
+          procs.map(p =>
+            `- ${p.display_name}: tolerance=±${p.tolerance_typical_mm ?? "?"}mm, min wall=${p.min_wall_thickness_mm ?? "?"}mm, setup≈$${p.setup_cost_usd_typical ?? "?"}, lead=${p.typical_lead_time_days ?? "?"}d`
+          ).join("\n")
+      }
     }
   } catch (dbErr) {
     console.warn("[CAD-COST] Material DB query failed (non-blocking):", dbErr instanceof Error ? dbErr.message : dbErr)
+  }
+
+  // FIX 2 (2026-04-30): Inject real matched supplier data so Finn's cost estimates
+  // are grounded in actual supplier economics (lead times, minimum orders, country)
+  // rather than LLM training priors. Pattern mirrors Chase/Max supplier grounding.
+  //
+  // Strategy: embed a combined description of all modules, run match_marketplace_listings_v2
+  // (Products + Services only — no Finance leak), inject top 10 suppliers' pricing-
+  // relevant fields. Non-blocking: any failure warns and continues without supplier context.
+  let supplierContextSection = ""
+  try {
+    const combinedDescForSuppliers = modules.map(m =>
+      [m.name, ...(m.keyParts ?? [])].join(" ")
+    ).join(". ")
+
+    if (combinedDescForSuppliers.trim().length > 5) {
+      const queryEmbedding = await embedQuery(combinedDescForSuppliers, { actionSlug: "finn_cost_supplier_grounding" })
+      const adminForSuppliers = createAdminClient()
+      const embStr = JSON.stringify(queryEmbedding) as unknown as string
+
+      // Run Products and Services in parallel, cap at 5 each (10 total) to keep
+      // the prompt lean. Finance category explicitly excluded (known category-leak gotcha).
+      const [productsResult, servicesResult] = await Promise.all([
+        adminForSuppliers.rpc("match_marketplace_listings_v2", {
+          query_embedding: embStr,
+          filter_category: "Products",
+          match_threshold: 0.2,
+          match_count: 5,
+          p_offset: 0,
+        }),
+        adminForSuppliers.rpc("match_marketplace_listings_v2", {
+          query_embedding: embStr,
+          filter_category: "Services",
+          match_threshold: 0.2,
+          match_count: 5,
+          p_offset: 0,
+        }),
+      ])
+
+      const matchedIds = [
+        ...(productsResult.data ?? []),
+        ...(servicesResult.data ?? []),
+      ].map((r: { id: string }) => r.id)
+
+      if (matchedIds.length > 0) {
+        const { data: listings } = await adminForSuppliers
+          .from("marketplace_listings")
+          .select("title, category, country_iso, lead_time, minimum_order, certifications, process_capabilities")
+          .in("id", matchedIds)
+          .in("category", ["Products", "Services"])
+
+        if (listings && listings.length > 0) {
+          const lines = listings.slice(0, 10).map((l) => {
+            const parts: string[] = []
+            if (l.title) parts.push(l.title)
+            if (l.category) parts.push(`[${l.category}]`)
+            if (l.country_iso && typeof l.country_iso === "string") parts.push(l.country_iso)
+            if (l.lead_time && typeof l.lead_time === "string") parts.push(`lead_time: ${l.lead_time}`)
+            if (l.minimum_order && typeof l.minimum_order === "string") parts.push(`min_order: ${l.minimum_order}`)
+
+            const certs = Array.isArray(l.certifications)
+              ? (l.certifications as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 2).join(", ")
+              : null
+            if (certs) parts.push(`certs: ${certs}`)
+
+            return `- ${parts.join(" | ")}`
+          }).join("\n")
+
+          supplierContextSection = `\n\nMATCHED SUPPLIERS (from our verified directory — let their lead times, minimum orders, and geographies inform your cost estimates):\n${lines}\n\nUse these suppliers' real economics (lead times, minimum orders, country of origin) to ground your estimates. UK/EU suppliers command premium pricing but shorter lead times; Asian suppliers offer lower unit cost with longer lead times.`
+          console.info(`[CAD-COST] Injected ${listings.length} matched suppliers into Finn's cost prompt`)
+        }
+      }
+    }
+  } catch (suppErr) {
+    console.warn("[CAD-COST] Supplier grounding failed (non-blocking):", suppErr instanceof Error ? suppErr.message : suppErr)
   }
 
   // DECISION: Compact summaries — keyParts + diagnostics only, no description/failureModes.
@@ -248,7 +353,7 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
   }
 }`
 
-  const userPromptPrefix = `Estimate costs. Be CONCISE.${productOverview ? `\nProduct: ${productOverview.slice(0, 200)}\n` : ""}${materialPricingContext}`
+  const userPromptPrefix = `Estimate costs. Be CONCISE.${productOverview ? `\nProduct: ${productOverview.slice(0, 200)}\n` : ""}${materialPricingContext}${supplierContextSection}`
 
   // Inner: single-batch DeepSeek call for a subset of modules. The outer
   // loop fans out batches for concurrency. See COST_BATCH_SIZE comment for
