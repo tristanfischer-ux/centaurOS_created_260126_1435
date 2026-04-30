@@ -803,7 +803,7 @@ Guidelines:
 - Large tasks (launch a product, complete a hiring cycle): 4-8 weeks
 - Do NOT default everything to the same number — vary based on realistic effort`
 
-            // Reinforce PROPOSED_ACTIONS format for non-Claude models that struggle
+            // Reinforce PROPOSED_ACTIONS format for models that struggle
             // with HTML comment syntax. MiniMax and Qwen need extra emphasis and
             // a concrete, minimal example repeated at the end of the instructions.
             if (modelTier && modelTier !== "claude") {

@@ -127,7 +127,7 @@ export function portTypeToSignalType(portType: string): SignalType {
 /**
  * Resolve a contract port name to the actual module port name.
  *
- * INTENT: Claude's interface extraction may rephrase port names (e.g.
+ * INTENT: The model's interface extraction may rephrase port names (e.g.
  * "Motor Power Supply" vs the module's "Motor Power Supply 12V"). React Flow
  * silently drops edges when handle IDs don't match. This snaps contract names
  * to the real port names via exact match first, then keyword overlap fallback.
@@ -157,7 +157,7 @@ function resolvePortName(contractPort: string, actualPorts: string[]): string | 
  * Each contract becomes an edge with compatibility status preserved.
  *
  * DECISION: Accepts modules to fuzzy-match contract port names against actual
- * module port names. Without this, rephrased port names from Claude's extraction
+ * module port names. Without this, rephrased port names from the model's extraction
  * cause React Flow to silently drop arrows (handle ID mismatch).
  */
 export function buildEdgesFromContracts(contracts: InterfaceContract[], modules: CadLabModule[]): FlowEdge[] {
