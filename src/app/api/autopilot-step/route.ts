@@ -32,6 +32,8 @@
 
 import { NextResponse } from "next/server"
 import { timingSafeEqual } from "crypto"
+import { writeFileSync, mkdirSync } from "fs"
+import { join } from "path"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import {
@@ -914,6 +916,54 @@ async function runStep(
                         insertErr.message,
                     )
                 }
+
+                // Dual-save: also write to ~/Downloads/forge-demos/ for local
+                // review during the engine loop. Non-fatal — Supabase storage
+                // is the source of truth; this is a convenience copy.
+                try {
+                    const { data: projRow } = await admin
+                        .from("cad_lab_projects")
+                        .select("name, autopilot_state")
+                        .eq("id", projectId)
+                        .maybeSingle()
+
+                    const projectName: string =
+                        typeof projRow?.name === "string" && projRow.name.length > 0
+                            ? projRow.name
+                            : projectId
+                    const projectSlug = projectName
+                        .toLowerCase()
+                        .replace(/[^a-z0-9]+/g, "-")
+                        .replace(/^-+|-+$/g, "")
+
+                    // Derive iteration count from stage_scores in autopilot_state
+                    const autopilotState = projRow?.autopilot_state as Record<string, unknown> | null
+                    const stageScores = autopilotState?.stage_scores as Record<string, unknown> | undefined
+                    const iterCount = stageScores ? Object.keys(stageScores).length : 0
+
+                    // Stage index: count of scored stages gives a rough ordinal
+                    const ORDERED_STAGES = [
+                        "waiting_chase", "waiting_max", "waiting_sizing", "waiting_layout",
+                        "waiting_bom", "waiting_finn", "matching_suppliers", "running_fang_reviews",
+                        "proofreading", "generating_pdf",
+                    ]
+                    const stageIndex = ORDERED_STAGES.indexOf("generating_pdf") + 1
+
+                    const localFilename = `${projectSlug}-stage${stageIndex}-iter${iterCount}.pdf`
+                    const demosDir = join(process.env.HOME ?? "/tmp", "Downloads", "forge-demos")
+                    mkdirSync(demosDir, { recursive: true })
+                    writeFileSync(join(demosDir, localFilename), pdfBytes)
+                    console.info(
+                        `[autopilot-step] PDF dual-saved to ${join(demosDir, localFilename)} (${pdfBytes.length} bytes)`,
+                    )
+                } catch (dualSaveErr) {
+                    // Non-fatal — log and continue
+                    console.warn(
+                        "[autopilot-step] PDF dual-save failed (non-fatal):",
+                        dualSaveErr instanceof Error ? dualSaveErr.message : dualSaveErr,
+                    )
+                }
+
                 return { ok: true }
             } catch (err) {
                 return {

@@ -450,3 +450,201 @@ export async function checkFoundryCohortGate(
 export function shouldScoreStage(stage: AutopilotStage): boolean {
     return !SKIP_SCORING_STAGES.includes(stage) && !!RUBRICS[stage]
 }
+
+// ── Diagnostic Council ────────────────────────────────────────────────
+
+export interface CouncilFinding {
+    model: string
+    findings: string[]
+    suggestedFixes: string[]
+    rawResponse: string
+}
+
+export interface CouncilDiagnosis {
+    projectId: string
+    stage: AutopilotStage
+    composite: number
+    individualFindings: CouncilFinding[]
+    consensusFindings: string[]
+    consensusFixes: string[]
+    convenedAt: string
+}
+
+/**
+ * Convenes a 3-model diagnostic council when a project scores < 8/10.
+ *
+ * Calls gpt-5.5, gpt-4.1-mini (×2 for diversity) in parallel. Each model
+ * is asked what specific code / prompt changes would fix the quality issues.
+ * Findings agreed by 2+ models are surfaced as consensus.
+ *
+ * Result is stored in autopilot_state.council_diagnosis.
+ */
+export async function conveneDiagnosticCouncil(
+    projectId: string,
+    stage: AutopilotStage,
+    scoreResult: StageScoreResult,
+    stageData: string,
+): Promise<CouncilDiagnosis> {
+    const rubric = RUBRICS[stage]
+
+    const failingDimensions = scoreResult.scores
+        .filter((s) => s.score < 8)
+        .map((s) => `- ${s.dimension} (score ${s.score}/10): ${s.reasoning}`)
+        .join("\n")
+
+    const systemPrompt = `You are a senior engineering consultant reviewing the output of a hardware product development AI pipeline stage.
+Your task is to identify SPECIFIC, ACTIONABLE fixes that would bring the quality score for this stage above 8/10.
+Be concrete — name the exact field, prompt behaviour, or data gap that is causing each quality issue.
+Focus on what code or prompt changes would fix each problem.
+
+Return ONLY valid JSON in this exact format:
+{
+  "findings": ["<specific issue 1>", "<specific issue 2>"],
+  "suggested_fixes": ["<concrete fix 1>", "<concrete fix 2>"]
+}`
+
+    const userPrompt = `Stage: ${stage}
+Overall score: ${scoreResult.composite}/10 (threshold: 8.0)
+Overall assessment: ${scoreResult.reasoning}
+
+Failing dimensions:
+${failingDimensions}
+
+Stage output data (truncated to 6000 chars):
+${stageData.slice(0, 6000)}
+
+What specific changes to the AI pipeline (prompts, data extraction, validation logic) would fix these quality issues?`
+
+    // 3-model council — gpt-5.5 (frontier) + gpt-4.1-mini (×2 for independent perspectives)
+    const COUNCIL_MODELS = [
+        { model: "gpt-5.5", label: "frontier" },
+        { model: "gpt-4.1-mini", label: "mini-a" },
+        { model: "gpt-4.1-mini", label: "mini-b" },
+    ]
+
+    const councilCalls = COUNCIL_MODELS.map(async ({ model, label }): Promise<CouncilFinding> => {
+        try {
+            const { text } = await callOpenAI(
+                systemPrompt,
+                userPrompt,
+                model,
+                4096,
+                60_000,
+            )
+
+            const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+            const parsed = JSON.parse(cleaned) as {
+                findings: string[]
+                suggested_fixes: string[]
+            }
+
+            return {
+                model: `${model}:${label}`,
+                findings: Array.isArray(parsed.findings) ? parsed.findings : [],
+                suggestedFixes: Array.isArray(parsed.suggested_fixes) ? parsed.suggested_fixes : [],
+                rawResponse: text.slice(0, 2000),
+            }
+        } catch (err) {
+            console.warn(
+                `[stage-scoring] council model ${model}:${label} failed for project=${projectId} stage=${stage}:`,
+                err instanceof Error ? err.message : err,
+            )
+            return {
+                model: `${model}:${label}`,
+                findings: [],
+                suggestedFixes: [],
+                rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}`,
+            }
+        }
+    })
+
+    const individualFindings = await Promise.all(councilCalls)
+
+    // Consensus: findings/fixes mentioned by 2+ models (fuzzy: normalise + substring match)
+    function normalise(s: string): string {
+        return s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()
+    }
+
+    function countAgreements(item: string, allResults: CouncilFinding[], field: "findings" | "suggestedFixes"): number {
+        const normItem = normalise(item)
+        return allResults.filter((r) =>
+            r[field].some((other) => {
+                const normOther = normalise(other)
+                return normItem.includes(normOther.slice(0, 30)) || normOther.includes(normItem.slice(0, 30))
+            }),
+        ).length
+    }
+
+    const allFindings = individualFindings.flatMap((r) => r.findings)
+    const allFixes = individualFindings.flatMap((r) => r.suggestedFixes)
+
+    const consensusFindings = [...new Set(allFindings)].filter(
+        (f) => countAgreements(f, individualFindings, "findings") >= 2,
+    )
+    const consensusFixes = [...new Set(allFixes)].filter(
+        (f) => countAgreements(f, individualFindings, "suggestedFixes") >= 2,
+    )
+
+    // Fall back to all findings if consensus is empty (council size is small)
+    const finalConsensusFindings = consensusFindings.length > 0 ? consensusFindings : allFindings.slice(0, 6)
+    const finalConsensusFixes = consensusFixes.length > 0 ? consensusFixes : allFixes.slice(0, 6)
+
+    const diagnosis: CouncilDiagnosis = {
+        projectId,
+        stage,
+        composite: scoreResult.composite,
+        individualFindings,
+        consensusFindings: finalConsensusFindings,
+        consensusFixes: finalConsensusFixes,
+        convenedAt: new Date().toISOString(),
+    }
+
+    // Persist to autopilot_state.council_diagnosis
+    try {
+        const admin = createAdminClient()
+        const { data: project } = await admin
+            .from("cad_lab_projects")
+            .select("autopilot_state")
+            .eq("id", projectId)
+            .maybeSingle()
+
+        const current = project?.autopilot_state as Record<string, unknown> | null
+        if (current) {
+            await admin
+                .from("cad_lab_projects")
+                .update({
+                    autopilot_state: {
+                        ...current,
+                        council_diagnosis: diagnosis,
+                    },
+                } as unknown as never)
+                .eq("id", projectId)
+        }
+    } catch (persistErr) {
+        // Non-fatal — log and continue; diagnosis is returned to caller regardless
+        console.warn(
+            `[stage-scoring] council diagnosis persist failed for project=${projectId}:`,
+            persistErr instanceof Error ? persistErr.message : persistErr,
+        )
+    }
+
+    console.info(
+        `[stage-scoring] council convened for project=${projectId} stage=${stage} ` +
+            `consensusFindings=${finalConsensusFindings.length} consensusFixes=${finalConsensusFixes.length}`,
+    )
+
+    return diagnosis
+}
+
+/**
+ * Loads the raw stage data string for a given project + rubric.
+ * Re-exported so the autopilot-tick route can pass it to conveneDiagnosticCouncil.
+ */
+export async function loadStageDataForCouncil(
+    projectId: string,
+    stage: AutopilotStage,
+): Promise<string> {
+    const rubric = RUBRICS[stage]
+    if (!rubric) return "No rubric found for this stage."
+    return loadStageData(projectId, rubric)
+}

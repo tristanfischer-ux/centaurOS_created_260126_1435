@@ -81,6 +81,8 @@ import {
     storeStageScore,
     checkFoundryCohortGate,
     shouldScoreStage,
+    conveneDiagnosticCouncil,
+    loadStageDataForCouncil,
 } from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
@@ -417,12 +419,40 @@ async function tickOnce(request: Request): Promise<TickResult> {
                             `[autopilot-tick] scored project=${project.id} stage=${stage} composite=${scoreResult.composite} passed=${scoreResult.passed}`,
                         )
                         if (!scoreResult.passed) {
+                            // Auto-convene diagnostic council for any project scoring < 8/10.
+                            // Fire-and-forget — don't await; the project stays in gate_hold
+                            // and the council result lands in autopilot_state.council_diagnosis
+                            // for the next tick / human review.
+                            loadStageDataForCouncil(project.id, stage as AutopilotStage)
+                                .then((stageData) =>
+                                    conveneDiagnosticCouncil(
+                                        project.id,
+                                        stage as AutopilotStage,
+                                        scoreResult,
+                                        stageData,
+                                    ),
+                                )
+                                .then((diagnosis) => {
+                                    console.info(
+                                        `[autopilot-tick] council complete for project=${project.id} stage=${stage} ` +
+                                            `consensusFindings=${diagnosis.consensusFindings.length} ` +
+                                            `fixes=${diagnosis.consensusFixes.length}: ` +
+                                            diagnosis.consensusFindings.slice(0, 2).join(" | "),
+                                    )
+                                })
+                                .catch((councilErr) => {
+                                    console.warn(
+                                        `[autopilot-tick] council failed for project=${project.id} stage=${stage}:`,
+                                        councilErr instanceof Error ? councilErr.message : councilErr,
+                                    )
+                                })
+
                             details.push({
                                 projectId: project.id,
                                 stage,
                                 action: "skip_running" as TickAction,
                                 ok: false,
-                                reason: `stage scoring: composite ${scoreResult.composite}/10 < 8.0 threshold — holding at gate`,
+                                reason: `stage scoring: composite ${scoreResult.composite}/10 < 8.0 threshold — council convened, holding at gate`,
                             })
                             skipped++
                             continue
