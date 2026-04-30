@@ -2,7 +2,7 @@
  * @file concept-research.tsx — Product research section for the Concept page
  *
  * @description Shows a "Research your product" step between the ScanHero and
- * SystemBlueprint. Runs Gemini Search + Claude Opus to produce a comprehensive
+ * SystemBlueprint. Runs Gemini Search + GPT-5.5 to produce a comprehensive
  * product research report that the user can review and edit before proceeding
  * to module generation.
  *
@@ -76,7 +76,7 @@ interface ConceptResearchProps {
  * ConceptResearch — Product research step in the Forge concept flow.
  *
  * @description Provides a one-click research experience:
- * 1. User clicks "Research Product" → Gemini searches the web → Claude Opus
+ * 1. User clicks "Research Product" → Gemini searches the web → GPT-5.5
  *    synthesizes a comprehensive report
  * 2. Report is displayed in an editable textarea
  * 3. Sources are shown in an expandable section

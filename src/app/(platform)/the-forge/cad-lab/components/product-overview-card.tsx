@@ -84,15 +84,19 @@ function tryFormatBriefJson(text: string): string | null {
 /** Maps raw model IDs to human-friendly display names */
 function getModelDisplayName(modelId: string): string {
   const DISPLAY_NAMES: Record<string, string> = {
-    "claude-opus-4-7": "Claude Opus 4.6",
-    "claude-sonnet-4-6": "Claude Sonnet 4.6",
-    "claude-haiku-4-5-20251001": "Claude Haiku 4.5",
+    "claude-opus-4-7": "GPT-5.5",
+    "claude-sonnet-4-6": "GPT-4.1-mini",
+    "claude-haiku-4-5-20251001": "Gemini 2.5 Flash",
     "gemini-3.1-flash-image-preview": "Nano Banana 2 (Gemini)",
     "gpt-image-1": "GPT Image 1 (OpenAI)",
+    // New model IDs
+    "gpt-5.5": "GPT-5.5",
+    "gpt-4.1-mini": "GPT-4.1-mini",
+    "gemini-2.5-flash": "Gemini 2.5 Flash",
     // Short labels from the decomposition race
-    "Opus": "Claude Opus 4.6",
-    "Sonnet": "Claude Sonnet 4.6",
-    "Haiku": "Claude Haiku 4.5",
+    "Opus": "GPT-5.5",
+    "Sonnet": "GPT-4.1-mini",
+    "Haiku": "Gemini 2.5 Flash",
     "Gemini": "Gemini Pro",
     "GPT-5.3": "GPT-5.3",
   }

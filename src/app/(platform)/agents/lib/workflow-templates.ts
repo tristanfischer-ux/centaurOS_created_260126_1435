@@ -32,7 +32,7 @@ interface PromptStep {
     label: string
     category: string
     icon: string
-    /** Override provider (defaults to Anthropic Claude Opus 4.6) */
+    /** Override provider (defaults to GPT-5.5) */
     providerId?: string
     /** Override model ID */
     modelId?: string

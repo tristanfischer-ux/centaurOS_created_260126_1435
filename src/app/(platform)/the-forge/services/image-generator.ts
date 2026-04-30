@@ -1270,7 +1270,7 @@ interface ConsistencyScoreResult {
 }
 
 /**
- * Sends hero + module image to Claude Vision and scores geometric consistency.
+ * Sends hero + module image to GPT-5.5 Vision and scores geometric consistency.
  * Returns null on any failure (non-blocking — keeps the first generation).
  *
  * @param heroBase64 - Base64-encoded PNG of the hero image

@@ -2,7 +2,7 @@
  * @file design-standards.ts — Types for the Design Standards Library.
  *
  * Engineering standards stored in Supabase, scored by relevance,
- * and injected into Claude Opus 1M context for standards-compliant CAD generation.
+ * and injected into GPT-5.5 context for standards-compliant CAD generation.
  */
 
 export interface DesignRule {

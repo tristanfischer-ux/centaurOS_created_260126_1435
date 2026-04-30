@@ -3557,7 +3557,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       researchTimers.push(setTimeout(() => addProgressLine("Searching Thingiverse for reference CAD models..."), 3000))
       researchTimers.push(setTimeout(() => addProgressLine("Querying design standards database (220+ standards across 19 domains)..."), 8000))
       researchTimers.push(setTimeout(() => addProgressLine("Loading material properties and process constraints from engineering library..."), 12000))
-      researchTimers.push(setTimeout(() => addProgressLine("Synthesising research report with Claude Opus..."), 18000))
+      researchTimers.push(setTimeout(() => addProgressLine("Synthesising research report..."), 18000))
       researchTimers.push(setTimeout(() => addProgressLine("This typically takes 20-40 seconds depending on product complexity..."), 25000))
 
       const res = await runCadLabResearch(subject, {

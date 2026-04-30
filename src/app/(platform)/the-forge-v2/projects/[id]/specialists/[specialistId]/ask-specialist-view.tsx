@@ -60,8 +60,8 @@ export interface AskSpecialistViewProps {
 
 function formatModelLabel(tier: string): string {
     switch (tier) {
-        case "claude": return "Claude Opus"
-        case "sonnet": return "Claude Sonnet"
+        case "claude": return "DeepSeek V4-Pro"
+        case "sonnet": return "DeepSeek V4"
         case "deepseek": return "DeepSeek V4"
         case "google": return "Gemini 3.1 Pro"
         case "openai": return "GPT-5.4"

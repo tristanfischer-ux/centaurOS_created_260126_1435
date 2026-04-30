@@ -1,7 +1,7 @@
 /**
  * @file route.ts — SSE endpoint for document skill generation
  *
- * @description Streams a Claude Opus 4.6-generated document back to the client
+ * @description Streams a GPT-5.5-generated document back to the client
  * via Server-Sent Events. Supports auto-data enrichment from Supabase and
  * saves the result to report_snapshots.
  *

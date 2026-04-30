@@ -4,7 +4,7 @@
  * @description Renders the concept definition stage with a deliberate,
  * step-by-step flow:
  * 1. ScanHero — idea input and refinement
- * 2. ConceptResearch — AI-powered product research (Gemini Search + Claude Opus)
+ * 2. ConceptResearch — product research (Gemini Search + GPT-5.5)
  * 3. Approval — user reviews the research and confirms ("Yes, I like it")
  * 4. View Dossier CTA — manual navigation to the engineering dossier
  *

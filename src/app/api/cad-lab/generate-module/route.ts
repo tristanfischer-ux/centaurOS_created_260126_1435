@@ -181,7 +181,7 @@ export async function POST(request: Request): Promise<Response> {
         ["electronics", "mechanical", "electromechanical", "fluid"].includes(body.domainHint)) {
       clientDomainHint = body.domainHint
     }
-    // SECURITY: Cap documentContext to prevent payload bloat in Claude API calls
+    // SECURITY: Cap documentContext to prevent payload bloat in OpenAI API calls
     if (body.documentContext && typeof body.documentContext === "string") {
       clientDocumentContext = body.documentContext.slice(0, 15_000)
     }

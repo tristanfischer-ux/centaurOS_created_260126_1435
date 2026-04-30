@@ -327,7 +327,7 @@ function parseSections(raw: string): Record<string, string> {
 // ─── Public API ──────────────────────────────────────────────────────
 
 /**
- * Generates a structural brief for a single module using Claude Opus 4.6.
+ * Generates a structural brief for a single module using GPT-5.5.
  *
  * @description Analyzes the module spec and produces a unified structural
  * description that drives both the technical illustration and the 3D CAD model.

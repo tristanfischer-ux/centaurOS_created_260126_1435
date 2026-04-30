@@ -2,7 +2,7 @@
  * @file route.ts — SSE endpoint for streaming email sequence generation.
  *
  * @description Authenticates the user, fetches campaign + contact + KB data,
- * calls Claude's streaming API, forwards text chunks as SSE events, then
+ * calls OpenAI's streaming API, forwards text chunks as SSE events, then
  * parses and saves the complete response to the database.
  *
  * @security Filters all queries by foundry_id. Auth via Supabase session.

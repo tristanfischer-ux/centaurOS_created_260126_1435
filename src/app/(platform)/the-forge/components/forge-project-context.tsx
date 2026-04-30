@@ -75,7 +75,7 @@ export interface ForgeProject {
   status: string
   scanStatus: ScanStatus
   thumbnailUrl: string | null
-  /** Research report from concept research (Gemini Search + Claude Opus) */
+  /** Research report from concept research (Gemini Search + GPT-5.5) */
   researchReport: {
     report: string
     sources: Array<{ uri: string; title: string }>

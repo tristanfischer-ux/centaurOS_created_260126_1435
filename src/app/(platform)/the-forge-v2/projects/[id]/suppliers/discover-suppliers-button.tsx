@@ -8,7 +8,7 @@
  * (< 3 suppliers, or empty because the directory has zero coverage for
  * the project's niche — horticulture, HVAC, shipping containers, etc.),
  * this button fires `discoverSuppliersForGap(projectId, moduleId)`. The
- * action kicks a Claude Opus web_search call against the gap's industry
+ * action kicks an OpenAI web_search call against the gap's industry
  * / process / material, persists up to 10 real UK/EU companies as
  * unverified-ai-discovery rows in the suppliers directory, then re-runs
  * matchSuppliersForProject so the shortlist refreshes.
@@ -116,8 +116,8 @@ export function DiscoverSuppliersButton({
                 aria-busy={running}
                 title={
                     running
-                        ? "Chase is running Claude Opus with the web_search tool — 60–90s typical"
-                        : `Runs Claude Opus web_search against the ${moduleName} gap. Up to 10 real UK/EU companies land as unverified candidates in the directory, then Chase re-matches so the shortlist refreshes. About £0.30 per run.`
+                        ? "Chase is searching for suppliers — 60–90s typical"
+                        : `Runs web search against the ${moduleName} gap. Up to 10 real UK/EU companies land as unverified candidates in the directory, then Chase re-matches so the shortlist refreshes. About £0.30 per run.`
                 }
             >
                 {label}

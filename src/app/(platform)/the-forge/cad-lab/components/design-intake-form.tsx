@@ -6,7 +6,7 @@
  * @description Collects use-case, compliance, process, material, tolerance,
  * quantity, and assumption inputs that improve research quality and build
  * toward a supplier-ready RFQ. Collapsed by default with clear explanation
- * of purpose. Also includes the Claude model selector under "Advanced."
+ * of purpose. Also includes the model selector under "Advanced."
  */
 
 import { useState } from "react"

@@ -79,7 +79,7 @@ export function ReviewImageCoherenceButton({
 
     const disabledTitle = !ready
         ? "Generate the cover illustration and at least one module render first."
-        : "Ask Claude Opus to flag module images that look out-of-family with the cover, then regenerate the top 3 outliers."
+        : "Flag module images that look out-of-family with the cover, then regenerate the top 3 outliers."
 
     const regenCount =
         status.kind === "done" ? status.outliers.filter((o) => o.regenerated).length : 0
