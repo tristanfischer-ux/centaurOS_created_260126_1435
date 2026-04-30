@@ -97,10 +97,16 @@ function inferTargetsFromSubject(subject: string, domain: string | null): Record
     const out: Record<string, number> = {}
     const s = subject.toLowerCase()
 
+    const WORD_NUMBERS: Record<string, number> = {
+        one: 1, two: 2, three: 3, four: 4, five: 5, six: 6, seven: 7,
+        eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+    }
+
     const capture = (re: RegExp): number | null => {
         const m = s.match(re)
         if (!m) return null
-        const n = Number.parseFloat(m[1])
+        const raw = m[1]
+        const n = WORD_NUMBERS[raw] ?? Number.parseFloat(raw)
         return Number.isFinite(n) ? n : null
     }
 
@@ -113,7 +119,7 @@ function inferTargetsFromSubject(subject: string, domain: string | null): Record
         if (out.kwh !== undefined && out.kw === undefined) out.kw = Math.round(out.kwh * 0.2)
     } else if (domain === "vertical_farm") {
         const canopy = capture(/(\d+(?:\.\d+)?)\s*m(?:²|2|\^2)\s*(?:canopy|growing|grow)/i)
-        const tiers = capture(/(\d+)\s*(?:tiers?|(?:growing\s+)?layers?)/i)
+        const tiers = capture(/(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s*(?:tiers?|(?:growing\s+)?layers?)/i)
         if (canopy !== null) out.canopy_m2 = canopy
         if (tiers !== null) out.tiers = tiers
     } else if (domain === "heat_pump") {

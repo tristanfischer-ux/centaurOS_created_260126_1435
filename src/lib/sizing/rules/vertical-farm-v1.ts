@@ -148,7 +148,7 @@ function evaluateConfig(
     tiers: number,
 ): ConfigOutcome {
     const tray_floor_m2 = canopy_m2 / (tiers * VF_RULES.trays.aisle_efficiency)
-    const aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm * 2) / 1_000_000
+    const aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
     const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
     const peak = peakLoadKw(canopy_m2)
     const hvac_floor_m2 = peak.peak_total_kw * VF_RULES.hvac.floor_m2_per_kw_thermal
@@ -352,7 +352,7 @@ function solve(input: DomainSolveInput): DomainSolveResult {
         targetCanopy / (tiers * VF_RULES.trays.aisle_efficiency)
 
     // Overall aisle allocation — a couple of pick aisles span the bay.
-    const aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm * 2) / 1_000_000
+    const aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
     const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
 
     const lighting_kw = targetCanopy * VF_RULES.lighting.kw_per_m2_canopy
