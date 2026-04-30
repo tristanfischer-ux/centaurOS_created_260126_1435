@@ -55,6 +55,7 @@ import type {
 } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Database } from "@/types/database.types"
+import { extractStageSection, extractConstraintAnchors, compressReferenceDossier } from "@/lib/reference-dossier"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -174,7 +175,7 @@ async function runFangReviewInternal(
             : undefined
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, name, modules, research, diagnostic_answers")
+            .select("id, foundry_id, subject, name, modules, research, diagnostic_answers, reference_dossier")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -333,7 +334,17 @@ async function runFangReviewInternal(
                 moduleId,
             )
 
-            // 6. Invoke the existing specialist-review engine.
+            // 6. Prepare reference dossier context for engineering review.
+            const fangDossierContext = (() => {
+                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return undefined
+                const stageSection = extractStageSection(project.reference_dossier, "fang")
+                const anchors = extractConstraintAnchors(project.reference_dossier)
+                if (stageSection && anchors) return `${stageSection}\n\n${anchors}`
+                if (stageSection) return stageSection
+                return compressReferenceDossier(project.reference_dossier)
+            })()
+
+            // 7. Invoke the existing specialist-review engine.
             const reviewRequest = {
                 projectId,
                 moduleId,
@@ -343,6 +354,7 @@ async function runFangReviewInternal(
                 diagnosticAnswers: diagnosticAnswers ?? undefined,
                 projectSubject,
                 bomPartNumbersForModule,
+                referenceDossierContext: fangDossierContext,
             }
             const reviewResult = await requestSpecialistReview(reviewRequest, trusted)
 

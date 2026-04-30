@@ -12,6 +12,9 @@ const PRIORITY_HEADINGS = [
   "mass data",
   "key components",
   "cost data",
+  "cost range",
+  "specifications",
+  "typical",
   "regulatory",
   "disagreements",
 ]
