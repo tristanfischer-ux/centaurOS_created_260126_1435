@@ -47,6 +47,15 @@ export interface OpenRouterCallResult {
     inputTokens: number
     outputTokens: number
     modelUsed: string
+    /**
+     * The finish reason from the model's response. "stop" = natural end;
+     * "length" = output was truncated due to max_tokens budget exhaustion.
+     * Reasoning models (Qwen 3 235B, DeepSeek V4-Pro) consume part of the
+     * max_tokens budget on internal thinking, so "length" truncation is
+     * common when the budget is too tight. Callers should check this to
+     * detect and handle truncated output.
+     */
+    finishReason: string | null
     /** Raw response for debugging — omit on success-path to keep logs lean. */
     raw?: unknown
 }
@@ -220,6 +229,7 @@ export async function callOpenRouter(
         inputTokens: raw.usage?.prompt_tokens ?? 0,
         outputTokens: raw.usage?.completion_tokens ?? 0,
         modelUsed: input.model,
+        finishReason: choice.finish_reason ?? null,
     }
 }
 

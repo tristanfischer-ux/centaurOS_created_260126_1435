@@ -66,16 +66,22 @@ export const TOOL_CALL_LEAK_PATTERNS: ReadonlyArray<{
     pattern: RegExp
     replacement: string
 }> = [
+    // "verified via lookup_process(sheet_metal)" — strip whole phrase
+    { pattern: /\bverified\s+(via|using|with)\s+`?[a-z][a-z0-9]*_[a-z0-9_]+`?(\([^)]*\))?/gi, replacement: "" },
+    // "(verified via `function_name`)" — parenthesised variant
+    { pattern: /\(verified\s+(via|using|with)\s+[^)]*\)/gi, replacement: "" },
+    // "Validated using calculate_stress(...)" — strip verb + tool call
+    { pattern: /\b(validated|confirmed|checked|verified)\s+(using|via|with|by)\s+`?[a-z][a-z0-9]*_[a-z0-9_]+`?(\([^)]*\))?/gi, replacement: "" },
+    // "The lookup_process(x) confirms" → strip "The <call>" leaving "confirms"
+    { pattern: /\bthe\s+`?lookup_\w+`?(\([^)]*\))?\s*/gi, replacement: "" },
     // `lookup_process(sheet_metal)` / `lookup_process(injection_molding)` etc.
     { pattern: /\blookup_\w+\([^)]*\)/g, replacement: "" },
     // `calculate_cost(...)` / `search_suppliers(...)` / `get_material(...)`
     { pattern: /\b(calculate|search|get|fetch|query|find|check|validate|compute|evaluate)_\w+\([^)]*\)/g, replacement: "" },
     // Backticked function names: `lookup_process`
     { pattern: /`[a-z][a-z0-9]*_[a-z0-9_]+`/g, replacement: "" },
-    // "verified via `lookup_process`" or "verified via lookup_process"
-    { pattern: /\bverified\s+via\s+(`?[a-z_]+`?)/gi, replacement: "" },
-    // "(verified via `function_name`)" — parenthesised variant
-    { pattern: /\(verified\s+via\s+[^)]*\)/gi, replacement: "" },
+    // "Recommend verify via that" → "Recommend that" (orphaned "verify via")
+    { pattern: /\b(verify|check|confirm)\s+(via|using|with)\s+(?=that|this|the|if|whether)/gi, replacement: "" },
 ]
 
 export function hasSupplierDescriptionLeak(text: string): boolean {
@@ -91,8 +97,16 @@ export function stripToolCallLeaks(text: string): string {
     for (const { pattern, replacement } of TOOL_CALL_LEAK_PATTERNS) {
         result = result.replace(pattern, replacement)
     }
-    // Collapse double spaces / leading spaces left by removals
-    result = result.replace(/  +/g, " ").replace(/^ +/gm, "").replace(/ +$/gm, "")
+    // Collapse artefacts left by removals
+    result = result
+        .replace(/  +/g, " ")       // double spaces
+        .replace(/^ +/gm, "")       // leading spaces
+        .replace(/ +$/gm, "")       // trailing spaces
+        .replace(/ ([.,;:])/g, "$1") // space before punctuation
+        .replace(/\.\s*\./g, ".")    // double periods
+        .replace(/,\s*,/g, ",")     // double commas
+        .replace(/\(\s*\)/g, "")    // empty parens
+        .replace(/^\s*$/gm, "")     // blank lines
     return result
 }
 

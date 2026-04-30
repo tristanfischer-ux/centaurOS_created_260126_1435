@@ -2446,7 +2446,7 @@ function ModulePage({
                                     <Text style={[styles.tableCell, { flex: 2.5 }]}>
                                         {p.name}
                                         {p.description ? (
-                                            <Text style={{ color: MUTED }}>{" — " + p.description}</Text>
+                                            <Text style={{ color: MUTED }}>{" — " + sanitizeReviewText(p.description)}</Text>
                                         ) : null}
                                     </Text>
                                     <Text style={[styles.tableCell, { width: 40 }]}>
@@ -3552,7 +3552,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     Cause:{" "}
                                                 </Text>
-                                                {renderedCause}
+                                                {sanitizeReviewText(renderedCause)}
                                             </Text>
                                         )}
                                         {renderedConsequence && (
@@ -3560,7 +3560,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     Consequence:{" "}
                                                 </Text>
-                                                {renderedConsequence}
+                                                {sanitizeReviewText(renderedConsequence)}
                                             </Text>
                                         )}
                                         {r.existingControls && (
@@ -3568,7 +3568,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     Existing controls:{" "}
                                                 </Text>
-                                                {r.existingControls}
+                                                {sanitizeReviewText(r.existingControls)}
                                             </Text>
                                         )}
                                         {renderedMitigation && (
@@ -3576,7 +3576,7 @@ function RisksPage({ modules }: { modules: ModulePdf[] }): React.ReactElement {
                                                 <Text style={{ fontWeight: "bold" }}>
                                                     Mitigation:{" "}
                                                 </Text>
-                                                {renderedMitigation}
+                                                {sanitizeReviewText(renderedMitigation)}
                                             </Text>
                                         )}
                                         {repaired.repaired && repaired.repairSource && (

@@ -75,6 +75,15 @@ const MAX_TOOL_LOOPS = 5
 // up to 64K output tokens — bump to 16384 for headroom while staying
 // inside the per-call budget envelope.
 const MAX_TOKENS = 16384
+// Loop 27 truncation fix: Qwen 3 235B is a reasoning model that consumes
+// a substantial portion of the max_tokens budget on internal chain-of-thought
+// (the `reasoning` field). At MAX_TOKENS=16384, if the model uses ~12K tokens
+// on reasoning, only ~4K remain for the visible review — causing mid-sentence
+// truncation on complex modules (observed: HAPS Right Propulsion Nacelle
+// cut off mid-sentence). Bump the OpenRouter-specific ceiling to 32768 so
+// the reasoning chain has room without starving the visible output. Qwen 3
+// 235B via OpenRouter supports up to 65536 output tokens.
+const OPENROUTER_MAX_TOKENS = 32768
 
 /** Valid moduleId pattern — alphanumeric, hyphens, underscores */
 const MODULE_ID_PATTERN = /^[a-zA-Z0-9_-]{1,100}$/
@@ -344,7 +353,7 @@ ${reviewContext}${assemblyNotesInstructions}`
                 model: process.env.FANG_REVIEW_MODEL ?? "qwen/qwen3-235b-a22b",
                 system: systemPrompt,
                 prompt: userMsg,
-                maxTokens: MAX_TOKENS,
+                maxTokens: OPENROUTER_MAX_TOKENS,
                 temperature: 0.2,
                 timeoutMs: 240_000,
             })
@@ -352,6 +361,24 @@ ${reviewContext}${assemblyNotesInstructions}`
                 return {
                     error: `OpenRouter Fang review failed: ${or.error}`,
                 }
+            }
+            // Loop 27 truncation detection: check for signs that the review
+            // was truncated due to max_tokens exhaustion. Reasoning models
+            // (Qwen 3 235B) eat token budget on internal thinking, so even
+            // 32K can occasionally be tight on very complex modules.
+            if (or.finishReason === "length") {
+                console.warn(
+                    `[CAD-REVIEWS] Fang review TRUNCATED for module="${targetModule.name}" ` +
+                    `(finish_reason=length, outputTokens=${or.outputTokens}, ` +
+                    `maxTokens=${OPENROUTER_MAX_TOKENS}). Review may be incomplete.`,
+                )
+            } else if (detectTruncatedReview(or.text)) {
+                console.warn(
+                    `[CAD-REVIEWS] Fang review appears truncated for module="${targetModule.name}" ` +
+                    `(heuristic detection: text ends mid-sentence, ` +
+                    `finish_reason=${or.finishReason ?? "unknown"}, ` +
+                    `outputTokens=${or.outputTokens}).`,
+                )
             }
             const reviewOR = parseReviewFromMarkdown(
                 or.text,
@@ -1588,4 +1615,53 @@ function extractAndParseJson(text: string): Record<string, unknown> | null {
         }
     }
     return null
+}
+
+/**
+ * Heuristic truncation detection for Fang review output.
+ *
+ * Loop 27 fix: reasoning models (Qwen 3 235B) consume a large portion of
+ * the max_tokens budget on internal chain-of-thought. When the visible
+ * output gets cut off, the `finish_reason` should be "length" — but some
+ * providers don't always set this reliably. This function provides a
+ * belt-and-braces check by examining the text itself.
+ *
+ * Returns true when the text appears to have been cut off mid-sentence.
+ */
+function detectTruncatedReview(text: string): boolean {
+    if (!text || text.length < 100) return false
+
+    const trimmed = text.trimEnd()
+    if (trimmed.length === 0) return false
+
+    // A properly-terminated review ends with punctuation, a closing markdown
+    // marker, or a complete sentence. If it ends mid-word or mid-sentence,
+    // it's likely truncated.
+    const lastChar = trimmed[trimmed.length - 1]
+
+    // Normal endings: sentence-ending punctuation, list markers, code fences,
+    // closing brackets, markdown headers
+    const normalEndings = /[.!?:)\]}>*`|#\n]$/
+    if (normalEndings.test(trimmed)) return false
+
+    // If the last character is a letter or comma mid-sentence, likely truncated
+    if (/[a-zA-Z,;(]$/.test(lastChar)) {
+        // Double-check: is the last "sentence" suspiciously short or mid-word?
+        // Find the last sentence boundary
+        const lastSentenceBoundary = Math.max(
+            trimmed.lastIndexOf(". "),
+            trimmed.lastIndexOf(".\n"),
+            trimmed.lastIndexOf("! "),
+            trimmed.lastIndexOf("? "),
+        )
+        if (lastSentenceBoundary > 0) {
+            const trailingFragment = trimmed.slice(lastSentenceBoundary + 2)
+            // If there's a substantial fragment after the last sentence boundary
+            // that doesn't end with punctuation, it's truncated
+            if (trailingFragment.length > 20) return true
+        }
+        return true
+    }
+
+    return false
 }
