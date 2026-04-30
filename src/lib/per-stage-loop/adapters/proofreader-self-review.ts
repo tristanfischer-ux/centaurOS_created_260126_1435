@@ -378,7 +378,7 @@ Output JSON ONLY:
                 output,
             )
             const result = await callOpenRouter({
-                model: "anthropic/claude-sonnet-4-6",
+                model: "deepseek/deepseek-chat",
                 system:
                     "You are a chartered UK hardware engineer scoring an AI-generated report-proofreader's findings. Output JSON only.",
                 prompt,

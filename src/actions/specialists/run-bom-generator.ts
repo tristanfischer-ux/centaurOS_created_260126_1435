@@ -342,7 +342,7 @@ async function runBomGeneratorInternal(
                 stage: STAGE,
                 trigger,
                 triggered_by: userId ?? undefined,
-                model_provider: "anthropic",
+                model_provider: "deepseek",
                 input_ref: {
                     source: "modules",
                     moduleCount: modules.length,

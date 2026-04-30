@@ -386,7 +386,7 @@ Output JSON ONLY:
         try {
             const prompt = finnCostAdapter.buildCouncilPrompt(input, output)
             const result = await callOpenRouter({
-                model: "anthropic/claude-sonnet-4-6",
+                model: "deepseek/deepseek-chat",
                 system:
                     "You are a chartered UK costing engineer scoring AI-generated per-module cost estimates. Output JSON only.",
                 prompt,

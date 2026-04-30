@@ -34,7 +34,7 @@ import type { DimensionSheet } from "@/lib/sizing/types"
 
 const HARNESS_OPENROUTER_MODEL =
     process.env.SIZING_HARNESS_OPENROUTER_MODEL ||
-    "anthropic/claude-sonnet-4-6"
+    "deepseek/deepseek-chat"
 
 const DEMO_PROJECT_IDS: ReadonlyArray<{ id: string; slug: string }> = [
     { id: "0ab0457a-ab32-4d2a-b1e3-32d8b877222c", slug: "bess" },

@@ -357,7 +357,7 @@ async function runChaseResearchInternal(
                 stage: STAGE,
                 trigger,
                 triggered_by: user.id ?? undefined,
-                model_provider: "anthropic",
+                model_provider: "google",
                 input_ref: {
                     source: "project.subject",
                     charCount: description.length,

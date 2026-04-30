@@ -393,7 +393,7 @@ Output JSON ONLY:
         if (promptSamples.length > 0) {
             const prompt = illustrationAdapter.buildCouncilPrompt(input, output)
             const result = await callOpenRouter({
-                model: "anthropic/claude-sonnet-4-6",
+                model: "deepseek/deepseek-chat",
                 system:
                     "You are a chartered UK engineer scoring AI-generated text-to-image prompts for hardware engineering modules. Output JSON only.",
                 prompt,

@@ -373,7 +373,7 @@ async function runMaxDecompositionInternal(
                 stage: STAGE,
                 trigger,
                 triggered_by: user.id ?? undefined,
-                model_provider: "anthropic",
+                model_provider: "deepseek",
                 input_ref: { source: "subject+research", charCount: report.length },
             })
             runId = started.runId

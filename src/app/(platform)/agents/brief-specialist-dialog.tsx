@@ -129,8 +129,8 @@ function detectPresentationIntent(message: string): boolean {
 // Each specialist declares its tier in specialists-data.ts via `modelTier`.
 
 const MODEL_TIERS = {
-    claude: { providerId: "anthropic", modelId: "claude-opus-4-7" },
-    sonnet: { providerId: "anthropic", modelId: "claude-sonnet-4-6" },
+    claude: { providerId: "together", modelId: "deepseek-ai/DeepSeek-V4-Pro" },
+    sonnet: { providerId: "deepseek", modelId: "deepseek-chat" },
     deepseek: { providerId: "deepseek", modelId: "deepseek-chat" },
     google: { providerId: "google", modelId: "gemini-3.1-pro-preview" },
     openai: { providerId: "openai", modelId: "gpt-5.5" },
@@ -138,7 +138,7 @@ const MODEL_TIERS = {
     "qwen-local": { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
     minimax: { providerId: "minimax", modelId: "MiniMax-M2.7" },
     // 2026-04-25 swap tiers — keep aligned with FALLBACK_CHAINS in failover.ts
-    haiku: { providerId: "anthropic", modelId: "claude-haiku-4-5-20251001" },
+    haiku: { providerId: "google", modelId: "gemini-2.5-flash" },
     "gpt-mini": { providerId: "openai", modelId: "gpt-4.1-mini" },
     "qwen-235b": { providerId: "qwen", modelId: "qwen3-235b-a22b" },
     "deepseek-v4-pro": { providerId: "together", modelId: "deepseek-ai/DeepSeek-V4-Pro" },

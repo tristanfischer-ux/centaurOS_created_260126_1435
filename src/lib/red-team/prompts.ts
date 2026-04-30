@@ -19,8 +19,8 @@ export const DEBATE_PERSONAS: DebatePersona[] = [
     characterTitle: "Strategy",
     label: "BULL",
     position: "Argues FOR the proposition",
-    providerId: "anthropic",
-    modelId: "claude-opus-4-7",
+    providerId: "openai",
+    modelId: "gpt-5.5",
     color: "text-success",
   },
   {
@@ -49,8 +49,8 @@ export const DEBATE_PERSONAS: DebatePersona[] = [
     characterTitle: "Chief of Staff",
     label: "DISRUPTOR",
     position: "Reframes with lateral thinking",
-    providerId: "anthropic",
-    modelId: "claude-sonnet-4-6",
+    providerId: "deepseek",
+    modelId: "deepseek-chat",
     color: "text-warning",
   },
   {

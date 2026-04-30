@@ -182,7 +182,7 @@ Output JSON ONLY:
     async fireCouncil(input, output): Promise<StageScore> {
         const prompt = maxDecomposeAdapter.buildCouncilPrompt(input, output)
         const result = await callOpenRouter({
-            model: "anthropic/claude-sonnet-4-6",
+            model: "deepseek/deepseek-chat",
             system:
                 "You are a chartered UK engineer scoring AI-generated module decompositions for hardware products. Output JSON only.",
             prompt,

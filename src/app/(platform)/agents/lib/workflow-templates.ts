@@ -17,8 +17,8 @@ const NODE_START_Y = 50
 const NODE_SPACING_Y = 160
 
 // ─── Default provider/model for all AI nodes ────────────────────────
-const DEFAULT_PROVIDER = "anthropic"
-const DEFAULT_MODEL = "claude-sonnet-4-6"
+const DEFAULT_PROVIDER = "deepseek"
+const DEFAULT_MODEL = "deepseek-chat"
 const IMAGE_PROVIDER = "google"
 const IMAGE_MODEL = "gemini-3.1-pro-preview"
 const VIDEO_PROVIDER = "minimax"

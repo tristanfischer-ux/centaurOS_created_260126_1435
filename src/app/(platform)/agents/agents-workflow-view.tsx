@@ -810,8 +810,8 @@ function AgentsFlowInner({
                 return false
             }
 
-            const providerId = data.providerId ?? "anthropic"
-            const modelId = data.modelId ?? "claude-sonnet-4-6"
+            const providerId = data.providerId ?? "deepseek"
+            const modelId = data.modelId ?? "deepseek-chat"
             const modality = data.outputModality ?? "text"
 
             // Set running state — clear any previous media outputs
