@@ -90,7 +90,7 @@ import {
 } from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
-export const maxDuration = 60
+export const maxDuration = 300
 
 type TickAction =
     | "advance"
