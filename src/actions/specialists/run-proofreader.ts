@@ -39,6 +39,7 @@ import { extractStageSection, extractConstraintAnchors, compressReferenceDossier
 import { dedupedUnitTotalGbp } from "@/lib/bom/assembly-dedup"
 import { runCrossModalCheck } from "@/lib/forge-v2/cross-modal-consistency"
 import { checkDecompositionCompleteness } from "@/lib/product-class-checklists"
+import { getCouncilFeedbackForStage } from "@/lib/forge-v2/stage-scoring"
 
 /**
  * V4-Pro is the preferred proofreader (frontier reasoning at half-Haiku
@@ -221,6 +222,8 @@ export async function runProofreaderBackground(
         return ""
     })()
 
+    const councilFeedback = await getCouncilFeedbackForStage(projectId, "proofreading")
+
     const systemPrompt =
         "You are an engineering proofreader. You read an auto-generated " +
         "engineering report's structured state and surface FACTUAL ERRORS, " +
@@ -247,7 +250,7 @@ export async function runProofreaderBackground(
         "Output ONLY the JSON object — no markdown, no preamble." +
         proofDossierContext
 
-    const userPrompt = sections
+    const userPrompt = (councilFeedback ? councilFeedback + "\n\n" : "") + sections
 
     // Try each model in priority order. If V4-Pro rate-limits or
     // 5xx-fails, fall through to Gemini 2.5 Flash. The proofreader is

@@ -60,6 +60,7 @@ import {
     consumeRemediationContext,
     buildRemediationPromptBlock,
 } from "@/lib/forge-v2/stage-gates/remediation"
+import { getCouncilFeedbackForStage } from "@/lib/forge-v2/stage-scoring"
 import {
     completePipelineRun,
     failPipelineRun,
@@ -311,9 +312,20 @@ async function runChaseResearchInternal(
             projectId,
             "waiting_chase",
         )
-        const descriptionToUse = gateChaseRemediationCtx
+        // Council quality-gate feedback — injected when the previous run
+        // scored <8/10 and the 6-model council produced diagnosis+fixes.
+        const councilFeedback = await getCouncilFeedbackForStage(
+            projectId,
+            "waiting_chase",
+        )
+
+        let descriptionToUse = gateChaseRemediationCtx
             ? buildRemediationPromptBlock(6, gateChaseRemediationCtx) + "\n\nProduct concept: " + description
             : description
+
+        if (councilFeedback) {
+            descriptionToUse = councilFeedback + "\n\n" + descriptionToUse
+        }
 
         // 3. Pre-flight tier budget check. Mirrors Max's pattern exactly —
         //    inner runCadLabResearch calls enforceCadLabLimit too; this

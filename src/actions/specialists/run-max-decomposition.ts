@@ -86,6 +86,7 @@ import type {
 } from "@/lib/cad-lab-types"
 import { extractStageSection, extractConstraintAnchors, compressReferenceDossier } from "@/lib/reference-dossier"
 import { loadGroundingData } from "@/lib/forge-v2/parallel-llm"
+import { getCouncilFeedbackForStage } from "@/lib/forge-v2/stage-scoring"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -419,14 +420,21 @@ async function runMaxDecompositionInternal(
                 console.warn("[run-max-decomposition] DB grounding failed (non-fatal):", groundingErr instanceof Error ? groundingErr.message : groundingErr)
             }
 
+            // Council quality-gate feedback for re-runs
+            const councilFeedback = await getCouncilFeedbackForStage(
+                projectId,
+                "waiting_max",
+            )
+
             const maxDossierContext = (() => {
                 const groundingBlock = maxGroundingSection ? `\n\n${maxGroundingSection}` : ""
-                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return groundingBlock || undefined
+                const councilBlock = councilFeedback ? `\n\n${councilFeedback}` : ""
+                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return (groundingBlock + councilBlock) || undefined
                 const stageSection = extractStageSection(project.reference_dossier, "max")
                 const anchors = extractConstraintAnchors(project.reference_dossier)
-                if (stageSection && anchors) return `${stageSection}\n\n${anchors}${groundingBlock}`
-                if (stageSection) return `${stageSection}${groundingBlock}`
-                return compressReferenceDossier(project.reference_dossier) + groundingBlock
+                if (stageSection && anchors) return `${stageSection}\n\n${anchors}${groundingBlock}${councilBlock}`
+                if (stageSection) return `${stageSection}${groundingBlock}${councilBlock}`
+                return compressReferenceDossier(project.reference_dossier) + groundingBlock + councilBlock
             })()
 
             const skeletonResult = await skeletonDecompose(

@@ -694,7 +694,9 @@ Respond with ONLY valid JSON:
 
   const systemPromptWithConstraints = systemPrompt + containerConstraintLine + refSection
 
-  const userPrompt = `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
+  const { getCouncilFeedbackForStage } = await import("@/lib/forge-v2/stage-scoring")
+  const bomCouncilFeedback = await getCouncilFeedbackForStage(projectId, "waiting_bom")
+  const userPrompt = (bomCouncilFeedback ? bomCouncilFeedback + "\n\n" : "") + `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
 
   // Parallel-and-compare: run 3 models from different lineages for the BOM
   // skeleton, then use a judge to select the best. Falls back to the existing

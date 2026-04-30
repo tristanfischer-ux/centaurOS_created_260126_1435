@@ -57,6 +57,7 @@ import type {
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import type { Database } from "@/types/database.types"
 import { extractStageSection, extractConstraintAnchors, compressReferenceDossier } from "@/lib/reference-dossier"
+import { getCouncilFeedbackForStage } from "@/lib/forge-v2/stage-scoring"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -591,6 +592,7 @@ async function runFangReviewInternal(
             })()
 
             // 7. Invoke the existing specialist-review engine.
+            const fangCouncilFeedback = await getCouncilFeedbackForStage(projectId, "running_fang_reviews")
             const reviewRequest = {
                 projectId,
                 moduleId,
@@ -603,6 +605,7 @@ async function runFangReviewInternal(
                 referenceDossierContext: fangDossierContext,
                 matchedSuppliersContext,
                 applicableStandardsContext,
+                councilFeedback: fangCouncilFeedback ?? undefined,
             }
             const reviewResult = await requestSpecialistReview(reviewRequest, trusted)
 

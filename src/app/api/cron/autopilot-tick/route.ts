@@ -83,6 +83,8 @@ import {
     shouldScoreStage,
     conveneDiagnosticCouncil,
     loadStageDataForCouncil,
+    getScoringAttemptCount,
+    MAX_SCORING_ATTEMPTS,
 } from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
@@ -403,56 +405,106 @@ async function tickOnce(request: Request): Promise<TickResult> {
             }
             // ── end Quality Gate hook ────────────────────────────────────
 
-            // ── Stage Scoring + Foundry Cohort Gate ────────────────────────
+            // ── Stage Scoring + Council Auto-Fix Loop + Foundry Cohort Gate ──
             // Score the stage output via LLM rubric. ALL projects in the
             // foundry must score ≥8/10 before ANY advances. This is the
             // non-negotiable quality gate Tristan corrected 3 times 2026-04-30.
+            //
+            // CLOSED LOOP (2026-04-30):
+            //   1. Score fails (<8/10) → await 6-model council → store diagnosis
+            //   2. Supersede the done tracking row → next tick re-fires the stage
+            //   3. Specialist reads council_diagnosis from autopilot_state as
+            //      additional context on re-run
+            //   4. Re-score → loop until pass or max attempts exhausted
             if (shouldScoreStage(stage as AutopilotStage)) {
                 const existingScores = (state as AutopilotState & { stage_scores?: Record<string, { passed: boolean }> }).stage_scores
                 const alreadyScored = existingScores?.[stage]?.passed
 
                 if (!alreadyScored) {
+                    // Check if we've exhausted scoring attempts
+                    const attemptCount = getScoringAttemptCount(
+                        state as unknown as Record<string, unknown>,
+                        stage,
+                    )
+                    if (attemptCount >= MAX_SCORING_ATTEMPTS) {
+                        console.error(
+                            `[autopilot-tick] project=${project.id} stage=${stage} exhausted ${MAX_SCORING_ATTEMPTS} scoring attempts — marking stuck`,
+                        )
+                        await recordFailure(
+                            project.id,
+                            stage,
+                            `Stage quality gate exhausted ${MAX_SCORING_ATTEMPTS} attempts without reaching 8/10 threshold`,
+                        )
+                        details.push({
+                            projectId: project.id,
+                            stage,
+                            action: "terminal_fail",
+                            ok: false,
+                            reason: `scoring exhausted: ${attemptCount}/${MAX_SCORING_ATTEMPTS} attempts`,
+                        })
+                        failed++
+                        continue
+                    }
+
                     const scoreResult = await scoreStageOutput(project.id, stage as AutopilotStage)
                     if (scoreResult) {
                         await storeStageScore(project.id, stage as AutopilotStage, scoreResult)
                         console.info(
-                            `[autopilot-tick] scored project=${project.id} stage=${stage} composite=${scoreResult.composite} passed=${scoreResult.passed}`,
+                            `[autopilot-tick] scored project=${project.id} stage=${stage} ` +
+                                `composite=${scoreResult.composite} passed=${scoreResult.passed} ` +
+                                `attempt=${attemptCount + 1}/${MAX_SCORING_ATTEMPTS}`,
                         )
                         if (!scoreResult.passed) {
-                            // Auto-convene diagnostic council for any project scoring < 8/10.
-                            // Fire-and-forget — don't await; the project stays in gate_hold
-                            // and the council result lands in autopilot_state.council_diagnosis
-                            // for the next tick / human review.
-                            loadStageDataForCouncil(project.id, stage as AutopilotStage)
-                                .then((stageData) =>
-                                    conveneDiagnosticCouncil(
-                                        project.id,
-                                        stage as AutopilotStage,
-                                        scoreResult,
-                                        stageData,
-                                    ),
+                            // ── Council auto-fix loop (AWAITED, not fire-and-forget) ──
+                            // 1. Convene 6-model council and WAIT for diagnosis
+                            // 2. Store diagnosis in autopilot_state.council_diagnosis
+                            // 3. Supersede the current done tracking row so next tick re-fires
+                            // 4. On re-fire, specialist reads council_diagnosis as context
+                            try {
+                                const stageData = await loadStageDataForCouncil(
+                                    project.id,
+                                    stage as AutopilotStage,
                                 )
-                                .then((diagnosis) => {
-                                    console.info(
-                                        `[autopilot-tick] council complete for project=${project.id} stage=${stage} ` +
-                                            `consensusFindings=${diagnosis.consensusFindings.length} ` +
-                                            `fixes=${diagnosis.consensusFixes.length}: ` +
-                                            diagnosis.consensusFindings.slice(0, 2).join(" | "),
-                                    )
-                                })
-                                .catch((councilErr) => {
-                                    console.warn(
-                                        `[autopilot-tick] council failed for project=${project.id} stage=${stage}:`,
-                                        councilErr instanceof Error ? councilErr.message : councilErr,
-                                    )
-                                })
+                                const diagnosis = await conveneDiagnosticCouncil(
+                                    project.id,
+                                    stage as AutopilotStage,
+                                    scoreResult,
+                                    stageData,
+                                )
+                                console.info(
+                                    `[autopilot-tick] council complete for project=${project.id} stage=${stage} ` +
+                                        `consensusFindings=${diagnosis.consensusFindings.length} ` +
+                                        `fixes=${diagnosis.consensusFixes.length}: ` +
+                                        diagnosis.consensusFindings.slice(0, 2).join(" | "),
+                                )
+
+                                // Supersede the done tracking row so next tick re-fires this stage
+                                await admin
+                                    .from("pipeline_runs")
+                                    .update({
+                                        status: "failed",
+                                        error_code: "COUNCIL_SUPERSEDED",
+                                        error_message: `Scored ${scoreResult.composite}/10 < 8.0 — council diagnosed, re-running (attempt ${attemptCount + 1})`,
+                                        finished_at: new Date().toISOString(),
+                                    } as never)
+                                    .eq("id", trackingRow.id)
+
+                                console.info(
+                                    `[autopilot-tick] superseded tracking row for project=${project.id} stage=${stage} — will re-fire on next tick with council context`,
+                                )
+                            } catch (councilErr) {
+                                console.warn(
+                                    `[autopilot-tick] council failed for project=${project.id} stage=${stage}:`,
+                                    councilErr instanceof Error ? councilErr.message : councilErr,
+                                )
+                            }
 
                             details.push({
                                 projectId: project.id,
                                 stage,
                                 action: "skip_running" as TickAction,
                                 ok: false,
-                                reason: `stage scoring: composite ${scoreResult.composite}/10 < 8.0 threshold — council convened, holding at gate`,
+                                reason: `stage scoring: composite ${scoreResult.composite}/10 < 8.0 threshold — council diagnosed, tracking row superseded for re-run (attempt ${attemptCount + 1}/${MAX_SCORING_ATTEMPTS})`,
                             })
                             skipped++
                             continue
@@ -484,7 +536,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     }
                 }
             }
-            // ── end Stage Scoring + Foundry Cohort Gate ────────────────────
+            // ── end Stage Scoring + Council Auto-Fix Loop + Foundry Cohort Gate ──
 
             if (config.nextStage === "done") {
                 await markDone(project.id, stage)

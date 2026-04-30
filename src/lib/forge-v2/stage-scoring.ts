@@ -47,6 +47,15 @@ export interface StageScoreResult {
     scored_at: string
 }
 
+export interface StageScoreHistory {
+    iterations: StageScoreResult[]
+    composite: number
+    passed: boolean
+    latest_scored_at: string
+}
+
+const MAX_SCORING_ATTEMPTS = 5
+
 // ── Per-stage rubric definitions ──────────────────────────────────────────
 
 const RUBRICS: Partial<Record<AutopilotStage, StageRubric>> = {
@@ -375,8 +384,22 @@ export async function storeStageScore(
     const current = project?.autopilot_state as Record<string, unknown> | null
     if (!current) return
 
-    const existingScores = (current.stage_scores ?? {}) as Record<string, StageScoreResult>
-    existingScores[stage] = result
+    const existingScores = (current.stage_scores ?? {}) as Record<string, StageScoreHistory>
+    const existing = existingScores[stage]
+
+    if (existing && existing.iterations) {
+        existing.iterations.push(result)
+        existing.composite = result.composite
+        existing.passed = result.passed
+        existing.latest_scored_at = result.scored_at
+    } else {
+        existingScores[stage] = {
+            iterations: [result],
+            composite: result.composite,
+            passed: result.passed,
+            latest_scored_at: result.scored_at,
+        }
+    }
 
     await admin
         .from("cad_lab_projects")
@@ -387,6 +410,76 @@ export async function storeStageScore(
             },
         } as unknown as never)
         .eq("id", projectId)
+}
+
+/**
+ * Get the number of scoring iterations for a stage.
+ */
+export function getScoringAttemptCount(
+    state: Record<string, unknown>,
+    stage: string,
+): number {
+    const stageScores = state.stage_scores as Record<string, StageScoreHistory> | undefined
+    const history = stageScores?.[stage]
+    if (!history?.iterations) return 0
+    return history.iterations.length
+}
+
+export { MAX_SCORING_ATTEMPTS }
+
+/**
+ * Build a council feedback context string for a specialist to incorporate
+ * on re-run. Returns null if no relevant council diagnosis exists.
+ */
+export async function getCouncilFeedbackForStage(
+    projectId: string,
+    stage: AutopilotStage,
+): Promise<string | null> {
+    const admin = createAdminClient()
+    const { data } = await admin
+        .from("cad_lab_projects")
+        .select("autopilot_state")
+        .eq("id", projectId)
+        .maybeSingle()
+
+    const state = data?.autopilot_state as Record<string, unknown> | null
+    if (!state) return null
+
+    const diagnosis = state.council_diagnosis as CouncilDiagnosis | null
+    if (!diagnosis) return null
+    if (diagnosis.stage !== stage) return null
+
+    const findings = diagnosis.consensusFindings
+    const fixes = diagnosis.consensusFixes
+
+    if (!findings.length && !fixes.length) return null
+
+    const attemptCount = getScoringAttemptCount(state, stage)
+
+    let ctx = `\n\n=== QUALITY GATE FEEDBACK (attempt ${attemptCount + 1}) ===\n`
+    ctx += `Previous attempt scored ${diagnosis.composite}/10 (threshold: 8.0).\n`
+    ctx += `A diagnostic council of 6 independent models identified these issues:\n\n`
+
+    if (findings.length) {
+        ctx += `ISSUES FOUND:\n`
+        for (const f of findings) {
+            ctx += `- ${f}\n`
+        }
+        ctx += `\n`
+    }
+
+    if (fixes.length) {
+        ctx += `REQUIRED FIXES:\n`
+        for (const f of fixes) {
+            ctx += `- ${f}\n`
+        }
+        ctx += `\n`
+    }
+
+    ctx += `Address ALL of these issues in your response. The quality gate will re-score your output.\n`
+    ctx += `=== END QUALITY GATE FEEDBACK ===\n`
+
+    return ctx
 }
 
 // ── Foundry-wide cohort gate ──────────────────────────────────────────────

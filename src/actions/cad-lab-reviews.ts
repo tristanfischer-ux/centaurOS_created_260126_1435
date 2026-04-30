@@ -171,6 +171,7 @@ export interface ReviewRequest {
      * Non-fatal — if absent the review still runs without standards grounding.
      */
     applicableStandardsContext?: string
+    councilFeedback?: string
 }
 
 export type ReviewResult =
@@ -391,9 +392,10 @@ ${reviewContext}${assemblyNotesInstructions}${refDossierBlock}`
         } catch (groundingErr) {
             console.warn("[CAD-REVIEWS] DB grounding failed (non-fatal):", groundingErr instanceof Error ? groundingErr.message : groundingErr)
         }
-        const groundedSystemPrompt = fangGroundingSection
+        const councilBlock = req.councilFeedback ? "\n\n" + req.councilFeedback : ""
+        const groundedSystemPrompt = (fangGroundingSection
             ? systemPrompt + "\n\n" + fangGroundingSection
-            : systemPrompt
+            : systemPrompt) + councilBlock
 
         // Route selection: parallel-and-compare (default) → OpenRouter single model → callOpenAI fallback.
         // The parallel-and-compare path runs 3 models from different lineages (Qwen 3 235B,
