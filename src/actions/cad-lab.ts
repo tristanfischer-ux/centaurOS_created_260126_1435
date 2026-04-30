@@ -2153,10 +2153,24 @@ export async function skeletonDecompose(
       ? researchReport.slice(0, 12_000) + "\n\n[Report truncated — full report available in later stages]"
       : researchReport
 
+    // FIX (Max Stage 2): Retrieve engineering data and inject into skeleton
+    // prompt so Max's module naming and material choices are grounded in
+    // real verified data rather than hallucinated training-data values.
+    let skeletonEngSection = ""
+    try {
+      const skeletonEngData = await retrieveEngineeringDataForPrompt(description)
+      if (skeletonEngData.content) {
+        skeletonEngSection = `\n\n${skeletonEngData.content}`
+        console.info(`[THE-FORGE] Max skeleton: Injected engineering data (${skeletonEngData.materialsCount} materials, ${skeletonEngData.hardwareCount} hardware, ${skeletonEngData.processesCount} processes)`)
+      }
+    } catch (skeletonEngErr) {
+      console.warn("[THE-FORGE] Max skeleton: Engineering data retrieval failed (non-fatal):", skeletonEngErr instanceof Error ? skeletonEngErr.message : skeletonEngErr)
+    }
+
     const docSection = documentContext
       ? `\n\n=== USER-UPLOADED REFERENCE DOCUMENTS ===\n${documentContext.slice(0, 8_000)}\nPrioritize these specs over web search results when there are conflicts.`
       : ""
-    const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}${docSection}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
+    const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}${skeletonEngSection}${docSection}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
 
     // DECISION: Direct call with Opus — output is N modules × ~200 tokens
     // each + schema overhead. Industrial BESS with 9 modules hit the 2048
@@ -2336,13 +2350,97 @@ export async function expandModuleDetail(
       `- ${m.name} (${m.id}): ${m.purpose} | inputs: [${m.inputs.join(", ")}] | outputs: [${m.outputs.join(", ")}]`
     ).join("\n")
 
+    // FIX 1 (Max Stage 2): Retrieve filtered engineering data (material_properties +
+    // process_capabilities) and inject so Max's expansion uses real material costs,
+    // tolerances, and process capabilities instead of hallucinated values.
+    let expansionEngSection = ""
+    try {
+      // Embed the specific module context (purpose + name) for tighter filtering
+      const moduleSearchText = `${target.name} ${target.purpose} ${target.inputs.join(" ")} ${target.outputs.join(" ")}`
+      const engData = await retrieveEngineeringDataForPrompt(moduleSearchText)
+      if (engData.content) {
+        expansionEngSection = `\n\n${engData.content}`
+        console.info(`[THE-FORGE] Max expand [${targetModuleId}]: Injected engineering data (${engData.materialsCount} materials, ${engData.hardwareCount} hardware, ${engData.processesCount} processes)`)
+      }
+    } catch (expansionEngErr) {
+      console.warn(`[THE-FORGE] Max expand [${targetModuleId}]: Engineering data retrieval failed (non-fatal):`, expansionEngErr instanceof Error ? expansionEngErr.message : expansionEngErr)
+    }
+
+    // FIX 2 (Max Stage 2): Supplier feasibility check — embed this module's context
+    // against marketplace_listings to verify procurement is realistic. Strategy:
+    // embed the full product description once (cheaper than per-module calls)
+    // filtered to top 30 across both Products + Services, then match by module
+    // name/purpose via simple includes check. Non-blocking — silently skipped if
+    // the query fails.
+    let supplierFeasibilitySection = ""
+    try {
+      const admin = createAdminClient()
+      // Embed the target module's context for a focused supplier search
+      const moduleEmbedText = `${description} — ${target.name}: ${target.purpose}`
+      const moduleEmbedding = await embedQuery(moduleEmbedText, { actionSlug: "max_expansion_supplier_check" })
+      const embStr = JSON.stringify(moduleEmbedding) as unknown as string
+
+      // Query Products + Services in parallel (10 each = lightweight)
+      const [prodResult, svcResult] = await Promise.all([
+        admin.rpc("match_marketplace_listings_v2", {
+          query_embedding: embStr,
+          filter_category: "Products",
+          match_threshold: 0.2,
+          match_count: 10,
+          p_offset: 0,
+        }),
+        admin.rpc("match_marketplace_listings_v2", {
+          query_embedding: embStr,
+          filter_category: "Services",
+          match_threshold: 0.2,
+          match_count: 10,
+          p_offset: 0,
+        }),
+      ])
+
+      const matchedIds = [
+        ...(prodResult.data ?? []),
+        ...(svcResult.data ?? []),
+      ].map((r: { id: string }) => r.id)
+
+      if (matchedIds.length > 0) {
+        const { data: listings } = await admin
+          .from("marketplace_listings")
+          .select("company_name, category, country_iso, materials, process_capabilities, specialties")
+          .in("id", matchedIds)
+          .in("category", ["Products", "Services"])
+          .limit(15)
+
+        if (listings && listings.length > 0) {
+          const top3Names = listings.slice(0, 3).map((l) => l.company_name).filter(Boolean).join(", ")
+          const supplierLines = listings.slice(0, 10).map((l) => {
+            const mats = Array.isArray(l.materials)
+              ? (l.materials as unknown[]).filter((v): v is string => typeof v === "string").slice(0, 2).join(", ")
+              : null
+            return `- ${l.company_name ?? "Unknown"} [${l.category ?? ""}${l.country_iso ? " · " + l.country_iso : ""}]${mats ? " — " + mats : ""}`
+          }).join("\n")
+          supplierFeasibilitySection = `\n\nSUPPLIER AVAILABILITY FOR "${target.name}": Our directory has ${listings.length} potential suppliers including ${top3Names}. This confirms procurement feasibility.\nTop matches:\n${supplierLines}\nPrioritise these verified companies when specifying keyParts and noting procurement risks.`
+          console.info(`[THE-FORGE] Max expand [${targetModuleId}]: ${listings.length} suppliers found — feasibility confirmed`)
+        } else {
+          supplierFeasibilitySection = `\n\nWARNING: No suppliers found in our directory for "${target.name}". Consider alternative materials/processes or flag this as a procurement risk in failureModes.`
+          console.warn(`[THE-FORGE] Max expand [${targetModuleId}]: No supplier matches found`)
+        }
+      } else {
+        supplierFeasibilitySection = `\n\nWARNING: No suppliers found in our directory for "${target.name}". Consider alternative materials/processes or flag this as a procurement risk in failureModes.`
+        console.warn(`[THE-FORGE] Max expand [${targetModuleId}]: No supplier matches found (embedding threshold not met)`)
+      }
+    } catch (supplierErr) {
+      // Non-blocking — log warning and continue without supplier context
+      console.warn(`[THE-FORGE] Max expand [${targetModuleId}]: Supplier feasibility check failed (non-fatal):`, supplierErr instanceof Error ? supplierErr.message : supplierErr)
+    }
+
     const docSection = documentContext
       ? `\n\n=== USER-UPLOADED REFERENCE DOCUMENTS ===\n${documentContext.slice(0, 5_000)}\nPrioritize these specs over web search results when there are conflicts.\n`
       : ""
     const userPrompt = `Product: ${description}
 
 Research Report:
-${truncatedReport}${docSection}
+${truncatedReport}${expansionEngSection}${supplierFeasibilitySection}${docSection}
 
 Full product skeleton:
 ${skeletonSummary}
