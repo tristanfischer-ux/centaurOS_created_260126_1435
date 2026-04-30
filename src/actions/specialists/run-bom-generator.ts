@@ -77,6 +77,7 @@ import {
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 
 import { checkAILimit } from "@/lib/ai/limit-check"
+import { extractStageSection, extractConstraintAnchors, compressReferenceDossier } from "@/lib/reference-dossier"
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
 import type {
@@ -188,7 +189,7 @@ async function runBomGeneratorInternal(
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
             .select(
-                "id, foundry_id, subject, modules, bom_generation_state",
+                "id, foundry_id, subject, modules, bom_generation_state, reference_dossier",
             )
             .eq("id", projectId)
             .maybeSingle()
@@ -214,6 +215,27 @@ async function runBomGeneratorInternal(
                 error: "Project not found",
                 errorCode: "PROJECT_FORBIDDEN",
             }
+        }
+
+        // Prepare Stage 0 reference dossier context for BOM generation.
+        // The stages (runBomSkeletonStage, runBomBatchStage) load their own
+        // project data via loadBomGenerationState, which also fetches
+        // reference_dossier and computes the context. This computation here
+        // is available for any future direct BOM function calls from this
+        // orchestrator.
+        const bomDossierContext = (() => {
+          const raw = (project as unknown as { reference_dossier?: unknown }).reference_dossier
+          if (typeof raw !== "string" || raw.length === 0) return undefined
+          const stageSection = extractStageSection(raw, "bom")
+          const anchors = extractConstraintAnchors(raw)
+          if (stageSection && anchors) return `${stageSection}\n\n${anchors}`
+          if (stageSection) return stageSection
+          return compressReferenceDossier(raw)
+        })()
+        if (bomDossierContext) {
+          console.info(
+            `[run-bom-generator] reference dossier context prepared (${bomDossierContext.length} chars)`,
+          )
         }
 
         // 2. Precondition: need Max's modules.
