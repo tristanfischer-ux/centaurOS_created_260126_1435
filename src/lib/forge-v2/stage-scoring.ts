@@ -14,7 +14,8 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { callOpenAI } from "@/lib/cad-lab/api-helpers"
+import { callOpenAI, callGemini } from "@/lib/cad-lab/api-helpers"
+import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
 // ── Rubric types ──────────────────────────────────────────────────────────
@@ -515,52 +516,119 @@ ${stageData.slice(0, 6000)}
 
 What specific changes to the AI pipeline (prompts, data extraction, validation logic) would fix these quality issues?`
 
-    // 3-model council — gpt-5.5 (frontier) + gpt-4.1-mini (×2 for independent perspectives)
-    const COUNCIL_MODELS = [
-        { model: "gpt-5.5", label: "frontier" },
-        { model: "gpt-4.1-mini", label: "mini-a" },
-        { model: "gpt-4.1-mini", label: "mini-b" },
-    ]
-
-    const councilCalls = COUNCIL_MODELS.map(async ({ model, label }): Promise<CouncilFinding> => {
-        try {
-            const { text } = await callOpenAI(
-                systemPrompt,
-                userPrompt,
-                model,
-                4096,
-                60_000,
-            )
-
-            const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-            const parsed = JSON.parse(cleaned) as {
-                findings: string[]
-                suggested_fixes: string[]
-            }
-
-            return {
-                model: `${model}:${label}`,
-                findings: Array.isArray(parsed.findings) ? parsed.findings : [],
-                suggestedFixes: Array.isArray(parsed.suggested_fixes) ? parsed.suggested_fixes : [],
-                rawResponse: text.slice(0, 2000),
-            }
-        } catch (err) {
-            console.warn(
-                `[stage-scoring] council model ${model}:${label} failed for project=${projectId} stage=${stage}:`,
-                err instanceof Error ? err.message : err,
-            )
-            return {
-                model: `${model}:${label}`,
-                findings: [],
-                suggestedFixes: [],
-                rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}`,
-            }
+    // 6-model multi-lineage diagnostic council (GPT-5.5, Gemini, DeepSeek, Qwen, Kimi, GLM)
+    async function callOpenAICompat(
+        baseURL: string,
+        apiKeyEnv: string,
+        modelId: string,
+        system: string,
+        user: string,
+    ): Promise<string> {
+        const apiKey = process.env[apiKeyEnv]?.trim()
+        if (!apiKey) throw new Error(`${apiKeyEnv} not configured`)
+        const response = await fetchWithTimeout(
+            `${baseURL}/chat/completions`,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                body: JSON.stringify({
+                    model: modelId,
+                    max_tokens: 16384,
+                    temperature: 0.2,
+                    messages: [
+                        { role: "system", content: system },
+                        { role: "user", content: user },
+                    ],
+                }),
+            },
+            120_000,
+        )
+        if (!response.ok) {
+            const errText = await response.text()
+            throw new Error(`${modelId} API error (${response.status}): ${errText.slice(0, 300)}`)
         }
-    })
+        const data = await response.json()
+        return data.choices?.[0]?.message?.content ?? ""
+    }
+
+    const councilCalls: Promise<CouncilFinding>[] = [
+        // 1. GPT-5.5 (OpenAI — US)
+        (async (): Promise<CouncilFinding> => {
+            try {
+                const { text } = await callOpenAI(systemPrompt, userPrompt, "gpt-5.5", 16384, 120_000)
+                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                return { model: "gpt-5.5:openai", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
+            } catch (err) {
+                console.warn(`[stage-scoring] council gpt-5.5 failed:`, err instanceof Error ? err.message : err)
+                return { model: "gpt-5.5:openai", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
+            }
+        })(),
+        // 2. Gemini 3.1 Pro (Google — US)
+        (async (): Promise<CouncilFinding> => {
+            try {
+                const { text } = await callGemini(systemPrompt, userPrompt, "gemini-3.1-pro-preview", 16384, 120_000)
+                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                return { model: "gemini-3.1-pro:google", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
+            } catch (err) {
+                console.warn(`[stage-scoring] council gemini failed:`, err instanceof Error ? err.message : err)
+                return { model: "gemini-3.1-pro:google", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
+            }
+        })(),
+        // 3. DeepSeek V4-Pro (DeepSeek — China)
+        (async (): Promise<CouncilFinding> => {
+            try {
+                const text = await callOpenAICompat("https://api.deepseek.com/v1", "DEEPSEEK_API_KEY", "deepseek-reasoner", systemPrompt, userPrompt)
+                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                return { model: "deepseek-v4-pro:deepseek", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
+            } catch (err) {
+                console.warn(`[stage-scoring] council deepseek failed:`, err instanceof Error ? err.message : err)
+                return { model: "deepseek-v4-pro:deepseek", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
+            }
+        })(),
+        // 4. Qwen 3 235B (Alibaba — China)
+        (async (): Promise<CouncilFinding> => {
+            try {
+                const text = await callOpenAICompat("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "QWEN_API_KEY", "qwen3-235b-a22b", systemPrompt, userPrompt)
+                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                return { model: "qwen3-235b:alibaba", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
+            } catch (err) {
+                console.warn(`[stage-scoring] council qwen failed:`, err instanceof Error ? err.message : err)
+                return { model: "qwen3-235b:alibaba", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
+            }
+        })(),
+        // 5. Kimi K2.6 (Moonshot — China)
+        (async (): Promise<CouncilFinding> => {
+            try {
+                const text = await callOpenAICompat("https://api.moonshot.cn/v1", "MOONSHOT_API_KEY", "kimi-k2.6", systemPrompt, userPrompt)
+                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                return { model: "kimi-k2.6:moonshot", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
+            } catch (err) {
+                console.warn(`[stage-scoring] council kimi failed:`, err instanceof Error ? err.message : err)
+                return { model: "kimi-k2.6:moonshot", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
+            }
+        })(),
+        // 6. GLM-5.1 (Zhipu — China)
+        (async (): Promise<CouncilFinding> => {
+            try {
+                const text = await callOpenAICompat("https://open.bigmodel.cn/api/paas/v4", "GLM_API_KEY", "glm-5.1", systemPrompt, userPrompt)
+                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                return { model: "glm-5.1:zhipu", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
+            } catch (err) {
+                console.warn(`[stage-scoring] council glm failed:`, err instanceof Error ? err.message : err)
+                return { model: "glm-5.1:zhipu", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
+            }
+        })(),
+    ]
 
     const individualFindings = await Promise.all(councilCalls)
 
-    // Consensus: findings/fixes mentioned by 2+ models (fuzzy: normalise + substring match)
+    // Consensus: findings/fixes mentioned by 3+ models (fuzzy: normalise + substring match)
     function normalise(s: string): string {
         return s.toLowerCase().replace(/[^a-z0-9 ]/g, " ").replace(/\s+/g, " ").trim()
     }
@@ -579,13 +647,13 @@ What specific changes to the AI pipeline (prompts, data extraction, validation l
     const allFixes = individualFindings.flatMap((r) => r.suggestedFixes)
 
     const consensusFindings = [...new Set(allFindings)].filter(
-        (f) => countAgreements(f, individualFindings, "findings") >= 2,
+        (f) => countAgreements(f, individualFindings, "findings") >= 3,
     )
     const consensusFixes = [...new Set(allFixes)].filter(
-        (f) => countAgreements(f, individualFindings, "suggestedFixes") >= 2,
+        (f) => countAgreements(f, individualFindings, "suggestedFixes") >= 3,
     )
 
-    // Fall back to all findings if consensus is empty (council size is small)
+    // Fall back to all findings if consensus is empty
     const finalConsensusFindings = consensusFindings.length > 0 ? consensusFindings : allFindings.slice(0, 6)
     const finalConsensusFixes = consensusFixes.length > 0 ? consensusFixes : allFixes.slice(0, 6)
 
