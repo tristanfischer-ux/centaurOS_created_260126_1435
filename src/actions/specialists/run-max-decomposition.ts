@@ -249,7 +249,7 @@ async function runMaxDecompositionInternal(
             | { report?: unknown; designBrief?: unknown }
             | null
         const report =
-            research && typeof research.report === "string" ? research.report : ""
+            research && typeof research.report === "string" ? research.report.slice(0, 12000) : ""
         const description =
             typeof project.subject === "string" ? project.subject.trim() : ""
 

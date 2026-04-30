@@ -30,6 +30,7 @@ import {
     MID_STRUCTURED_MODEL,
     CHEAP_PROSE_MODEL,
 } from "@/lib/ai/openrouter"
+import { callParallelAndCompare } from "@/lib/forge-v2/parallel-llm"
 import {
     computeFeasibilityVerdict,
     type FeasibilityVerdict,
@@ -252,41 +253,36 @@ export async function runProofreaderBackground(
 
     const userPrompt = (councilFeedback ? councilFeedback + "\n\n" : "") + sections
 
-    // Try each model in priority order. If V4-Pro rate-limits or
-    // 5xx-fails, fall through to Gemini 2.5 Flash. The proofreader is
-    // non-blocking (the fire-endpoint always advances the stage), but
-    // we still want findings when possible. Returning silently with
-    // `result=null` collapses to an empty findings array in the column.
-    let result: Awaited<ReturnType<typeof callOpenRouter>> | null = null
-    let lastError: string | null = null
-    for (const model of PROOFREADER_MODELS) {
-        const attempt = await callOpenRouter({
-            model,
-            system: systemPrompt,
-            prompt: userPrompt,
-            maxTokens: 16384,
-            temperature: 0.1,
-            timeoutMs: 90_000,
-        })
-        if (attempt.ok) {
-            result = attempt
-            break
-        }
-        lastError = attempt.error
-        if (!attempt.retriable) {
-            // Hard failure (auth, bad request, etc.) — try next model.
-            continue
-        }
-        // Retriable (429 / 5xx) — fall through to next model.
-        console.warn(
-            `[run-proofreader] ${model} retriable error: ${attempt.error} — falling back`,
+    // Run 3 models in parallel (GPT-5.5 + DeepSeek V4-Pro + Gemini 3.1 Pro)
+    // and use the judge to pick the best proofreading output. This replaces
+    // the serial V4-Pro → Gemini fallback loop — parallel execution is faster
+    // and lineage diversity catches different classes of hallucinated findings.
+    let parallelResult: { text: string; tokensIn: number; tokensOut: number } | null = null
+    let parallelError: string | null = null
+    try {
+        parallelResult = await callParallelAndCompare(
+            systemPrompt,
+            userPrompt,
+            "proofreading",
+            "Most thorough fact-check: catches the most genuine contradictions, hallucinated standards, and math errors without false positives. Prefers outputs with well-calibrated severity (few over-classified blockers, no under-classified cosmetics).",
+            projectId,
         )
+    } catch (err) {
+        parallelError = err instanceof Error ? err.message : String(err)
+        console.warn(`[run-proofreader] callParallelAndCompare failed: ${parallelError}`)
     }
-    if (!result || !result.ok) {
+    if (!parallelResult) {
         return {
             ok: false,
-            error: `All proofreader models failed: ${lastError ?? "unknown"}`,
+            error: `Proofreader parallel-and-compare failed: ${parallelError ?? "unknown"}`,
         }
+    }
+    // Wrap into the shape downstream parsing expects (mirrors callOpenRouter result shape).
+    const result = {
+        text: parallelResult.text,
+        inputTokens: parallelResult.tokensIn,
+        outputTokens: parallelResult.tokensOut,
+        modelUsed: "parallel-and-compare (proofreading triad)",
     }
 
     let findings: ProofreadFinding[] = []

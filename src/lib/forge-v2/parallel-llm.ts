@@ -162,6 +162,12 @@ export const STAGE_MODEL_TRIADS: Record<string, ModelConfig[]> = {
         makeDeepSeekModel(),
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
     ],
+    // Proofreading (synthesis + fact-check) — same triad as Chase/Max/Finn
+    proofreading: [
+        makeOpenAIModel("gpt-5.5", "GPT-5.5"),
+        makeDeepSeekModel(),
+        makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
+    ],
 }
 
 // ── DB grounding tables per stage ─────────────────────────────────────
@@ -178,6 +184,8 @@ export const STAGE_DB_GROUNDING: Record<string, string[]> = {
     waiting_bom: ["material_properties", "marketplace_listings", "process_capabilities"],
     waiting_finn: ["marketplace_listings"],
     running_fang_reviews: ["material_properties", "design_standards", "process_capabilities", "marketplace_listings"],
+    // Proofreading reads from the project record directly — no additional table grounding needed
+    proofreading: [],
 }
 
 // ── DB grounding data loader ──────────────────────────────────────────
@@ -387,13 +395,16 @@ Be decisive. Pick one winner. Only synthesise if the combination is clearly bett
             judgeUsed: true,
         }
     } catch (judgeErr) {
-        // Judge failed — fall back to first successful output
-        const fallback = successfulOutputs[0]
-        console.warn(`[parallel-llm] Judge failed, falling back to ${fallback.model}:`, judgeErr instanceof Error ? judgeErr.message : judgeErr)
+        // Judge failed — fall back to the longest response among successful outputs
+        // (longest = most thorough; better than defaulting to the first arbitrarily)
+        const fallback = successfulOutputs.reduce((best, current) =>
+            current.output.length > best.output.length ? current : best,
+        )
+        console.log(`[parallel-llm] Judge failed for stage ${stage}; falling back to longest response from ${fallback.model} (${fallback.output.length} chars). Judge error: ${judgeErr instanceof Error ? judgeErr.message : judgeErr}`)
         return {
             bestOutput: fallback.output,
             winnerModel: fallback.model,
-            selectionReason: `Judge model failed; defaulting to first successful output from ${fallback.model}.`,
+            selectionReason: `Judge model failed; selected longest response (${fallback.output.length} chars) from ${fallback.model} as most thorough fallback.`,
             allOutputs: allOutputs.map((o) => ({ model: o.model, output: o.output.slice(0, 500), error: o.error })),
             judgeUsed: false,
         }
