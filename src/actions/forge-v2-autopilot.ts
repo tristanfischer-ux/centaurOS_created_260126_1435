@@ -52,6 +52,7 @@
 
 import { withAuth } from "@/lib/server-action-utils"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { resetToFounderBrief } from "@/lib/forge-v2/stage-scoring"
 
 // ─── Shape ─────────────────────────────────────────────────────────────
 
@@ -346,6 +347,9 @@ export async function startAutopilot(
                 )
             }
         }
+
+        // ── 1c. Wipe all generated content — start fresh from founder's original brief ──
+        await resetToFounderBrief(projectId)
 
         // ── 2. Seed the initial state ────────────────────────────────
         const startedAt = new Date().toISOString()
