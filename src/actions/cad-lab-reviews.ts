@@ -47,26 +47,17 @@ import {
 } from "@/lib/agent-memory"
 import type { ConversationMessage } from "@/lib/agent-memory"
 import { withLlmPermit } from "@/lib/ai/llm-permit"
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-// Loop 8 cost cut (2026-04-26 — Tristan flagged "very, very, very expensive"):
-// Drop fang.review from claude-opus-4-7 → claude-sonnet-4-6.
-//
-// Why this is safe: Sonnet 4.6 is already used for QUICK_VERDICT (line ~417)
-// and for Chase + Max in the autopilot pipeline at this quality bar. Every
-// council benchmark sweep this month (forgeos_specialist_model_swap_findings_20260425
-// memory) cleared Sonnet for fang-class structured DFM review. The agents
-// surface even moved past Sonnet to Qwen 3 235B for vp-engineering, but
-// the Qwen swap inside this file would need an Anthropic-SDK → OpenRouter
-// refactor (tool-use streaming has different API surfaces) so we ship the
-// 5× cost cut today and leave the 25× cut for a follow-up.
-//
-// Per-regen impact: 6 projects × 7-9 modules × per-call cost.
-// Opus 4.7 ≈ £0.50/call → ~£25-30/regen on fang alone.
-// Sonnet 4.6 ≈ £0.10/call → ~£5-6/regen on fang alone.
-const REVIEW_MODEL = "claude-sonnet-4-6"
+// Anthropic SDK fully removed 2026-04-30. All review calls now route
+// through callOpenAI (gpt-5.4 for complex reviews, gpt-4.1-mini for
+// quick/lightweight calls). The OpenRouter path for Qwen 3 235B remains
+// as the primary Fang review route via FANG_REVIEW_VIA=openrouter.
+const REVIEW_MODEL = "gpt-5.4"
+const REVIEW_MODEL_LIGHTWEIGHT = "gpt-4.1-mini"
 const MAX_TOOL_LOOPS = 5
 // Loop 7 critique fix A7 (LOOP-7-CRITIQUE.md): reviews were truncating
 // mid-sentence at the 8192 ceiling on every demo. Sample evidence: BESS
@@ -165,8 +156,8 @@ export type ReviewResult =
  * Requests a specialist review of a specific CAD Lab module.
  *
  * @description Loads the module from the project, builds specialist-specific
- * context, calls the Anthropic API with tools enabled (so the specialist can
- * run engineering calculations), parses the structured review, and saves it
+ * context, calls OpenAI/OpenRouter with tool schemas embedded in the prompt
+ * (so the specialist can run engineering calculations), parses the structured review, and saves it
  * back to the project.
  */
 export async function requestSpecialistReview(
@@ -329,28 +320,16 @@ ${reviewContext}${assemblyNotesInstructions}${refDossierBlock}`
             console.warn("[CAD-REVIEWS] Memory bridge failed (non-fatal):", err instanceof Error ? err.message : "Unknown")
         }
 
-        // ── Get tools for this specialist ──
+        // ── Get tools for this specialist (included in prompt as JSON schemas) ──
         const tools = getToolsForSpecialist(req.specialistId)
-        const anthropicTools = tools.map(t => ({
-            name: t.name,
-            description: t.description,
-            input_schema: t.parameters,
-        }))
 
-        // Loop 8 cost cut (2026-04-26 — Tristan flagged "very, very, very
-        // expensive"): when FANG_REVIEW_VIA=openrouter, bypass the
-        // Anthropic SDK + tool-use loop entirely and call OpenRouter once
-        // with qwen/qwen3-235b-a22b. The agents-surface vp-engineering
-        // already routes here per benchmark
+        // Route selection: OpenRouter (Qwen 3 235B, default) or callOpenAI (GPT-5.4 fallback).
+        // The OpenRouter path remains the primary Fang review route per benchmark
         // (forgeos_specialist_model_swap_findings_20260425 memory:
-        // "Qwen 3 235B = best Fang ever measured"). Tools are dropped on
-        // this path — Qwen produces the structured review text directly
-        // and the downstream parseReviewFromMarkdown extracts what we
-        // need. Per-call cost ≈ £0.04 vs ≈ £0.10 on Sonnet vs ≈ £0.50 on
-        // the original Opus. Default route stays "anthropic" until this
-        // is verified end-to-end on a single project.
+        // "Qwen 3 235B = best Fang ever measured").
         const reviewRoute = process.env.FANG_REVIEW_VIA ?? "openrouter"
-        const calculationsPerformedOR: ReviewCalculation[] = []
+        const calculationsPerformed: ReviewCalculation[] = []
+
         if (reviewRoute === "openrouter") {
             const { callOpenRouter } = await import("@/lib/ai/openrouter")
             const userMsg = `Review the module "${targetModule.name}" and provide your structured assessment in the markdown format described above. Engineering claims should be grounded in your domain expertise — show your work in calculations sections.`
@@ -389,7 +368,7 @@ ${reviewContext}${assemblyNotesInstructions}${refDossierBlock}`
                 or.text,
                 req.specialistId,
                 specialist.name,
-                calculationsPerformedOR,
+                calculationsPerformed,
                 Date.now() - startTime,
             )
             try {
@@ -409,117 +388,73 @@ ${reviewContext}${assemblyNotesInstructions}${refDossierBlock}`
             return { review: reviewOR }
         }
 
-        // ── Call Anthropic with tool loop ──
-        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-        if (!apiKey) {
-            return { error: "Anthropic API key not configured" }
-        }
-
-        const Anthropic = (await import("@anthropic-ai/sdk")).default
-        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
-        // function limit. SDK default is 10min + 2 retries, which in a
-        // tool loop can silently blow past the ceiling and return 504 with
-        // no actionable error. 240s + no retries lets us fail fast and
-        // surface the real cause. See forgeos-rules.md R4/R5.
-        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
-// and uses exponential backoff between attempts. With 4 autopilot chains
-// running in parallel and ~9 modules each, the blast hits org-level
-// rate limits; without retries the call fails immediately and the review
-// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
-// transient rate-limit spikes while keeping per-call wall-clock under
-// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
-// where every Fang review failed with "Too many requests" before maxRetries
-// was raised. Total worst-case retry latency: ~30s, still inside timeout.
-const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
-
+        // ── Call OpenAI (GPT-5.4) with tool schemas embedded in prompt ──
+        // DECISION: Tool schemas are serialised into the system prompt as JSON
+        // so the model can reference them and return structured JSON tool-call
+        // requests. Since callOpenAI is text-in/text-out, we execute tools
+        // manually between rounds and feed results back as user messages.
         const toolCtx = { foundryId, specialistId: req.specialistId, userId }
-        const calculationsPerformed: ReviewCalculation[] = []
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const messages: Array<{ role: "user" | "assistant"; content: string | any[] }> = [
-            // Prepend memory history as multi-turn messages for continuity
-            ...memoryHistory.map(m => ({ role: m.role as "user" | "assistant", content: m.content })),
-            {
-                role: "user",
-                content: `Review the module "${targetModule.name}" and provide your structured assessment. Use your tools to verify engineering claims with real calculations and data lookups.`,
-            },
-        ]
+        // Build tool-schema block for the system prompt
+        const toolSchemaBlock = tools.length > 0
+            ? `\n\n## Available Engineering Tools\nYou have access to the following tools. To call a tool, output a JSON block:\n\`\`\`json\n{"tool_calls": [{"name": "<tool_name>", "arguments": {...}}]}\n\`\`\`\n\nTools:\n${tools.map(t => `- **${t.name}**: ${t.description}\n  Parameters: ${JSON.stringify(t.parameters)}`).join("\n")}\n\nAfter you receive tool results, incorporate them into your final review. If you do not need tools, proceed directly with your review.`
+            : ""
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const createParams: any = {
-            model: REVIEW_MODEL,
-            max_tokens: MAX_TOKENS,
-            system: systemPrompt,
-            messages,
-            tools: anthropicTools,
-            tool_choice: { type: "auto" as const },
-        }
+        const fullSystemPrompt = systemPrompt + toolSchemaBlock
 
-        // DECISION: Only use text from the FINAL API response for the review.
-        // Intermediate text (during tool-calling turns) may contain partial
-        // thinking that shouldn't be in the structured review output.
+        // Build conversation with memory history
+        const memoryHistoryBlock = memoryHistory.length > 0
+            ? memoryHistory.map(m => `[${m.role}]: ${m.content}`).join("\n") + "\n\n"
+            : ""
+
+        const userMsg = `${memoryHistoryBlock}Review the module "${targetModule.name}" and provide your structured assessment. Use your tools to verify engineering claims with real calculations and data lookups.`
+
         let finalText = ""
         let loopCount = 0
+        let currentUserMsg = userMsg
 
         while (loopCount <= MAX_TOOL_LOOPS) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const response = await withLlmPermit("anthropic", REVIEW_MODEL, () => client.messages.create(createParams)) as any
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const content: any[] = response.content ?? []
+            const response = await withLlmPermit("openai", REVIEW_MODEL, () =>
+                callOpenAI(fullSystemPrompt, currentUserMsg, REVIEW_MODEL, MAX_TOKENS, 240_000),
+            )
 
-            // Collect text from THIS response
-            let turnText = ""
-            for (const block of content) {
-                if (block.type === "text" && block.text) {
-                    turnText += block.text
-                }
-            }
+            const text = response.text
 
-            // Check for tool calls
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const toolUseBlocks = content.filter((b: any) => b.type === "tool_use")
-            if (toolUseBlocks.length === 0 || loopCount >= MAX_TOOL_LOOPS) {
-                // INTENT: This is the final response — use its text as the review
-                finalText = turnText
+            // Check if the model emitted tool calls as JSON
+            const toolCallMatch = text.match(/```json\s*\n?\s*\{[\s\S]*?"tool_calls"\s*:\s*\[[\s\S]*?\]\s*\}\s*\n?\s*```/)
+            if (!toolCallMatch || loopCount >= MAX_TOOL_LOOPS) {
+                // No tool calls or max loops reached — this is the final review text
+                finalText = text
                 break
             }
 
-            // Execute tool calls in parallel
-            const toolResults = await Promise.all(
-                toolUseBlocks.map(async (toolBlock: { name: string; input?: Record<string, unknown>; id: string }) => {
-                    const result = await executeToolCall(
-                        toolBlock.name,
-                        (toolBlock.input ?? {}) as Record<string, unknown>,
-                        toolCtx,
-                    )
+            // Parse and execute tool calls
+            try {
+                const jsonStr = toolCallMatch[0].replace(/```json\s*\n?/, "").replace(/\n?\s*```$/, "")
+                const parsed = JSON.parse(jsonStr)
+                const toolCalls = parsed.tool_calls as Array<{ name: string; arguments: Record<string, unknown> }>
 
-                    // Track for transparency
-                    calculationsPerformed.push({
-                        tool: toolBlock.name,
-                        description: describeToolCall(toolBlock.name, toolBlock.input),
-                        result: result.slice(0, 200),
-                    })
+                const toolResults = await Promise.all(
+                    toolCalls.map(async (tc) => {
+                        const result = await executeToolCall(tc.name, tc.arguments ?? {}, toolCtx)
+                        calculationsPerformed.push({
+                            tool: tc.name,
+                            description: describeToolCall(tc.name, tc.arguments),
+                            result: result.slice(0, 200),
+                        })
+                        return `Tool "${tc.name}" result: ${result}`
+                    }),
+                )
 
-                    return {
-                        type: "tool_result" as const,
-                        tool_use_id: toolBlock.id,
-                        content: result,
-                    }
-                }),
-            )
-
-            // Append assistant response + tool results
-            messages.push({ role: "assistant", content: response.content })
-            loopCount++
-            const remaining = MAX_TOOL_LOOPS - loopCount
-            messages.push({
-                role: "user",
-                content: [
-                    ...toolResults,
-                    { type: "text", text: `[System: ${remaining} tool call${remaining === 1 ? "" : "s"} remaining]` },
-                ],
-            })
-            createParams.messages = messages
+                loopCount++
+                const remaining = MAX_TOOL_LOOPS - loopCount
+                currentUserMsg = `Tool results:\n${toolResults.join("\n\n")}\n\n[System: ${remaining} tool call${remaining === 1 ? "" : "s"} remaining]\n\nNow continue your review, incorporating the tool results above.`
+            } catch (parseErr) {
+                // Tool call JSON was malformed — treat the full text as the review
+                console.warn("[CAD-REVIEWS] Failed to parse tool call JSON:", parseErr instanceof Error ? parseErr.message : parseErr)
+                finalText = text
+                break
+            }
         }
 
         // ── Parse structured review from markdown ──
@@ -936,28 +871,6 @@ export async function requestDecompositionCheckpoints(
             return { error: "No modules to checkpoint" }
         }
 
-        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-        if (!apiKey) {
-            return { error: "Anthropic API key not configured" }
-        }
-
-        const Anthropic = (await import("@anthropic-ai/sdk")).default
-        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
-        // function limit. SDK default is 10min + 2 retries, which in a
-        // tool loop can silently blow past the ceiling and return 504 with
-        // no actionable error. 240s + no retries lets us fail fast and
-        // surface the real cause. See forgeos-rules.md R4/R5.
-        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
-// and uses exponential backoff between attempts. With 4 autopilot chains
-// running in parallel and ~9 modules each, the blast hits org-level
-// rate limits; without retries the call fails immediately and the review
-// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
-// transient rate-limit spikes while keeping per-call wall-clock under
-// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
-// where every Fang review failed with "Too many requests" before maxRetries
-// was raised. Total worst-case retry latency: ~30s, still inside timeout.
-const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
-
         // Build module summary for the prompt
         const moduleSummary = req.modules.map((m, i) =>
             `${i + 1}. **${m.name}** (id: ${m.id}): ${m.purpose}\n   Key parts: ${m.keyParts.join(", ")}\n   Lead: ${m.leadWeeks}wk | Inputs: ${m.inputs.join(", ")} | Outputs: ${m.outputs.join(", ")}`
@@ -1011,22 +924,19 @@ SUMMARY: <1-2 sentences>
 SUGGESTIONS: <comma-separated list, or "none">
 FLAGGED_MODULES: <comma-separated module IDs needing attention, or "none">`
 
-                // DECISION: Use Sonnet for checkpoints — fast gut-level assessment,
-                // not full Opus review. Saves cost and latency.
-                const response = await await withLlmPermit("anthropic", QUICK_VERDICT_MODEL, () => client.messages.create({
-                    model: QUICK_VERDICT_MODEL,
-                    max_tokens: CHECKPOINT_MAX_TOKENS,
-                    system: systemPrompt,
-                    messages: [{
-                        role: "user",
-                        content: `Assess this module decomposition for "${req.projectSubject}":\n\n${moduleSummary}\n\nResearch context (first 2000 chars):\n${req.researchReport.slice(0, 2000)}`,
-                    }],
-                }))
+                // DECISION: Use gpt-4.1-mini for checkpoints — fast gut-level
+                // assessment, not full review. Saves cost and latency.
+                const response = await withLlmPermit("openai", REVIEW_MODEL_LIGHTWEIGHT, () =>
+                    callOpenAI(
+                        systemPrompt,
+                        `Assess this module decomposition for "${req.projectSubject}":\n\n${moduleSummary}\n\nResearch context (first 2000 chars):\n${req.researchReport.slice(0, 2000)}`,
+                        REVIEW_MODEL_LIGHTWEIGHT,
+                        CHECKPOINT_MAX_TOKENS,
+                        60_000,
+                    ),
+                )
 
-                const text = response.content
-                    .filter(b => b.type === "text")
-                    .map(b => b.type === "text" ? b.text : "")
-                    .join("")
+                const text = response.text
 
                 const checkpoint = parseCheckpointResponse(
                     text,
@@ -1253,12 +1163,6 @@ export async function reviseModulesFromCheckpoints(
     }
     // SECURITY: Authenticate caller to prevent unauthenticated API credit burn
     return withAIGate('cad_lab_review', async () => {
-        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-        if (!apiKey) {
-            console.error("[CAD-REVIEWS] No API key for module revision")
-            return emptyResult
-        }
-
         // Collect flagged module IDs from all checkpoints
         const flaggedIds = new Set<string>()
         const concernsByModule = new Map<string, string[]>()
@@ -1293,23 +1197,6 @@ export async function reviseModulesFromCheckpoints(
             designLevelInfeasibility: infeasibility.flagged,
             infeasibilityEvidence: infeasibility.evidence,
         }
-
-        const Anthropic = (await import("@anthropic-ai/sdk")).default
-        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
-        // function limit. SDK default is 10min + 2 retries, which in a
-        // tool loop can silently blow past the ceiling and return 504 with
-        // no actionable error. 240s + no retries lets us fail fast and
-        // surface the real cause. See forgeos-rules.md R4/R5.
-        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
-// and uses exponential backoff between attempts. With 4 autopilot chains
-// running in parallel and ~9 modules each, the blast hits org-level
-// rate limits; without retries the call fails immediately and the review
-// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
-// transient rate-limit spikes while keeping per-call wall-clock under
-// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
-// where every Fang review failed with "Too many requests" before maxRetries
-// was raised. Total worst-case retry latency: ~30s, still inside timeout.
-const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
 
         // INTENT: Stronger JSON contract. Previous prompt said "Return a JSON
         // object with keys: ..." which Claude often violated by wrapping in
@@ -1370,16 +1257,10 @@ Return the revised fields as a single JSON object now.`
                     const hint = attempt === 0
                         ? ""
                         : "\n\nIMPORTANT: Your previous response was not valid JSON matching the required shape. Output ONLY the JSON object this time, starting with { and ending with }. No prose.\n"
-                    const response = await await withLlmPermit("anthropic", REVIEW_MODEL, () => client.messages.create({
-                        model: REVIEW_MODEL,
-                        max_tokens: 2048,
-                        system: systemPrompt,
-                        messages: [{ role: "user", content: buildUserContent(mod, hint) }],
-                    }))
-                    const text = response.content
-                        .filter((b) => b.type === "text")
-                        .map((b) => b.type === "text" ? b.text : "")
-                        .join("")
+                    const response = await withLlmPermit("openai", REVIEW_MODEL_LIGHTWEIGHT, () =>
+                        callOpenAI(systemPrompt, buildUserContent(mod, hint), REVIEW_MODEL_LIGHTWEIGHT, 2048, 60_000),
+                    )
+                    const text = response.text
                     const parsed = extractAndParseJson(text)
                     if (!parsed) {
                         console.warn(`[CAD-REVIEWS] ${mod.id} attempt ${attempt + 1}: no JSON found`)
@@ -1466,12 +1347,6 @@ export async function reviseModulesFromReviews(
     req: ReviewRevisionRequest,
 ): Promise<Record<string, RevisedModuleFields>> {
     return withAIGate('cad_lab_review', async () => {
-        const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-        if (!apiKey) {
-            console.error("[CAD-REVIEWS] No API key for review-based revision")
-            return {}
-        }
-
         // Group accepted issues by module
         const issuesByModule = new Map<string, typeof req.acceptedIssues>()
         for (const item of req.acceptedIssues) {
@@ -1485,22 +1360,14 @@ export async function reviseModulesFromReviews(
         const affectedModules = req.modules.filter(m => issuesByModule.has(m.id))
         if (affectedModules.length === 0) return {}
 
-        const Anthropic = (await import("@anthropic-ai/sdk")).default
-        // SECURITY/RELIABILITY: Cap SDK time to stay under Vercel's 300s
-        // function limit. SDK default is 10min + 2 retries, which in a
-        // tool loop can silently blow past the ceiling and return 504 with
-        // no actionable error. 240s + no retries lets us fail fast and
-        // surface the real cause. See forgeos-rules.md R4/R5.
-        // maxRetries: 2 — the Anthropic SDK natively honours Retry-After on 429s
-// and uses exponential backoff between attempts. With 4 autopilot chains
-// running in parallel and ~9 modules each, the blast hits org-level
-// rate limits; without retries the call fails immediately and the review
-// is marked REVIEW_FAILED. Two retries (~10s + ~20s SDK backoff) absorb
-// transient rate-limit spikes while keeping per-call wall-clock under
-// the 240s budget. Confirmed against the 4-project demo run on 2026-04-25
-// where every Fang review failed with "Too many requests" before maxRetries
-// was raised. Total worst-case retry latency: ~30s, still inside timeout.
-const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
+        const revisionSystemPrompt = `You revise product module descriptions to address specific specialist review issues. Rules:
+- Address EVERY accepted issue — don't skip any
+- Preserve the original intent and level of detail
+- Only change what's needed to address the specific issues
+- Keep the same writing style and tone
+- Where an issue has a suggested fix, incorporate it
+- Return ALL fields (even unchanged ones) as valid JSON
+- Do NOT add disclaimers or meta-commentary — just return the revised content`
 
         const results = await Promise.allSettled(
             affectedModules.map(async (mod) => {
@@ -1516,20 +1383,10 @@ const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 2 })
                     ? `\nDiagnostic specs: Process=${diagnostics.mfg_process || "unspecified"}, Material=${diagnostics.material || "unspecified"}, Tolerance=${diagnostics.tolerance || "unspecified"}, Finish=${diagnostics.finish || "unspecified"}, Batch=${diagnostics.batch_size || "unspecified"}`
                     : ""
 
-                const response = await await withLlmPermit("anthropic", REVIEW_MODEL, () => client.messages.create({
-                    model: REVIEW_MODEL,
-                    max_tokens: 2048,
-                    system: `You revise product module descriptions to address specific specialist review issues. Rules:
-- Address EVERY accepted issue — don't skip any
-- Preserve the original intent and level of detail
-- Only change what's needed to address the specific issues
-- Keep the same writing style and tone
-- Where an issue has a suggested fix, incorporate it
-- Return ALL fields (even unchanged ones) as valid JSON
-- Do NOT add disclaimers or meta-commentary — just return the revised content`,
-                    messages: [{
-                        role: "user",
-                        content: `Product: "${req.projectSubject}"
+                const response = await withLlmPermit("openai", REVIEW_MODEL_LIGHTWEIGHT, () =>
+                    callOpenAI(
+                        revisionSystemPrompt,
+                        `Product: "${req.projectSubject}"
 
 Module: "${mod.name}" (id: ${mod.id})
 ${diagnosticContext}
@@ -1546,13 +1403,13 @@ Specialist review issues to address:
 ${issueText}
 
 Revise the module fields to address all the issues above. Return a JSON object with keys: purpose, description, keyParts, whyItMatters, failureModes, unknowns.`,
-                    }],
-                }))
+                        REVIEW_MODEL_LIGHTWEIGHT,
+                        2048,
+                        60_000,
+                    ),
+                )
 
-                const text = response.content
-                    .filter((b) => b.type === "text")
-                    .map((b) => b.type === "text" ? b.text : "")
-                    .join("")
+                const text = response.text
 
                 const parsed = extractAndParseJson(text)
                 if (!parsed) {
