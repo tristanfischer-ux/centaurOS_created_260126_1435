@@ -453,20 +453,23 @@ export function reconcileCostTree(
         0,
     )
 
-    const reconciledUnitTotalGbp = moduleSum > 0 ? moduleSum : originalUnitTotalGbp
     const divergenceFraction =
         originalUnitTotalGbp > 0
             ? Math.abs(moduleSum - originalUnitTotalGbp) / originalUnitTotalGbp
             : 0
     const wasReconciled = divergenceFraction > SUBTREE_SUM_TOLERANCE
+    const reconciledUnitTotalGbp = wasReconciled && moduleSum > 0
+        ? moduleSum
+        : originalUnitTotalGbp
 
+    const pctDenominator = reconciledUnitTotalGbp
     const reconciledPerModule: ReconciledModuleCost[] = perModuleCost.map((m) => ({
         moduleName: m.moduleName,
         totalGbp: m.totalGbp,
         finnTotalGbp: m.finnTotalGbp,
         pctOfUnit:
-            reconciledUnitTotalGbp > 0 && m.totalGbp != null
-                ? (m.totalGbp / reconciledUnitTotalGbp) * 100
+            pctDenominator > 0 && m.totalGbp != null
+                ? (m.totalGbp / pctDenominator) * 100
                 : null,
     }))
 

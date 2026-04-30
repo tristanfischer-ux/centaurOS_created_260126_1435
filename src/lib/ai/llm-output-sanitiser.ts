@@ -77,9 +77,14 @@ export const TOOL_CALL_LEAK_PATTERNS: ReadonlyArray<{
     // `lookup_process(sheet_metal)` / `lookup_process(injection_molding)` etc.
     { pattern: /\blookup_\w+\([^)]*\)/g, replacement: "" },
     // `calculate_cost(...)` / `search_suppliers(...)` / `get_material(...)`
-    { pattern: /\b(calculate|search|get|fetch|query|find|check|validate|compute|evaluate)_\w+\([^)]*\)/g, replacement: "" },
-    // Backticked function names: `lookup_process`
-    { pattern: /`[a-z][a-z0-9]*_[a-z0-9_]+`/g, replacement: "" },
+    // Restricted to known LLM tool prefixes to avoid stripping legitimate
+    // engineering terms like check_valve(150psi) or find_bearing(SKF_6205).
+    { pattern: /\b(calculate|search|fetch|query|compute|evaluate)_\w+\([^)]*\)/g, replacement: "" },
+    // Backticked tool-call function names only — restricted to known tool
+    // prefixes (lookup_, calculate_, search_, fetch_, query_, compute_,
+    // evaluate_) to avoid stripping legitimate engineering identifiers
+    // like `check_valve`, `motor_controller`, `pressure_sensor`.
+    { pattern: /`(lookup|calculate|search|fetch|query|compute|evaluate)_[a-z0-9_]+`/g, replacement: "" },
     // "Recommend verify via that" → "Recommend that" (orphaned "verify via")
     { pattern: /\b(verify|check|confirm)\s+(via|using|with)\s+(?=that|this|the|if|whether)/gi, replacement: "" },
 ]
