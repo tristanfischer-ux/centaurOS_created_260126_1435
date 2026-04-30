@@ -233,7 +233,7 @@ async function runChaseResearchInternal(
             : undefined
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, research, reference_dossier")
+            .select("id, foundry_id, subject, founder_raw_brief, research, reference_dossier")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -262,12 +262,13 @@ async function runChaseResearchInternal(
             }
         }
 
-        // 2. Precondition: Chase needs the founder's short concept
-        //    (project.subject). Without it runCadLabResearch has nothing
-        //    to search for — it would either refuse or synthesise a
-        //    low-quality generic report. Fail loud instead.
+        // 2. Precondition: Chase needs the founder's original brief.
+        //    founder_raw_brief is the ground truth (never modified after creation).
+        //    Falls back to subject for legacy projects without founder_raw_brief.
         const description =
-            typeof project.subject === "string" ? project.subject.trim() : ""
+            (typeof project.founder_raw_brief === "string" && project.founder_raw_brief.trim())
+                ? project.founder_raw_brief.trim()
+                : (typeof project.subject === "string" ? project.subject.trim() : "")
 
         if (!description) {
             return {

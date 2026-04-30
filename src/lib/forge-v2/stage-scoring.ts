@@ -716,3 +716,78 @@ export async function loadStageDataForCouncil(
     if (!rubric) return "No rubric found for this stage."
     return loadStageData(projectId, rubric)
 }
+
+// ── Full reset to founder brief ──────────────────────────────────────────
+// Rule (Tristan 2026-04-30): every full loop starts from the original
+// founder_raw_brief. All generated content is wiped so Chase runs fresh.
+
+export async function resetToFounderBrief(projectId: string): Promise<{
+    ok: boolean
+    error?: string
+}> {
+    const admin = createAdminClient()
+
+    const { error: updateErr } = await admin
+        .from("cad_lab_projects")
+        .update({
+            research: null,
+            modules: null,
+            reviews: null,
+            ai_cost_estimates: null,
+            proofread_findings: null,
+            feasibility_verdict: null,
+            oracle_findings: null,
+            executive_summary: null,
+            cost_reconciliation: null,
+            dimension_sheet: null,
+            spatial_plan: null,
+            bom_generation_state: null,
+            image_render_state: null,
+            concept_render_url: null,
+            system_illustration_url: null,
+            interior_overview_url: null,
+            reference_dossier: null,
+            brief_locked_at: null,
+            brief_locked_by: null,
+            gate_remediation_context: null,
+            autopilot_state: {
+                stage: "waiting_chase",
+                status: "paused",
+                attempts: 0,
+                completed_stages: [],
+                failed_stages: [],
+                stage_scores: {},
+                started_at: new Date().toISOString(),
+                finished_at: null,
+            },
+        } as never)
+        .eq("id", projectId)
+
+    if (updateErr) {
+        console.error("[resetToFounderBrief] failed:", updateErr.message)
+        return { ok: false, error: updateErr.message }
+    }
+
+    // Clear related pipeline_runs so old rows don't poison the 23505 handler
+    const { error: pipelineErr } = await admin
+        .from("pipeline_runs")
+        .delete()
+        .eq("project_id", projectId)
+
+    if (pipelineErr) {
+        console.error("[resetToFounderBrief] pipeline_runs cleanup:", pipelineErr.message)
+    }
+
+    // Clear report_downloads for this project
+    const { error: reportErr } = await admin
+        .from("report_downloads")
+        .delete()
+        .eq("project_id", projectId)
+
+    if (reportErr) {
+        console.error("[resetToFounderBrief] report_downloads cleanup:", reportErr.message)
+    }
+
+    console.log(`[resetToFounderBrief] project ${projectId} reset to founder_raw_brief — all generated content cleared`)
+    return { ok: true }
+}
