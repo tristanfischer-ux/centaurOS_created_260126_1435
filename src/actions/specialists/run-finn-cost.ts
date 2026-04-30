@@ -278,39 +278,66 @@ async function runFinnCostInternal(
                 dimensionSheet !== null && dimensionSheet.feasible === false
 
             if (oracleFailed || solverFailed) {
-                // Build a human-readable summary from whichever signal fired.
-                const reasonParts: string[] = []
-
-                if (oracleFailed && feasibilityVerdict?.blockers?.length) {
-                    const oracleBlockers = feasibilityVerdict.blockers
-                        .filter((b) => b.explanation)
-                        .map((b) => b.explanation!)
-                        .slice(0, 3)
-                        .join("; ")
-                    if (oracleBlockers) reasonParts.push(oracleBlockers)
+                // Marginal tolerance: if ONLY the solver failed (not the
+                // oracle) and the overshoot is ≤5%, proceed with a warning
+                // rather than hard-blocking. A 2% floor-area shortfall
+                // shouldn't prevent costing — the founder needs to see the
+                // numbers to make an informed trade-off.
+                const MARGINAL_THRESHOLD = 0.05
+                let marginal = false
+                if (solverFailed && !oracleFailed && dimensionSheet) {
+                    const floorBudget = (dimensionSheet as { floor_budget_m2?: number }).floor_budget_m2
+                    const moduleDims = (dimensionSheet as { module_dimensions?: Record<string, { floor_m2?: number }> }).module_dimensions
+                    if (floorBudget && floorBudget > 0 && moduleDims) {
+                        const usedFloor = Object.values(moduleDims).reduce(
+                            (sum, m) => sum + (m.floor_m2 ?? 0), 0
+                        )
+                        const overFraction = (usedFloor - floorBudget) / floorBudget
+                        if (overFraction > 0 && overFraction <= MARGINAL_THRESHOLD) {
+                            marginal = true
+                            console.info(
+                                `[run-finn-cost] marginal infeasibility (${(overFraction * 100).toFixed(1)}% over) — proceeding with warning`,
+                                `project=${projectId}`,
+                            )
+                        }
+                    }
                 }
 
-                if (solverFailed && dimensionSheet?.conflicts?.length) {
-                    const solverConflicts = dimensionSheet.conflicts
-                        .slice(0, 2)
-                        .join("; ")
-                    if (solverConflicts) reasonParts.push(solverConflicts)
-                }
+                if (!marginal) {
+                    // Build a human-readable summary from whichever signal fired.
+                    const reasonParts: string[] = []
 
-                const reason =
-                    reasonParts.length > 0
-                        ? reasonParts.join(" | ")
-                        : "The design does not pass physics checks. Resolve the sizing issues and re-run."
+                    if (oracleFailed && feasibilityVerdict?.blockers?.length) {
+                        const oracleBlockers = feasibilityVerdict.blockers
+                            .filter((b) => b.explanation)
+                            .map((b) => b.explanation!)
+                            .slice(0, 3)
+                            .join("; ")
+                        if (oracleBlockers) reasonParts.push(oracleBlockers)
+                    }
 
-                console.warn(
-                    `[run-finn-cost] blocking cost run on infeasible design: project=${projectId}`,
-                    `oracle_failed=${oracleFailed} solver_failed=${solverFailed}`,
-                )
+                    if (solverFailed && dimensionSheet?.conflicts?.length) {
+                        const solverConflicts = dimensionSheet.conflicts
+                            .slice(0, 2)
+                            .join("; ")
+                        if (solverConflicts) reasonParts.push(solverConflicts)
+                    }
 
-                return {
-                    ok: false,
-                    error: `Cost estimation skipped — the design is not physically feasible. ${reason}`,
-                    errorCode: "INFEASIBLE_DESIGN",
+                    const reason =
+                        reasonParts.length > 0
+                            ? reasonParts.join(" | ")
+                            : "The design does not pass physics checks. Resolve the sizing issues and re-run."
+
+                    console.warn(
+                        `[run-finn-cost] blocking cost run on infeasible design: project=${projectId}`,
+                        `oracle_failed=${oracleFailed} solver_failed=${solverFailed}`,
+                    )
+
+                    return {
+                        ok: false,
+                        error: `Cost estimation skipped — the design is not physically feasible. ${reason}`,
+                        errorCode: "INFEASIBLE_DESIGN",
+                    }
                 }
             }
         }
