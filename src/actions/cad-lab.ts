@@ -2172,11 +2172,29 @@ export async function skeletonDecompose(
       : ""
     const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}${skeletonEngSection}${docSection}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
 
-    // GPT-5.5 reasoning model consumes tokens for internal thinking before
-    // emitting visible output. 4096 was too low — truncated JSON → parse fail.
-    const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 16384, 180_000, 1,
-    )
+    // Parallel-and-compare: run 3 models from different lineages, pick the best.
+    // Falls back to the single-model callClaude path if runParallelAndCompare throws.
+    let text: string
+    let tokensIn = 0
+    let tokensOut = 0
+    try {
+      const { runParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+      const parallelResult = await runParallelAndCompare(
+        systemPrompt,
+        userPrompt,
+        "waiting_max",
+        "Pick the decomposition with the most accurate physical module breakdown, realistic interfaces, and complete JSON structure.",
+      )
+      text = parallelResult.bestOutput
+      console.info(`[THE-FORGE] Max skeleton parallel-and-compare winner: ${parallelResult.winnerModel} — ${parallelResult.selectionReason}`)
+    } catch (parallelErr) {
+      // Fallback: single-model Claude call if the parallel infrastructure fails
+      console.warn("[THE-FORGE] Max skeleton parallel-and-compare failed, falling back to callClaude:", parallelErr instanceof Error ? parallelErr.message : parallelErr)
+      const fallback = await callClaude(systemPrompt, userPrompt, modelId, 16384, 180_000, 1)
+      text = fallback.text
+      tokensIn = fallback.tokensIn
+      tokensOut = fallback.tokensOut
+    }
 
     // Parse JSON response
     let parsed: unknown
