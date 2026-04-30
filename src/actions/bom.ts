@@ -505,6 +505,61 @@ async function fetchMarketplaceSupplierContextForBom(
   }
 }
 
+/**
+ * Fetches the `process_capabilities` reference table and formats it as a
+ * prompt injection block for BOM expansion.
+ *
+ * BOM FIX 1 (2026-04-30): The 20-row `process_capabilities` table carries
+ * verified tolerance, wall-thickness, setup cost, per-part cost multiplier,
+ * and lead-time data for every manufacturing process. Previously only Finn
+ * and Fang received this data — the BOM expansion prompt was missing it and
+ * had to rely on training-data priors for process cost and tolerance
+ * estimates. This function injects the real table so Max's BOM line items
+ * are grounded in the same verified data the rest of the pipeline uses.
+ *
+ * Non-fatal: if the query fails, returns "" and expansion continues without
+ * process-capability grounding.
+ */
+async function fetchProcessCapabilitiesForPrompt(): Promise<string> {
+  try {
+    const admin = createAdminClient()
+    const { data, error } = await admin
+      .from("process_capabilities")
+      .select("display_name, tolerance_typical_mm, min_wall_thickness_mm, setup_cost_usd_typical, per_part_cost_multiplier, typical_lead_time_days")
+      .limit(20)
+
+    if (error || !data || data.length === 0) {
+      if (error) {
+        console.warn("[bom:process_capabilities] query failed (non-fatal):", error.message)
+      }
+      return ""
+    }
+
+    const lines = data.map((row) => {
+      const parts: string[] = [row.display_name ?? "unknown"]
+      if (row.tolerance_typical_mm != null)
+        parts.push(`tolerance ±${row.tolerance_typical_mm}mm`)
+      if (row.min_wall_thickness_mm != null)
+        parts.push(`min wall ${row.min_wall_thickness_mm}mm`)
+      if (row.setup_cost_usd_typical != null)
+        parts.push(`setup ~$${row.setup_cost_usd_typical}`)
+      if (row.per_part_cost_multiplier != null)
+        parts.push(`per-part ×${row.per_part_cost_multiplier}`)
+      if (row.typical_lead_time_days != null)
+        parts.push(`lead ${row.typical_lead_time_days}d`)
+      return `- ${parts.join(" | ")}`
+    }).join("\n")
+
+    return `\n\nMANUFACTURING PROCESS DATA (verified database — use these real setup costs, tolerances, and lead times when specifying manufacturing processes for parts):\n${lines}`
+  } catch (err) {
+    console.warn(
+      "[bom:process_capabilities] fetchProcessCapabilitiesForPrompt threw (non-fatal):",
+      err instanceof Error ? err.message : err,
+    )
+    return ""
+  }
+}
+
 async function skeletonBomInternal(
   projectId: string,
   modules: CadLabModule[],
@@ -946,9 +1001,13 @@ export async function expandBomParts(
       .filter((s) => typeof s === "string" && s.length > 0)
       .join(" — ")
     const oracleHint = renderOracleHint(oracleSubject)
+    // BOM FIX 1 (2026-04-30): fetch verified process capability data so the
+    // expansion model has real tolerances, setup costs, and lead times rather
+    // than training-data priors.
+    const processCapabilitiesHint = await fetchProcessCapabilitiesForPrompt()
     const briefContext = designBrief
-      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}`
-      : oracleHint
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}${processCapabilitiesHint}`
+      : `${oracleHint}${processCapabilitiesHint}`
 
     // Include module context for material/process reasoning.
     // L17-P1: include estimatedMassKg so the LLM can use the module mass
@@ -1311,9 +1370,11 @@ export async function generateBomFromModules(
       .filter((s) => typeof s === "string" && s.length > 0)
       .join(" — ")
     const oracleHint = renderOracleHint(oracleSubject)
+    // BOM FIX 1 (2026-04-30): inject verified process capability data.
+    const processCapabilitiesHint = await fetchProcessCapabilitiesForPrompt()
     const briefContext = designBrief
-      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}`
-      : oracleHint
+      ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${costCeilingHint}${oracleHint}${processCapabilitiesHint}`
+      : `${oracleHint}${processCapabilitiesHint}`
 
     // L17-P1: include estimatedMassKg so the LLM can use the module mass
     // budget as an upper bound for individual part masses.
@@ -2401,9 +2462,22 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
   // is proven.
   // W21 fix (2026-04-28): no longer needs ANTHROPIC_API_KEY — uses OpenRouter
 
+  // BOM FIX 1 (2026-04-30): add oracle hint + process capabilities to distributed
+  // batch stage so the prompt context matches the monolithic `generateBomFromModules`
+  // pathway. Previously this stage was missing both, producing worse cost grounding
+  // than the legacy pathway for industrial and HAPS projects.
+  const oracleSubjectBatch = [
+    designBrief?.useCase ?? "",
+    modules[0]?.purpose ?? "",
+    modules.map((m) => m.name).slice(0, 3).join(" "),
+  ]
+    .filter((s) => typeof s === "string" && s.length > 0)
+    .join(" — ")
+  const oracleHintBatch = renderOracleHint(oracleSubjectBatch)
+  const processCapabilitiesHintBatch = await fetchProcessCapabilitiesForPrompt()
   const briefContext = designBrief
-    ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"`
-    : ""
+    ? `\nDesign Brief: use case="${truncate(designBrief.useCase, 200)}", process="${truncate(designBrief.targetProcess, 100)}", material="${truncate(designBrief.targetMaterial, 100)}", tolerance="${truncate(designBrief.toleranceTarget, 100)}", quantity="${truncate(designBrief.quantityTarget, 100)}"${oracleHintBatch}${processCapabilitiesHintBatch}`
+    : `${oracleHintBatch}${processCapabilitiesHintBatch}`
 
   // L17-P1: include estimatedMassKg so the LLM can use the module mass
   // budget as an upper bound for individual part masses.

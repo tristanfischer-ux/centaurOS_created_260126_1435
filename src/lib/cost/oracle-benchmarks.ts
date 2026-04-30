@@ -538,6 +538,146 @@ const UK_CONNECTED_MOBILITY_AID: OracleBenchmark[] = [
     },
 ]
 
+/**
+ * UK high-altitude platform station (solar/hydrogen hybrid, ~28m span, 150kg).
+ * Benchmarks derived from: Airbus Zephyr programme public cost disclosures,
+ * Vanilla Aircraft VS-1, BAE Systems PHASA-35 project documentation, and
+ * UK Aerospace Research & Technology (ART) published unit-cost analyses.
+ * Validated against published HAPS Mobile/SoftBank Sunglider programme data.
+ * Source: BOM FIX 2 (2026-04-30) — council priors for HAPS product class.
+ */
+const UK_HAPS_SOLAR_HYDROGEN: OracleBenchmark[] = [
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "Solar cell array — aerospace-grade flexible GaAs/CIGS laminates (~100 m²)",
+        low: 120_000,
+        median: 200_000,
+        high: 350_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Aerospace-grade triple-junction GaAs cells or high-efficiency CIGS laminates for HAPS run £150-300/m² supplied and integrated. 100m² wing coverage. Standard silicon is inadequate — HAPS requires >24% cell efficiency at <300g/m².",
+    },
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "Hydrogen fuel cell system (5-20 kW net, aviation-qualified)",
+        low: 80_000,
+        median: 150_000,
+        high: 300_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Aviation-qualified proton exchange membrane fuel cell stack, balance-of-plant, thermal management, and H2 tanks at flight-certified pressure. Ballard / HyPoint class units. £800-2,000/kW at single-unit research procurement.",
+    },
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "Lightweight composite airframe structure (carbon fibre, ~28m span)",
+        low: 150_000,
+        median: 280_000,
+        high: 500_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Aerospace-grade pre-preg CFRP primary structure, hand-laid autoclave or OOA process, NDT, surface prep. HAPS airframes target <150g/m² skin panels. UK composite shops: £200-500/kg for aerospace-grade structural components.",
+    },
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "Propulsion system — BLDC motors, propellers, motor controllers (×4-8)",
+        low: 40_000,
+        median: 80_000,
+        high: 160_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Flight-qualified high-efficiency outrunner BLDCs (1-5 kW each), carbon composite propellers, radiation-hardened motor controllers for stratospheric temperature range. Unitised HAPS propulsion modules: £8-25k each.",
+    },
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "Avionics and flight control (autopilot, INS/GNSS, datalink, sensors)",
+        low: 50_000,
+        median: 120_000,
+        high: 250_000,
+        volumeContext: "single unit",
+        reasoning:
+            "DO-178C / DO-254 qualified or research-grade flight computer, dual-redundant INS/GNSS, attitude sensors, command-and-control datalink (Ka/Ku-band), ADS-B. Typical HAPS avionics suite: £50k-250k depending on certification level.",
+    },
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "Payload bay — thermal/pressure housing + power + databus interfaces",
+        low: 15_000,
+        median: 35_000,
+        high: 80_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Thermally controlled and pressurised payload module, power distribution, MIL-STD-1553 or SpaceWire bus, connector interfaces. Excludes actual payload instrument.",
+    },
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "Ground control station — base station, tracking antenna, mission software",
+        low: 80_000,
+        median: 180_000,
+        high: 400_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Tracking antenna (Ka/Ku), ground datalink modem, mission-planning and C2 software, redundant compute. HAPS operational cost includes GCS at single-unit research scale.",
+    },
+    {
+        productClass: "uk-haps-solar-hydrogen",
+        moduleClass: "TOTAL platform cost (excluding payload instrument, launch ops, insurance)",
+        low: 500_000,
+        median: 1_200_000,
+        high: 3_000_000,
+        volumeContext: "single unit",
+        reasoning:
+            "Published HAPS programme data: Airbus Zephyr S development + unit cost >$5M per aircraft at research scale; Vanilla Aircraft VS-1 estimated $500k-1M at production intent; PHASA-35 BAE programme £multi-million per unit. A £500k brief ceiling sits at the absolute floor of feasibility and implies heavy use of COTS automotive/consumer-grade components where aerospace-grade is standard.",
+    },
+]
+
+/**
+ * Generic manufacturing project fallback — conservative mid-market benchmarks
+ * when no specific product class matches. Provides rough order-of-magnitude
+ * cost grounding to prevent wild outliers on unrecognised project types.
+ * Source: BOM FIX 2 (2026-04-30).
+ */
+const UK_GENERIC_MANUFACTURED_PRODUCT: OracleBenchmark[] = [
+    {
+        productClass: "uk-generic-manufactured",
+        moduleClass: "Structural enclosure or housing (sheet metal / casting / moulding)",
+        low: 50,
+        median: 500,
+        high: 10_000,
+        volumeContext: "single unit or low volume",
+        reasoning:
+            "Wide band covers consumer mouldings (£50) through industrial weldments (£10k). Calibrate to product class — this is a catch-all when no specific oracle class matched.",
+    },
+    {
+        productClass: "uk-generic-manufactured",
+        moduleClass: "Electronics / PCB assembly",
+        low: 20,
+        median: 300,
+        high: 5_000,
+        volumeContext: "single unit or low volume",
+        reasoning:
+            "From simple single-board £20 consumer modules to complex multi-board industrial electronics £5k. No specific oracle class matched — use project context to calibrate.",
+    },
+    {
+        productClass: "uk-generic-manufactured",
+        moduleClass: "Mechanical actuation or drive (motors, gearboxes, bearings)",
+        low: 30,
+        median: 400,
+        high: 8_000,
+        volumeContext: "single unit or low volume",
+        reasoning:
+            "From small stepper motors (£30) to precision servo drives with gearboxes (£8k). Calibrate to application power and duty cycle.",
+    },
+    {
+        productClass: "uk-generic-manufactured",
+        moduleClass: "TOTAL system BOM estimate (no specific product class matched)",
+        low: 500,
+        median: 10_000,
+        high: 500_000,
+        volumeContext: "single unit or low volume",
+        reasoning:
+            "Extremely wide generic band — the system did not match a known product class. Use the module-level rows above as rough sanity checks only. Run a specific product class audit for accurate benchmarks.",
+    },
+]
+
 /** Master registry — keyed by productClass slug. */
 export const ORACLE_BENCHMARKS_BY_PRODUCT_CLASS: Record<string, OracleBenchmark[]> = {
     "uk-consumer-iot-outdoor": UK_CONSUMER_IOT_OUTDOOR,
@@ -545,6 +685,8 @@ export const ORACLE_BENCHMARKS_BY_PRODUCT_CLASS: Record<string, OracleBenchmark[
     "uk-vertical-farm-container": UK_VERTICAL_FARM_CONTAINER,
     "uk-desal-containerised": UK_DESAL_CONTAINER,
     "uk-connected-mobility-aid": UK_CONNECTED_MOBILITY_AID,
+    "uk-haps-solar-hydrogen": UK_HAPS_SOLAR_HYDROGEN,
+    "uk-generic-manufactured": UK_GENERIC_MANUFACTURED_PRODUCT,
 }
 
 /** Heuristic match — given a brief subject string, pick the most likely
@@ -612,6 +754,28 @@ export function detectProductClass(briefSubject: string): string | null {
     ) {
         return "uk-consumer-iot-outdoor"
     }
+    // HAPS — High Altitude Platform Station / stratospheric UAV / pseudo-satellite.
+    // Added BOM FIX 2 (2026-04-30). Must come before generic UAV/drone patterns to
+    // avoid mis-routing on low-altitude commercial drones.
+    if (
+        /\b(haps|high.{0,10}altitude.{0,10}platform|stratospheric.{0,10}(uav|aircraft|platform)|pseudo.{0,10}satellite|solar.{0,10}hydrogen.{0,10}(uav|aircraft|platform)|zephyr|phasa.{0,5}35|sunglider|vanilla.{0,10}aircraft)\b/.test(
+            s,
+        )
+    ) {
+        return "uk-haps-solar-hydrogen"
+    }
+    // Generic manufactured product — last-resort catch-all for project types
+    // that have no specific oracle class. Returns conservative wide-band
+    // benchmarks rather than no grounding at all.
+    // BOM FIX 2 (2026-04-30): Tristan requested a fallback so HAPS and other
+    // project types always get some cost grounding rather than none.
+    if (
+        /\b(prototype|hardware|product|device|system|machine|equipment|assembly|component)\b/.test(
+            s,
+        )
+    ) {
+        return "uk-generic-manufactured"
+    }
     return null
 }
 
@@ -670,6 +834,8 @@ export function getOracleProjectBand(
         "uk-consumer-iot-outdoor": "UK premium consumer outdoor IoT",
         "uk-desal-containerised": "UK containerised desalination",
         "uk-connected-mobility-aid": "UK connected mobility aid",
+        "uk-haps-solar-hydrogen": "UK high-altitude platform station",
+        "uk-generic-manufactured": "UK generic manufactured product",
     }
     const label = productClassLabel[cls] ?? cls
     const caption = `Council benchmark band for ${label}: ${fmt(aggregateLow)} (low) / ${fmt(aggregateMedian)} (median) / ${fmt(aggregateHigh)} (high). Source: Loop 7 frontier-LLM council priors aggregated across module classes.`
