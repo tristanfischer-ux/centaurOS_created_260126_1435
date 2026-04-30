@@ -543,37 +543,46 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         : ""
       const synthesisUserPrompt = `Product to research: ${description}\n\n${rawContext}${standardsSection}${engineeringDataSection}${marketplaceSupplierSection}${docSection}`
 
-      // Fallback chain: Gemini → OpenAI → DeepSeek.
-      // Anthropic eliminated per 2026-04-29 directive.
-      // DeepSeek added 2026-04-30: Gemini 503 + OpenAI timeout cascades
-      // caused all 5 demo projects to fail synthesis simultaneously.
-      // DeepSeek is a different provider, different infrastructure, so a
-      // Gemini-wide 503 storm does not affect it. Trimmed timeout (90s)
-      // because DeepSeek is faster than GPT-5.5 for prose.
+      // Parallel-and-compare: run 3 models (GPT-5.5 + DeepSeek V4-Pro + Gemini 3.1 Pro)
+      // on the SAME synthesis prompt. gpt-4.1-mini judges and picks the best output.
+      // Falls back to single-model Gemini → OpenAI → DeepSeek chain if parallel fails.
       try {
-        console.info("[THE-FORGE] Step 1: Synthesizing report with Gemini (domain: %s)...", domain)
-        const geminiResult = await callGemini(synthesisPrompt, synthesisUserPrompt, "gemini-3.1-pro-preview", 8192, 120_000)
-        report = geminiResult.text
-      } catch (geminiErr) {
-        const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
-        console.warn("[THE-FORGE] Step 1: Gemini synthesis failed, trying OpenAI fallback:", geminiMsg.slice(0, 200))
+        const { runParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+        console.info("[THE-FORGE] Step 1: Running parallel-and-compare synthesis (domain: %s)...", domain)
+        const parallelResult = await runParallelAndCompare(
+          synthesisPrompt,
+          synthesisUserPrompt,
+          "waiting_chase",
+          "Select the output with the most comprehensive research: verified sources with URLs, quantitative market sizing, named competitors with specs, and regulatory coverage. Prefer outputs grounded in real data over generic summaries.",
+        )
+        report = parallelResult.bestOutput
+        synthesisModel = parallelResult.winnerModel
+        console.info(`[THE-FORGE] Step 1: Parallel-and-compare winner: ${parallelResult.winnerModel} — ${parallelResult.selectionReason}`)
+      } catch (parallelErr) {
+        console.warn("[THE-FORGE] Step 1: Parallel-and-compare failed, falling back to single-model chain:", parallelErr instanceof Error ? parallelErr.message : String(parallelErr))
         try {
-          synthesisModel = "gpt-5.5"
-          const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.5", 8192, 120_000)
-          report = openaiResult.text
-          console.info("[THE-FORGE] Step 1: OpenAI synthesis succeeded (fallback)")
-        } catch (openaiErr) {
-          const openaiMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr)
-          console.warn("[THE-FORGE] Step 1: OpenAI synthesis failed, trying DeepSeek fallback:", openaiMsg.slice(0, 200))
+          console.info("[THE-FORGE] Step 1: Synthesizing report with Gemini (domain: %s)...", domain)
+          const geminiResult = await callGemini(synthesisPrompt, synthesisUserPrompt, "gemini-3.1-pro-preview", 8192, 120_000)
+          report = geminiResult.text
+        } catch (geminiErr) {
+          const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
+          console.warn("[THE-FORGE] Step 1: Gemini synthesis failed, trying OpenAI fallback:", geminiMsg.slice(0, 200))
           try {
-            synthesisModel = "deepseek-chat"
-            const deepseekResult = await callDeepSeek(synthesisPrompt, synthesisUserPrompt, "deepseek-chat", 8192, 90_000)
-            report = deepseekResult.text
-            console.info("[THE-FORGE] Step 1: DeepSeek synthesis succeeded (second fallback)")
-          } catch (deepseekErr) {
-            console.error("[THE-FORGE] Step 1: ALL synthesis models failed:", deepseekErr instanceof Error ? deepseekErr.message : String(deepseekErr))
-            report = "Research sources found but report synthesis failed — tap Retry to try again."
-            synthesisSucceeded = false
+            synthesisModel = "gpt-5.5"
+            const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.5", 8192, 120_000)
+            report = openaiResult.text
+          } catch (openaiErr) {
+            const openaiMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr)
+            console.warn("[THE-FORGE] Step 1: OpenAI synthesis failed, trying DeepSeek fallback:", openaiMsg.slice(0, 200))
+            try {
+              synthesisModel = "deepseek-chat"
+              const deepseekResult = await callDeepSeek(synthesisPrompt, synthesisUserPrompt, "deepseek-chat", 8192, 90_000)
+              report = deepseekResult.text
+            } catch (deepseekErr) {
+              console.error("[THE-FORGE] Step 1: ALL synthesis models failed:", deepseekErr instanceof Error ? deepseekErr.message : String(deepseekErr))
+              report = "Research sources found but report synthesis failed — tap Retry to try again."
+              synthesisSucceeded = false
+            }
           }
         }
       }

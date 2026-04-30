@@ -126,6 +126,12 @@ function makeQwenModel(): ModelConfig {
  * diversity of perspectives across the pipeline.
  */
 export const STAGE_MODEL_TRIADS: Record<string, ModelConfig[]> = {
+    // Chase (research synthesis) — factual diversity catches hallucinated sources
+    waiting_chase: [
+        makeOpenAIModel("gpt-5.5", "GPT-5.5"),
+        makeDeepSeekModel(),
+        makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
+    ],
     // Max (concept synthesis) — creative diversity matters most
     waiting_max: [
         makeOpenAIModel("gpt-5.5", "GPT-5.5"),
@@ -166,6 +172,7 @@ export const STAGE_MODEL_TRIADS: Record<string, ModelConfig[]> = {
  * real supplier, material, and standards data rather than hallucinated.
  */
 export const STAGE_DB_GROUNDING: Record<string, string[]> = {
+    waiting_chase: ["marketplace_listings"],
     waiting_max: ["design_standards"],
     waiting_sizing: ["material_properties", "design_standards"],
     waiting_bom: ["material_properties", "marketplace_listings", "process_capabilities"],
