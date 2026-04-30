@@ -283,28 +283,55 @@ async function runFinnCostInternal(
                 // rather than hard-blocking. A 2% floor-area shortfall
                 // shouldn't prevent costing — the founder needs to see the
                 // numbers to make an informed trade-off.
-                // NOTE: Enclosure/envelope entries in module_dimensions
-                // represent the building shell itself, not floor-consuming
-                // modules — they are excluded from the usedFloor sum below.
+                //
+                // GOTCHA (2026-04-30): The layout stage can rename / split a
+                // single solver module into mirror-pair keys in module_dimensions
+                // (e.g. "battery_racks" → "battery_rack_port" + "battery_rack_starboard",
+                // each carrying the full floor_m2). Re-summing module_dimensions
+                // then double-counts every mirror-pair module and produces a
+                // wildly inflated "usedFloor" (e.g. 36.5 m² instead of 21.5 m²).
+                //
+                // The solver's own iterations[0].used_floor_m2 is the
+                // authoritative floor sum — it was computed at solve time from
+                // the engineering coefficients, before any layout renaming.
+                // Use it instead of re-summing module_dimensions.
                 const MARGINAL_THRESHOLD = 0.05
                 let marginal = false
                 if (solverFailed && !oracleFailed && dimensionSheet) {
                     const floorBudget = (dimensionSheet as { floor_budget_m2?: number }).floor_budget_m2
-                    const moduleDims = (dimensionSheet as { module_dimensions?: Record<string, { floor_m2?: number }> }).module_dimensions
-                    if (floorBudget && floorBudget > 0 && moduleDims) {
-                        const usedFloor = Object.entries(moduleDims).reduce(
-                            (sum, [key, m]) => {
-                                if (/enclosure|envelope|building_shell/i.test(key)) return sum
-                                return sum + (m.floor_m2 ?? 0)
-                            }, 0
-                        )
-                        const overFraction = (usedFloor - floorBudget) / floorBudget
-                        if (overFraction > 0 && overFraction <= MARGINAL_THRESHOLD) {
-                            marginal = true
-                            console.info(
-                                `[run-finn-cost] marginal infeasibility (${(overFraction * 100).toFixed(1)}% over) — proceeding with warning`,
-                                `project=${projectId}`,
-                            )
+                    // Prefer the solver's authoritative used_floor_m2 from iterations.
+                    // Fall back to summing module_dimensions only when iterations is absent
+                    // (legacy projects that pre-date the iterations field).
+                    const solverIterations = (dimensionSheet as {
+                        iterations?: Array<{ used_floor_m2?: number }>
+                    }).iterations
+                    const solverUsedFloor = solverIterations?.[0]?.used_floor_m2 ?? null
+                    const moduleDims = solverUsedFloor === null
+                        ? (dimensionSheet as { module_dimensions?: Record<string, { floor_m2?: number }> }).module_dimensions
+                        : null
+                    if (floorBudget && floorBudget > 0) {
+                        // Use the solver's own sum when available; otherwise fall back
+                        // to summing module_dimensions (excluding envelope/shell entries).
+                        const usedFloor = solverUsedFloor !== null
+                            ? solverUsedFloor
+                            : moduleDims
+                                ? Object.entries(moduleDims).reduce(
+                                    (sum, [key, m]) => {
+                                        if (/enclosure|envelope|building_shell/i.test(key)) return sum
+                                        return sum + (m.floor_m2 ?? 0)
+                                    }, 0
+                                )
+                                : null
+                        if (usedFloor !== null) {
+                            const overFraction = (usedFloor - floorBudget) / floorBudget
+                            if (overFraction > 0 && overFraction <= MARGINAL_THRESHOLD) {
+                                marginal = true
+                                console.info(
+                                    `[run-finn-cost] marginal infeasibility (${(overFraction * 100).toFixed(1)}% over) — proceeding with warning`,
+                                    `project=${projectId}`,
+                                    `used_floor_m2=${usedFloor} floor_budget_m2=${floorBudget} source=${solverUsedFloor !== null ? "solver-iterations" : "module_dimensions-sum"}`,
+                                )
+                            }
                         }
                     }
                 }
