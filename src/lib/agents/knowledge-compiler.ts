@@ -1,8 +1,8 @@
 /**
  * @file knowledge-compiler.ts — Extracts reusable manufacturing knowledge from completed CAD Lab projects.
  *
- * @description Analyses completed CAD Lab projects (modules, metrics, design briefs) and uses Claude
- * to extract validated facts and metrics. Results are written to the specialist knowledge base
+ * @description Analyses completed CAD Lab projects (modules, metrics, design briefs) and uses
+ * GPT-4.1-mini to extract validated facts and metrics. Results are written to the specialist knowledge base
  * via upsertKnowledge so specialists benefit from accumulated project learnings.
  *
  * @related src/lib/agents/knowledge-base.ts — CRUD for specialist_knowledge_base
@@ -12,7 +12,7 @@
  * @security Uses createAdminClient() — bypasses RLS. Always scoped by foundry_id.
  */
 
-import Anthropic from "@anthropic-ai/sdk"
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { upsertKnowledge } from "@/lib/agents/knowledge-base"
@@ -206,31 +206,24 @@ export async function compileProjectKnowledge(projectId: string): Promise<Compil
     const avgVision = visionScoreCount > 0 ? (visionScoreSum / visionScoreCount).toFixed(1) : "N/A"
     summary += `\nAGGREGATES: total_modules=${totalModules}, first_attempt_successes=${firstAttemptSuccessCount}, avg_vision_score=${avgVision}\n`
 
-    // Step 3 — Send to Claude
-    const anthropic = new Anthropic()
-    let response: Anthropic.Message
+    // Step 3 — Send to GPT-4.1-mini
+    let responseText: string
     try {
-        response = await anthropic.messages.create({
-            model: "claude-haiku-4-5-20251001",
-            max_tokens: 2048,
-            system: SYSTEM_PROMPT,
-            messages: [{ role: "user", content: summary }],
-        })
+        const result = await callOpenAI(SYSTEM_PROMPT, summary, "gpt-4.1-mini", 2048, 30_000)
+        responseText = result.text
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        throw new Error(`[KnowledgeCompiler] Claude API error: ${message}`)
+        throw new Error(`[KnowledgeCompiler] OpenAI API error: ${message}`)
     }
 
-    const textBlock = response.content.find((b) => b.type === "text")
-    if (!textBlock || textBlock.type !== "text") {
-        throw new Error("[KnowledgeCompiler] Claude returned no text content")
+    if (!responseText.trim()) {
+        throw new Error("[KnowledgeCompiler] OpenAI returned no text content")
     }
 
     // Parse and validate
-    // GOTCHA: Claude sometimes wraps JSON in markdown fences (```json ... ```) — strip them
     let rawCandidates: unknown[]
     try {
-        let text = textBlock.text.trim()
+        let text = responseText.trim()
         const fenceMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/)
         if (fenceMatch) {
             text = fenceMatch[1].trim()
@@ -242,7 +235,7 @@ export async function compileProjectKnowledge(projectId: string): Promise<Compil
         rawCandidates = parsed
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        throw new Error(`[KnowledgeCompiler] Failed to parse Claude response: ${message}`)
+        throw new Error(`[KnowledgeCompiler] Failed to parse response: ${message}`)
     }
 
     const validTypes: ReadonlyArray<string> = ["fact", "metric"]

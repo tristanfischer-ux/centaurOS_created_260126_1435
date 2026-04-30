@@ -84,10 +84,10 @@ export async function POST(request: Request) {
     // 5. Build prompt
     const { systemPrompt, userPrompt } = buildOutreachPrompt({ campaign, contact, knowledgeBase })
 
-    // 6. Stream from Claude
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    // 6. Stream from OpenAI
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) {
-        return NextResponse.json({ error: "ANTHROPIC_API_KEY not configured" }, { status: 500 })
+        return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 })
     }
 
     const encoder = new TextEncoder()
@@ -97,26 +97,27 @@ export async function POST(request: Request) {
             let fullOutput = ""
             let tokensIn = 0
             let tokensOut = 0
-            const outreachModel = "claude-sonnet-4-6"
+            const outreachModel = "gpt-5.5"
             const heartbeatInterval = setInterval(() => {
                 try { controller.enqueue(encoder.encode(": keepalive\n\n")) } catch { /* stream closed */ }
             }, 15_000)
 
             let response: Response
             try {
-                response = await fetch("https://api.anthropic.com/v1/messages", {
+                response = await fetch("https://api.openai.com/v1/chat/completions", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
-                        "x-api-key": apiKey,
-                        "anthropic-version": "2023-06-01",
+                        "Authorization": `Bearer ${apiKey}`,
                     },
                     body: JSON.stringify({
                         model: outreachModel,
-                        max_tokens: 4096,
+                        max_completion_tokens: 4096,
                         stream: true,
-                        system: systemPrompt,
-                        messages: [{ role: "user", content: userPrompt }],
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: userPrompt },
+                        ],
                     }),
                     signal: AbortSignal.timeout(120_000),
                 })
@@ -178,23 +179,24 @@ export async function POST(request: Request) {
                     for (const line of lines) {
                         if (!line.startsWith("data: ")) continue
                         const payload = line.slice(6).trim()
-                        if (payload === "[DONE]") continue
+                        if (payload === "[DONE]") break
 
                         try {
                             const event = JSON.parse(payload)
 
                             // FLOW: Forward text delta chunks to client
-                            if (event.type === "content_block_delta" && event.delta?.text) {
-                                fullOutput += event.delta.text
+                            const content = event.choices?.[0]?.delta?.content
+                            if (content) {
+                                fullOutput += content
                                 controller.enqueue(encoder.encode(
-                                    `data: ${JSON.stringify({ text: event.delta.text })}\n\n`
+                                    `data: ${JSON.stringify({ text: content })}\n\n`
                                 ))
-                            } else if (event.type === "message_start" && event.message?.usage) {
-                                tokensIn = event.message.usage.input_tokens ?? tokensIn
-                                tokensOut = event.message.usage.output_tokens ?? tokensOut
-                            } else if (event.type === "message_delta" && event.usage) {
-                                if (typeof event.usage.input_tokens === 'number') tokensIn = event.usage.input_tokens
-                                if (typeof event.usage.output_tokens === 'number') tokensOut = event.usage.output_tokens
+                            }
+
+                            // Capture usage when present (OpenAI sends it on the final chunk)
+                            if (event.usage) {
+                                tokensIn = event.usage.prompt_tokens ?? tokensIn
+                                tokensOut = event.usage.completion_tokens ?? tokensOut
                             }
                         } catch {
                             // Skip non-JSON lines
@@ -260,7 +262,7 @@ export async function POST(request: Request) {
                     return
                 }
 
-                guard.trackUsage({ model: 'claude-sonnet-4-6' }).catch(() => {})
+                guard.trackUsage({ model: 'gpt-5.5' }).catch(() => {})
 
                 controller.enqueue(encoder.encode(
                     `data: ${JSON.stringify({ done: true, emailCount })}\n\n`

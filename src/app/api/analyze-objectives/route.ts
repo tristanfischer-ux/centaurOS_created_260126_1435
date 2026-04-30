@@ -24,7 +24,7 @@ import { aiGuard } from '@/lib/ai/guard'
 export const maxDuration = 300
 export const dynamic = 'force-dynamic'
 
-const OBJECTIVES_MODEL = 'claude-opus-4-7'
+const OBJECTIVES_MODEL = 'gpt-5.5'
 // GOTCHA: With dates on every task, 15 objectives × 8 tasks × full fields
 // produces ~12K-16K tokens. 8192 was truncating the JSON mid-string.
 const OBJECTIVES_MAX_TOKENS = 16384
@@ -83,50 +83,65 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient text provided' }, { status: 400 })
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
   }
 
   try {
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey })
-
     const truncatedText = text.slice(0, 100000)
 
-    const response = await client.messages.create({
-      model: OBJECTIVES_MODEL,
-      max_tokens: OBJECTIVES_MAX_TOKENS,
-      system: OBJECTIVES_PROMPT,
-      messages: [
-        { role: 'user', content: `Analyze the following business plan:\n\n${truncatedText}` },
-      ],
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: OBJECTIVES_MODEL,
+        max_completion_tokens: OBJECTIVES_MAX_TOKENS,
+        messages: [
+          { role: 'system', content: OBJECTIVES_PROMPT },
+          { role: 'user', content: `Analyze the following business plan:\n\n${truncatedText}` },
+        ],
+      }),
     })
 
-    const textBlock = response.content.find(block => block.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
+    const data = await response.json()
+
+    if (!response.ok || !data.choices) {
+      console.error('[analyze-objectives] OpenAI API error:', data.error?.message ?? data)
+      return NextResponse.json({ error: 'Objectives extraction failed' }, { status: 500 })
+    }
+
+    const rawText: string = data.choices[0]?.message?.content ?? ''
+    if (!rawText) {
       return NextResponse.json({ error: 'AI returned no text content' }, { status: 500 })
     }
 
     // Strip markdown code fences
-    let raw = textBlock.text.trim()
+    let raw = rawText.trim()
     const fenceMatch = raw.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/)
     if (fenceMatch) raw = fenceMatch[1].trim()
 
-    // GOTCHA: If Opus hit max_tokens, the JSON may be truncated mid-string.
+    // GOTCHA: If the model hit max_completion_tokens, the JSON may be truncated.
     // Try to recover by finding the last complete object in the array.
-    if (response.stop_reason === 'max_tokens') {
-      console.warn('[analyze-objectives] Opus hit max_tokens — attempting JSON repair')
-      // Find the last complete '}' that closes an array element
+    if (data.choices[0]?.finish_reason === 'length') {
+      console.warn('[analyze-objectives] Model hit max_completion_tokens — attempting JSON repair')
       const lastCompleteObj = raw.lastIndexOf('}')
       if (lastCompleteObj > 0) {
         raw = raw.slice(0, lastCompleteObj + 1) + ']'
       }
     }
 
-    return NextResponse.json({ raw, usage: response.usage, stopReason: response.stop_reason })
+    const usage = {
+      input_tokens: data.usage?.prompt_tokens ?? 0,
+      output_tokens: data.usage?.completion_tokens ?? 0,
+    }
+
+    return NextResponse.json({ raw, usage, stopReason: data.choices[0]?.finish_reason })
   } catch (error) {
-    console.error('[analyze-objectives] Opus extraction failed:', error instanceof Error ? error.message : error)
+    console.error('[analyze-objectives] Objectives extraction failed:', error instanceof Error ? error.message : error)
     return NextResponse.json({ error: 'Objectives extraction failed' }, { status: 500 })
   }
 }
