@@ -293,7 +293,8 @@ export async function callOpenAI(
       body: JSON.stringify({
         model: modelId,
         ...tokenParam,
-        temperature: 0.2,
+        // Reasoning models (gpt-5+, o3, o4) reject any explicit temperature override.
+        ...(isReasoningModel ? {} : { temperature: 0.2 }),
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: userPrompt },

@@ -530,7 +530,10 @@ What specific changes to the AI pipeline (prompts, data extraction, validation l
                 system: systemPrompt,
                 prompt: userPrompt,
                 maxTokens: 16384,
-                temperature: 0.2,
+                // temperature is intentionally omitted — reasoning models (DeepSeek V4-Pro,
+                // Kimi K2.6, GLM-5.1) reject any explicit temperature. The openrouter client
+                // detects reasoning models and omits temperature automatically; non-reasoning
+                // models default to 0 (structured-output workloads).
                 timeoutMs: 120_000,
             })
             if (!result.ok) throw new Error(result.error)

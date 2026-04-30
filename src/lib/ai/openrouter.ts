@@ -87,12 +87,39 @@ interface RawResponse {
 }
 
 /**
+ * Models that only support the default temperature and reject any explicit
+ * temperature override. Passing temperature to these models causes an API error.
+ * Pattern-matched against the model string (substring match).
+ */
+const REASONING_MODEL_PATTERNS = [
+    "deepseek-v4",       // deepseek/deepseek-v4-pro, deepseek/deepseek-v4-flash
+    "deepseek-r1",       // deepseek/deepseek-r1 variants
+    "kimi-k2",           // moonshotai/kimi-k2.6
+    "gpt-5",             // openai/gpt-5.5 (reasoning model — no temperature)
+    "o1",                // openai/o1, openai/o1-mini, openai/o1-preview
+    "o3",                // openai/o3, openai/o3-mini
+    "o4",                // openai/o4-mini
+]
+
+/**
+ * Returns true when the model is a reasoning model that does not accept a
+ * temperature parameter. Passing temperature to these models causes an API error
+ * ("Unsupported value: 'temperature' does not support X with this model").
+ */
+function isReasoningModel(model: string): boolean {
+    const lower = model.toLowerCase()
+    return REASONING_MODEL_PATTERNS.some((pattern) => lower.includes(pattern))
+}
+
+/**
  * Single-shot chat completion against OpenRouter.
  *
  * Behaviour:
  *   - Reads `OPENROUTER_API_KEY` at call time (server-side env only).
  *   - Default `maxTokens` = 16384 (sized for V4 reasoning + V4-Flash JSON).
  *   - Default `temperature` = 0 (structured-output workloads dominate).
+ *   - Temperature is OMITTED for reasoning models (GPT-5.5, DeepSeek V4,
+ *     Kimi K2.6, o1/o3/o4 families) — they reject any explicit temperature.
  *   - Default `timeoutMs` = 90_000 (BOM batches sometimes run ~60s).
  *   - Extracts text from `message.content` (final answer). Falls back to
  *     `message.reasoning_content` ONLY when `suppressReasoningFallback` is false
@@ -111,17 +138,21 @@ export async function callOpenRouter(
         }
     }
     const maxTokens = input.maxTokens ?? 16384
-    const temperature = input.temperature ?? 0
     const timeoutMs = input.timeoutMs ?? 90_000
     const messages: Array<{ role: "system" | "user"; content: string }> = []
     if (input.system) messages.push({ role: "system", content: input.system })
     messages.push({ role: "user", content: input.prompt })
 
-    const body = {
+    // Reasoning models reject any explicit temperature parameter — omit it.
+    // For non-reasoning models, default to 0 (structured-output workloads).
+    const omitTemperature = isReasoningModel(input.model)
+    const temperature = omitTemperature ? undefined : (input.temperature ?? 0)
+
+    const body: Record<string, unknown> = {
         model: input.model,
         messages,
         max_tokens: maxTokens,
-        temperature,
+        ...(temperature !== undefined ? { temperature } : {}),
     }
 
     let response: Response
