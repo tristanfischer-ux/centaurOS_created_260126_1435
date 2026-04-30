@@ -211,7 +211,7 @@ export async function POST(request: Request): Promise<Response> {
     return NextResponse.json({ error: "Module already generated", moduleId }, { status: 400 })
   }
 
-  const modelIdVal = (project.model_id || "claude-opus-4-7") as ClaudeModelId
+  const modelIdVal = (project.model_id || "gpt-5.5") as ClaudeModelId
   const researchData = project.research as { report?: string; designBrief?: CadLabDesignBrief } | null
   const researchReport = researchData?.report ?? ""
   // H4: Extract design brief from research for manufacturing constraints injection

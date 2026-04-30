@@ -1625,20 +1625,17 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                         throw new Error(`No API key configured for provider ${target.providerId} (overloaded)`)
                     }
 
-                    const isAnthropic = target.providerId === "anthropic"
-
-                    if (isAnthropic) {
-                        // ── Anthropic Tool Loop (non-streaming beta API) ──────
-                        const Anthropic = (await import("@anthropic-ai/sdk")).default
-                        const client = new Anthropic({ apiKey: targetApiKey })
+                    if (target.providerId === "openai") {
+                        // ── OpenAI Tool Loop (chat completions with function calling) ──
 
                         // Build conversation messages — fresh per attempt so a cascade
                         // doesn't reuse partial tool-loop state from the failed target.
                         const conversationMessages: Array<{
-                            role: "user" | "assistant"
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                            content: string | any[]
-                        }> = []
+                            role: "system" | "user" | "assistant" | "tool"
+                            content: string
+                            tool_call_id?: string
+                            tool_calls?: Array<{ id: string; type: "function"; function: { name: string; arguments: string } }>
+                        }> = [{ role: "system", content: systemPrompt }]
                         if (history && history.length > 0) {
                             for (const msg of history) {
                                 if (msg.role === "user" || msg.role === "assistant") {
@@ -1648,150 +1645,97 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                         }
                         conversationMessages.push({ role: "user", content: finalPrompt })
 
-                        // Build tool definitions for Anthropic format
-                        const anthropicTools: Array<{
-                            name: string
-                            description: string
-                            input_schema: Record<string, unknown>
-                        }> = tools.map((t) => ({
-                            name: t.name,
-                            description: t.description,
-                            input_schema: t.parameters,
+                        // Build tool definitions for OpenAI function-calling format
+                        const openaiTools = tools.map((t) => ({
+                            type: "function" as const,
+                            function: {
+                                name: t.name,
+                                description: t.description,
+                                parameters: t.parameters,
+                            },
                         }))
 
-                        // Add web search tool if enabled
-                        const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
-                        const allTools: Array<Record<string, unknown>> = [...anthropicTools]
-                        const betas: string[] = []
-                        if (enableWebSearch) {
-                            allTools.push({
-                                type: "web_search_20260209",
-                                name: "web_search",
-                                max_uses: 3,
-                            })
-                            betas.push(WEB_SEARCH_BETA)
-                        }
-
-                        const maxTokens = enableThinking ? 32768 : 16384
-                        const useThinking = enableThinking && target.providerId === "anthropic"
-
-                        const createParams = {
-                            model: target.modelId,
-                            max_tokens: maxTokens,
-                            system: systemPrompt,
-                            messages: conversationMessages,
-                            tools: allTools,
-                            tool_choice: { type: "auto" as const },
-                            ...(betas.length > 0 && { betas }),
-                            ...(useThinking && {
-                                thinking: {
-                                    type: "enabled" as const,
-                                    budget_tokens: 10_000,
-                                },
-                            }),
-                        }
-
-                        // Reset accumulators per attempt so a cascade doesn't include
+                        // Reset accumulators per attempt so a cascade does not include
                         // text from the previous failed provider.
                         fullOutput = ""
 
                         let loopCount = 0
-
                         while (loopCount <= MAX_TOOL_LOOPS) {
                             let response
                             try {
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete
-                                response = await client.beta.messages.create(createParams as any) as any
+                                const fetchResp = await fetch("https://api.openai.com/v1/chat/completions", {
+                                    method: "POST",
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "Authorization": `Bearer ${targetApiKey}`,
+                                    },
+                                    body: JSON.stringify({
+                                        model: target.modelId,
+                                        messages: conversationMessages,
+                                        tools: openaiTools.length > 0 ? openaiTools : undefined,
+                                        tool_choice: openaiTools.length > 0 ? "auto" : undefined,
+                                        max_completion_tokens: 16384,
+                                    }),
+                                })
+                                if (!fetchResp.ok) {
+                                    const errText = await fetchResp.text()
+                                    throw new Error(`OpenAI API error ${fetchResp.status}: ${errText}`)
+                                }
+                                response = await fetchResp.json() as {
+                                    choices: Array<{
+                                        message: {
+                                            role: string
+                                            content: string | null
+                                            tool_calls?: Array<{ id: string; type: string; function: { name: string; arguments: string } }>
+                                        }
+                                        finish_reason: string
+                                    }>
+                                }
                             } catch (err) {
                                 const msg = err instanceof Error ? err.message : String(err)
                                 if (hasEmittedToClient && isRetryableError(msg)) {
-                                    // Wrap as non-retryable so withFailover doesn't cascade after we've
+                                    // Wrap as non-retryable so withFailover does not cascade after we have
                                     // already shipped tokens to the client.
                                     throw new Error(`mid-stream provider failure (no fallback): ${msg}`)
                                 }
                                 throw err
                             }
 
-                            // Handle pause_turn (web search continuation)
-                            let finalResponse = response
-                            let continueCount = 0
-                            while (finalResponse.stop_reason === "pause_turn" && continueCount < 3) {
-                                continueCount++
-                                const continueMessages = [
-                                    ...conversationMessages,
-                                    { role: "assistant" as const, content: finalResponse.content },
-                                    { role: "user" as const, content: "Continue." },
-                                ]
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta API types incomplete for pause_turn
-                                finalResponse = await client.beta.messages.create({
-                                    ...createParams,
-                                    messages: continueMessages,
-                                } as any) as any
-                            }
+                            const choice = response.choices[0]
+                            if (!choice) break
 
-                            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Anthropic beta response content blocks have variable shape
-                            const content: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown>; citations?: Array<{ url?: string; title?: string; cited_text?: string }> }> = finalResponse.content ?? []
+                            const assistantMessage = choice.message
+                            const toolCallBlocks = assistantMessage.tool_calls ?? []
+                            const textContent = assistantMessage.content ?? ""
 
-                            // Check if the model wants to use tools
-                            const toolUseBlocks = content.filter(b => b.type === "tool_use")
-                            const textBlocks = content.filter(b => b.type === "text")
-
-                            // Stream any intermediate text the model produced before tool calls
-                            for (const block of textBlocks) {
-                                if (block.text) {
-                                    const chunkSize = 100
-                                    for (let i = 0; i < block.text.length; i += chunkSize) {
-                                        const text = block.text.slice(i, i + chunkSize)
-                                        fullOutput += text
-                                        hasEmittedToClient = true
-                                        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
-                                    }
+                            // Stream any text the model produced before or instead of tool calls
+                            if (textContent) {
+                                const chunkSize = 100
+                                for (let i = 0; i < textContent.length; i += chunkSize) {
+                                    const text = textContent.slice(i, i + chunkSize)
+                                    fullOutput += text
+                                    hasEmittedToClient = true
+                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ text })}\n\n`))
                                 }
                             }
 
-                            // Extract and emit web search citations
-                            const citations: Array<{ title: string; url: string; snippet: string }> = []
-                            const seenUrls = new Set<string>()
-                            for (const block of content) {
-                                if (block.type === "text" && block.citations) {
-                                    for (const c of block.citations) {
-                                        const url = c.url ?? ""
-                                        if (url && !seenUrls.has(url)) {
-                                            seenUrls.add(url)
-                                            citations.push({
-                                                title: (c.title ?? "Source").toString(),
-                                                url,
-                                                snippet: (c.cited_text ?? "").slice(0, 200),
-                                            })
-                                        }
-                                    }
-                                }
-                            }
-                            if (citations.length > 0) {
-                                try {
-                                    controller.enqueue(encoder.encode(`data: ${JSON.stringify({ webSources: citations })}\n\n`))
-                                } catch {
-                                    // Stream may be closed
-                                }
-                            }
-
-                            // If no tool calls or we've hit the limit, we're done
-                            if (toolUseBlocks.length === 0 || loopCount >= MAX_TOOL_LOOPS) {
+                            // If no tool calls or we have hit the limit, we are done
+                            if (toolCallBlocks.length === 0 || loopCount >= MAX_TOOL_LOOPS) {
                                 break
                             }
 
                             // Stream tool-use markers to the client for UX feedback
-                            for (const toolBlock of toolUseBlocks) {
+                            for (const toolCall of toolCallBlocks) {
                                 try {
                                     hasEmittedToClient = true
                                     controller.enqueue(encoder.encode(
-                                        `data: ${JSON.stringify({ toolUse: { name: toolBlock.name, id: toolBlock.id } })}\n\n`,
+                                        `data: ${JSON.stringify({ toolUse: { name: toolCall.function.name, id: toolCall.id } })}\n\n`,
                                     ))
                                 } catch {
                                     // Stream may be closed
                                 }
                                 console.info("[agents/execute] Tool call:", {
-                                    tool: toolBlock.name,
+                                    tool: toolCall.function.name,
                                     specialistId,
                                     loopIteration: loopCount,
                                 })
@@ -1799,25 +1743,37 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
 
                             // Execute all tool calls in parallel for lower latency
                             const toolResults = await Promise.all(
-                                toolUseBlocks.map(async (toolBlock) => {
+                                toolCallBlocks.map(async (toolCall) => {
+                                    let parsedInput: Record<string, unknown> = {}
+                                    try {
+                                        parsedInput = JSON.parse(toolCall.function.arguments) as Record<string, unknown>
+                                    } catch { /* use empty input */ }
                                     const result = await executeToolCall(
-                                        toolBlock.name!,
-                                        (toolBlock.input ?? {}) as Record<string, unknown>,
+                                        toolCall.function.name,
+                                        parsedInput,
                                         { foundryId, specialistId, userId, threadId },
                                     )
                                     return {
-                                        type: "tool_result" as const,
-                                        tool_use_id: toolBlock.id!,
+                                        role: "tool" as const,
+                                        tool_call_id: toolCall.id,
                                         content: result,
                                     }
                                 })
                             )
 
-                            // Append the assistant's response (with tool_use) and tool results to messages
+                            // Append the assistant response (with tool_calls) and tool results to messages
                             conversationMessages.push({
                                 role: "assistant",
-                                content: finalResponse.content,
+                                content: textContent,
+                                tool_calls: toolCallBlocks.map(tc => ({
+                                    id: tc.id,
+                                    type: "function" as const,
+                                    function: { name: tc.function.name, arguments: tc.function.arguments },
+                                })),
                             })
+                            for (const tr of toolResults) {
+                                conversationMessages.push(tr)
+                            }
 
                             loopCount++
                             const remaining = MAX_TOOL_LOOPS - loopCount
@@ -1825,14 +1781,8 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                             // Inject tools_remaining counter so the model can plan its tool usage
                             conversationMessages.push({
                                 role: "user",
-                                content: [
-                                    ...toolResults,
-                                    { type: "text", text: `[System: ${remaining} tool call${remaining === 1 ? "" : "s"} remaining]` },
-                                ],
+                                content: `[System: ${remaining} tool call${remaining === 1 ? "" : "s"} remaining]`,
                             })
-
-                            // Update createParams with new messages for next iteration
-                            createParams.messages = conversationMessages
                         }
                     } else {
                         // ── Non-Anthropic: inject tool context into system prompt ──
