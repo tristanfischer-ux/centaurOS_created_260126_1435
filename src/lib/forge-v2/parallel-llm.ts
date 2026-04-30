@@ -411,6 +411,353 @@ Be decisive. Pick one winner. Only synthesise if the combination is clearly bett
     }
 }
 
+// ── Chase 10-model multi-lineage lineup ──────────────────────────────
+
+/**
+ * 10 models from 10 different training lineages for Chase (Stage 1).
+ * Lineage diversity is the primary mechanism for catching hallucinated
+ * sources and achieving factual cross-validation on research synthesis.
+ */
+function buildChaseFullLineup(): ModelConfig[] {
+    return [
+        // 1. US OpenAI — strongest general-purpose frontier
+        makeOpenAIModel("gpt-5.5", "GPT-5.5"),
+        // 2. China DeepSeek — deep reasoning, different RLHF priors
+        makeDeepSeekModel(),
+        // 3. US Google — best long-document research synthesis
+        makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
+        // 4. China Moonshot — different open-weight lineage, multimodal
+        {
+            id: "moonshotai/kimi-k2.6",
+            displayName: "Kimi K2.6",
+            lineage: "Moonshot (China)",
+            call: async (system, user) => {
+                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+                const response = await fetchWithTimeout(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: "moonshotai/kimi-k2.6",
+                            max_tokens: 16000,
+                            temperature: 0.2,
+                            messages: [
+                                { role: "system", content: system },
+                                { role: "user", content: user },
+                            ],
+                        }),
+                    },
+                    180_000,
+                )
+                if (!response.ok) {
+                    const errText = await response.text()
+                    throw new Error(`Kimi K2.6 error (${response.status}): ${errText.slice(0, 300)}`)
+                }
+                const data = await response.json()
+                const content = data.choices?.[0]?.message?.content ?? ""
+                const reasoning = data.choices?.[0]?.message?.reasoning_content ?? ""
+                return content || reasoning
+            },
+        },
+        // 5. China Alibaba MoE — Qwen 3 235B, strong JSON + logic
+        makeQwenModel(),
+        // 6. US xAI — adversarial lineage, willing to challenge consensus
+        {
+            id: "x-ai/grok-3",
+            displayName: "Grok-3",
+            lineage: "xAI (US)",
+            call: async (system, user) => {
+                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+                const response = await fetchWithTimeout(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: "x-ai/grok-3",
+                            max_tokens: 16000,
+                            temperature: 0.2,
+                            messages: [
+                                { role: "system", content: system },
+                                { role: "user", content: user },
+                            ],
+                        }),
+                    },
+                    180_000,
+                )
+                if (!response.ok) {
+                    const errText = await response.text()
+                    throw new Error(`Grok-3 error (${response.status}): ${errText.slice(0, 300)}`)
+                }
+                const data = await response.json()
+                return data.choices?.[0]?.message?.content ?? ""
+            },
+        },
+        // 7. EU Mistral — different non-US priors, catches US-default assumptions
+        {
+            id: "mistralai/mistral-large-2407",
+            displayName: "Mistral Large",
+            lineage: "Mistral (EU)",
+            call: async (system, user) => {
+                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+                const response = await fetchWithTimeout(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: "mistralai/mistral-large-2407",
+                            max_tokens: 16000,
+                            temperature: 0.2,
+                            messages: [
+                                { role: "system", content: system },
+                                { role: "user", content: user },
+                            ],
+                        }),
+                    },
+                    180_000,
+                )
+                if (!response.ok) {
+                    const errText = await response.text()
+                    throw new Error(`Mistral Large error (${response.status}): ${errText.slice(0, 300)}`)
+                }
+                const data = await response.json()
+                return data.choices?.[0]?.message?.content ?? ""
+            },
+        },
+        // 8. China Alibaba 1M-context — Qwen3.6-Plus, ideal for long research prompts
+        {
+            id: "qwen/qwen3.6-plus",
+            displayName: "Qwen3.6-Plus",
+            lineage: "Alibaba 1M-ctx (China)",
+            call: async (system, user) => {
+                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+                const response = await fetchWithTimeout(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: "qwen/qwen3.6-plus",
+                            max_tokens: 16000,
+                            temperature: 0.2,
+                            messages: [
+                                { role: "system", content: system },
+                                { role: "user", content: user },
+                            ],
+                        }),
+                    },
+                    180_000,
+                )
+                if (!response.ok) {
+                    const errText = await response.text()
+                    throw new Error(`Qwen3.6-Plus error (${response.status}): ${errText.slice(0, 300)}`)
+                }
+                const data = await response.json()
+                const content = data.choices?.[0]?.message?.content ?? ""
+                const reasoning = data.choices?.[0]?.message?.reasoning_content ?? ""
+                return content || reasoning
+            },
+        },
+        // 9. China DeepSeek Flash — faster DeepSeek tier, different temperature regime
+        {
+            id: "deepseek/deepseek-v4-flash",
+            displayName: "DeepSeek V4-Flash",
+            lineage: "DeepSeek Flash (China)",
+            call: async (system, user) => {
+                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+                const response = await fetchWithTimeout(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: "deepseek/deepseek-v4-flash",
+                            max_tokens: 16000,
+                            temperature: 0.2,
+                            messages: [
+                                { role: "system", content: system },
+                                { role: "user", content: user },
+                            ],
+                        }),
+                    },
+                    180_000,
+                )
+                if (!response.ok) {
+                    const errText = await response.text()
+                    throw new Error(`DeepSeek V4-Flash error (${response.status}): ${errText.slice(0, 300)}`)
+                }
+                const data = await response.json()
+                const content = data.choices?.[0]?.message?.content ?? ""
+                const reasoning = data.choices?.[0]?.message?.reasoning_content ?? ""
+                return content || reasoning
+            },
+        },
+        // 10. US Google Flash — faster Gemini tier, different reasoning path
+        makeGeminiModel("gemini-2.5-flash", "Gemini 2.5 Flash"),
+    ]
+}
+
+// ── Tournament bracket judge helper ──────────────────────────────────
+
+async function judgeGroup(
+    candidates: Array<{ model: string; lineage: string; output: string }>,
+    selectionCriteria: string,
+    roundLabel: string,
+): Promise<{ model: string; lineage: string; output: string }> {
+    if (candidates.length === 1) return candidates[0]
+
+    const judgeSystem = `You are comparing ${candidates.length} research synthesis outputs for a hardware product development pipeline.
+Your job: select the BEST output based on this criteria: ${selectionCriteria}
+
+Return ONLY valid JSON with no markdown fences:
+{
+  "winner": <1-based index of the best output>,
+  "reason": "<1-2 sentences explaining the selection>"
+}
+
+Be decisive. Pick one winner.`
+
+    const judgeUser = candidates
+        .map((c, i) => `--- OUTPUT ${i + 1} (${c.model}, lineage: ${c.lineage}) ---\n${c.output.slice(0, 4000)}\n`)
+        .join("\n")
+
+    try {
+        const { text: judgeText } = await callOpenAI(judgeSystem, judgeUser, "gpt-4.1-mini", 4096, 60_000)
+        const cleaned = judgeText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+        const result = JSON.parse(cleaned) as { winner: number; reason: string }
+        const winnerIdx = Math.max(0, Math.min(result.winner - 1, candidates.length - 1))
+        console.info(`[parallel-llm] ${roundLabel}: judge picked candidate ${result.winner} (${candidates[winnerIdx].model}). Reason: ${result.reason}`)
+        return candidates[winnerIdx]
+    } catch (err) {
+        // Judge failed — pick longest response as fallback
+        const fallback = candidates.reduce((best, c) => c.output.length > best.output.length ? c : best)
+        console.warn(`[parallel-llm] ${roundLabel}: judge failed, using longest response (${fallback.model}, ${fallback.output.length} chars). Error: ${err instanceof Error ? err.message : err}`)
+        return fallback
+    }
+}
+
+/**
+ * Runs 10 models from different lineages in parallel for Chase (Stage 1),
+ * then uses a tournament bracket with gpt-4.1-mini as judge to select the best.
+ *
+ * Tournament structure:
+ *   Round 1: 4 groups of ~2-3 models each → 4 group winners
+ *   Round 2 (final): 4 group winners → 1 overall winner
+ *
+ * Requires at least 5 successful responses to proceed. If fewer succeed,
+ * falls back to whatever we have (or the single-model path if only 1 succeeded).
+ *
+ * @param systemPrompt - The system prompt for all models
+ * @param userPrompt   - The user prompt (should include DB grounding)
+ * @param selectionCriteria - What makes one output "better" for the judge
+ * @returns The winning output with metadata
+ */
+export async function runChaseMultiLineage(
+    systemPrompt: string,
+    userPrompt: string,
+    selectionCriteria: string,
+): Promise<ParallelLLMResult> {
+    const models = buildChaseFullLineup()
+    const MIN_SUCCESSFUL = 5
+
+    console.info(`[parallel-llm] Chase multi-lineage: launching ${models.length} models in parallel — ${models.map((m) => m.displayName).join(", ")}`)
+
+    // Run all models in parallel, collect results gracefully
+    const settled = await Promise.allSettled(
+        models.map(async (model) => {
+            const start = Date.now()
+            try {
+                const output = await model.call(systemPrompt, userPrompt)
+                const elapsed = Date.now() - start
+                console.info(`[parallel-llm] Chase ${model.displayName} completed in ${elapsed}ms (${output.length} chars)`)
+                return { model: model.displayName, lineage: model.lineage, output, error: undefined }
+            } catch (err) {
+                const elapsed = Date.now() - start
+                const errMsg = err instanceof Error ? err.message : String(err)
+                console.warn(`[parallel-llm] Chase ${model.displayName} failed after ${elapsed}ms: ${errMsg}`)
+                return { model: model.displayName, lineage: model.lineage, output: "", error: errMsg }
+            }
+        }),
+    )
+
+    const allOutputs = settled.map((r) =>
+        r.status === "fulfilled"
+            ? r.value
+            : { model: "unknown", lineage: "unknown", output: "", error: r.reason?.message ?? "unknown error" },
+    )
+
+    const successful = allOutputs.filter((o) => o.output.length > 100 && !o.error)
+
+    console.info(`[parallel-llm] Chase multi-lineage: ${successful.length}/${models.length} models returned usable output`)
+
+    // Not enough successful responses — use what we have with a warning
+    if (successful.length < MIN_SUCCESSFUL) {
+        console.warn(`[parallel-llm] Chase multi-lineage: only ${successful.length} models succeeded (minimum ${MIN_SUCCESSFUL}). Proceeding with available responses.`)
+    }
+
+    // If only 1 (or 0) succeeded, skip tournament entirely
+    if (successful.length <= 1) {
+        const best = successful[0] ?? allOutputs[0]
+        return {
+            bestOutput: best.output,
+            winnerModel: best.model,
+            selectionReason: `Only ${successful.length} model(s) returned usable output; ${best.model} used directly.`,
+            allOutputs: allOutputs.map((o) => ({ model: o.model, output: o.output.slice(0, 500), error: o.error })),
+            judgeUsed: false,
+        }
+    }
+
+    // If 5 or fewer succeeded, skip tournament and do a single judge call
+    if (successful.length <= 5) {
+        console.info(`[parallel-llm] Chase: ${successful.length} successful — direct judge call (no tournament needed)`)
+        const winner = await judgeGroup(successful as Array<{ model: string; lineage: string; output: string }>, selectionCriteria, "Direct judge")
+        return {
+            bestOutput: winner.output,
+            winnerModel: winner.model,
+            selectionReason: `Direct judge (${successful.length} models): ${winner.model} selected.`,
+            allOutputs: allOutputs.map((o) => ({ model: o.model, output: o.output.slice(0, 500), error: o.error })),
+            judgeUsed: true,
+        }
+    }
+
+    // Tournament bracket: split into 4 groups, judge each group, then judge the 4 winners
+    const successfulCandidates = successful as Array<{ model: string; lineage: string; output: string }>
+    const groupCount = 4
+    const groups: Array<Array<{ model: string; lineage: string; output: string }>> = [[], [], [], []]
+    successfulCandidates.forEach((c, i) => groups[i % groupCount].push(c))
+
+    console.info(`[parallel-llm] Chase tournament Round 1: ${groupCount} groups of sizes [${groups.map((g) => g.length).join(", ")}]`)
+
+    // Round 1: judge each group in parallel
+    const round1Winners = await Promise.all(
+        groups
+            .filter((g) => g.length > 0)
+            .map((group, i) => judgeGroup(group, selectionCriteria, `Round 1 Group ${i + 1}`)),
+    )
+
+    console.info(`[parallel-llm] Chase tournament Round 2 (final): ${round1Winners.length} finalists — ${round1Winners.map((w) => w.model).join(", ")}`)
+
+    // Round 2 (final): judge the group winners
+    const overallWinner = await judgeGroup(round1Winners, selectionCriteria, "Round 2 Final")
+
+    console.info(`[parallel-llm] Chase multi-lineage winner: ${overallWinner.model}`)
+
+    return {
+        bestOutput: overallWinner.output,
+        winnerModel: overallWinner.model,
+        selectionReason: `Tournament bracket (${successfulCandidates.length} models, ${round1Winners.length} finalists): ${overallWinner.model} won.`,
+        allOutputs: allOutputs.map((o) => ({ model: o.model, output: o.output.slice(0, 500), error: o.error })),
+        judgeUsed: true,
+    }
+}
+
 // ── Convenience wrapper matching callClaude/callOpenAI signature ─────
 
 /**

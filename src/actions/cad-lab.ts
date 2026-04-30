@@ -543,21 +543,22 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         : ""
       const synthesisUserPrompt = `Product to research: ${description}\n\n${rawContext}${standardsSection}${engineeringDataSection}${marketplaceSupplierSection}${docSection}`
 
-      // Parallel-and-compare: run 3 models (GPT-5.5 + DeepSeek V4-Pro + Gemini 3.1 Pro)
-      // on the SAME synthesis prompt. gpt-4.1-mini judges and picks the best output.
-      // Falls back to single-model Gemini → OpenAI → DeepSeek chain if parallel fails.
+      // Multi-lineage tournament: run 10 models from 10 different training lineages
+      // in parallel, then use a 2-round tournament (gpt-4.1-mini judge) to pick the best.
+      // 10 models: GPT-5.5, DeepSeek V4-Pro, Gemini 3.1 Pro, Kimi K2.6, Qwen 3 235B,
+      // Grok-3, Mistral Large, Qwen3.6-Plus, DeepSeek V4-Flash, Gemini 2.5 Flash.
+      // Falls back to single-model Gemini → OpenAI → DeepSeek chain if all fail.
       try {
-        const { runParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
-        console.info("[THE-FORGE] Step 1: Running parallel-and-compare synthesis (domain: %s)...", domain)
-        const parallelResult = await runParallelAndCompare(
+        const { runChaseMultiLineage } = await import("@/lib/forge-v2/parallel-llm")
+        console.info("[THE-FORGE] Step 1: Running Chase multi-lineage tournament (10 models, domain: %s)...", domain)
+        const parallelResult = await runChaseMultiLineage(
           synthesisPrompt,
           synthesisUserPrompt,
-          "waiting_chase",
           "Select the output with the most comprehensive research: verified sources with URLs, quantitative market sizing, named competitors with specs, and regulatory coverage. Prefer outputs grounded in real data over generic summaries.",
         )
         report = parallelResult.bestOutput
         synthesisModel = parallelResult.winnerModel
-        console.info(`[THE-FORGE] Step 1: Parallel-and-compare winner: ${parallelResult.winnerModel} — ${parallelResult.selectionReason}`)
+        console.info(`[THE-FORGE] Step 1: Chase multi-lineage winner: ${parallelResult.winnerModel} — ${parallelResult.selectionReason}`)
       } catch (parallelErr) {
         console.warn("[THE-FORGE] Step 1: Parallel-and-compare failed, falling back to single-model chain:", parallelErr instanceof Error ? parallelErr.message : String(parallelErr))
         try {
