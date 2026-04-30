@@ -409,6 +409,7 @@ export async function checkFoundryCohortGate(
         .eq("foundry_id", foundryId)
         .not("autopilot_state", "is", null)
         .not("autopilot_state->>started_at", "is", null)
+        .eq("autopilot_state->>stage", stage)
 
     if (!projects?.length) {
         return { allPassed: false, results: [] }
