@@ -71,6 +71,9 @@ import { callClaude, callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import type {
     CadLabDesignBrief,
+    CadLabDesignBriefCompetitor,
+    CadLabDesignBriefMarketSizing,
+    CadLabDesignBriefSource,
     CadLabResearchResult,
 } from "@/lib/cad-lab-types"
 import { triageRegulatoryMatrix } from "@/lib/regulatory-triage"
@@ -548,6 +551,14 @@ async function runChaseResearchInternal(
                 },
                 regulatory:
                     extraction.brief?.regulatory || priorDesignBrief?.regulatory,
+                // New fields — always prefer fresh extraction; no prior
+                // to preserve (founders don't edit these in the Brief UI).
+                sources:
+                    extraction.brief?.sources || priorDesignBrief?.sources,
+                marketSizing:
+                    extraction.brief?.marketSizing || priorDesignBrief?.marketSizing,
+                competitors:
+                    extraction.brief?.competitors || priorDesignBrief?.competitors,
             }
 
             // Item 2 (council 2026-04-29): regulatory triage — post-Chase pass.
@@ -984,6 +995,83 @@ JSON shape:
     "markets": ["GB","US"] or null,
     "productionRegion": string or null
   },
+  "sources": [
+    {
+      "title": "Full title of the source (e.g. 'IEA World Energy Outlook 2024')",
+      "type": "academic | industry_report | government | market_research | standard | other",
+      "year": 2024,
+      "publisher": "Issuing body or publisher name",
+      "relevance": "One sentence — what this source establishes and why it was cited (e.g. 'Provides CAGR and TAM figures for stationary BESS market 2024–2030')"
+    }
+  ],
+  "marketSizing": {
+    "tamMUsd": 42000,
+    "samMUsd": 8500,
+    "somMUsd": 340,
+    "cagrPct": 18.4,
+    "cagrPeriod": "2024–2030",
+    "primarySource": "BloombergNEF Energy Storage Market Outlook 2024",
+    "segments": [
+      {
+        "name": "Behind-the-meter commercial BESS, United Kingdom",
+        "sizeMUsd": 1200,
+        "year": 2024,
+        "source": "Aurora Energy Research UK BESS Report 2024"
+      },
+      {
+        "name": "Grid-scale front-of-meter BESS, United Kingdom",
+        "sizeMUsd": 3800,
+        "year": 2024,
+        "source": "National Grid ESO Electricity Ten Year Statement 2024"
+      },
+      {
+        "name": "Industrial and commercial microgrid BESS, European Union",
+        "sizeMUsd": 5200,
+        "year": 2024,
+        "source": "Wood Mackenzie European Energy Storage Monitor Q3 2024"
+      }
+    ],
+    "tailwinds": [
+      "United Kingdom Contracts for Difference reforms improving grid-scale BESS revenue stacking",
+      "Falling lithium iron phosphate cell costs — below $60/kWh at pack level by 2025",
+      "National Grid ESO capacity market clearing prices rising due to coal exit"
+    ]
+  },
+  "competitors": [
+    {
+      "name": "Fluence Energy",
+      "countryIso": "US",
+      "product": "Gridstack modular BESS platform, 500 kWh–100 MWh+",
+      "technicalSpecs": "Lithium iron phosphate cells, 1.5 MWh per 20ft container, round-trip efficiency 87–92%, 10-year performance warranty",
+      "pricing": "£350–£500/kWh installed at utility scale (2024 estimates)",
+      "marketSharePct": 12,
+      "strengths": "Strong United Kingdom project pipeline (Mersey Grid, Sunnica), deep EPC integration, proven DNO interconnection track record",
+      "weaknesses": "No United Kingdom manufacturing — supply chain lead times 18–24 months; not cost-competitive below 5 MWh",
+      "differentiationAngle": "Compete on delivery speed and UK-local supply chain for sub-5 MWh commercial projects where Fluence minimum order size is a barrier"
+    },
+    {
+      "name": "Powin Energy",
+      "countryIso": "US",
+      "product": "Stack140 and Stack225 modular BESS, software-defined architecture",
+      "technicalSpecs": "Modular 140 kWh and 225 kWh stacks, integrated Stack OS energy management system, lithium iron phosphate chemistry",
+      "pricing": "£300–£450/kWh installed depending on project scale",
+      "marketSharePct": 7,
+      "strengths": "Software-differentiated stack management, strong North American installed base, modular architecture reduces installation time",
+      "weaknesses": "Limited United Kingdom project references; Stack OS proprietary lock-in concerns for asset owners",
+      "differentiationAngle": "Open-protocol energy management system and UK-certified installation pathway as differentiators for asset owners wary of software lock-in"
+    },
+    {
+      "name": "BYD Battery-Box",
+      "countryIso": "CN",
+      "product": "HVS and HVM commercial and industrial BESS, 10 kWh–1 MWh",
+      "technicalSpecs": "Lithium iron phosphate blade battery, 48 V and high-voltage architecture, integrated BMS, IEC 62619 certified",
+      "pricing": "£180–£280/kWh installed at commercial scale",
+      "marketSharePct": 18,
+      "strengths": "Lowest cost per kWh at scale, vertically integrated cell manufacturing, strong United Kingdom distributor network",
+      "weaknesses": "Tariff risk post-2024 United Kingdom import reviews; limited UK after-sales service depth; geopolitical procurement concerns for public sector buyers",
+      "differentiationAngle": "Position as UK-certified, locally supported alternative for public sector and regulated-utility buyers with procurement constraints on Chinese supply chain"
+    }
+  ],
   "regulatory": [
     {
       "code": "BS EN IEC 62933-5-2",
@@ -1001,6 +1089,9 @@ JSON shape:
 
 Rules:
 - Ground every field in the report. If the report doesn't mention a constraint, use null — do NOT invent numbers or dates.
+- "sources" MUST contain at least 3 citations and MUST include at least one from each of these categories: (a) a government or regulatory publication, (b) an industry report or market research source (e.g. BloombergNEF, Wood Mackenzie, Mordor Intelligence, IDC, MarketsandMarkets), (c) a technical standard or academic paper. If the research report names specific reports or data sources, cite them. If it does not, infer the most authoritative sources for this product class and cite them explicitly — do NOT leave sources empty. Source diversity is scored by the council and an empty array scores 0/10.
+- "marketSizing" is REQUIRED — do not omit or null this block. Provide: (a) TAM in USD million with the year the estimate applies, (b) SAM scoped to the founder's accessible geography and customer segment, (c) SOM as a realistic 5-year target for a new entrant, (d) CAGR as a percentage with the period (e.g. "2024–2030"), (e) at least 3 named market segments each with a USD million size estimate and the source. If the report gives ranges, use the midpoint. If the report gives no market data at all, use the most credible public estimates for this product class and note the source — do NOT return null for this field. Quantitative market data is scored by the council and a missing block scores 0/10.
+- "competitors" MUST contain at least 3 named, real companies or products competing in this market. For each: (a) company or product name, (b) core product description, (c) at least one technical specification (capacity, efficiency, power rating, price point, or similar), (d) indicative pricing in GBP or USD (state which), (e) strengths and weaknesses grounded in the report or public knowledge, (f) a specific differentiationAngle the founder can use. Do NOT list generic categories ("established incumbents") — name the specific company. Competitor analysis is scored by the council and fewer than 3 named competitors scores 0/10.
 - "regulatory" must be a project-specific compliance matrix, NOT a list of well-known standards. Each row needs applicability + designImpact + evidenceRequired + ownerRole + gapAction filled out. Generic standard descriptions without project-mapped obligations are a regression — every row must connect a clause to a design decision.
 - "applicability" MUST start with one of these regime tags, followed by " — " and the project-specific scope text:
   - "UK statutory" — Acts, Regulations, or statutory instruments that legally apply (UKCA marking, BS 7671, ESQCR, EAWR, Electrical Equipment Safety Regs, Supply of Machinery Safety Regs, EMC Regs, RED, RoHS, WEEE, PSTI, PESR, CDM, GPSR, HSWA, Food Safety Act, MHRA Class designation, Ofcom radio, etc.).
@@ -1515,6 +1606,105 @@ function normaliseBriefShape(
             .filter((r) => r.code.length > 0 && r.name.length > 0)
         if (regulatory.length > 0) {
             brief.regulatory = regulatory
+        }
+    }
+
+    // ── sources ──────────────────────────────────────────────────────────
+    // Parse the citations Chase produced during research. Minimum 3 required
+    // for a healthy source_diversity score. We silently drop malformed rows
+    // (missing title or relevance) to avoid corrupting the column.
+    if (Array.isArray(raw.sources)) {
+        const VALID_SOURCE_TYPES = new Set([
+            "academic", "industry_report", "government", "market_research", "standard", "other",
+        ])
+        const sources: CadLabDesignBriefSource[] = raw.sources
+            .filter((s): s is Record<string, unknown> => !!s && typeof s === "object")
+            .map((s) => {
+                const title = typeof s.title === "string" ? s.title.trim() : ""
+                const relevance = typeof s.relevance === "string" ? s.relevance.trim() : ""
+                if (!title || !relevance) return null
+                const rawType = typeof s.type === "string" ? s.type.trim() : "other"
+                const type = VALID_SOURCE_TYPES.has(rawType)
+                    ? (rawType as CadLabDesignBriefSource["type"])
+                    : "other"
+                const entry: CadLabDesignBriefSource = { title, type, relevance }
+                if (typeof s.year === "number" && Number.isFinite(s.year)) entry.year = s.year
+                if (typeof s.publisher === "string" && s.publisher.trim()) entry.publisher = s.publisher.trim()
+                return entry
+            })
+            .filter((s): s is CadLabDesignBriefSource => s !== null)
+        if (sources.length > 0) {
+            brief.sources = sources
+        }
+    }
+
+    // ── marketSizing ─────────────────────────────────────────────────────
+    // Parse the TAM/SAM/SOM block. Required for quantitative_market_data score.
+    // All numeric fields must be finite positive numbers; drop the block if
+    // the core four are absent.
+    if (raw.marketSizing && typeof raw.marketSizing === "object") {
+        const ms = raw.marketSizing as Record<string, unknown>
+        const tamMUsd = typeof ms.tamMUsd === "number" && Number.isFinite(ms.tamMUsd) ? ms.tamMUsd : null
+        const samMUsd = typeof ms.samMUsd === "number" && Number.isFinite(ms.samMUsd) ? ms.samMUsd : null
+        const somMUsd = typeof ms.somMUsd === "number" && Number.isFinite(ms.somMUsd) ? ms.somMUsd : null
+        const cagrPct = typeof ms.cagrPct === "number" && Number.isFinite(ms.cagrPct) ? ms.cagrPct : null
+        const cagrPeriod = typeof ms.cagrPeriod === "string" ? ms.cagrPeriod.trim() : ""
+        const primarySource = typeof ms.primarySource === "string" ? ms.primarySource.trim() : ""
+        if (tamMUsd !== null && samMUsd !== null && somMUsd !== null && cagrPct !== null) {
+            const segments: CadLabDesignBriefMarketSizing["segments"] = []
+            if (Array.isArray(ms.segments)) {
+                for (const seg of ms.segments) {
+                    if (!seg || typeof seg !== "object") continue
+                    const segR = seg as Record<string, unknown>
+                    const segName = typeof segR.name === "string" ? segR.name.trim() : ""
+                    const segSize = typeof segR.sizeMUsd === "number" && Number.isFinite(segR.sizeMUsd) ? segR.sizeMUsd : null
+                    const segYear = typeof segR.year === "number" && Number.isFinite(segR.year) ? segR.year : null
+                    const segSource = typeof segR.source === "string" ? segR.source.trim() : ""
+                    if (segName && segSize !== null && segYear !== null) {
+                        segments.push({ name: segName, sizeMUsd: segSize, year: segYear, source: segSource })
+                    }
+                }
+            }
+            const sizing: CadLabDesignBriefMarketSizing = {
+                tamMUsd,
+                samMUsd,
+                somMUsd,
+                cagrPct,
+                cagrPeriod,
+                primarySource,
+                segments,
+            }
+            if (Array.isArray(ms.tailwinds)) {
+                const tailwinds = ms.tailwinds.filter((t): t is string => typeof t === "string" && t.trim().length > 0)
+                if (tailwinds.length > 0) sizing.tailwinds = tailwinds
+            }
+            brief.marketSizing = sizing
+        }
+    }
+
+    // ── competitors ───────────────────────────────────────────────────────
+    // Parse named competitor entries. Minimum 3 required for competitor_analysis
+    // score. Drop rows missing name, product, or differentiationAngle.
+    if (Array.isArray(raw.competitors)) {
+        const competitors: CadLabDesignBriefCompetitor[] = raw.competitors
+            .filter((c): c is Record<string, unknown> => !!c && typeof c === "object")
+            .map((c) => {
+                const name = typeof c.name === "string" ? c.name.trim() : ""
+                const product = typeof c.product === "string" ? c.product.trim() : ""
+                const strengths = typeof c.strengths === "string" ? c.strengths.trim() : ""
+                const weaknesses = typeof c.weaknesses === "string" ? c.weaknesses.trim() : ""
+                const differentiationAngle = typeof c.differentiationAngle === "string" ? c.differentiationAngle.trim() : ""
+                if (!name || !product || !differentiationAngle) return null
+                const entry: CadLabDesignBriefCompetitor = { name, product, strengths, weaknesses, differentiationAngle }
+                if (typeof c.countryIso === "string" && c.countryIso.trim()) entry.countryIso = c.countryIso.trim()
+                if (typeof c.technicalSpecs === "string" && c.technicalSpecs.trim()) entry.technicalSpecs = c.technicalSpecs.trim()
+                if (typeof c.pricing === "string" && c.pricing.trim()) entry.pricing = c.pricing.trim()
+                if (typeof c.marketSharePct === "number" && Number.isFinite(c.marketSharePct)) entry.marketSharePct = c.marketSharePct
+                return entry
+            })
+            .filter((c): c is CadLabDesignBriefCompetitor => c !== null)
+        if (competitors.length > 0) {
+            brief.competitors = competitors
         }
     }
 

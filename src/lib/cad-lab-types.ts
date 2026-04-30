@@ -44,6 +44,23 @@ export interface CadLabDesignBrief {
   constraints?: CadLabDesignBriefConstraints
   /** Per-project regulatory posture — what standards apply and where we are against each. */
   regulatory?: CadLabDesignBriefRegulatoryItem[]
+  /**
+   * Source citations supporting the research — academic papers, industry reports,
+   * government standards, market research. Minimum 3 entries required by the
+   * source_diversity scoring rubric.
+   */
+  sources?: CadLabDesignBriefSource[]
+  /**
+   * Quantitative market sizing — TAM, SAM, SOM with CAGR and segment breakdown.
+   * Required by the quantitative_market_data scoring rubric.
+   */
+  marketSizing?: CadLabDesignBriefMarketSizing
+  /**
+   * Named competitor analysis — minimum 3 competitors with technical specs,
+   * pricing, market share, and differentiation. Required by the
+   * competitor_analysis scoring rubric.
+   */
+  competitors?: CadLabDesignBriefCompetitor[]
 }
 
 /**
@@ -155,6 +172,84 @@ export interface CadLabDesignBriefRegulatoryItem {
   /** Loop 3 P4: the next concrete action for this standard — what the
    *  founder does next to advance status from "not-started". */
   gapAction?: string
+}
+
+/**
+ * A source citation produced by Chase during research.
+ * Populates CadLabDesignBrief.sources for the source_diversity scoring rubric.
+ */
+export interface CadLabDesignBriefSource {
+  /** Short label (e.g. "IEA World Energy Outlook 2024") */
+  title: string
+  /** Category of source — academic, industry_report, government, market_research, standard */
+  type: "academic" | "industry_report" | "government" | "market_research" | "standard" | "other"
+  /** Year of publication or last update (YYYY). */
+  year?: number
+  /** Publisher or issuing body. */
+  publisher?: string
+  /** What this source establishes or why it was cited. */
+  relevance: string
+}
+
+/**
+ * A single market segment within the TAM/SAM/SOM breakdown.
+ */
+export interface CadLabMarketSegment {
+  /** Segment name (e.g. "Behind-the-meter commercial BESS, UK") */
+  name: string
+  /** Estimated size in USD million at the stated year. */
+  sizeMUsd: number
+  /** Year the size estimate applies to. */
+  year: number
+  /** Source or basis for this estimate. */
+  source: string
+}
+
+/**
+ * Quantitative market sizing block produced by Chase.
+ * Populates CadLabDesignBrief.marketSizing for the quantitative_market_data rubric.
+ */
+export interface CadLabDesignBriefMarketSizing {
+  /** Total Addressable Market in USD million. */
+  tamMUsd: number
+  /** Serviceable Addressable Market in USD million. */
+  samMUsd: number
+  /** Serviceable Obtainable Market in USD million (5-year realistic share). */
+  somMUsd: number
+  /** Compound Annual Growth Rate as a percentage (e.g. 18.4 for 18.4%). */
+  cagrPct: number
+  /** Year range the CAGR applies to (e.g. "2024–2030"). */
+  cagrPeriod: string
+  /** Primary source for the top-level TAM/SAM/SOM figures. */
+  primarySource: string
+  /** 3+ market segments with individual size estimates. */
+  segments: CadLabMarketSegment[]
+  /** Notable tailwinds driving growth — policy, technology, cost curves, etc. */
+  tailwinds?: string[]
+}
+
+/**
+ * A single named competitor in the competitive landscape analysis.
+ */
+export interface CadLabDesignBriefCompetitor {
+  /** Company or product name. */
+  name: string
+  /** Headquarters country (ISO-2, e.g. "GB", "US", "CN"). */
+  countryIso?: string
+  /** Core product or solution they offer in this market. */
+  product: string
+  /** Key technical specifications relevant to this founder's product (e.g. energy density, capacity range, efficiency). */
+  technicalSpecs?: string
+  /** Indicative pricing — unit price, subscription, or installed cost range (GBP or USD, state which). */
+  pricing?: string
+  /** Estimated market share percentage, if known. */
+  marketSharePct?: number
+  /** Where this competitor is strong — geography, customer segment, channel. */
+  strengths: string
+  /** Where this competitor is weak or where the founder can differentiate. */
+  weaknesses: string
+  /** How the founder's product should differentiate from this competitor. */
+  differentiationAngle: string
 }
 
 /** DFM (Design for Manufacturability) analysis result */
