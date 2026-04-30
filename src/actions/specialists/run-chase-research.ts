@@ -1297,6 +1297,32 @@ async function callExtractionWithPrompts(
                 reportText,
             )
         }
+        // Guard: detect missing sources / marketSizing / competitors. These fields
+        // are required by the scorer rubric (source_diversity, market_sizing,
+        // competitor_analysis dimensions — all scored 0/10 when absent). V4-Pro
+        // under reasoning-trace pressure omits them even when the prompt demands
+        // them. Fall back to gpt-4.1-mini which reliably emits the full JSON.
+        const parsedSources = (parsed as { sources?: unknown }).sources
+        const parsedMarketSizing = (parsed as { marketSizing?: unknown }).marketSizing
+        const parsedCompetitors = (parsed as { competitors?: unknown }).competitors
+        const missingScoreFields =
+            (!Array.isArray(parsedSources) || parsedSources.length < 3) ||
+            !parsedMarketSizing ||
+            (!Array.isArray(parsedCompetitors) || parsedCompetitors.length < 3)
+        if (missingScoreFields) {
+            const sourcesCount = Array.isArray(parsedSources) ? parsedSources.length : 0
+            const competitorsCount = Array.isArray(parsedCompetitors) ? parsedCompetitors.length : 0
+            console.warn(
+                `[run-chase-research] V4-Pro missing scorer fields (sources=${sourcesCount}, marketSizing=${!!parsedMarketSizing}, competitors=${competitorsCount}); falling back to gpt-4.1-mini`,
+            )
+            return await callExtractionViaAnthropic(
+                systemPrompt,
+                userPrompt,
+                result.inputTokens,
+                result.outputTokens,
+                reportText,
+            )
+        }
         return {
             ok: true,
             brief: parsed,

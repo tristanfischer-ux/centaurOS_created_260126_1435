@@ -49,8 +49,45 @@ export const BomOutputSchema = z.array(BomPartSchema).min(1)
 
 export const ChaseResearchOutputSchema = z
     .object({
-        regulatory_items: z.array(z.object({}).passthrough()),
-        research_findings: z.array(z.object({}).passthrough()),
+        regulatory_items: z.array(z.object({}).passthrough()).optional(),
+        research_findings: z.array(z.object({}).passthrough()).optional(),
+        // Fields added in commit 86a398dd — sources/market_sizing/competitors
+        // are required by the scorer rubric (source_diversity, market_sizing,
+        // competitor_analysis dimensions). The schema validates they are present
+        // with at least the minimum entry count.
+        sources: z
+            .array(
+                z.object({
+                    title: z.string().min(1),
+                    relevance: z.string().min(1),
+                    type: z.string().optional(),
+                    year: z.number().optional(),
+                    publisher: z.string().optional(),
+                }),
+            )
+            .min(3, "Chase must return at least 3 source citations for source_diversity scoring")
+            .optional(),
+        marketSizing: z
+            .object({
+                tamMUsd: z.number().positive(),
+                samMUsd: z.number().positive(),
+                somMUsd: z.number().positive(),
+                cagrPct: z.number(),
+                cagrPeriod: z.string().min(1),
+                primarySource: z.string().min(1),
+                segments: z.array(z.object({}).passthrough()),
+            })
+            .optional(),
+        competitors: z
+            .array(
+                z.object({
+                    name: z.string().min(1),
+                    product: z.string().min(1),
+                    differentiationAngle: z.string().min(1),
+                }),
+            )
+            .min(3, "Chase must return at least 3 named competitors for competitor_analysis scoring")
+            .optional(),
     })
     .passthrough()
 
