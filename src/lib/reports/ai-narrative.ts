@@ -11,9 +11,10 @@
  * - src/actions/report-generator.ts — Calls these functions during report build
  */
 
-// DECISION: Dynamic import per-call (matches cad-lab-cost.ts pattern) to avoid
-// module-scope side effects. The Anthropic SDK handles connection pooling internally.
-const MODEL_ID = 'claude-opus-4-7'
+// DECISION: GPT-5.5 is the high-quality reasoning model replacing Claude Opus.
+// AbortSignal.timeout() handles the timeout directly — no Promise.race needed.
+// Note: GPT-5.5 is a reasoning model — uses max_completion_tokens, not max_tokens.
+const MODEL_ID = 'gpt-5.5'
 const API_TIMEOUT_MS = 45_000
 
 // ─── Public Types ─────────────────────────────────────────────────
@@ -115,8 +116,8 @@ export async function generateExecutiveNarrative(
   context: NarrativeContext,
   options: NarrativeOptions,
 ): Promise<NarrativeResult> {
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-    console.warn('[ReportNarrative] ANTHROPIC_API_KEY not set — using template fallback')
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    console.warn('[ReportNarrative] OPENAI_API_KEY not set — using template fallback')
     return buildFallbackNarrative(context, options)
   }
 
@@ -124,27 +125,31 @@ export async function generateExecutiveNarrative(
     const systemPrompt = buildExecutiveSystemPrompt(options)
     const userPrompt = buildExecutiveUserPrompt(context)
 
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY?.trim()}`,
+      },
+      body: JSON.stringify({
+        model: MODEL_ID,
+        max_completion_tokens: 1024,
+        temperature: TONE_TEMPERATURE[options.tone],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    })
 
-    const t = timeoutWithCleanup(API_TIMEOUT_MS)
-    try {
-      const response = await Promise.race([
-        client.messages.create({
-          model: MODEL_ID,
-          max_tokens: 1024,
-          temperature: TONE_TEMPERATURE[options.tone],
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-        }),
-        t.promise,
-      ])
-
-      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
-      return parseNarrativeResponse(text, context, options)
-    } finally {
-      t.clear()
+    if (!resp.ok) {
+      throw new Error(`OpenAI API error (${resp.status})`)
     }
+
+    const data = await resp.json()
+    const text = data.choices?.[0]?.message?.content ?? ''
+    return parseNarrativeResponse(text, context, options)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[ReportNarrative] Executive narrative generation failed:', { message })
@@ -170,7 +175,7 @@ export async function generateSectionNarrative(
   sectionData: Record<string, unknown>,
   options: NarrativeOptions,
 ): Promise<string> {
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
+  if (!process.env.OPENAI_API_KEY?.trim()) {
     return buildSectionFallback(sectionType)
   }
 
@@ -187,27 +192,31 @@ export async function generateSectionNarrative(
 
     const userPrompt = `Section data:\n${JSON.stringify(sectionData, null, 2)}`
 
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY?.trim()}`,
+      },
+      body: JSON.stringify({
+        model: MODEL_ID,
+        max_completion_tokens: 256,
+        temperature: SECTION_TONE_TEMPERATURE[options.tone],
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    })
 
-    const t = timeoutWithCleanup(API_TIMEOUT_MS)
-    try {
-      const response = await Promise.race([
-        client.messages.create({
-          model: MODEL_ID,
-          max_tokens: 256,
-          temperature: SECTION_TONE_TEMPERATURE[options.tone],
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-        }),
-        t.promise,
-      ])
-
-      const text = response.content[0]?.type === 'text' ? response.content[0].text.trim() : ''
+    if (resp.ok) {
+      const data = await resp.json()
+      const text = (data.choices?.[0]?.message?.content ?? '').trim()
       return text || buildSectionFallback(sectionType)
-    } finally {
-      t.clear()
     }
+
+    return buildSectionFallback(sectionType)
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     console.error('[ReportNarrative] Section narrative failed:', {
@@ -413,15 +422,3 @@ function buildSectionFallback(sectionType: string): string {
   return SECTION_FALLBACKS[sectionType] ?? 'This section provides additional detail for the reporting period.'
 }
 
-// ─── Utilities ────────────────────────────────────────────────────
-
-// DECISION: Using Promise.race with a rejecting timeout to guarantee we never
-// wait longer than API_TIMEOUT_MS regardless of network conditions.
-// Returns a clearable handle so the timer doesn't dangle after the race resolves.
-function timeoutWithCleanup(ms: number) {
-  let timer: ReturnType<typeof setTimeout>
-  const promise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
-  })
-  return { promise, clear: () => clearTimeout(timer!) }
-}

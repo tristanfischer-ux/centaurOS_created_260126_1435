@@ -86,10 +86,10 @@ async function callLLMStreaming(
 
 async function callHaiku(prompt: string, maxTokens = 500): Promise<string> {
   try {
-    const result = await callLLMStreaming("anthropic", "claude-haiku-4-5", "Be concise, factual, cite sources.", prompt, () => {}, maxTokens)
+    const result = await callLLMStreaming("openai", "gpt-4.1-mini", "Be concise, factual, cite sources.", prompt, () => {}, maxTokens)
     return result.text
   } catch (err) {
-    console.warn("[RedTeam] Haiku call failed:", err instanceof Error ? err.message : err)
+    console.warn("[RedTeam] Research call failed:", err instanceof Error ? err.message : err)
     return "[Research unavailable]"
   }
 }
@@ -244,12 +244,12 @@ export async function POST(request: Request) {
                 (chunk) => emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk }),
               )
             } catch (primaryErr) {
-              console.warn(`[RedTeam] ${persona.providerId}/${persona.modelId} failed, falling back to Sonnet:`, primaryErr instanceof Error ? primaryErr.message : primaryErr)
+              console.warn(`[RedTeam] ${persona.providerId}/${persona.modelId} failed, falling back to GPT-5.5:`, primaryErr instanceof Error ? primaryErr.message : primaryErr)
               // DECISION: Don't emit fallback notice to client — it leaks internal model info.
               // The persona keeps its personality; only the underlying model changes silently.
-              usedModelId = "claude-sonnet-4-6 (fallback)"
+              usedModelId = "gpt-5.5 (fallback)"
               result = await callLLMStreaming(
-                "anthropic", "claude-sonnet-4-6", systemPrompt, userPrompt,
+                "openai", "gpt-5.5", systemPrompt, userPrompt,
                 (chunk) => emit({ phase: "chunk", round: roundIdx + 1, persona: persona.role, chunk }),
               )
             }
@@ -332,7 +332,7 @@ export async function POST(request: Request) {
         // ── Synthesis ────────────────────────────────────
         emit({ phase: "synthesis_start", message: "Writing verdict..." })
         const { text: synthesisText, costUsd: synthCost } = await callLLMStreaming(
-          "anthropic", "claude-opus-4-7",
+          "openai", "gpt-5.5",
           "Write the authoritative final synthesis. Be measured, specific, honest.",
           getSynthesisPrompt(topic, fullTranscript),
           (chunk) => emit({ phase: "synthesis_chunk", chunk }),

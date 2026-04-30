@@ -1,11 +1,11 @@
 /**
  * @file evaluation-digest.ts — Aggregates specialist evaluation scores across
  * the last 30 days, identifies systematic weak spots, and generates concrete
- * patches to domain-knowledge markdown files via Claude.
+ * patches to domain-knowledge markdown files via GPT-4.1-mini.
  *
  * @description Cross-foundry, cross-specialist quality analysis. Pulls all
  * evaluated assistant messages, groups by specialist, computes averages, then
- * uses Claude to write targeted prompt patches for underperforming specialists.
+ * uses GPT-4.1-mini to write targeted prompt patches for underperforming specialists.
  *
  * @related
  * - Evaluator: src/lib/agents/evaluator.ts (writes scores)
@@ -14,7 +14,7 @@
  * - Prompt Builder: src/lib/agents/prompt-builder.ts (consumes domain knowledge)
  */
 
-import Anthropic from "@anthropic-ai/sdk"
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 
@@ -290,47 +290,34 @@ Return ONLY a JSON array (no markdown fences, no preamble):
  * @returns Array of prompt patches, or empty array on failure
  */
 async function generatePatches(weakSpots: WeakSpot[]): Promise<PromptPatch[]> {
-    // INTENT: Enrich weak spots with targetFile before sending to Claude
     const enriched = weakSpots.map(ws => ({
         ...ws,
         targetFile: SPECIALIST_FILE_MAP[ws.specialistId] ?? `src/lib/agents/domain-knowledge/${ws.specialistId}.md`,
     }))
 
-    const anthropic = new Anthropic()
-
     try {
-        const response = await anthropic.messages.create({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 4096,
-            system: PATCH_SYSTEM_PROMPT,
-            messages: [
-                {
-                    role: "user",
-                    content: JSON.stringify(enriched, null, 2),
-                },
-            ],
-        })
+        const result = await callOpenAI(
+            PATCH_SYSTEM_PROMPT,
+            JSON.stringify(enriched, null, 2),
+            "gpt-4.1-mini",
+            4096,
+            30_000,
+        )
 
-        // INTENT: Extract text from response content blocks
-        const text = response.content
-            .filter((block): block is Anthropic.TextBlock => block.type === "text")
-            .map(block => block.text)
-            .join("")
-
-        return parsePatchResponse(text)
+        return parsePatchResponse(result.text)
     } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        console.error("[evaluation-digest] Claude API error:", message)
+        console.error("[evaluation-digest] OpenAI API error:", message)
         return []
     }
 }
 
 /**
- * Parses Claude's JSON response into PromptPatch array.
+ * Parses the AI JSON response into PromptPatch array.
  * Handles markdown fences, preamble, and malformed JSON gracefully.
  */
 function parsePatchResponse(text: string): PromptPatch[] {
-    // INTENT: Strip markdown code fences if Claude wraps the JSON
+    // INTENT: Strip markdown code fences if the model wraps the JSON
     let cleaned = text.trim()
     const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/)
     if (fenceMatch) {
