@@ -669,12 +669,19 @@ export async function runChaseMultiLineage(
 
     console.info(`[parallel-llm] Chase multi-lineage: launching ${models.length} models in parallel — ${models.map((m) => m.displayName).join(", ")}`)
 
+    const PER_MODEL_TIMEOUT_MS = 120_000 // 120s per model — prevents one slow model from blocking the entire function
+
     // Run all models in parallel, collect results gracefully
     const settled = await Promise.allSettled(
         models.map(async (model) => {
             const start = Date.now()
             try {
-                const output = await model.call(systemPrompt, userPrompt)
+                const output = await Promise.race([
+                    model.call(systemPrompt, userPrompt),
+                    new Promise<never>((_, reject) =>
+                        setTimeout(() => reject(new Error(`Timeout after ${PER_MODEL_TIMEOUT_MS / 1000}s`)), PER_MODEL_TIMEOUT_MS),
+                    ),
+                ])
                 const elapsed = Date.now() - start
                 console.info(`[parallel-llm] Chase ${model.displayName} completed in ${elapsed}ms (${output.length} chars)`)
                 return { model: model.displayName, lineage: model.lineage, output, error: undefined }
