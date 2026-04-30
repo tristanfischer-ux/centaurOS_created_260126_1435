@@ -2,7 +2,7 @@
  * @file ai-narrative.ts
  *
  * @description Server-side module that generates executive narratives for
- * reports using the Claude Opus API. Two exported functions: one for the full
+ * reports using the GPT-5.5 API. Two exported functions: one for the full
  * executive summary and one for lightweight section intros. Falls back to
  * template-based prose when the API key is missing or the call fails.
  *
@@ -104,7 +104,7 @@ const SECTION_TONE_TEMPERATURE: Record<NarrativeOptions['tone'], number> = {
 /**
  * Generate a full executive narrative for a report.
  *
- * @description Sends the report metrics to Claude Opus and returns polished prose
+ * @description Sends the report metrics to GPT-5.5 and returns polished prose
  * suitable for the executive-summary section. Falls back to a deterministic
  * template when the API is unavailable.
  *

@@ -127,9 +127,9 @@ import { isRetryableError } from "@/lib/agents/error-classification"
  * @returns The API key string, or null if not configured
  */
 function resolveApiKeyForProvider(pid: AIProviderId): string | null {
+    // ELIMINATED 2026-04-30: anthropic removed — ForgeOS no longer uses Anthropic.
     const envMap: Partial<Record<AIProviderId, string>> = {
         openai: process.env.OPENAI_API_KEY?.trim() ?? "",
-        anthropic: process.env.ANTHROPIC_API_KEY?.trim() ?? "",
         google: process.env.GOOGLE_AI_API_KEY?.trim() ?? "",
         qwen: process.env.DASHSCOPE_API_KEY?.trim() ?? "",
         "qwen-local": "ollama",

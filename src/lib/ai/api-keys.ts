@@ -14,9 +14,12 @@
 
 // ─── Provider Keys ──────────────────────────────────────────────────
 
-/** Anthropic API key (Claude Opus, Sonnet, Haiku) */
+/**
+ * Anthropic API key — ELIMINATED 2026-04-30.
+ * ForgeOS no longer uses Anthropic. Always returns undefined.
+ */
 export function getAnthropicKey(): string | undefined {
-  return process.env.ANTHROPIC_API_KEY?.trim() || undefined
+  return undefined
 }
 
 /** OpenAI API key (GPT-5.3, GPT Image, TTS) */
@@ -88,11 +91,12 @@ export function getModalThermalUrl(): string | undefined {
 
 // ─── Convenience: Get key or throw ──────────────────────────────────
 
-/** Get Anthropic key or throw (for server actions that require it) */
+/**
+ * Anthropic key — ELIMINATED 2026-04-30. Always throws.
+ * No ForgeOS path should call this; the throw makes regressions loud.
+ */
 export function requireAnthropicKey(): string {
-  const key = getAnthropicKey()
-  if (!key) throw new Error("ANTHROPIC_API_KEY is not configured")
-  return key
+  throw new Error("Anthropic has been eliminated from ForgeOS (2026-04-30). Use OpenAI or DeepSeek instead.")
 }
 
 /** Get OpenAI key or throw */

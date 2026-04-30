@@ -276,288 +276,24 @@ async function streamOpenAI(opts: StreamingTextOptions): Promise<void> {
     }
 }
 
+/**
+ * ELIMINATED 2026-04-30 — Anthropic removed from ForgeOS.
+ * Stub kept so the TEXT_PROVIDERS type shape compiles; the function is NOT
+ * registered in TEXT_PROVIDERS, so it will never be called.
+ */
 async function streamAnthropic(opts: StreamingTextOptions): Promise<void> {
-    // Route to web search handler if enabled
-    if (opts.enableWebSearch) {
-        return streamAnthropicWithWebSearch(opts)
-    }
-
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey: opts.apiKey, timeout: 240_000, maxRetries: 0 })
-
-    // Anthropic uses a separate `system` param, so we build messages without it
-    const conversationMessages: Array<{ role: "user" | "assistant"; content: string }> = []
-
-    if (opts.conversationHistory && opts.conversationHistory.length > 0) {
-        for (const msg of opts.conversationHistory) {
-            if (msg.role === "user" || msg.role === "assistant") {
-                conversationMessages.push({ role: msg.role, content: msg.content })
-            }
-        }
-    }
-
-    conversationMessages.push({ role: "user", content: opts.userPrompt })
-
-    // Build stream parameters, conditionally enabling extended thinking
-    // Extended thinking adds an internal chain-of-thought step before the
-    // final response, improving reasoning quality for complex analysis.
-    const thinkingBudget = opts.thinkingBudget ?? 10_000
-    // AUDIT: Prompt caching — system prompt cached for 5-min TTL (90% input cost reduction on hits).
-    // The Anthropic SDK supports cache_control on system content blocks natively.
-    const cachedSystem = [{
-        type: 'text' as const,
-        text: opts.systemPrompt,
-        cache_control: { type: 'ephemeral' as const },
-    }]
-    const streamParams: Parameters<typeof client.messages.stream>[0] = {
-        model: opts.modelId,
-        max_tokens: opts.maxTokens ?? 4096,
-        system: cachedSystem,
-        messages: conversationMessages,
-        ...(opts.enableThinking && {
-            thinking: {
-                type: "enabled" as const,
-                budget_tokens: thinkingBudget,
-            },
-        }),
-    }
-
-    // Fallback estimator — only used if `finalMessage()` cannot be read.
-    let outputCharCount = 0
-
-    try {
-        const stream = await client.messages.stream(streamParams)
-
-        for await (const event of stream) {
-            if (opts.signal?.aborted) break
-            // Only stream text deltas to the user -- thinking blocks are internal
-            // reasoning that improves quality silently without exposing raw chain-of-thought.
-            if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-                outputCharCount += event.delta.text.length
-                opts.onChunk(event.delta.text)
-            }
-        }
-
-        // AUDIT: Log cache metrics from streaming response for observability.
-        // The Anthropic SDK provides usage data on the final message.
-        let tokensIn = 0
-        let tokensOut = 0
-        let usedEstimator = false
-        try {
-            const finalMsg = await stream.finalMessage()
-            const usageAny = finalMsg.usage as unknown as Record<string, number>
-            const cacheRead = usageAny?.cache_read_input_tokens ?? 0
-            const cacheWrite = usageAny?.cache_creation_input_tokens ?? 0
-            // For cost-logging, sum cache reads + cache writes into tokensIn so
-            // the dashboard never under-reports input volume. The price map
-            // bills the full input rate; cache-aware pricing is a future
-            // enhancement requiring per-row cache columns.
-            tokensIn = (finalMsg.usage?.input_tokens ?? 0) + cacheRead + cacheWrite
-            tokensOut = finalMsg.usage?.output_tokens ?? 0
-            if (cacheRead > 0 || cacheWrite > 0) {
-                console.info("[streamAnthropic] Cache metrics:", {
-                    model: opts.modelId,
-                    cacheRead,
-                    cacheWrite,
-                    inputTokens: finalMsg.usage?.input_tokens ?? 0,
-                })
-            }
-        } catch {
-            // Non-critical — cache metrics are observability, not functional.
-            // Fall back to char-count estimator for cost logging.
-            usedEstimator = true
-            tokensIn = estimateTokens(opts.systemPrompt + opts.userPrompt)
-            tokensOut = Math.ceil(outputCharCount / 4)
-        }
-
-        void logLlmUsage({
-            action: opts.actionSlug ?? "anthropic_unknown",
-            modelUsed: opts.modelId,
-            tokensIn,
-            tokensOut,
-            status: "success",
-            foundryId: opts.foundryId,
-            userId: opts.userId,
-            specialistId: opts.specialistId,
-            errorMessage: usedEstimator
-                ? "estimated tokens — finalMessage() unavailable"
-                : undefined,
-        })
-
-        opts.onDone()
-    } catch (err) {
-        // Extract meaningful error details from Anthropic SDK errors
-        const errorMessage = err instanceof Error ? err.message : String(err)
-        console.error("[streamAnthropic] Stream failed:", {
-            model: opts.modelId,
-            enableThinking: opts.enableThinking,
-            error: errorMessage,
-        })
-        void logLlmUsage({
-            action: opts.actionSlug ?? "anthropic_unknown",
-            modelUsed: opts.modelId,
-            tokensIn: 0,
-            tokensOut: 0,
-            status: classifyStreamError(err),
-            errorMessage: errorMessage.slice(0, 200),
-            foundryId: opts.foundryId,
-            userId: opts.userId,
-            specialistId: opts.specialistId,
-        })
-        opts.onError(errorMessage)
-    }
+    opts.onError("Anthropic provider has been eliminated from ForgeOS (2026-04-30). No Anthropic API calls are permitted.")
 }
 
 /**
- * Streams Anthropic with web_search tool enabled (non-streaming beta API).
- *
- * Uses client.beta.messages.create() (non-streaming) because web_search
- * requires the beta API which doesn't support streaming. Simulates streaming
- * by emitting response text in chunks.
- *
- * Handles pause_turn continuation (max 5 loops) and citation extraction.
+ * ELIMINATED 2026-04-30 — Anthropic web-search path removed from ForgeOS.
+ * Stub only; never reachable because streamAnthropic itself is a stub that
+ * short-circuits before calling this.
  */
 async function streamAnthropicWithWebSearch(opts: StreamingTextOptions): Promise<void> {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey: opts.apiKey, timeout: 240_000, maxRetries: 0 })
-
-    const conversationMessages: Array<{ role: "user" | "assistant"; content: string | Array<{ type: string; text?: string }> }> = []
-    if (opts.conversationHistory && opts.conversationHistory.length > 0) {
-        for (const msg of opts.conversationHistory) {
-            if (msg.role === "user" || msg.role === "assistant") {
-                conversationMessages.push({ role: msg.role, content: msg.content })
-            }
-        }
-    }
-    conversationMessages.push({ role: "user", content: opts.userPrompt })
-
-    // AUDIT: Prompt caching for web search path (same pattern as streaming)
-    const cachedSystem = [{
-        type: 'text' as const,
-        text: opts.systemPrompt,
-        cache_control: { type: 'ephemeral' as const },
-    }]
-    const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09"
-    const webSearchTool = {
-        type: "web_search_20260209",
-        name: "web_search",
-        max_uses: 3,
-    }
-
-    const createParams = {
-        model: opts.modelId,
-        max_tokens: opts.maxTokens ?? 4096,
-        system: cachedSystem,
-        messages: conversationMessages,
-        tools: [webSearchTool],
-        betas: [WEB_SEARCH_BETA],
-    }
-
-    // Token totals across the (potentially multiple) pause_turn loops.
-    let totalTokensIn = 0
-    let totalTokensOut = 0
-
-    try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        let response = await client.beta.messages.create(createParams as any) as any
-        // Sum tokens from the first response. Beta API returns usage blocks
-        // with the same shape as the standard messages API.
-        const firstUsage = response?.usage ?? {}
-        totalTokensIn += (firstUsage.input_tokens ?? 0)
-            + (firstUsage.cache_read_input_tokens ?? 0)
-            + (firstUsage.cache_creation_input_tokens ?? 0)
-        totalTokensOut += firstUsage.output_tokens ?? 0
-
-        // Handle pause_turn continuation
-        let continueCount = 0
-        while (response.stop_reason === "pause_turn" && continueCount < 5) {
-            continueCount++
-            const prevMessages = [
-                ...conversationMessages.slice(0, -1),
-                { role: "user" as const, content: opts.userPrompt },
-                { role: "assistant" as const, content: response.content },
-                { role: "user" as const, content: "Continue." },
-            ]
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            response = await client.beta.messages.create({ ...createParams, messages: prevMessages } as any) as any
-            const u = response?.usage ?? {}
-            totalTokensIn += (u.input_tokens ?? 0)
-                + (u.cache_read_input_tokens ?? 0)
-                + (u.cache_creation_input_tokens ?? 0)
-            totalTokensOut += u.output_tokens ?? 0
-        }
-
-        // Extract text and citations from response
-        const content: Array<{ type: string; text?: string; citations?: Array<{ url?: string; title?: string | null; cited_text?: string }> | null }> = response.content ?? []
-
-        // Collect citations
-        const seen = new Set<string>()
-        const sources: Array<{ title: string; url: string; snippet: string }> = []
-        for (const block of content) {
-            if (block.type !== "text" || !block.citations) continue
-            for (const c of block.citations) {
-                const url = c.url ?? ""
-                if (!url || seen.has(url)) continue
-                seen.add(url)
-                sources.push({
-                    title: (c.title ?? "Source").toString(),
-                    url,
-                    snippet: (c.cited_text ?? "").slice(0, 200),
-                })
-            }
-        }
-
-        // Emit citations if any
-        if (sources.length > 0 && opts.onCitations) {
-            opts.onCitations(sources)
-        }
-
-        // Simulate streaming by emitting text in chunks
-        const fullText = content
-            .filter(b => b.type === "text" && b.text)
-            .map(b => b.text!)
-            .join("\n")
-
-        // Emit in ~100 char chunks for a natural streaming feel
-        const chunkSize = 100
-        for (let i = 0; i < fullText.length; i += chunkSize) {
-            if (opts.signal?.aborted) break
-            opts.onChunk(fullText.slice(i, i + chunkSize))
-        }
-
-        void logLlmUsage({
-            action: opts.actionSlug ?? "anthropic_websearch_unknown",
-            modelUsed: opts.modelId,
-            tokensIn: totalTokensIn,
-            tokensOut: totalTokensOut,
-            status: "success",
-            foundryId: opts.foundryId,
-            userId: opts.userId,
-            specialistId: opts.specialistId,
-        })
-        opts.onDone()
-    } catch (err) {
-        const errorMessage = err instanceof Error ? err.message : String(err)
-        console.error("[streamAnthropicWithWebSearch] Failed:", {
-            model: opts.modelId,
-            error: errorMessage,
-        })
-        void logLlmUsage({
-            action: opts.actionSlug ?? "anthropic_websearch_unknown",
-            // Even on error, keep any tokens already consumed by completed
-            // pause_turn loops — they were billed.
-            modelUsed: opts.modelId,
-            tokensIn: totalTokensIn,
-            tokensOut: totalTokensOut,
-            status: classifyStreamError(err),
-            errorMessage: errorMessage.slice(0, 200),
-            foundryId: opts.foundryId,
-            userId: opts.userId,
-            specialistId: opts.specialistId,
-        })
-        opts.onError(errorMessage)
-    }
+    opts.onError("Anthropic web-search provider has been eliminated from ForgeOS (2026-04-30).")
 }
+
 
 async function streamGoogle(opts: StreamingTextOptions): Promise<void> {
     const { GoogleGenerativeAI } = await import("@google/generative-ai")
@@ -1457,9 +1193,11 @@ type ImageGenFn = (opts: ImageGenerationOptions) => Promise<ImageGenerationResul
 type AudioGenFn = (opts: AudioGenerationOptions) => Promise<AudioGenerationResult>
 type VideoGenFn = (opts: VideoGenerationOptions) => Promise<VideoGenerationResult>
 
+// ELIMINATED 2026-04-30: anthropic removed — ForgeOS no longer uses Anthropic.
+// streamAnthropic is kept as a stub below so unused-import linters don't fire
+// on the function definition, but it is not registered here.
 const TEXT_PROVIDERS: Partial<Record<AIProviderId, TextStreamFn>> = {
     openai: streamOpenAI,
-    anthropic: streamAnthropic,
     google: streamGoogle,
     qwen: streamQwen,
     "qwen-local": streamQwenLocal,

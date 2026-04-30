@@ -290,7 +290,8 @@ export async function withFailover<T>(
 function hasApiKeyForProvider(providerId: AIProviderId): boolean {
     switch (providerId) {
         case "anthropic":
-            return !!process.env.ANTHROPIC_API_KEY?.trim()
+            // ELIMINATED 2026-04-30 — Anthropic removed from ForgeOS.
+            return false
         case "openai":
             return !!process.env.OPENAI_API_KEY?.trim()
         case "deepseek":

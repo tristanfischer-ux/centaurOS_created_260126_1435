@@ -2,11 +2,11 @@
  * @file ai-slide-generator.ts
  *
  * @description Server-side module that generates a complete strategic briefing
- * slide deck using the Claude Opus API. Unlike ai-narrative.ts which generates a
+ * slide deck using the GPT-5.5 API. Unlike ai-narrative.ts which generates a
  * single summary, this module produces the ENTIRE document structure -- every
  * slide, headline, body paragraph, and data point -- from source context.
  *
- * INTENT: Produce high-quality executive presentations by having Claude generate
+ * INTENT: Produce high-quality executive presentations by having GPT-5.5 generate
  * 100% of the content structure, not just an executive summary.
  *
  * @related
@@ -65,7 +65,7 @@ Available slide types (use a variety for visual interest):
 /**
  * Generate a complete strategic briefing slide deck from source context.
  *
- * @description Sends source material to Claude Opus and receives a fully structured
+ * @description Sends source material to GPT-5.5 and receives a fully structured
  * presentation with 12-18 slides. Each slide has a specific visual type and
  * all content needed for rendering.
  *
@@ -344,11 +344,11 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
       },
       {
         slideType: 'argument',
-        headline: 'Narrative generation requires the Claude API',
-        body: 'The strategic briefing system uses Claude Opus to synthesize source material into a structured presentation.',
+        headline: 'Narrative generation requires the OpenAI API',
+        body: 'The strategic briefing system uses GPT-5.5 to synthesize source material into a structured presentation.',
         supportingPoints: [
           'Set OPENAI_API_KEY in your environment variables',
-          'The system uses Claude Opus 4.6 for high-quality generation',
+          'The system uses GPT-5.5 for high-quality generation',
           'Fallback content is shown when the API is unavailable',
         ],
       },
@@ -360,7 +360,7 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
           'Provide detailed source material for richer presentations',
           'Choose the right tone for your audience',
         ],
-        closingLine: 'Once configured, Claude will generate the full presentation from your source material.',
+        closingLine: 'Once configured, GPT-5.5 will generate the full presentation from your source material.',
       },
     ],
   }

@@ -44,9 +44,9 @@ export const maxDuration = 300
 // ─── API Key Resolution ─────────────────────────────────────────
 
 function resolveApiKey(providerId: AIProviderId): string {
+  // ELIMINATED 2026-04-30: anthropic removed — ForgeOS no longer uses Anthropic.
   const envMap: Partial<Record<AIProviderId, string>> = {
     openai: process.env.OPENAI_API_KEY?.trim(),
-    anthropic: process.env.ANTHROPIC_API_KEY?.trim(),
     google: process.env.GOOGLE_AI_API_KEY?.trim(),
     qwen: process.env.DASHSCOPE_API_KEY?.trim(),
   }
