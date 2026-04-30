@@ -84,6 +84,7 @@ import type {
     CadLabModule,
     SkeletonModule,
 } from "@/lib/cad-lab-types"
+import { extractStageSection, extractConstraintAnchors, compressReferenceDossier } from "@/lib/reference-dossier"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -208,7 +209,7 @@ async function runMaxDecompositionInternal(
         //    another tenant's project on behalf of this caller.)
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, model_id, research")
+            .select("id, foundry_id, subject, model_id, research, reference_dossier")
             .eq("id", projectId)
             .maybeSingle()
 
