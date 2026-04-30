@@ -934,6 +934,39 @@ export async function buildChaseExtractionPrompts(
           ].join("\n")
         : ""
 
+    // FIX 2: Inject the design_standards table as a code allowlist so the LLM
+    // cannot hallucinate standard codes. Gate 6 fails on 100% of demo projects
+    // because the model invents codes that don't exist in our verified table.
+    // Querying the full table (verified=true only) gives the extraction model
+    // an explicit allowlist: "your regulatory[].code MUST come from this list."
+    // Non-fatal: if the query fails, the prompt still generates (worse, but live).
+    let designStandardsAllowlist = ""
+    try {
+        const adminForStds = createAdminClient()
+        const { data: standards } = await adminForStds
+            .from("design_standards")
+            .select("standard_code, standard_name, industry_domain")
+            .eq("verified", true)
+            .order("industry_domain")
+            .order("standard_code")
+
+        if (standards && standards.length > 0) {
+            const grouped: Record<string, string[]> = {}
+            for (const s of standards) {
+                const domain = (s.industry_domain as string) ?? "general"
+                if (!grouped[domain]) grouped[domain] = []
+                grouped[domain].push(`${s.standard_code} — ${s.standard_name}`)
+            }
+            const groupedLines = Object.entries(grouped)
+                .map(([domain, codes]) => `  [${domain}]\n${codes.map((c) => `    ${c}`).join("\n")}`)
+                .join("\n")
+            designStandardsAllowlist = `\n\nVERIFIED STANDARD CODES ALLOWLIST (${standards.length} entries from design_standards table — CRITICAL):\nEvery "code" field in your regulatory[] array MUST exactly match a code from this list.\nDo NOT invent codes. Do NOT use codes not on this list.\nIf a relevant standard isn't listed, omit that row rather than inventing a code.\n\n${groupedLines}\n\nENFORCEMENT: Any code not in the above list will be rejected by Quality Gate 6. Invented codes = Gate 6 failure = Chase re-run wasting the founder's AI budget. Use only verified codes above.`
+            console.info(`[run-chase-research] Injected ${standards.length} verified standard codes as Gate 6 allowlist`)
+        }
+    } catch (stdsErr) {
+        console.warn("[run-chase-research] design_standards allowlist query failed (non-fatal):", stdsErr instanceof Error ? stdsErr.message : stdsErr)
+    }
+
     const systemPrompt = `${remediationHeader}You are Chase, a strategist advising a hardware founder. Read the research report and extract a crisp strategic brief. Return ONLY minified JSON — no prose, no markdown fences.
 
 JSON shape:
@@ -1082,7 +1115,7 @@ ${trimmedReport}
 
 Output JSON only.`
 
-    return { systemPrompt, userPrompt }
+    return { systemPrompt: systemPrompt + designStandardsAllowlist, userPrompt }
 }
 
 async function callExtractionWithPrompts(
