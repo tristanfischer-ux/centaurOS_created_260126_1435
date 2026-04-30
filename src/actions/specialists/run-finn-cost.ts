@@ -299,6 +299,11 @@ async function runFinnCostInternal(
                 let marginal = false
                 if (solverFailed && !oracleFailed && dimensionSheet) {
                     const floorBudget = (dimensionSheet as { floor_budget_m2?: number }).floor_budget_m2
+                    console.info(
+                        `[run-finn-cost] marginal-check entered: project=${projectId}`,
+                        `floorBudget=${floorBudget}`,
+                        `dimensionSheet_keys=${Object.keys(dimensionSheet as Record<string, unknown>).join(",")}`,
+                    )
                     // Prefer the solver's authoritative used_floor_m2 from iterations.
                     // Fall back to summing module_dimensions only when iterations is absent
                     // (legacy projects that pre-date the iterations field).
