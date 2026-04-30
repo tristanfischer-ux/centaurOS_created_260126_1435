@@ -66,6 +66,20 @@ export const TOOL_CALL_LEAK_PATTERNS: ReadonlyArray<{
     pattern: RegExp
     replacement: string
 }> = [
+    // ── Category D (Loop 28 FIX-4): engine directive leak ───────────────
+    // Raw engine directives like [REPLACE_PART partId=abc123 newCost=18000]
+    // are internal machine-readable tags that Fang emits for the patch
+    // generator. They should be consumed by fang-patch-generator.ts and
+    // never reach the PDF renderer. This is a last-resort safety net: strip
+    // any remaining bracket-enclosed uppercase engine syntax so founders
+    // never see "[REPLACE_PART partId=...]" in their engineering reports.
+    //
+    // Pattern: [ UPPERCASE_WORD key=value ... ] — covers REPLACE_PART,
+    // ENGINE_DIRECTIVE, and any future engine tags of the same form.
+    // Narrow anchor: requires at least one `key=value` attribute so we
+    // don't accidentally strip legitimate bracketed text like "[Note]" or
+    // regulatory codes like "[UK SI 2016/1128]".
+    { pattern: /\[\s*[A-Z][A-Z0-9_]+(?:\s+[A-Za-z][A-Za-z0-9_]*\s*=\s*"?[^\s\]"]*"?)+\s*\]/g, replacement: "" },
     // "verified via lookup_process(sheet_metal)" — requires parens or backticks
     // to avoid stripping legitimate "verified using non_destructive_testing"
     { pattern: /\bverified\s+(via|using|with)\s+`[a-z][a-z0-9]*_[a-z0-9_]+`(\([^)]*\))?/gi, replacement: "" },

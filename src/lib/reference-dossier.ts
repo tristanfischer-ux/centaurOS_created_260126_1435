@@ -25,6 +25,7 @@ const SUMMARY_HEADINGS = [
   "manufacturers",
   "suppliers",
   "real-world installations",
+  "real aircraft",
   "engineering pitfalls",
   "design constraints",
 ]
@@ -87,7 +88,7 @@ function truncateToFirstParagraph(body: string): string {
 }
 
 const STAGE_KEYWORDS: Record<string, string[]> = {
-  chase: ["regulatory", "standards"],
+  chase: ["regulatory", "standards", "specifications", "cost", "aircraft", "installations", "programmes"],
   brief: ["market", "competitors", "brief"],
   max: ["subsystem", "architecture", "modules"],
   sizing: ["dimension", "mass", "sizing"],

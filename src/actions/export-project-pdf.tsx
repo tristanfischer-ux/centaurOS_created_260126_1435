@@ -5797,9 +5797,28 @@ async function exportProjectPdfInternal(
                     typeof m.mirrorOf === "string"
                         ? moduleNameById.get(m.mirrorOf) ?? m.mirrorOf
                         : null,
-                keyParts: Array.isArray(m.keyParts) ? m.keyParts : [],
-                failureModes: Array.isArray(m.failureModes) ? m.failureModes : [],
-                unknowns: Array.isArray(m.unknowns) ? m.unknowns : [],
+                // FIX-4 (Loop 28): strip engine directives (e.g. [REPLACE_PART partId=...])
+                // from all string arrays before any render path touches them.
+                // These bracket-enclosed uppercase tags are machine-readable directives
+                // emitted by Fang for the patch generator — they must never reach the PDF.
+                // sanitizeReviewText covers fields explicitly passed through it, but
+                // keyParts / failureModes / unknowns are rendered without that wrapper,
+                // so we strip at the data-prep layer as a belt-and-braces safety net.
+                keyParts: Array.isArray(m.keyParts)
+                    ? (m.keyParts as unknown[])
+                          .filter((p): p is string => typeof p === "string")
+                          .map((p) => stripToolCallLeaks(p))
+                    : [],
+                failureModes: Array.isArray(m.failureModes)
+                    ? (m.failureModes as unknown[])
+                          .filter((f): f is string => typeof f === "string")
+                          .map((f) => stripToolCallLeaks(f))
+                    : [],
+                unknowns: Array.isArray(m.unknowns)
+                    ? (m.unknowns as unknown[])
+                          .filter((u): u is string => typeof u === "string")
+                          .map((u) => stripToolCallLeaks(u))
+                    : [],
                 riskMatrix: (() => {
                     const raw = (m as { riskMatrix?: unknown }).riskMatrix
                     if (!Array.isArray(raw)) return []
