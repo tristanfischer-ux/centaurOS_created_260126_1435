@@ -246,6 +246,33 @@ If a metric is not applicable to this product type, omit it.
 ## Material & Manufacturing Notes
 Primary materials, wall thicknesses, manufacturing method if known.
 
+## Market Sizing
+Provide quantitative market data for the product category in the target region:
+- Total addressable market size (currency value and/or unit volume)
+- Compound annual growth rate (percentage, with date range)
+- Annual installations or unit sales in the target region
+- Key market segments and their relative share
+Cite specific numbers from market research sources (for example Bloomberg New Energy Finance, Grand View Research, MarketsandMarkets, Mordor Intelligence, or equivalent). If precise figures are unavailable, provide bounded ranges from the most authoritative source you can find and note the uncertainty.
+
+## Competitive Landscape
+Name at least 3-5 direct competitors and compare on:
+- Company name and product/model
+- Technology approach
+- Key specifications (capacity, output, dimensions, weight)
+- Approximate pricing or cost per unit
+- Market position (established leader, emerging challenger, niche specialist)
+- Key differentiators
+Summarise in a comparison table. Then write one paragraph on the proposed product's competitive positioning — where it fits, what gap it fills, and what its primary advantage would be.
+
+## Sources & References
+Include at least 5 diverse citations from different source types:
+- Academic papers or peer-reviewed journals
+- Industry reports (for example Bloomberg New Energy Finance, IHS Markit, Wood Mackenzie)
+- Government publications or standards bodies
+- Trade news or press releases
+- Company datasheets or product documentation
+For each source, provide: title, publisher/author, date (if known), and URL (if available). Populate the sources array in the output with objects containing url, title, and source_type (academic, industry, government, news, or datasheet).
+
 ## Dimensional Confidence
 Rate each major dimension:
 - ✅ Confirmed (from official specs or multiple sources)

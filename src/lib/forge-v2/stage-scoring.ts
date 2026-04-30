@@ -15,7 +15,7 @@
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { callOpenAI, callGemini } from "@/lib/cad-lab/api-helpers"
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { callOpenRouter } from "@/lib/ai/openrouter"
 import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
 // ── Rubric types ──────────────────────────────────────────────────────────
@@ -516,48 +516,39 @@ ${stageData.slice(0, 6000)}
 
 What specific changes to the AI pipeline (prompts, data extraction, validation logic) would fix these quality issues?`
 
-    // 6-model multi-lineage diagnostic council (GPT-5.5, Gemini, DeepSeek, Qwen, Kimi, GLM)
-    async function callOpenAICompat(
-        baseURL: string,
-        apiKeyEnv: string,
-        modelId: string,
-        system: string,
-        user: string,
-    ): Promise<string> {
-        const apiKey = process.env[apiKeyEnv]?.trim()
-        if (!apiKey) throw new Error(`${apiKeyEnv} not configured`)
-        const response = await fetchWithTimeout(
-            `${baseURL}/chat/completions`,
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                body: JSON.stringify({
-                    model: modelId,
-                    max_tokens: 16384,
-                    temperature: 0.2,
-                    messages: [
-                        { role: "system", content: system },
-                        { role: "user", content: user },
-                    ],
-                }),
-            },
-            120_000,
-        )
-        if (!response.ok) {
-            const errText = await response.text()
-            throw new Error(`${modelId} API error (${response.status}): ${errText.slice(0, 300)}`)
-        }
-        const data = await response.json()
-        return data.choices?.[0]?.message?.content ?? ""
+    // Helper: parse council JSON response from any model
+    function parseCouncilResponse(text: string): { findings: string[]; suggested_fixes: string[] } {
+        const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+        return JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
     }
 
+    // Helper: call a model via OpenRouter for council work
+    async function councilViaOpenRouter(model: string, label: string): Promise<CouncilFinding> {
+        try {
+            const result = await callOpenRouter({
+                model,
+                system: systemPrompt,
+                prompt: userPrompt,
+                maxTokens: 16384,
+                temperature: 0.2,
+                timeoutMs: 120_000,
+            })
+            if (!result.ok) throw new Error(result.error)
+            const parsed = parseCouncilResponse(result.text)
+            return { model: label, findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: result.text.slice(0, 2000) }
+        } catch (err) {
+            console.warn(`[stage-scoring] council ${label} failed:`, err instanceof Error ? err.message : err)
+            return { model: label, findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
+        }
+    }
+
+    // 6-model multi-lineage diagnostic council
     const councilCalls: Promise<CouncilFinding>[] = [
-        // 1. GPT-5.5 (OpenAI — US)
+        // 1. GPT-5.5 (OpenAI — US) — reasoning model: no temperature override
         (async (): Promise<CouncilFinding> => {
             try {
                 const { text } = await callOpenAI(systemPrompt, userPrompt, "gpt-5.5", 16384, 120_000)
-                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                const parsed = parseCouncilResponse(text)
                 return { model: "gpt-5.5:openai", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
             } catch (err) {
                 console.warn(`[stage-scoring] council gpt-5.5 failed:`, err instanceof Error ? err.message : err)
@@ -568,62 +559,21 @@ What specific changes to the AI pipeline (prompts, data extraction, validation l
         (async (): Promise<CouncilFinding> => {
             try {
                 const { text } = await callGemini(systemPrompt, userPrompt, "gemini-3.1-pro-preview", 16384, 120_000)
-                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
+                const parsed = parseCouncilResponse(text)
                 return { model: "gemini-3.1-pro:google", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
             } catch (err) {
                 console.warn(`[stage-scoring] council gemini failed:`, err instanceof Error ? err.message : err)
                 return { model: "gemini-3.1-pro:google", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
             }
         })(),
-        // 3. DeepSeek V4-Pro (DeepSeek — China)
-        (async (): Promise<CouncilFinding> => {
-            try {
-                const text = await callOpenAICompat("https://api.deepseek.com/v1", "DEEPSEEK_API_KEY", "deepseek-reasoner", systemPrompt, userPrompt)
-                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
-                return { model: "deepseek-v4-pro:deepseek", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
-            } catch (err) {
-                console.warn(`[stage-scoring] council deepseek failed:`, err instanceof Error ? err.message : err)
-                return { model: "deepseek-v4-pro:deepseek", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
-            }
-        })(),
-        // 4. Qwen 3 235B (Alibaba — China)
-        (async (): Promise<CouncilFinding> => {
-            try {
-                const text = await callOpenAICompat("https://dashscope-intl.aliyuncs.com/compatible-mode/v1", "QWEN_API_KEY", "qwen3-235b-a22b", systemPrompt, userPrompt)
-                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
-                return { model: "qwen3-235b:alibaba", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
-            } catch (err) {
-                console.warn(`[stage-scoring] council qwen failed:`, err instanceof Error ? err.message : err)
-                return { model: "qwen3-235b:alibaba", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
-            }
-        })(),
-        // 5. Kimi K2.6 (Moonshot — China)
-        (async (): Promise<CouncilFinding> => {
-            try {
-                const text = await callOpenAICompat("https://api.moonshot.cn/v1", "MOONSHOT_API_KEY", "kimi-k2.6", systemPrompt, userPrompt)
-                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
-                return { model: "kimi-k2.6:moonshot", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
-            } catch (err) {
-                console.warn(`[stage-scoring] council kimi failed:`, err instanceof Error ? err.message : err)
-                return { model: "kimi-k2.6:moonshot", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
-            }
-        })(),
-        // 6. GLM-5.1 (Zhipu — China)
-        (async (): Promise<CouncilFinding> => {
-            try {
-                const text = await callOpenAICompat("https://open.bigmodel.cn/api/paas/v4", "GLM_API_KEY", "glm-5.1", systemPrompt, userPrompt)
-                const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-                const parsed = JSON.parse(cleaned) as { findings: string[]; suggested_fixes: string[] }
-                return { model: "glm-5.1:zhipu", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
-            } catch (err) {
-                console.warn(`[stage-scoring] council glm failed:`, err instanceof Error ? err.message : err)
-                return { model: "glm-5.1:zhipu", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
-            }
-        })(),
+        // 3. DeepSeek V4-Pro (via OpenRouter — China)
+        councilViaOpenRouter("deepseek/deepseek-v4-pro", "deepseek-v4-pro:deepseek"),
+        // 4. Qwen 3 235B (via OpenRouter — China/Alibaba)
+        councilViaOpenRouter("qwen/qwen3-235b-a22b", "qwen3-235b:alibaba"),
+        // 5. Kimi K2.6 (via OpenRouter — China/Moonshot)
+        councilViaOpenRouter("moonshotai/kimi-k2.6", "kimi-k2.6:moonshot"),
+        // 6. GLM-5.1 (via OpenRouter — China/Zhipu)
+        councilViaOpenRouter("z-ai/glm-5.1", "glm-5.1:zhipu"),
     ]
 
     const individualFindings = await Promise.all(councilCalls)
