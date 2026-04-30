@@ -79,6 +79,7 @@ import type { AiCostEstimate, CadLabModule } from "@/lib/cad-lab-types"
 import type { DiagnosticAnswers } from "@/components/cad/cad-lab-diagnostics"
 import { estimateNreCosts } from "@/lib/cost/nre-cost-layer"
 import { extractStageSection, extractConstraintAnchors, compressReferenceDossier } from "@/lib/reference-dossier"
+import { loadGroundingData } from "@/lib/forge-v2/parallel-llm"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -522,6 +523,20 @@ async function runFinnCostInternal(
         // From here on: every exit path routes through complete/fail so the
         // chip reflects reality even if something unexpected throws.
         try {
+            // Load DB grounding data for Finn stage (marketplace_listings). This
+            // enriches Finn's cost estimates with real supplier pricing context.
+            // Non-fatal — if it fails, Finn proceeds with existing internal grounding.
+            let finnGroundingData: string | undefined
+            try {
+                const grounding = await loadGroundingData("waiting_finn", projectId)
+                if (grounding) {
+                    finnGroundingData = grounding
+                    console.info("[run-finn-cost] Injected DB grounding for waiting_finn")
+                }
+            } catch (groundingErr) {
+                console.warn("[run-finn-cost] DB grounding failed (non-fatal):", groundingErr instanceof Error ? groundingErr.message : groundingErr)
+            }
+
             // 5. Call the inner estimator. It handles DeepSeek call, JSON
             //    parse, classification overrides, and validation. Returns
             //    `{ success: true, estimates }` or `{ success: false, error }`.
@@ -532,6 +547,7 @@ async function runFinnCostInternal(
                 productOverview,
                 undefined,
                 trusted,
+                finnGroundingData,
             )
 
             if (!estimateResult.success) {
