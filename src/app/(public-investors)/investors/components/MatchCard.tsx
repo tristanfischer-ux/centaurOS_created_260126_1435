@@ -24,8 +24,9 @@
 
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useCallback, useRef, useState, useTransition } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 import { MatchPillarBars } from '@/app/(platform)/investors/components/MatchPillarBars'
 import type {
@@ -163,15 +164,21 @@ export function MatchCard({
     onSave?.()
   }
 
-  const handleCardClick = (e: React.MouseEvent) => {
-    // Don't toggle if clicking on interactive elements (buttons, links).
-    // Those handle their own events via stopPropagation.
-    if (cardState === 'closed') {
-      setCardState('medium')
-    } else {
-      setCardState('closed')
-    }
-  }
+  const router = useRouter()
+
+  const { onClick: handleCardClick, onDoubleClick: handleCardDoubleClick, onKeyDown: handleCardKeyDown } = useExpandNavigateHandlers({
+    onExpand: () => {
+      if (cardState === 'closed') {
+        setCardState('medium')
+      } else {
+        setCardState('closed')
+      }
+    },
+    onOpenProfile: () => {
+      onTrackClick?.('open')
+      router.push(`/investors/${firm.id}`)
+    },
+  })
 
   // Hardware fit score badge (shared between states)
   const hwScoreBadge = (() => {
@@ -179,8 +186,8 @@ export function MatchCard({
                     (firm as unknown as { hardware_fit_score?: number }).hardware_fit_score
     if (typeof hwScore === 'number' && hwScore >= 0 && hwScore <= 10) {
       let badgeColor = 'bg-muted text-muted-foreground'
-      if (hwScore >= 7.0) badgeColor = 'bg-green-100 text-green-700'
-      else if (hwScore >= 4.0) badgeColor = 'bg-amber-100 text-amber-700'
+      if (hwScore >= 7.0) badgeColor = 'bg-international-orange/10 text-international-orange'
+      else if (hwScore >= 4.0) badgeColor = 'bg-muted text-muted-foreground'
 
       return (
         <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full inline-flex items-center ${badgeColor}`}>
@@ -237,7 +244,11 @@ export function MatchCard({
     return (
       <div
         className="relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px"
+        role="button"
+        tabIndex={0}
         onClick={handleCardClick}
+        onDoubleClick={handleCardDoubleClick}
+        onKeyDown={handleCardKeyDown}
       >
         {/* ── Header row: rank + name + type chip | composite % ── */}
         <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -318,7 +329,7 @@ export function MatchCard({
 
         {/* ── Expand hint ── */}
         <div className="text-[10px] text-muted-foreground mt-2 select-none">
-          ▼ Click to expand
+          ▼ Click to expand · Double-click for full profile
         </div>
       </div>
     )
@@ -328,7 +339,11 @@ export function MatchCard({
   return (
     <div
       className="relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px"
+      role="button"
+      tabIndex={0}
       onClick={handleCardClick}
+      onDoubleClick={handleCardDoubleClick}
+      onKeyDown={handleCardKeyDown}
     >
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
@@ -382,19 +397,18 @@ export function MatchCard({
       <ClosedChipRow attrs={attrs} firmType={firmType} />
 
       {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
-      <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
+      <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
         {SCORECARD_PILLARS.map(({ key, label, weight }) => {
           const raw   = pillars?.[key]
           const hasScore = raw !== undefined
           const value = hasScore ? raw : 0
           const isNA  = !hasScore
 
-          // Colour tiers from Forge Capital CSS (lines 937-950 of 07b)
-          let fillColor = '#d1d5db' // score-na grey
+          let fillColor = '#e5e7eb' // N/A: neutral
           if (!isNA) {
-            if (value >= 70) fillColor = '#16a34a'      // green  (score-high)
-            else if (value >= 40) fillColor = '#f59e0b' // amber  (score-mid)
-            else fillColor = '#dc2626'                   // red    (score-low)
+            if (value >= 70) fillColor = '#ff4500'      // international-orange — strong
+            else if (value >= 40) fillColor = '#fdba74' // orange-300 — moderate
+            else fillColor = '#cbd5e1'                   // slate-300 — weak
           }
 
           return (
@@ -526,11 +540,66 @@ export function MatchCard({
           View full profile →
         </Link>
         <span className="text-[10px] text-muted-foreground select-none">
-          ▲ Click card to collapse
+          ▲ Click to collapse · Double-click to open full profile
         </span>
       </div>
     </div>
   )
+}
+
+// ─── Single/double-click handler ────────────────────────────────────────────
+
+function useExpandNavigateHandlers({
+  onExpand,
+  onOpenProfile,
+}: {
+  onExpand: () => void
+  onOpenProfile: () => void
+}) {
+  const timer = useRef<number | null>(null)
+
+  const clearTimer = useCallback(() => {
+    if (timer.current !== null) {
+      window.clearTimeout(timer.current)
+      timer.current = null
+    }
+  }, [])
+
+  const onClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (e.defaultPrevented) return
+      clearTimer()
+      timer.current = window.setTimeout(() => {
+        onExpand()
+        timer.current = null
+      }, 220)
+    },
+    [onExpand, clearTimer],
+  )
+
+  const onDoubleClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      clearTimer()
+      onOpenProfile()
+    },
+    [onOpenProfile, clearTimer],
+  )
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        onOpenProfile()
+      } else if (e.key === ' ') {
+        e.preventDefault()
+        onExpand()
+      }
+    },
+    [onExpand, onOpenProfile],
+  )
+
+  return { onClick, onDoubleClick, onKeyDown }
 }
 
 // ─── Shared sub-components ───────────────────────────────────────────────────

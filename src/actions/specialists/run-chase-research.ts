@@ -81,6 +81,7 @@ import {
     extractCostCeilingFromProse,
     extractAllCostCeilingsFromProse,
 } from "@/lib/brief-cost-ceiling-extractor"
+import { compressReferenceDossier } from "@/lib/reference-dossier"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -232,7 +233,7 @@ async function runChaseResearchInternal(
             : undefined
         const { data: project, error: projectErr } = await admin
             .from("cad_lab_projects")
-            .select("id, foundry_id, subject, research")
+            .select("id, foundry_id, subject, research, reference_dossier")
             .eq("id", projectId)
             .maybeSingle()
 
@@ -400,10 +401,16 @@ async function runChaseResearchInternal(
             //    converts that failure mode into an invisible recovery
             //    without papering over hard errors (budget cap, auth,
             //    validation) that retry can't fix.
+            const referenceDossierContext =
+                typeof project.reference_dossier === "string" && project.reference_dossier.length > 0
+                    ? compressReferenceDossier(project.reference_dossier)
+                    : undefined
+
             const researchResult: CadLabResearchResult =
                 await runResearchWithOneRetry(descriptionToUse, { // gate remediation context prepended when present (step 2b)
                     priorDesignBrief,
                     priorAssumptionNotes,
+                    documentContext: referenceDossierContext,
                     onRetry: (firstErr) => {
                         retried = true
                         firstErrorMessage = firstErr
@@ -784,6 +791,7 @@ async function runResearchWithOneRetry(
     opts: {
         priorDesignBrief: CadLabDesignBrief | undefined
         priorAssumptionNotes: string | undefined
+        documentContext?: string
         onRetry: (firstErrorMessage: string) => void
         /**
          * TrustedContext for the after()-context calls — skips the cookie
@@ -792,12 +800,14 @@ async function runResearchWithOneRetry(
         trusted?: { userId: string; foundryId: string }
     },
 ): Promise<CadLabResearchResult> {
-    const researchArg = opts.priorDesignBrief
-        ? {
-              designBrief: opts.priorDesignBrief,
-              assumptionNotes: opts.priorAssumptionNotes,
-          }
-        : undefined
+    const researchArg: {
+        designBrief?: CadLabDesignBrief
+        assumptionNotes?: string
+        documentContext?: string
+    } = {}
+    if (opts.priorDesignBrief) researchArg.designBrief = opts.priorDesignBrief
+    if (opts.priorAssumptionNotes) researchArg.assumptionNotes = opts.priorAssumptionNotes
+    if (opts.documentContext) researchArg.documentContext = opts.documentContext
 
     const first = await runCadLabResearch(description, researchArg, opts.trusted)
     if (first.success) return first

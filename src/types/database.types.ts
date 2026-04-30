@@ -4707,7 +4707,6 @@ export type Database = {
           accepted_risks: Json | null
           additional_context: string | null
           ai_cost_estimates: Json | null
-          cost_reconciliation: Json | null
           archived_at: string | null
           autopilot_state: Json | null
           batch_started_at: string | null
@@ -4720,6 +4719,7 @@ export type Database = {
           canonical_specs_revision: number
           checkpoints: Json | null
           concept_render_url: string | null
+          cost_reconciliation: Json | null
           created_at: string
           created_by: string
           decomposition_connections: Json | null
@@ -4760,6 +4760,7 @@ export type Database = {
           provider_results: Json | null
           quality_ratings: Json | null
           reference_documents: Json | null
+          reference_dossier: string | null
           reference_images: Json | null
           research: Json | null
           result: Json | null
@@ -4787,7 +4788,6 @@ export type Database = {
           accepted_risks?: Json | null
           additional_context?: string | null
           ai_cost_estimates?: Json | null
-          cost_reconciliation?: Json | null
           archived_at?: string | null
           autopilot_state?: Json | null
           batch_started_at?: string | null
@@ -4800,6 +4800,7 @@ export type Database = {
           canonical_specs_revision?: number
           checkpoints?: Json | null
           concept_render_url?: string | null
+          cost_reconciliation?: Json | null
           created_at?: string
           created_by: string
           decomposition_connections?: Json | null
@@ -4840,6 +4841,7 @@ export type Database = {
           provider_results?: Json | null
           quality_ratings?: Json | null
           reference_documents?: Json | null
+          reference_dossier?: string | null
           reference_images?: Json | null
           research?: Json | null
           result?: Json | null
@@ -4867,7 +4869,6 @@ export type Database = {
           accepted_risks?: Json | null
           additional_context?: string | null
           ai_cost_estimates?: Json | null
-          cost_reconciliation?: Json | null
           archived_at?: string | null
           autopilot_state?: Json | null
           batch_started_at?: string | null
@@ -4880,6 +4881,7 @@ export type Database = {
           canonical_specs_revision?: number
           checkpoints?: Json | null
           concept_render_url?: string | null
+          cost_reconciliation?: Json | null
           created_at?: string
           created_by?: string
           decomposition_connections?: Json | null
@@ -4920,6 +4922,7 @@ export type Database = {
           provider_results?: Json | null
           quality_ratings?: Json | null
           reference_documents?: Json | null
+          reference_dossier?: string | null
           reference_images?: Json | null
           research?: Json | null
           result?: Json | null
@@ -5629,6 +5632,129 @@ export type Database = {
         }
         Relationships: []
       }
+      component_intelligence: {
+        Row: {
+          c_rate: number | null
+          capacity_ah: number | null
+          category: string
+          created_at: string
+          cycle_life_cycles: number | null
+          datasheet_rev: string
+          depth_of_discharge_pct: number | null
+          energy_density_wh_per_kg: number | null
+          eol_date: string | null
+          extracted_at: string
+          extraction_confidence: number
+          extraction_model: string
+          height_mm: number | null
+          id: string
+          length_mm: number | null
+          lifecycle_status: string
+          manufacturer_name: string
+          mass_kg: number | null
+          mpn: string
+          nominal_voltage_v: number | null
+          pdf_page: number | null
+          quote_span: string | null
+          search_text: unknown
+          source_pdf_id: string | null
+          source_url: string
+          specifications: Json
+          un_38_3_certified: boolean | null
+          updated_at: string
+          valid_from: string
+          valid_to: string | null
+          verified_at: string | null
+          verified_by: string | null
+          width_mm: number | null
+        }
+        Insert: {
+          c_rate?: number | null
+          capacity_ah?: number | null
+          category: string
+          created_at?: string
+          cycle_life_cycles?: number | null
+          datasheet_rev: string
+          depth_of_discharge_pct?: number | null
+          energy_density_wh_per_kg?: number | null
+          eol_date?: string | null
+          extracted_at: string
+          extraction_confidence: number
+          extraction_model: string
+          height_mm?: number | null
+          id?: string
+          length_mm?: number | null
+          lifecycle_status: string
+          manufacturer_name: string
+          mass_kg?: number | null
+          mpn: string
+          nominal_voltage_v?: number | null
+          pdf_page?: number | null
+          quote_span?: string | null
+          search_text?: unknown
+          source_pdf_id?: string | null
+          source_url: string
+          specifications?: Json
+          un_38_3_certified?: boolean | null
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          width_mm?: number | null
+        }
+        Update: {
+          c_rate?: number | null
+          capacity_ah?: number | null
+          category?: string
+          created_at?: string
+          cycle_life_cycles?: number | null
+          datasheet_rev?: string
+          depth_of_discharge_pct?: number | null
+          energy_density_wh_per_kg?: number | null
+          eol_date?: string | null
+          extracted_at?: string
+          extraction_confidence?: number
+          extraction_model?: string
+          height_mm?: number | null
+          id?: string
+          length_mm?: number | null
+          lifecycle_status?: string
+          manufacturer_name?: string
+          mass_kg?: number | null
+          mpn?: string
+          nominal_voltage_v?: number | null
+          pdf_page?: number | null
+          quote_span?: string | null
+          search_text?: unknown
+          source_pdf_id?: string | null
+          source_url?: string
+          specifications?: Json
+          un_38_3_certified?: boolean | null
+          updated_at?: string
+          valid_from?: string
+          valid_to?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+          width_mm?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "component_intelligence_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "buyer_stats"
+            referencedColumns: ["buyer_id"]
+          },
+          {
+            foreignKeyName: "component_intelligence_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       component_pricing: {
         Row: {
           component_name: string
@@ -5924,6 +6050,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      corpus_chunks: {
+        Row: {
+          chunk_idx: number
+          chunk_text: string
+          created_at: string | null
+          embedded_at: string | null
+          embedding: string | null
+          entity_id: string
+          id: number
+          page_url: string
+          source: string
+        }
+        Insert: {
+          chunk_idx: number
+          chunk_text: string
+          created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
+          entity_id: string
+          id: number
+          page_url: string
+          source: string
+        }
+        Update: {
+          chunk_idx?: number
+          chunk_text?: string
+          created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
+          entity_id?: string
+          id?: number
+          page_url?: string
+          source?: string
+        }
+        Relationships: []
       }
       crop_advisor_alerts: {
         Row: {
@@ -15332,6 +15494,42 @@ export type Database = {
           },
         ]
       }
+      page_chunks_corpus: {
+        Row: {
+          chunk_idx: number
+          chunk_text: string
+          created_at: string | null
+          embedded_at: string | null
+          embedding: string | null
+          entity_id: string
+          id: number
+          page_url: string
+          source: string
+        }
+        Insert: {
+          chunk_idx: number
+          chunk_text: string
+          created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
+          entity_id: string
+          id: number
+          page_url: string
+          source: string
+        }
+        Update: {
+          chunk_idx?: number
+          chunk_text?: string
+          created_at?: string | null
+          embedded_at?: string | null
+          embedding?: string | null
+          entity_id?: string
+          id?: number
+          page_url?: string
+          source?: string
+        }
+        Relationships: []
+      }
       parts: {
         Row: {
           ai_confidence: number | null
@@ -21729,6 +21927,70 @@ export type Database = {
           },
         ]
       }
+      supplier_component: {
+        Row: {
+          component_id: string
+          created_at: string
+          currency_code: string | null
+          id: string
+          last_quoted_moq: number | null
+          last_quoted_price: number | null
+          lead_time_days: number | null
+          quote_date: string | null
+          relationship_type: string
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          component_id: string
+          created_at?: string
+          currency_code?: string | null
+          id?: string
+          last_quoted_moq?: number | null
+          last_quoted_price?: number | null
+          lead_time_days?: number | null
+          quote_date?: string | null
+          relationship_type: string
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          component_id?: string
+          created_at?: string
+          currency_code?: string | null
+          id?: string
+          last_quoted_moq?: number | null
+          last_quoted_price?: number | null
+          lead_time_days?: number | null
+          quote_date?: string | null
+          relationship_type?: string
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_component_component_id_fkey"
+            columns: ["component_id"]
+            isOneToOne: false
+            referencedRelation: "component_intelligence"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_component_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "marketplace_listings"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_component_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "supplier_search_ranking"
+            referencedColumns: ["listing_id"]
+          },
+        ]
+      }
       supplier_corrections: {
         Row: {
           applied_at: string | null
@@ -24934,6 +25196,67 @@ export type Database = {
         }
         Relationships: []
       }
+      v_search_click_through_rate: {
+        Row: {
+          ctr_pct: number | null
+          queries_with_click: number | null
+          surface: string | null
+          total_queries: number | null
+          window_label: string | null
+        }
+        Relationships: []
+      }
+      v_search_listing_traction: {
+        Row: {
+          clicks: number | null
+          ctr_pct: number | null
+          impressions: number | null
+          listing_id: string | null
+        }
+        Relationships: []
+      }
+      v_search_query_overview: {
+        Row: {
+          avg_result_count: number | null
+          distinct_foundries: number | null
+          distinct_users: number | null
+          p50_latency_ms: number | null
+          p95_latency_ms: number | null
+          surface: string | null
+          total_queries: number | null
+          zero_result_pct: number | null
+        }
+        Relationships: []
+      }
+      v_search_query_terms: {
+        Row: {
+          distinct_queries: number | null
+          occurrences: number | null
+          term: string | null
+        }
+        Relationships: []
+      }
+      v_search_top_result_ctr: {
+        Row: {
+          ctr_pct: number | null
+          position_bucket: string | null
+          queries_with_click_in_bucket: number | null
+          queries_with_results: number | null
+          surface: string | null
+        }
+        Relationships: []
+      }
+      v_search_zero_results: {
+        Row: {
+          example_query_text: string | null
+          first_seen: string | null
+          last_seen: string | null
+          occurrences: number | null
+          query_text_lower: string | null
+          surface: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       _postgis_deprecate: {
@@ -26397,6 +26720,24 @@ export type Database = {
           version: number
         }[]
       }
+      match_page_chunks_corpus: {
+        Args: {
+          filter_entity_id?: string
+          filter_source?: string
+          match_count?: number
+          match_threshold?: number
+          query_embedding: string
+        }
+        Returns: {
+          chunk_idx: number
+          chunk_text: string
+          entity_id: string
+          id: number
+          page_url: string
+          similarity: number
+          source: string
+        }[]
+      }
       match_people_semantic: {
         Args: {
           match_count?: number
@@ -26611,6 +26952,20 @@ export type Database = {
       schedule_payment_retry: {
         Args: { p_failed_payment_id: string }
         Returns: string
+      }
+      schema_preflight_check_columns: {
+        Args: { checks: Json }
+        Returns: {
+          column_name: string
+          table_name: string
+        }[]
+      }
+      schema_preflight_get_latest_migration: {
+        Args: never
+        Returns: {
+          total_count: number
+          version: string
+        }[]
       }
       search_forge_map_factories: {
         Args: {
