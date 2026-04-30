@@ -6,7 +6,7 @@
  *
  * @description Uploads spec sheets, datasheets, and CAD files to Supabase Storage,
  * extracts text from document types (PDF, DOCX, PPTX, XLSX), and summarizes into
- * design-relevant specs via Claude Haiku.
+ * design-relevant specs via OpenAI gpt-4.1-mini.
  *
  * @security All actions require authentication via withAuth. Project ownership is
  * verified before any operation.
@@ -288,20 +288,13 @@ export async function extractDocumentText(
       // Cap raw text
       const truncatedText = rawText.slice(0, MAX_RAW_TEXT_CHARS)
 
-      // INTENT: Summarize into design-relevant specs via Claude Haiku
-      const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-      if (!apiKey) {
-        console.warn("[REF-DOCS] No ANTHROPIC_API_KEY — returning raw text without summarization")
-        return { rawText: truncatedText, extractedSpecs: null, status: "complete" }
-      }
+      // INTENT: Summarize into design-relevant specs via OpenAI gpt-4.1-mini
+      const { callOpenAI: callOpenAIHelper } = await import("@/lib/cad-lab/api-helpers")
 
-      const Anthropic = (await import("@anthropic-ai/sdk")).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
-
-      const response = await client.messages.create({
-        model: "claude-haiku-4-5-20251001",
-        max_tokens: 4096,
-        system: `You are an engineering document analyzer. Extract design-relevant specifications from the provided document text. Focus on:
+      let extractedSpecs: string | null = null
+      try {
+        const result = await callOpenAIHelper(
+          `You are an engineering document analyzer. Extract design-relevant specifications from the provided document text. Focus on:
 
 1. **Dimensions & Tolerances** — exact measurements, clearances, fit specs
 2. **Materials & Properties** — material grades, mechanical properties, surface finishes
@@ -312,13 +305,15 @@ export async function extractDocumentText(
 7. **Cost & Lead Time Targets** — budget constraints, delivery timelines
 
 Output a concise, structured summary (under 3000 characters) that a CAD engineer can reference while designing. Use bullet points. Include exact numbers where available. Skip sections with no relevant data.`,
-        messages: [{
-          role: "user",
-          content: `Extract the design-relevant specifications from this document:\n\n${truncatedText}`,
-        }],
-      })
-
-      const extractedSpecs = response.content[0]?.type === "text" ? response.content[0].text : null
+          `Extract the design-relevant specifications from this document:\n\n${truncatedText}`,
+          "gpt-4.1-mini",
+          4096,
+          120_000,
+        )
+        extractedSpecs = result.text || null
+      } catch (err) {
+        console.warn("[REF-DOCS] OpenAI summarization failed:", err instanceof Error ? err.message : err)
+      }
 
       return {
         rawText: truncatedText,

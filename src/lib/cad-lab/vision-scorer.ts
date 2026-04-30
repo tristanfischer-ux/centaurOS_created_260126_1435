@@ -1,14 +1,14 @@
 /**
  * @file vision-scorer.ts — P2: Vision-based render quality scoring
  *
- * @description Sends SVG renders to Claude vision API to assess how well
+ * @description Sends SVG renders to OpenAI vision API to assess how well
  * the generated CAD model matches the product description. Returns a 1-10
  * score with specific issues identified.
  *
  * INTENT: ~20% of generation failures pass deterministic validators but look
  * wrong. This catches visual mismatches that geometry checks miss.
  *
- * @security Uses ANTHROPIC_API_KEY server-side only. Never exposes to client.
+ * @security Uses OPENAI_API_KEY server-side only. Never exposes to client.
  */
 
 import { withRetry } from '@/lib/retry'
@@ -43,9 +43,9 @@ export async function scoreRenderVision(
   referenceImageBase64?: string,
   renderMediaType: "image/svg+xml" | "image/png" | "image/jpeg" = "image/svg+xml",
 ): Promise<VisionScoreResult | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    console.warn("[VISION-SCORER] ANTHROPIC_API_KEY not configured, skipping")
+    console.warn("[VISION-SCORER] OPENAI_API_KEY not configured, skipping")
     return null
   }
 
@@ -87,45 +87,44 @@ Scoring guide:
 Return ONLY valid JSON: { "score": <number>, "issues": [<string>, ...], "summary": "<one sentence>" }
 Do not include any text outside the JSON.`
 
-    // INTENT: Build content array — with reference image, send both for visual comparison
-    type ContentBlock = { type: string; source?: { type: string; media_type: string; data: string }; text?: string }
-    const contentBlocks: ContentBlock[] = []
+    // INTENT: Build content array — with reference image, send both for visual comparison (OpenAI vision format)
+    type ContentPart = { type: "image_url"; image_url: { url: string } } | { type: "text"; text: string }
+    const contentParts: ContentPart[] = []
 
     if (referenceImageBase64) {
-      contentBlocks.push({
-        type: "image",
-        source: { type: "base64", media_type: "image/png", data: referenceImageBase64 },
+      contentParts.push({
+        type: "image_url",
+        image_url: { url: `data:image/png;base64,${referenceImageBase64}` },
       })
     }
-    contentBlocks.push({
-      type: "image",
-      source: { type: "base64", media_type: renderMediaType, data: svgIsoBase64 },
+    contentParts.push({
+      type: "image_url",
+      image_url: { url: `data:${renderMediaType};base64,${svgIsoBase64}` },
     })
 
     const textPrompt = referenceImageBase64
       ? `Module: ${moduleName}\n\nImage 1 is the target product design. Image 2 is the CAD render.\nScore how well Image 2 matches Image 1. Return JSON only.`
       : `Module: ${moduleName}\n\nProduct description: ${productDescription}${interfaceContext}\n\nScore this render against the description. Return JSON only.`
 
-    contentBlocks.push({ type: "text", text: textPrompt })
+    contentParts.push({ type: "text", text: textPrompt })
 
     const data = await withRetry(async () => {
       const response = await fetchWithTimeout(
-        "https://api.anthropic.com/v1/messages",
+        "https://api.openai.com/v1/chat/completions",
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
+            "Authorization": `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "claude-sonnet-4-20250514",
-            max_tokens: 1024,
-            system: systemPrompt,
+            model: "gpt-5.4",
+            max_completion_tokens: 1024,
             messages: [
+              { role: "system", content: systemPrompt },
               {
                 role: "user",
-                content: contentBlocks,
+                content: contentParts,
               },
             ],
           }),
@@ -152,7 +151,7 @@ Do not include any text outside the JSON.`
     })
 
     if (!data) return null
-    const text = data?.content?.[0]?.text
+    const text = data?.choices?.[0]?.message?.content
     if (!text) return null
 
     // INTENT: Extract JSON from response — Claude may wrap in markdown code blocks

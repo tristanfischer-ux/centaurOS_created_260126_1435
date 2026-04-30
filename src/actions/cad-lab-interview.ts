@@ -4,14 +4,14 @@
  * @file cad-lab-interview.ts — Server actions for the guided design brief interview.
  *
  * @description Two LLM calls:
- *   1. `getNextInterviewQuestion()` — Sonnet 4.6 generates dynamic follow-up questions
- *   2. `synthesizeDesignBrief()` — Opus 4.6 synthesizes conversation into a structured brief
+ *   1. `getNextInterviewQuestion()` — gpt-4.1-mini generates dynamic follow-up questions
+ *   2. `synthesizeDesignBrief()` — gpt-5.4 synthesizes conversation into a structured brief
  *
- * @security Server-side only, uses ANTHROPIC_API_KEY directly.
+ * @security Server-side only, uses OPENAI_API_KEY via callOpenAI helper.
  */
 
 import { createClient } from "@/lib/supabase/server"
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { checkRateLimit } from "@/lib/security/rate-limit"
 import { sanitizeErrorMessage } from "@/lib/security/sanitize"
 import { classifyAIError } from "@/lib/agents/error-classification"
@@ -40,47 +40,17 @@ interface SynthesisResult {
   summary: string
 }
 
-// ─── Claude API Helper ───────────────────────────────────────────────
+// ─── OpenAI API Helper ──────────────────────────────────────────────
 
-async function callClaudeForInterview(
+async function callOpenAIForInterview(
   systemPrompt: string,
   userPrompt: string,
-  model: string,
+  modelId: string,
   maxTokens: number = 1024,
   timeoutMs: number = 30_000,
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
-
-  const response = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
-      }),
-    },
-    timeoutMs,
-  )
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "")
-    console.error(`[INTERVIEW] Claude API error ${response.status}: ${text.slice(0, 500)}`)
-    throw new Error(sanitizeErrorMessage(`Interview request failed (${response.status})`))
-  }
-
-  const data = await response.json()
-  const block = data.content?.[0]
-  if (!block || block.type !== "text") throw new Error("Unexpected Claude response format")
-  return block.text
+  const result = await callOpenAI(systemPrompt, userPrompt, modelId, maxTokens, timeoutMs)
+  return result.text
 }
 
 // ─── JSON Extraction ─────────────────────────────────────────────────
@@ -154,7 +124,7 @@ Return ONLY valid JSON:
 // ─── Server Actions ──────────────────────────────────────────────────
 
 /**
- * Generates the next interview question using Sonnet 4.6.
+ * Generates the next interview question using gpt-4.1-mini.
  *
  * @param subject - The product subject the user typed
  * @param conversation - Array of previous Q&A pairs
@@ -183,10 +153,10 @@ export async function getNextInterviewQuestion(
     ? `The user wants to build: "${subject.slice(0, 500)}"\n\nThis is your first question — no acknowledgment needed.`
     : `The user wants to build: "${subject.slice(0, 500)}"\n\nConversation so far:\n${safeConversation.map((e, i) => `Q${i + 1}: ${e.question}\nA${i + 1}: ${e.answer}`).join("\n\n")}\n\nGenerate your next response.`
 
-  const text = await callClaudeForInterview(
+  const text = await callOpenAIForInterview(
     INTERVIEW_SYSTEM_PROMPT,
     userPrompt,
-    "claude-sonnet-4-6",
+    "gpt-4.1-mini",
     1024,
   )
 
@@ -217,7 +187,7 @@ export async function getNextInterviewQuestion(
 }
 
 /**
- * Synthesizes the full conversation into a structured design brief using Opus 4.6.
+ * Synthesizes the full conversation into a structured design brief using gpt-5.4.
  *
  * @param subject - The original product subject
  * @param conversation - Full conversation history
@@ -244,12 +214,12 @@ export async function synthesizeDesignBrief(
 
   const userPrompt = `Original subject: "${subject.slice(0, 500)}"\n\nInterview transcript:\n${safeConversation.map((e, i) => `Q${i + 1}: ${e.question}\nA${i + 1}: ${e.answer}`).join("\n\n")}\n\nSynthesize into a design brief.`
 
-  const text = await callClaudeForInterview(
+  const text = await callOpenAIForInterview(
     SYNTHESIS_SYSTEM_PROMPT,
     userPrompt,
-    "claude-opus-4-7",
+    "gpt-5.4",
     4096, // Generous — brief fields + summary need room for specific engineering detail
-    60_000, // 60s — Opus needs more time than Sonnet for synthesis
+    60_000, // 60s — synthesis needs more time
   )
 
   try {

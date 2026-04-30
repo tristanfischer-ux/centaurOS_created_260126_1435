@@ -8,7 +8,7 @@
  * @related src/actions/cad-lab.ts
  */
 
-import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 
 export type CadLabDomain = "electronics" | "mechanical" | "electromechanical" | "fluid"
 
@@ -52,40 +52,21 @@ const DETECT_FROM_DESCRIPTION_PROMPT = `You are classifying a product descriptio
 Use the same rules: electronics (PCB/ICs), mechanical (structures/materials only), electromechanical (motors/drones/robots), fluid (pumps/piping). Reply with only the single word.`
 
 /**
- * Calls Claude to classify text into a CAD Lab domain.
+ * Calls OpenAI (gpt-4.1-mini) to classify text into a CAD Lab domain.
  */
-async function classifyWithClaude(
+async function classifyWithLLM(
   prompt: string,
   text: string,
 ): Promise<CadLabDomain> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) return "mechanical"
-
-  const truncated = text.slice(0, 8000)
-  const response = await fetchWithTimeout(
-    "https://api.anthropic.com/v1/messages",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-6",
-        max_tokens: 32,
-        system: prompt,
-        messages: [{ role: "user", content: truncated }],
-      }),
-    },
-    15_000,
-  )
-
-  if (!response.ok) return "mechanical"
-  const data = await response.json()
-  const word = (data.content?.[0]?.text ?? "").trim().toLowerCase().replace(/\.$/, "")
-  if (DOMAIN_VALUES.includes(word as CadLabDomain)) return word as CadLabDomain
-  return "mechanical"
+  try {
+    const truncated = text.slice(0, 8000)
+    const result = await callOpenAI(prompt, truncated, "gpt-4.1-mini", 32, 15_000)
+    const word = result.text.trim().toLowerCase().replace(/\.$/, "")
+    if (DOMAIN_VALUES.includes(word as CadLabDomain)) return word as CadLabDomain
+    return "mechanical"
+  } catch {
+    return "mechanical"
+  }
 }
 
 /**
@@ -95,7 +76,7 @@ export async function detectDomainFromResearchReport(
   researchReport: string,
 ): Promise<CadLabDomain> {
   if (!researchReport?.trim()) return "mechanical"
-  return classifyWithClaude(DETECT_FROM_REPORT_PROMPT, researchReport)
+  return classifyWithLLM(DETECT_FROM_REPORT_PROMPT, researchReport)
 }
 
 /**
@@ -105,7 +86,7 @@ export async function detectDomainFromProductDescription(
   description: string,
 ): Promise<CadLabDomain> {
   if (!description?.trim()) return "mechanical"
-  return classifyWithClaude(DETECT_FROM_DESCRIPTION_PROMPT, description)
+  return classifyWithLLM(DETECT_FROM_DESCRIPTION_PROMPT, description)
 }
 
 // ─── Lightweight domain detection from keyParts (no AI call) ────────────

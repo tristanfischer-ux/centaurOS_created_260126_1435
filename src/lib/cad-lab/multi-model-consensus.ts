@@ -2,7 +2,7 @@
  * @file multi-model-consensus.ts
  *
  * @description Multi-model consensus for high-stakes engineering recommendations.
- * Runs the same prompt through Claude, GPT-5.3, and optionally Gemini; returns
+ * Runs the same prompt through OpenAI GPT-5.4 and optionally Gemini; returns
  * consensus value or flags disagreement with alternatives.
  *
  * @related src/actions/cad-lab.ts (prefillDiagnostics)
@@ -44,35 +44,7 @@ const apiShouldRetry = (error: Error) => {
     msg.includes('network') || msg.includes('timeout') || msg.includes('529')
 }
 
-async function callClaude(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
-  return withRetry(async () => {
-    const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-opus-4-7",
-          max_tokens: 256,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
-      },
-      30_000,
-    )
-    if (!response.ok) throw new Error(`Claude error: ${response.status}`)
-    const data = await response.json()
-    return (data.content?.[0]?.text ?? "").trim()
-  }, { maxRetries: 2, baseDelay: 2000, shouldRetry: apiShouldRetry })
-}
-
-async function callOpenAI(systemPrompt: string, userPrompt: string): Promise<string> {
+async function callOpenAIConsensus(systemPrompt: string, userPrompt: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
   const OpenAI = (await import("openai")).default
@@ -121,7 +93,7 @@ async function callGemini(systemPrompt: string, userPrompt: string): Promise<str
 }
 
 /**
- * Runs a material-recommendation prompt through Claude and GPT-5.3 (and Gemini if configured).
+ * Runs a material-recommendation prompt through OpenAI GPT-5.4 (and Gemini if configured).
  * Returns consensus material or alternatives when models disagree.
  *
  * @param systemPrompt - System instruction for the recommendation
@@ -136,8 +108,8 @@ export async function runMaterialConsensus(
   const results: string[] = []
 
   const runners: Array<{ name: string; fn: () => Promise<string> }> = [
-    { name: "Claude", fn: () => callClaude(systemPrompt, userPrompt) },
-    { name: "GPT-5.3", fn: () => callOpenAI(systemPrompt, userPrompt) },
+    { name: "OpenAI", fn: () => callOpenAIConsensus(systemPrompt, userPrompt) },
+    { name: "GPT-5.3", fn: () => callOpenAIConsensus(systemPrompt, userPrompt) },
   ]
   if (process.env.GOOGLE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()) {
     runners.push({ name: "Gemini", fn: () => callGemini(systemPrompt, userPrompt) })
