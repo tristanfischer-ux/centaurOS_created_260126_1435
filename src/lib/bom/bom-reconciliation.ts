@@ -401,8 +401,10 @@ export interface BomOutlierFlag {
         | "COMPONENT_EXCEEDS_TOTAL_MASS_BUDGET_100PCT"  // error: single component > total assembly mass
         | "COMPONENT_EXCEEDS_TOTAL_MASS_BUDGET_50PCT"   // warning: single component > 50% of total mass
         | "COMPONENT_EXCEEDS_MODULE_MASS_BUDGET"        // error: part exceeds its parent module's mass budget
-        | "COMPONENT_EXCEEDS_COST_CEILING_80PCT"        // warning: single component > 80% of unit cost ceiling
+        | "COMPONENT_EXCEEDS_COST_CEILING_30PCT"        // warning: single component > 30% of unit cost ceiling
+        | "COMPONENT_DOMINATES_MODULE_COST"             // warning: single part costs more than all other parts in its module combined
         | "MODULE_BOM_MASS_DIVERGENCE"                  // warning: module-page estimated mass vs bill-of-materials mass total >20% off
+        | "MODULE_BOM_COST_DIVERGENCE"                  // warning: module-page estimated cost vs bill-of-materials cost total >30% off
     severity: OutlierSeverity
     /** Human-readable explanation. No acronyms; user-facing. */
     message: string
@@ -450,9 +452,9 @@ export interface BomOutlierResult {
  *      budget — that would imply the module is heavier than the entire
  *      sub-system it belongs to.
  *
- *   3. **Cost ceiling — single component >80% of unit cost ceiling (warning).**
- *      A single COTS component eating 80%+ of the stated unit cost ceiling
- *      means the rest of the bill of materials cannot close at all.
+ *   3. **Cost ceiling — single component >30% of unit cost ceiling (warning).**
+ *      A single COTS component eating 30%+ of the stated unit cost ceiling
+ *      is unusual and warrants investigation. Loop 28 tightened from 80%.
  *
  *   4. **Module mass divergence — bill-of-materials sum vs module estimate >20%.**
  *      Fang sizes modules; the bill of materials generator independently
@@ -460,8 +462,18 @@ export interface BomOutlierResult {
  *      module, one of the two sources is wrong and the PDF would report
  *      contradictory mass figures.
  *
+ *   5. **Single-part cost dominance — one part costs more than all others
+ *      in its module combined (warning).** A single component dominating a
+ *      module's cost suggests either a pricing error or a fundamental design
+ *      issue. Loop 28 addition.
+ *
+ *   6. **Module cost divergence — bill-of-materials cost sum vs module
+ *      estimate >30% off (warning).** Same principle as mass divergence but
+ *      for cost. Catches the CE-004-PUR class of bug (PLC at £18,000 in BOM
+ *      vs £900 on module page). Loop 28 addition.
+ *
  * @param parts         Merged bill of materials parts from the expansion stage.
- * @param modules       Module list from Max's decomposition (for per-module budgets and mass divergence).
+ * @param modules       Module list from Max's decomposition (for per-module budgets and mass/cost divergence).
  * @param totalMassBudgetKg  Programme-level assembly mass budget from the design brief (optional).
  * @param unitCostCeilingGbp Founder's stated unit cost ceiling from the design brief (optional).
  *
@@ -479,6 +491,7 @@ export function detectBomOutliers(
         id: string
         name: string
         estimatedMassKg?: number | null
+        estimatedCostGbp?: number | null
     }>,
     totalMassBudgetKg?: number | null,
     unitCostCeilingGbp?: number | null,
@@ -564,10 +577,10 @@ export function detectBomOutliers(
         }
     }
 
-    // ── Check 3: per-component cost vs unit cost ceiling ──
+    // ── Check 3: per-component cost vs unit cost ceiling (Loop 28: 80% → 30%) ──
 
     if (typeof unitCostCeilingGbp === "number" && unitCostCeilingGbp > 0) {
-        const warnThreshold = unitCostCeilingGbp * 0.8
+        const warnThreshold = unitCostCeilingGbp * 0.3
         for (const part of parts) {
             const cost = typeof part.estimatedUnitCostGbp === "number" && Number.isFinite(part.estimatedUnitCostGbp)
                 ? part.estimatedUnitCostGbp
@@ -576,7 +589,7 @@ export function detectBomOutliers(
 
             if (cost > warnThreshold) {
                 flags.push({
-                    checkId: "COMPONENT_EXCEEDS_COST_CEILING_80PCT",
+                    checkId: "COMPONENT_EXCEEDS_COST_CEILING_30PCT",
                     severity: "warning",
                     partNumber: part.partNumber,
                     observedValue: cost,
@@ -586,10 +599,9 @@ export function detectBomOutliers(
                         `£${cost.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} — ` +
                         `${((cost / unitCostCeilingGbp) * 100).toFixed(1)}% of the stated unit cost ` +
                         `ceiling of £${unitCostCeilingGbp.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}. ` +
-                        `A single component consuming 80% or more of the entire programme cost ` +
-                        `ceiling leaves insufficient budget for the remaining bill of materials. ` +
-                        `Review whether this part can be substituted with a lower-cost alternative, ` +
-                        `or revise the stated cost ceiling to reflect realistic system economics.`,
+                        `A single component consuming 30% or more of the entire programme cost ` +
+                        `ceiling is unusual and warrants investigation. Review whether this part ` +
+                        `is correctly priced, or whether a lower-cost alternative exists.`,
                 })
             }
         }
@@ -632,6 +644,86 @@ export function detectBomOutliers(
                     `inconsistent figures. Whichever is wrong will cause the programme mass ` +
                     `budget to appear misleading. Verify part-level masses against the ` +
                     `module-level mass estimate.`,
+            })
+        }
+    }
+
+    // ── Check 5 (Loop 28): single-part cost dominance per module ──
+
+    // Group parts by module, sum costs, find the dominant part.
+    const moduleCostMap = new Map<string, { total: number; parts: Array<{ partNumber: string; name: string; cost: number }> }>()
+    for (const part of parts) {
+        const modId = part.sourceModuleId
+        if (typeof modId !== "string" || modId.length === 0) continue
+        const cost = typeof part.estimatedUnitCostGbp === "number" && Number.isFinite(part.estimatedUnitCostGbp) ? part.estimatedUnitCostGbp : 0
+        if (cost <= 0) continue
+        if (!moduleCostMap.has(modId)) {
+            moduleCostMap.set(modId, { total: 0, parts: [] })
+        }
+        const entry = moduleCostMap.get(modId)!
+        entry.total += cost
+        entry.parts.push({ partNumber: part.partNumber, name: part.name, cost })
+    }
+
+    for (const [modId, entry] of moduleCostMap) {
+        if (entry.parts.length < 2) continue
+        for (const p of entry.parts) {
+            const othersCost = entry.total - p.cost
+            if (p.cost > othersCost && othersCost > 0) {
+                const modName = moduleNameMap.get(modId) ?? modId
+                const dominanceRatio = p.cost / entry.total
+                flags.push({
+                    checkId: "COMPONENT_DOMINATES_MODULE_COST",
+                    severity: "warning",
+                    partNumber: p.partNumber,
+                    moduleId: modId,
+                    observedValue: p.cost,
+                    thresholdValue: othersCost,
+                    message:
+                        `Cost dominance: component "${p.name}" (${p.partNumber}) costs ` +
+                        `£${p.cost.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} — ` +
+                        `${(dominanceRatio * 100).toFixed(1)}% of module "${modName}" total ` +
+                        `(£${entry.total.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}). ` +
+                        `This single part costs more than all other parts in the module combined ` +
+                        `(£${othersCost.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}). ` +
+                        `Verify the pricing is correct — a dominant component may indicate a ` +
+                        `scale error or an opportunity to substitute a lower-cost alternative.`,
+                })
+            }
+        }
+    }
+
+    // ── Check 6 (Loop 28): module-level cost divergence (BOM sum vs module estimate) ──
+
+    const moduleEstimatedCost = new Map<string, number>()
+    for (const m of modules) {
+        if (typeof m.estimatedCostGbp === "number" && m.estimatedCostGbp > 0) {
+            moduleEstimatedCost.set(m.id, m.estimatedCostGbp)
+        }
+    }
+
+    for (const [modId, moduleEstimate] of moduleEstimatedCost) {
+        const bomEntry = moduleCostMap.get(modId)
+        if (!bomEntry || bomEntry.total === 0) continue
+
+        const divergence = Math.abs(bomEntry.total - moduleEstimate) / Math.max(bomEntry.total, moduleEstimate)
+        if (divergence > 0.30) {
+            const modName = moduleNameMap.get(modId) ?? modId
+            flags.push({
+                checkId: "MODULE_BOM_COST_DIVERGENCE",
+                severity: "warning",
+                moduleId: modId,
+                observedValue: bomEntry.total,
+                thresholdValue: moduleEstimate,
+                message:
+                    `Cost divergence: module "${modName}" has an estimated cost of ` +
+                    `£${moduleEstimate.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ` +
+                    `from the costing stage, but the sum of bill-of-materials part costs for ` +
+                    `this module totals £${bomEntry.total.toLocaleString("en-GB", { minimumFractionDigits: 0, maximumFractionDigits: 0 })} ` +
+                    `(a ${(divergence * 100).toFixed(1)}% divergence). ` +
+                    `The costing specialist and the bill-of-materials generator have produced ` +
+                    `inconsistent figures. Verify part-level costs against the module-level ` +
+                    `cost estimate — a single overpriced component may be the root cause.`,
             })
         }
     }

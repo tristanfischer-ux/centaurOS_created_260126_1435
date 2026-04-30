@@ -405,3 +405,76 @@ export function validateCostTree(
 
     return { findings, hasFindings, hasCritical, summaryMessage }
 }
+
+// ── Cost-tree auto-reconciliation ────────────────────────────────────────────
+
+/** Result of cost-tree auto-reconciliation. */
+export interface CostTreeReconciliation {
+    /** The reconciled unit total — always equals sum(perModule costs). */
+    reconciledUnitTotalGbp: number
+    /** The original unit total from the parts-table roll-up. */
+    originalUnitTotalGbp: number
+    /** Per-module costs with corrected percentages. */
+    reconciledPerModule: ReconciledModuleCost[]
+    /** True when auto-reconciliation changed the unit total. */
+    wasReconciled: boolean
+    /** Divergence between original and reconciled, as a fraction (0.16 = 16%). */
+    divergenceFraction: number
+}
+
+export interface ReconciledModuleCost {
+    moduleName: string
+    totalGbp: number | null
+    finnTotalGbp: number | null
+    /** Percentage of the reconciled unit total (0-100). Always sums to ~100. */
+    pctOfUnit: number | null
+}
+
+/**
+ * Auto-reconcile the cost tree so that the unit total always equals
+ * sum(per-module costs) and the % OF UNIT column always sums to ~100%.
+ *
+ * The root cause of the Loop 27 Desalination 214% bug: unitTotalGbp comes
+ * from the deduped parts-table roll-up, but some modules fall back to Finn
+ * estimates when the BOM has no rows for that module. This makes
+ * sum(perModuleCost) > unitTotalGbp, and the % column (which uses
+ * unitTotalGbp as denominator) exceeds 100%.
+ *
+ * The fix: recompute unitTotalGbp = sum(perModuleCost[i].totalGbp) so
+ * they are always consistent. The original parts-table total is preserved
+ * for the reconciliation section.
+ */
+export function reconcileCostTree(
+    perModuleCost: ModuleCostEntry[],
+    originalUnitTotalGbp: number,
+): CostTreeReconciliation {
+    const moduleSum = perModuleCost.reduce(
+        (acc, m) => acc + (m.totalGbp ?? 0),
+        0,
+    )
+
+    const reconciledUnitTotalGbp = moduleSum > 0 ? moduleSum : originalUnitTotalGbp
+    const divergenceFraction =
+        originalUnitTotalGbp > 0
+            ? Math.abs(moduleSum - originalUnitTotalGbp) / originalUnitTotalGbp
+            : 0
+    const wasReconciled = divergenceFraction > SUBTREE_SUM_TOLERANCE
+
+    const reconciledPerModule: ReconciledModuleCost[] = perModuleCost.map((m) => ({
+        moduleName: m.moduleName,
+        totalGbp: m.totalGbp,
+        finnTotalGbp: m.finnTotalGbp,
+        pctOfUnit:
+            reconciledUnitTotalGbp > 0 && m.totalGbp != null
+                ? (m.totalGbp / reconciledUnitTotalGbp) * 100
+                : null,
+    }))
+
+    return {
+        reconciledUnitTotalGbp,
+        originalUnitTotalGbp,
+        reconciledPerModule,
+        wasReconciled,
+        divergenceFraction,
+    }
+}

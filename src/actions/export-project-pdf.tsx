@@ -76,7 +76,9 @@ import {
 import {
     SUPPLIER_DESCRIPTION_LEAK_PATTERNS,
     SUPPLIER_DESCRIPTION_FALLBACK,
-} from "@/lib/ai/supplier-description-sanitiser"
+    stripToolCallLeaks,
+    formatJsonArrayField,
+} from "@/lib/ai/llm-output-sanitiser"
 
 // ─── Result ────────────────────────────────────────────────────────────
 
@@ -225,13 +227,16 @@ const styles = StyleSheet.create({
         objectFit: "contain",
     },
     moduleImageEmpty: {
-        height: 60,
+        height: 80,
         backgroundColor: BG_SOFT,
         borderRadius: 4,
         marginTop: 6,
         marginBottom: 6,
         alignItems: "center",
         justifyContent: "center",
+        borderWidth: 1,
+        borderColor: "#e5e7eb",
+        borderStyle: "dashed",
     },
     // INTENT: every AI-generated illustration carries a small disclaimer
     // caption. Founders consistently mistook renders for authored technical
@@ -556,7 +561,10 @@ function cleanReviewText(raw: string | null | undefined): string {
         .replace(/×/g, " x ")
         .replace(/–|—/g, "-")
 
-    // 5. Collapse 3+ blank lines back down to 1 (filter step above can
+    // 5. Strip tool-call artifacts (Loop 28 P1: Fang `lookup_process()` leaks)
+    text = stripToolCallLeaks(text)
+
+    // 6. Collapse 3+ blank lines back down to 1 (filter step above can
     //    leave gaps where a telemetry line was the only content of a
     //    paragraph).
     text = text.replace(/\n{3,}/g, "\n\n").trim()
@@ -875,6 +883,16 @@ interface PdfInput {
          * before rendering annotations.
          */
         costTreeValidation: import("@/lib/cost/cost-tree-validation").CostTreeValidationResult | null
+        /**
+         * Loop 28 P2: auto-reconciled cost tree.
+         * When per-module costs (some falling back to Finn estimates) diverge
+         * from the parts-table unit total by >1%, this field contains the
+         * reconciled figures: unit total = sum(per-module costs), and each
+         * module's % OF UNIT is recomputed against that reconciled total.
+         * The original parts-table total is preserved for the reconciliation
+         * section. Null when reconciliation did not run.
+         */
+        costTreeReconciliation: import("@/lib/cost/cost-tree-validation").CostTreeReconciliation | null
     }
     suppliers: SupplierPdf[]
     /**
@@ -2284,8 +2302,11 @@ function ModulePage({
                 </>
             ) : (
                 <View style={styles.moduleImageEmpty}>
-                    <Text style={{ color: MUTED, fontSize: 9 }}>
-                        No render generated yet for this module.
+                    <Text style={{ color: MUTED, fontSize: 10, fontWeight: 600, marginBottom: 2 }}>
+                        {mod.name}
+                    </Text>
+                    <Text style={{ color: MUTED, fontSize: 8 }}>
+                        Illustration not yet available — will be generated on the next pipeline run.
                     </Text>
                 </View>
             )}
@@ -3174,8 +3195,10 @@ function CostPage({ data }: { data: PdfInput }): React.ReactElement {
                     <Text style={[styles.tableHeadCell, { width: 70, textAlign: "right" }]}>% of unit</Text>
                 </View>
                 {data.cost.perModule.map((c, i) => {
-                    const pct =
-                        data.cost.unitTotalGbp && c.totalGbp
+                    const reconciled = data.cost.costTreeReconciliation?.reconciledPerModule?.[i]
+                    const pct = reconciled?.pctOfUnit != null
+                        ? reconciled.pctOfUnit.toFixed(1) + "%"
+                        : data.cost.unitTotalGbp && c.totalGbp
                             ? ((c.totalGbp / data.cost.unitTotalGbp) * 100).toFixed(1) + "%"
                             : "—"
                     return (
@@ -4056,15 +4079,22 @@ function SuppliersPage({
                             </Text>
                         )}
                         {(() => {
-                            // Loop 7 critique fix A10: filter out scrape-failure
-                            // strings ("MISSING - Not found on website",
-                            // "NOT STATED ON WEBSITE", "NONE RECORDED…")
-                            // before showing the certifications list. Better
-                            // to say nothing than to surface ETL provenance.
-                            const cleaned = (s.certifications ?? []).filter(
-                                (c) =>
+                            // Loop 7 fix A10: filter scrape-failure strings.
+                            // Loop 28 P1: handle raw JSON arrays (`["ISO 9001"]`)
+                            // that leak through when certifications column is
+                            // stored as stringified JSON rather than a parsed array.
+                            const rawCerts = s.certifications ?? []
+                            const certsArray = Array.isArray(rawCerts)
+                                ? rawCerts
+                                : typeof rawCerts === "string"
+                                    ? (() => { try { const p = JSON.parse(rawCerts); return Array.isArray(p) ? p.map(String) : [] } catch { return [] } })()
+                                    : []
+                            const cleaned = certsArray.filter(
+                                (c: string) =>
+                                    typeof c === "string" &&
+                                    c.trim().length > 0 &&
                                     !/^(MISSING\b|NOT STATED\b|NONE RECORDED\b|UNKNOWN\b|N\/A$)/i.test(
-                                        (c ?? "").trim(),
+                                        c.trim(),
                                     ),
                             )
                             return cleaned.length > 0 ? (
@@ -5112,6 +5142,7 @@ function getSectionManifest(data: PdfInput): string[] {
                   "Supplier shortlist",
               ]
             : []),
+        "Audit log",
     ]
 }
 
@@ -5391,11 +5422,12 @@ function ForgeProjectPdf({ data }: { data: PdfInput }): React.ReactElement {
              *  itself doesn't render until that mechanism is wired.
              */}
 
-            {/* AuditLog page intentionally omitted from the customer-
-             *  facing PDF — Tristan-flagged 2026-04-26 NIGHT: "the project
-             *  audit log I don't think we should be showing the customer".
-             *  The audit data still ships in pipeline_runs for internal
-             *  tooling; only the PDF rendering is suppressed. */}
+            {/* Loop 28 P3: Audit log re-enabled as mandatory section.
+             *  Loop 27 council (4/4 unanimous) flagged missing audit log as
+             *  compliance-critical gap. Reframed from "project audit log"
+             *  (user actions) to "generation audit trail" (pipeline stages,
+             *  models, timestamps, validation warnings). Always renders. */}
+            <AuditLogPage rows={data.auditLog} />
         </Document>
     )
 }
@@ -6071,6 +6103,31 @@ async function exportProjectPdfInternal(
             )
         }
 
+        // Loop 28 P2: auto-reconcile cost tree so % OF UNIT always sums to
+        // ~100%. The root cause: unitTotalGbp comes from deduped parts-table
+        // but some modules fall back to Finn estimates (higher), making
+        // sum(perModuleCost) > unitTotalGbp. Fix: recompute unitTotalGbp =
+        // sum(perModuleCost[i].totalGbp).
+        let costTreeReconciliation: import("@/lib/cost/cost-tree-validation").CostTreeReconciliation | null = null
+        try {
+            const { reconcileCostTree } = await import("@/lib/cost/cost-tree-validation")
+            costTreeReconciliation = reconcileCostTree(perModuleCost, unitTotalGbp)
+            if (costTreeReconciliation.wasReconciled) {
+                console.warn(
+                    `[pdf-cost-reconciliation] project=${projectId} ` +
+                    `originalTotal=£${Math.round(unitTotalGbp)} ` +
+                    `reconciledTotal=£${Math.round(costTreeReconciliation.reconciledUnitTotalGbp)} ` +
+                    `divergence=${(costTreeReconciliation.divergenceFraction * 100).toFixed(1)}%`,
+                )
+                unitTotalGbp = costTreeReconciliation.reconciledUnitTotalGbp
+            }
+        } catch (err) {
+            console.warn(
+                "[pdf-cost-reconciliation] threw (non-fatal):",
+                err instanceof Error ? err.message : err,
+            )
+        }
+
         // Fix 2 — Loop 26 WARNING-level: build-time cost-mismatch detection
         // and in-place healing. Replaces the old "amber banner" approach.
         //
@@ -6247,12 +6304,16 @@ async function exportProjectPdfInternal(
                     leadTimeById.set(id, (l.lead_time as string | null) ?? null)
                     minimumOrderById.set(id, (l.minimum_order as string | null) ?? null)
                     const certs = l.certifications as unknown
-                    certificationsById.set(
-                        id,
-                        Array.isArray(certs)
-                            ? certs.filter((c): c is string => typeof c === "string")
-                            : null,
-                    )
+                    let parsedCerts: string[] | null = null
+                    if (Array.isArray(certs)) {
+                        parsedCerts = certs.filter((c): c is string => typeof c === "string")
+                    } else if (typeof certs === "string") {
+                        try {
+                            const p = JSON.parse(certs)
+                            if (Array.isArray(p)) parsedCerts = p.filter((c: unknown): c is string => typeof c === "string")
+                        } catch { /* not JSON */ }
+                    }
+                    certificationsById.set(id, parsedCerts)
                     const desc = l.description as string | null
                     // Truncate description to keep the PDF section dense — the
                     // founder gets a flavour, not a wall of marketing copy.
@@ -6541,6 +6602,10 @@ async function exportProjectPdfInternal(
                 // Findings are rendered as ⚠ annotations below the per-module
                 // roll-up table. Null when the validator did not run.
                 costTreeValidation,
+                // Loop 28 P2: auto-reconciled cost tree. When reconciliation
+                // was applied, the % OF UNIT column uses the reconciled total
+                // as denominator so it sums to ~100%.
+                costTreeReconciliation,
             },
             // Loop 8 P3 — cost-realism reframe via Oracle benchmark band.
             oracleProjectBand: await (async () => {

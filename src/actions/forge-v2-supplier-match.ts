@@ -39,7 +39,7 @@ import {
 import {
     SUPPLIER_DESCRIPTION_LEAK_PATTERNS,
     SUPPLIER_DESCRIPTION_FALLBACK,
-} from "@/lib/ai/supplier-description-sanitiser"
+} from "@/lib/ai/llm-output-sanitiser"
 import {
     assessDirectoryCoverage,
     formatCoverageDisclosure,

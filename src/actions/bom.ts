@@ -2703,6 +2703,7 @@ export async function runBomMergeStage(projectId: string): Promise<void> {
         id: m.id,
         name: m.name,
         estimatedMassKg: (m as { estimatedMassKg?: number | null }).estimatedMassKg ?? null,
+        estimatedCostGbp: null,
       })),
       totalMassBudgetKg,
       unitCostCeilingGbp,
