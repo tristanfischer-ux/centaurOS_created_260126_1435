@@ -34,51 +34,7 @@ export async function GET(request: NextRequest) {
   const results: ProviderStatus[] = []
   const timeout = 10_000
 
-  // 1. Anthropic
-  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (anthropicKey) {
-    const start = Date.now()
-    const anthropicModel = "claude-haiku-4-5-20251001"
-    try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-api-key": anthropicKey, "anthropic-version": "2023-06-01" },
-        body: JSON.stringify({ model: anthropicModel, max_tokens: 5, messages: [{ role: "user", content: "1" }] }),
-        signal: AbortSignal.timeout(timeout),
-      })
-      const data = await res.json()
-      const ok = !!data.content
-      void logLlmUsage({
-        action: 'health_check_anthropic',
-        modelUsed: anthropicModel,
-        tokensIn: data.usage?.input_tokens ?? 0,
-        tokensOut: data.usage?.output_tokens ?? 0,
-        status: ok ? 'success' : 'error',
-        errorMessage: ok ? undefined : (data.error?.message ?? 'unknown error').slice(0, 200),
-      })
-      results.push({
-        provider: "Anthropic",
-        model: "claude-haiku-4-5",
-        status: ok ? "ok" : "error",
-        responseMs: Date.now() - start,
-        ...(data.error && { error: data.error.message?.slice(0, 100) }),
-      })
-    } catch (err) {
-      void logLlmUsage({
-        action: 'health_check_anthropic',
-        modelUsed: anthropicModel,
-        tokensIn: 0,
-        tokensOut: 0,
-        status: 'error',
-        errorMessage: err instanceof Error ? err.message.slice(0, 200) : String(err).slice(0, 200),
-      })
-      results.push({ provider: "Anthropic", model: "claude-haiku-4-5", status: "error", responseMs: Date.now() - start, error: err instanceof Error ? err.message.slice(0, 100) : "Unknown" })
-    }
-  } else {
-    results.push({ provider: "Anthropic", model: "—", status: "not_configured", responseMs: null })
-  }
-
-  // 2. OpenAI
+  // 1. OpenAI
   const openaiKey = process.env.OPENAI_API_KEY?.trim()
   if (openaiKey) {
     const start = Date.now()
@@ -122,7 +78,7 @@ export async function GET(request: NextRequest) {
     results.push({ provider: "OpenAI", model: "—", status: "not_configured", responseMs: null })
   }
 
-  // 3. Google
+  // 2. Google
   const googleKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (googleKey) {
     const start = Date.now()
@@ -166,7 +122,7 @@ export async function GET(request: NextRequest) {
     results.push({ provider: "Google", model: "—", status: "not_configured", responseMs: null })
   }
 
-  // 4. Qwen / DashScope
+  // 3. Qwen / DashScope
   const dashscopeKey = process.env.DASHSCOPE_API_KEY?.trim()
   if (dashscopeKey) {
     const start = Date.now()
@@ -192,7 +148,7 @@ export async function GET(request: NextRequest) {
     results.push({ provider: "Qwen (DashScope)", model: "—", status: "not_configured", responseMs: null })
   }
 
-  // 5. MiniMax
+  // 4. MiniMax
   const minimaxKey = process.env.MINIMAX_API_KEY?.trim()
   if (minimaxKey) {
     results.push({ provider: "MiniMax", model: "M2.7", status: "ok", responseMs: null }) // Lightweight check — key exists

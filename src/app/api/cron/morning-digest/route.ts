@@ -24,7 +24,6 @@
  */
 
 import { NextResponse } from 'next/server'
-import Anthropic from '@anthropic-ai/sdk'
 import { Resend } from 'resend'
 
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -81,35 +80,39 @@ function getDisplayDate(): string {
 }
 
 /**
- * Generate a brief motivational message from Cal (Chief of Staff) via Haiku.
+ * Generate a brief motivational message from Cal (Chief of Staff) via GPT-4.1-mini.
  *
- * DECISION: Haiku is fast (~0.5s) and cheap (~$0.001 per call). Perfect for
- * a short motivational blurb. Falls back to a static message if the API call
- * fails to avoid blocking the entire digest run.
+ * DECISION: GPT-4.1-mini is fast and cheap. Perfect for a short motivational blurb.
+ * Falls back to a static message if the API call fails to avoid blocking the entire
+ * digest run.
  */
 async function generateCalMessage(
   userName: string,
   taskCount: number,
   taskTitles: string[]
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY
+  const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) {
     return getStaticCalMessage(taskCount)
   }
 
   try {
-    const anthropic = new Anthropic({ apiKey })
-
     const taskContext = taskTitles.length > 0
       ? `Their tasks for today: ${taskTitles.slice(0, 5).join(', ')}${taskTitles.length > 5 ? ` and ${taskTitles.length - 5} more` : ''}.`
       : 'They have a clear day with no tasks due.'
 
-    const response = await anthropic.messages.create({
-      model: 'claude-3-5-haiku-latest',
-      max_tokens: 150,
-      messages: [{
-        role: 'user',
-        content: `You are Cal, Chief of Staff at a hardware startup accelerator. Write a 1-2 sentence morning message for ${userName} to start their day. ${taskContext}
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4.1-mini',
+        max_tokens: 150,
+        messages: [{
+          role: 'user',
+          content: `You are Cal, Chief of Staff at a hardware startup accelerator. Write a 1-2 sentence morning message for ${userName} to start their day. ${taskContext}
 
 Rules:
 - Be warm but professional. No cheese, no cliches, no exclamation marks.
@@ -117,13 +120,13 @@ Rules:
 - If they have no tasks, acknowledge the breathing room and suggest something productive.
 - Keep it under 40 words. One thought, clearly expressed.
 - Do NOT use greetings like "Good morning" — that's already in the email header.
-- Do NOT use quotes, attributions, or sign-offs.`
-      }],
+- Do NOT use quotes, attributions, or sign-offs.`,
+        }],
+      }),
     })
 
-    const text = response.content[0]?.type === 'text'
-      ? response.content[0].text.trim()
-      : null
+    const data = await response.json()
+    const text: string | null = data.choices?.[0]?.message?.content?.trim() ?? null
 
     if (text && text.length > 10 && text.length < 300) {
       return text

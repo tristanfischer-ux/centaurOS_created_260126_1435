@@ -152,37 +152,84 @@ export async function POST(request: Request): Promise<Response> {
           `# User Brief\n\n${userContext.trim()}`,
         ].join("")
 
-        // Step 3: Call Claude Opus 4.6 with streaming
+        // Step 3: Call GPT-5.5 with streaming
         emit({ type: "progress", message: "Generating document…", percent: 30 })
 
-        const Anthropic = (await import("@anthropic-ai/sdk")).default
-        const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim() })
+        const openaiApiKey = process.env.OPENAI_API_KEY?.trim()
+        if (!openaiApiKey) {
+          emit({ type: "error", message: "AI service not configured" })
+          return
+        }
 
         let fullContent = ""
-        let tokensUsed = 0
+        let tokensIn = 0
+        let tokensOut = 0
 
-        const messageStream = client.messages.stream({
-          model: "claude-opus-4-7",
-          max_tokens: 8192,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userMessage }],
+        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${openaiApiKey}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-5.5",
+            max_completion_tokens: 8192,
+            stream: true,
+            stream_options: { include_usage: true },
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: userMessage },
+            ],
+          }),
         })
 
-        for await (const event of messageStream) {
-          if (event.type === "content_block_delta" && event.delta.type === "text_delta") {
-            const text = event.delta.text
-            fullContent += text
-            emit({ type: "chunk", text })
+        if (!openaiResponse.ok || !openaiResponse.body) {
+          const errText = await openaiResponse.text()
+          console.error("[DocumentSkill] OpenAI API error:", openaiResponse.status, errText.slice(0, 500))
+          emit({ type: "error", message: "Document generation failed. Please try again." })
+          return
+        }
+
+        const reader = openaiResponse.body.getReader()
+        const decoder = new TextDecoder()
+        let sseBuffer = ""
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          sseBuffer += decoder.decode(value, { stream: true })
+          const lines = sseBuffer.split("\n")
+          sseBuffer = lines.pop() ?? ""
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue
+            const payload = line.slice(6).trim()
+            if (payload === "[DONE]") break
+
+            try {
+              const event = JSON.parse(payload)
+              const content = event.choices?.[0]?.delta?.content
+              if (content) {
+                fullContent += content
+                emit({ type: "chunk", text: content })
+              }
+              if (event.usage) {
+                tokensIn = event.usage.prompt_tokens ?? tokensIn
+                tokensOut = event.usage.completion_tokens ?? tokensOut
+              }
+            } catch {
+              // Skip non-JSON lines
+            }
           }
         }
 
-        const finalMessage = await messageStream.finalMessage()
-        tokensUsed = (finalMessage.usage?.input_tokens ?? 0) + (finalMessage.usage?.output_tokens ?? 0)
+        const tokensUsed = tokensIn + tokensOut
 
         guard.trackUsage({
-          model: 'claude-opus-4-7',
-          promptTokens: finalMessage.usage?.input_tokens,
-          completionTokens: finalMessage.usage?.output_tokens,
+          model: 'gpt-5.5',
+          promptTokens: tokensIn,
+          completionTokens: tokensOut,
         }).catch(() => {})
 
         if (!fullContent.trim()) {
