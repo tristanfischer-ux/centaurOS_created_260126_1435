@@ -187,19 +187,22 @@ function evaluateConfig(
     let aisle_m2: number
     let rack_h_mm: number
 
+    let floor_budget_m2: number
+
     if (isContainer(envelope)) {
         const layout = containerLayout(envelope)
         tray_floor_m2 = containerTrayFloor(envelope)
         aisle_m2 = (layout.usable_length_mm * layout.actual_aisle_mm) / 1_000_000
         const usable_h_mm = envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm
         rack_h_mm = usable_h_mm
+        const grow_zone_m2 = (layout.usable_length_mm * envelope.interior_d_mm) / 1_000_000
+        floor_budget_m2 = grow_zone_m2 - aisle_m2
     } else {
         tray_floor_m2 = canopy_m2 / (tiers * VF_RULES.trays.aisle_efficiency)
         aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
         rack_h_mm = tiers * 500 + VF_RULES.trays.ducting_reserve_mm
+        floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
     }
-
-    const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
     const peak = peakLoadKw(canopy_m2)
     const hvac_floor_m2 = peak.peak_total_kw * VF_RULES.hvac.floor_m2_per_kw_thermal
     const water_m2 = Math.max(canopy_m2 * VF_RULES.water.m2_per_m2_canopy, VF_RULES.water.min_m2)
@@ -209,7 +212,10 @@ function evaluateConfig(
         canopy_m2 * VF_RULES.harvest_prep.m2_per_m2_canopy,
         VF_RULES.harvest_prep.min_m2,
     )
-    const used = tray_floor_m2 + hvac_floor_m2 + water_m2 + air_m2 + controls_m2 + harvest_m2
+    const container = isContainer(envelope)
+    const used = container
+        ? tray_floor_m2
+        : tray_floor_m2 + hvac_floor_m2 + water_m2 + air_m2 + controls_m2 + harvest_m2
     const remaining = floor_budget_m2 - used
     const floor_fits = remaining >= 0
     const ceiling_fits = rack_h_mm <= envelope.interior_h_mm
@@ -415,6 +421,8 @@ function solve(input: DomainSolveInput): DomainSolveResult {
     let actual_rack_depth_mm: number = VF_RULES.container.rack_depth_mm
     let actual_aisle_mm: number = VF_RULES.container.aisle_width_mm
 
+    let floor_budget_m2: number
+
     if (isContainer(envelope)) {
         const layout = containerLayout(envelope)
         usable_length_mm = layout.usable_length_mm
@@ -424,13 +432,14 @@ function solve(input: DomainSolveInput): DomainSolveResult {
         aisle_m2 = (usable_length_mm * actual_aisle_mm) / 1_000_000
         const usable_h_mm = envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm
         tier_h_mm = Math.floor(usable_h_mm / tiers)
+        const grow_zone_m2 = (usable_length_mm * envelope.interior_d_mm) / 1_000_000
+        floor_budget_m2 = grow_zone_m2 - aisle_m2
     } else {
         tray_floor_m2 = targetCanopy / (tiers * VF_RULES.trays.aisle_efficiency)
         aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
         tier_h_mm = 500
+        floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
     }
-
-    const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
 
     const lighting_kw = targetCanopy * VF_RULES.lighting.kw_per_m2_canopy
     // v1.1: HVAC sized from transpiration physics, not flat 0.15 kW/m²
@@ -452,8 +461,10 @@ function solve(input: DomainSolveInput): DomainSolveResult {
         VF_RULES.harvest_prep.min_m2,
     )
 
-    const used_floor_m2 =
-        tray_floor_m2 + hvac_floor_m2 + water_m2 + air_m2 + controls_m2 + harvest_m2
+    const containerMode = isContainer(envelope)
+    const used_floor_m2 = containerMode
+        ? tray_floor_m2
+        : tray_floor_m2 + hvac_floor_m2 + water_m2 + air_m2 + controls_m2 + harvest_m2
     const remaining_floor_m2 = floor_budget_m2 - used_floor_m2
     const utilization_pct = (used_floor_m2 / floor_budget_m2) * 100
 
