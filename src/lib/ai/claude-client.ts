@@ -150,7 +150,9 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
       'Authorization': `Bearer ${apiKey}`,
     }
 
-    // GPT-5.4 is a reasoning model — use max_completion_tokens, not max_tokens.
+    // GPT-5.5 is a reasoning model — use max_completion_tokens, not max_tokens.
+    // Reasoning models (gpt-5.x, o1, o3) reject non-default temperature.
+    const isReasoningModel = /^(gpt-5|o[13])/.test(OPENAI_MODEL)
     const response = await fetchWithTimeout(
       'https://api.openai.com/v1/chat/completions',
       {
@@ -159,7 +161,7 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
         body: JSON.stringify({
           model: OPENAI_MODEL,
           max_completion_tokens: maxTokens,
-          temperature: 0.2,
+          ...(!isReasoningModel && { temperature: 0.2 }),
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
