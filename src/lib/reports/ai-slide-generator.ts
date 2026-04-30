@@ -23,9 +23,10 @@ import type {
 } from './slide-deck-types'
 import { generateSlideBackgroundImage } from './report-image-generator'
 
-// DECISION: Dynamic import per-call (matches cad-lab-cost.ts pattern) to avoid
-// module-scope side effects. The Anthropic SDK handles connection pooling internally.
-const MODEL_ID = 'claude-opus-4-7'
+// DECISION: GPT-5.5 replaces Claude Opus for slide deck generation.
+// AbortSignal.timeout() handles timeout. GPT-5.5 is a reasoning model:
+// uses max_completion_tokens, not max_tokens.
+const MODEL_ID = 'gpt-5.5'
 // DECISION: 60s timeout because structured JSON generation with
 // 12-18 slides takes significantly longer than a short narrative summary.
 const API_TIMEOUT_MS = 60_000
@@ -74,8 +75,8 @@ Available slide types (use a variety for visual interest):
 export async function generateStrategicBriefing(
   request: GenerateBriefingRequest,
 ): Promise<GenerateBriefingResponse> {
-  if (!process.env.ANTHROPIC_API_KEY?.trim()) {
-    console.warn('[SlideGenerator] ANTHROPIC_API_KEY not set — using fallback')
+  if (!process.env.OPENAI_API_KEY?.trim()) {
+    console.warn('[SlideGenerator] OPENAI_API_KEY not set — using fallback')
     return {
       success: true,
       briefing: buildFallbackBriefing(request),
@@ -87,28 +88,31 @@ export async function generateStrategicBriefing(
     console.info('[SlideGenerator] Prompt length:', (systemPrompt.length + userPrompt.length), 'chars')
     const genStart = Date.now()
 
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim(), timeout: 240_000, maxRetries: 0 })
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.OPENAI_API_KEY?.trim()}`,
+      },
+      body: JSON.stringify({
+        model: MODEL_ID,
+        max_completion_tokens: 8192,
+        temperature: 0.7,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
+    })
 
-    const t = timeoutWithCleanup(API_TIMEOUT_MS)
-    let result: Awaited<ReturnType<InstanceType<typeof Anthropic>['messages']['create']>>
-    try {
-      result = await Promise.race([
-        client.messages.create({
-          model: MODEL_ID,
-          max_tokens: 8192,
-          temperature: 0.7,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: userPrompt }],
-        }),
-        t.promise,
-      ])
-    } finally {
-      t.clear()
+    if (!resp.ok) {
+      throw new Error(`OpenAI API error (${resp.status})`)
     }
 
-    console.info('[SlideGenerator] Claude responded in', Date.now() - genStart, 'ms')
-    const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+    const data = await resp.json()
+    console.info('[SlideGenerator] GPT-5.5 responded in', Date.now() - genStart, 'ms')
+    const text = data.choices?.[0]?.message?.content ?? ''
     console.info('[SlideGenerator] Response length:', text.length, 'chars')
     const slides = parseSlideResponse(text)
 
@@ -185,8 +189,7 @@ export async function generateStrategicBriefing(
 
 // ─── Prompt Builder ──────────────────────────────────────────────
 
-// DECISION: Split into system + user prompts to leverage Anthropic's first-class
-// system prompt support. System encodes role/instructions, user carries the data.
+// DECISION: Split into system + user prompts. System encodes role/instructions, user carries the data.
 function buildPrompts(request: GenerateBriefingRequest): { systemPrompt: string; userPrompt: string } {
   const systemPrompt = [
     'You are an expert presentation designer and executive communication specialist.',
@@ -344,7 +347,7 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
         headline: 'Narrative generation requires the Claude API',
         body: 'The strategic briefing system uses Claude Opus to synthesize source material into a structured presentation.',
         supportingPoints: [
-          'Set ANTHROPIC_API_KEY in your environment variables',
+          'Set OPENAI_API_KEY in your environment variables',
           'The system uses Claude Opus 4.6 for high-quality generation',
           'Fallback content is shown when the API is unavailable',
         ],
@@ -353,7 +356,7 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
         slideType: 'summary',
         headline: 'Next Steps',
         takeaways: [
-          'Configure the ANTHROPIC_API_KEY environment variable',
+          'Configure the OPENAI_API_KEY environment variable',
           'Provide detailed source material for richer presentations',
           'Choose the right tone for your audience',
         ],
@@ -363,15 +366,3 @@ function buildFallbackBriefing(request: GenerateBriefingRequest): StrategicBrief
   }
 }
 
-// ─── Utilities ────────────────────────────────────────────────────
-
-// DECISION: Using Promise.race with a rejecting timeout to guarantee we never
-// wait longer than API_TIMEOUT_MS regardless of network conditions.
-// Returns a clearable handle so the timer doesn't dangle after the race resolves.
-function timeoutWithCleanup(ms: number) {
-  let timer: ReturnType<typeof setTimeout>
-  const promise = new Promise<never>((_, reject) => {
-    timer = setTimeout(() => reject(new Error(`Request timed out after ${ms}ms`)), ms)
-  })
-  return { promise, clear: () => clearTimeout(timer!) }
-}

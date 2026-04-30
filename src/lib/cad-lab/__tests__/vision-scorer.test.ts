@@ -10,11 +10,11 @@ global.fetch = mockFetch
 
 beforeEach(() => {
   mockFetch.mockReset()
-  process.env.ANTHROPIC_API_KEY = "test-key"
+  process.env.OPENAI_API_KEY = "test-key"
 })
 
 afterEach(() => {
-  delete process.env.ANTHROPIC_API_KEY
+  delete process.env.OPENAI_API_KEY
 })
 
 describe("scoreRenderVision", () => {
@@ -22,13 +22,15 @@ describe("scoreRenderVision", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [
+        choices: [
           {
-            text: JSON.stringify({
-              score: 8,
-              issues: ["Minor proportion issue on lid"],
-              summary: "Good match to product description",
-            }),
+            message: {
+              content: JSON.stringify({
+                score: 8,
+                issues: ["Minor proportion issue on lid"],
+                summary: "Good match to product description",
+              }),
+            },
           },
         ],
       }),
@@ -51,9 +53,11 @@ describe("scoreRenderVision", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [
+        choices: [
           {
-            text: '```json\n{"score": 6, "issues": ["Missing handle"], "summary": "Acceptable"}\n```',
+            message: {
+              content: '```json\n{"score": 6, "issues": ["Missing handle"], "summary": "Acceptable"}\n```',
+            },
           },
         ],
       }),
@@ -73,7 +77,7 @@ describe("scoreRenderVision", () => {
   })
 
   it("returns null when API key is missing", async () => {
-    delete process.env.ANTHROPIC_API_KEY
+    delete process.env.OPENAI_API_KEY
     const result = await scoreRenderVision("dGVzdA==", "test", "test")
     expect(result).toBeNull()
     expect(mockFetch).not.toHaveBeenCalled()
@@ -104,7 +108,7 @@ describe("scoreRenderVision", () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        content: [{ text: '{"score": "not a number", "issues": [], "summary": "ok"}' }],
+        choices: [{ message: { content: '{"score": "not a number", "issues": [], "summary": "ok"}' } }],
       }),
     })
 

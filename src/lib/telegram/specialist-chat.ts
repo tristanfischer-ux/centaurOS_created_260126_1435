@@ -186,18 +186,23 @@ export async function sendToSpecialist(
     // (`claude` ? anthropic : minimax) silently misrouted every non-Claude
     // specialist to MiniMax, regardless of their assigned tier. If you add a
     // new tier to specialists-config.ts, add it here AND in FALLBACK_CHAINS.
+    //
+    // 2026-04-29: Anthropic eliminated from failover chains. claude/sonnet/haiku
+    // tiers now route through non-Anthropic providers (mirrors failover.ts primaries).
     type SpecialistModelTier = typeof specialist.modelTier
     const PRIMARY_TARGETS: Record<SpecialistModelTier, { providerId: AIProviderId; modelId: string }> = {
-        claude: { providerId: 'anthropic', modelId: 'claude-opus-4-7' },
-        sonnet: { providerId: 'anthropic', modelId: 'claude-sonnet-4-6' },
+        // claude tier: was anthropic/claude-opus-4-7, now together/DeepSeek-V4-Pro (mirrors failover.ts)
+        claude: { providerId: 'together', modelId: 'deepseek-ai/DeepSeek-V4-Pro' },
+        // sonnet tier: was anthropic/claude-sonnet-4-6, now deepseek/deepseek-chat (mirrors failover.ts)
+        sonnet: { providerId: 'deepseek', modelId: 'deepseek-chat' },
         deepseek: { providerId: 'deepseek', modelId: 'deepseek-chat' },
         google: { providerId: 'google', modelId: 'gemini-3.1-pro-preview' },
         openai: { providerId: 'openai', modelId: 'gpt-5.5' },
         qwen: { providerId: 'qwen', modelId: 'qwen3.5-plus' },
         'qwen-local': { providerId: 'qwen-local', modelId: 'qwen3:30b-a3b' },
         minimax: { providerId: 'minimax', modelId: 'MiniMax-M2.7' },
-        // Benchmark-validated swaps 2026-04-25 — must mirror primaries in failover.ts.
-        haiku: { providerId: 'anthropic', modelId: 'claude-haiku-4-5-20251001' },
+        // haiku tier: was anthropic/claude-haiku-4-5, now google/gemini-2.5-flash (mirrors failover.ts)
+        haiku: { providerId: 'google', modelId: 'gemini-2.5-flash' },
         'gpt-mini': { providerId: 'openai', modelId: 'gpt-4.1-mini' },
         'qwen-235b': { providerId: 'qwen', modelId: 'qwen3-235b-a22b' },
         'deepseek-v4-pro': { providerId: 'together', modelId: 'deepseek-ai/DeepSeek-V4-Pro' },
@@ -210,7 +215,6 @@ export async function sendToSpecialist(
     // src/app/api/agents/execute/route.ts — every provider that any tier can
     // resolve to MUST have an entry here.
     const envMap: Partial<Record<AIProviderId, string>> = {
-        anthropic: process.env.ANTHROPIC_API_KEY?.trim() ?? '',
         deepseek: process.env.DEEPSEEK_API_KEY?.trim() ?? '',
         google: process.env.GOOGLE_AI_API_KEY?.trim() ?? '',
         openai: process.env.OPENAI_API_KEY?.trim() ?? '',
