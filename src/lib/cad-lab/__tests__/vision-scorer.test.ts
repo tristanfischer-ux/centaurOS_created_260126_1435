@@ -158,7 +158,7 @@ describe("scoreRenderVision", () => {
     await scoreRenderVision("dGVzdA==", "test", "test", "=== a) SPACE BUDGET ===\nTotal: 100mm")
 
     const callBody = JSON.parse(mockFetch.mock.calls[0][1].body)
-    const textContent = callBody.messages[0].content.find((c: { type: string }) => c.type === "text")
+    const textContent = callBody.messages[1].content.find((c: { type: string }) => c.type === "text")
     expect(textContent.text).toContain("Interface specification excerpt")
   })
 })
