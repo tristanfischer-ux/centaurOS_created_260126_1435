@@ -8,7 +8,7 @@
  * ClassificationReviewPanel to pre-fill overrides for parts the deterministic
  * classifier couldn't resolve.
  *
- * @security Requires ANTHROPIC_API_KEY environment variable.
+ * @security Requires DEEPSEEK_API_KEY environment variable.
  */
 
 import { classifyPart, KNOWN_PROCESSES, KNOWN_MATERIALS } from "@/lib/part-classification"

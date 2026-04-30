@@ -13,7 +13,7 @@
  * diagnostics only, no description/failureModes) and instruct Haiku
  * to keep reasoning under 15 words per part. Tested: 9 modules in ~22s.
  *
- * @security Requires ANTHROPIC_API_KEY environment variable.
+ * @security Requires OPENROUTER_API_KEY environment variable.
  */
 
 import type { AiCostEstimate, CadLabModule } from "@/lib/cad-lab-types"

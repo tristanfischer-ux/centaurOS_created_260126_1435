@@ -556,7 +556,7 @@ async function generateOneModuleImageInternal(
             systemIllustrationRefBase64 &&
             systemIllustrationRefMimeType &&
             modules.length >= 2 &&
-            process.env.ANTHROPIC_API_KEY?.trim()
+            process.env.OPENAI_API_KEY?.trim()
         ) {
             try {
                 const moduleNames = modules.map((m) => m.name)

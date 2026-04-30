@@ -407,7 +407,7 @@ export function ThesisView({
         if (result.error === 'text_too_short') {
           toast.error('That text was too short to extract a thesis from.')
         } else if (result.error === 'ai_not_configured') {
-          toast.error("Fiona isn't set up yet — ask your admin to add ANTHROPIC_API_KEY")
+          toast.error("Fiona isn't set up yet — ask your admin to add OPENAI_API_KEY")
         } else if (result.error === 'extraction_failed') {
           toast.error("Fiona couldn't parse this plan. Try a clearer version or edit manually.")
         } else {
