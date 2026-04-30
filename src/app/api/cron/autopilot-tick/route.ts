@@ -492,6 +492,24 @@ async function tickOnce(request: Request): Promise<TickResult> {
                                 console.info(
                                     `[autopilot-tick] superseded tracking row for project=${project.id} stage=${stage} — will re-fire on next tick with council context`,
                                 )
+
+                                // Reset autopilot_state to 'idle' so the next cron tick
+                                // re-fires this stage. The council_diagnosis written above
+                                // remains in the state; the specialist reads it on the re-fire.
+                                const currentState = project.autopilot_state as Record<string, unknown>
+                                const prevAttempts = typeof currentState.attempts === "number" ? currentState.attempts : 0
+                                const updatedState = {
+                                    ...currentState,
+                                    status: "idle",
+                                    attempts: prevAttempts + 1,
+                                }
+                                await admin
+                                    .from("cad_lab_projects")
+                                    .update({ autopilot_state: updatedState } as unknown as never)
+                                    .eq("id", project.id)
+                                console.info(
+                                    `[autopilot-tick] reset autopilot_state to idle for project=${project.id} stage=${stage} attempts=${updatedState.attempts}`,
+                                )
                             } catch (councilErr) {
                                 console.warn(
                                     `[autopilot-tick] council failed for project=${project.id} stage=${stage}:`,
