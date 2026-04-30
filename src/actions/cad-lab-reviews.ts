@@ -1640,12 +1640,12 @@ function detectTruncatedReview(text: string): boolean {
     const lastChar = trimmed[trimmed.length - 1]
 
     // Normal endings: sentence-ending punctuation, list markers, code fences,
-    // closing brackets, markdown headers
-    const normalEndings = /[.!?:)\]}>*`|#\n]$/
+    // closing brackets, markdown headers, numbers (e.g. "factor is 2.5")
+    const normalEndings = /[.!?)\]}>*`|#\n\d]$/
     if (normalEndings.test(trimmed)) return false
 
-    // If the last character is a letter or comma mid-sentence, likely truncated
-    if (/[a-zA-Z,;(]$/.test(lastChar)) {
+    // If the last character is a letter, comma, or colon mid-sentence, likely truncated
+    if (/[a-zA-Z,;(:]$/.test(lastChar)) {
         // Double-check: is the last "sentence" suspiciously short or mid-word?
         // Find the last sentence boundary
         const lastSentenceBoundary = Math.max(

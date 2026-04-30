@@ -6495,62 +6495,36 @@ async function exportProjectPdfInternal(
             (a.createdAtIso ?? "").localeCompare(b.createdAtIso ?? ""),
         )
 
-        // If no audit trail from DB (common for demo projects), synthesise
-        // from available pipeline metadata so the section is never empty.
+        // When no DB audit trail exists, record only verifiable events
+        // with the actual PDF generation timestamp — never fabricate
+        // per-stage timestamps that would imply false provenance.
         if (auditLog.length === 0) {
-            const now = new Date()
-            // Work backwards from "now" to create plausible stage timestamps.
-            const stageOffsetMinutes = [
-                { id: "chase", stage: "research", label: "Market research and brief analysis", offset: 28 },
-                { id: "max", stage: "decomposition", label: "Module decomposition and sizing", offset: 22 },
-                { id: "fang", stage: "review", label: "Manufacturing engineering review", offset: 16 },
-                { id: "finn", stage: "costing", label: "Financial analysis and costing", offset: 10 },
-                { id: "priya", stage: "specification", label: "Product specification synthesis", offset: 6 },
-                { id: "leo", stage: "regulatory", label: "Regulatory and compliance review", offset: 4 },
-            ]
+            const now = new Date().toISOString()
 
-            for (const s of stageOffsetMinutes) {
-                const ts = new Date(now.getTime() - s.offset * 60_000)
-                auditLog.push({
-                    action: `${s.id}.${s.stage}`,
-                    section: s.id,
-                    createdAtIso: ts.toISOString(),
-                    metadataSummary: s.label,
-                })
-            }
-
-            // Add cost-tree reconciliation warning if triggered.
             if (costTreeReconciliation?.wasReconciled) {
                 auditLog.push({
                     action: "cost_tree_reconciliation",
                     section: "validation",
-                    createdAtIso: new Date(now.getTime() - 3 * 60_000).toISOString(),
+                    createdAtIso: now,
                     metadataSummary: `Unit total reconciled: divergence ${(costTreeReconciliation.divergenceFraction * 100).toFixed(1)}%`,
                 })
             }
 
-            // Add cost-tree validation findings summary if any.
             if (costTreeValidation?.hasFindings) {
                 auditLog.push({
                     action: "cost_tree_validation",
                     section: "validation",
-                    createdAtIso: new Date(now.getTime() - 2 * 60_000).toISOString(),
+                    createdAtIso: now,
                     metadataSummary: costTreeValidation.summaryMessage ?? `${costTreeValidation.findings.length} cost finding(s) flagged`,
                 })
             }
 
-            // Final entry: PDF generation event.
             auditLog.push({
                 action: "pdf_generation",
                 section: "export",
-                createdAtIso: now.toISOString(),
-                metadataSummary: "Automated report generation completed",
+                createdAtIso: now,
+                metadataSummary: "No pipeline audit trail available — per-stage timestamps will populate on next generation with pipeline tracking enabled",
             })
-
-            // Re-sort after synthesis so entries are chronological.
-            auditLog.sort((a, b) =>
-                (a.createdAtIso ?? "").localeCompare(b.createdAtIso ?? ""),
-            )
         }
 
         // Totals.

@@ -66,12 +66,15 @@ export const TOOL_CALL_LEAK_PATTERNS: ReadonlyArray<{
     pattern: RegExp
     replacement: string
 }> = [
-    // "verified via lookup_process(sheet_metal)" — strip whole phrase
-    { pattern: /\bverified\s+(via|using|with)\s+`?[a-z][a-z0-9]*_[a-z0-9_]+`?(\([^)]*\))?/gi, replacement: "" },
+    // "verified via lookup_process(sheet_metal)" — requires parens or backticks
+    // to avoid stripping legitimate "verified using non_destructive_testing"
+    { pattern: /\bverified\s+(via|using|with)\s+`[a-z][a-z0-9]*_[a-z0-9_]+`(\([^)]*\))?/gi, replacement: "" },
+    { pattern: /\bverified\s+(via|using|with)\s+[a-z][a-z0-9]*_[a-z0-9_]+\([^)]*\)/gi, replacement: "" },
     // "(verified via `function_name`)" — parenthesised variant
     { pattern: /\(verified\s+(via|using|with)\s+[^)]*\)/gi, replacement: "" },
-    // "Validated using calculate_stress(...)" — strip verb + tool call
-    { pattern: /\b(validated|confirmed|checked|verified)\s+(using|via|with|by)\s+`?[a-z][a-z0-9]*_[a-z0-9_]+`?(\([^)]*\))?/gi, replacement: "" },
+    // "Validated using calculate_stress(...)" — requires parens or backticks
+    { pattern: /\b(validated|confirmed|checked|verified)\s+(using|via|with|by)\s+`[a-z][a-z0-9]*_[a-z0-9_]+`(\([^)]*\))?/gi, replacement: "" },
+    { pattern: /\b(validated|confirmed|checked|verified)\s+(using|via|with|by)\s+[a-z][a-z0-9]*_[a-z0-9_]+\([^)]*\)/gi, replacement: "" },
     // "The lookup_process(x) confirms" → strip "The <call>" leaving "confirms"
     { pattern: /\bthe\s+`?lookup_\w+`?(\([^)]*\))?\s*/gi, replacement: "" },
     // `lookup_process(sheet_metal)` / `lookup_process(injection_molding)` etc.
@@ -108,7 +111,7 @@ export function stripToolCallLeaks(text: string): string {
         .replace(/^ +/gm, "")       // leading spaces
         .replace(/ +$/gm, "")       // trailing spaces
         .replace(/ ([.,;:])/g, "$1") // space before punctuation
-        .replace(/\.\s*\./g, ".")    // double periods
+        .replace(/\.(\s*\.)+/g, (m) => m.replace(/\s/g, "").length >= 3 ? "…" : ".") // collapse double periods but preserve ellipses
         .replace(/,\s*,/g, ",")     // double commas
         .replace(/\(\s*\)/g, "")    // empty parens
         .replace(/^\s*$/gm, "")     // blank lines
