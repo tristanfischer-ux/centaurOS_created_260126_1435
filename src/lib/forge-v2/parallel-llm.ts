@@ -392,3 +392,49 @@ Be decisive. Pick one winner. Only synthesise if the combination is clearly bett
         }
     }
 }
+
+// ── Convenience wrapper matching callClaude/callOpenAI signature ─────
+
+/**
+ * Drop-in replacement for callClaude / callOpenAI in specialist functions.
+ * Runs 3 models in parallel, picks the best, returns { text, tokensIn, tokensOut }
+ * so the caller's JSON parsing logic works unchanged.
+ *
+ * Also injects database grounding data into the user prompt automatically
+ * if the stage has configured grounding tables.
+ */
+export async function callParallelAndCompare(
+    systemPrompt: string,
+    userPrompt: string,
+    stage: string,
+    selectionCriteria: string,
+    projectId?: string,
+): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
+    // Inject database grounding if configured for this stage
+    let groundedUserPrompt = userPrompt
+    if (projectId) {
+        try {
+            const groundingData = await loadGroundingData(stage, projectId)
+            if (groundingData) {
+                groundedUserPrompt = userPrompt + groundingData
+                console.info(`[parallel-llm] Injected DB grounding (${groundingData.length} chars) for stage ${stage}, project ${projectId}`)
+            }
+        } catch (err) {
+            console.warn(`[parallel-llm] DB grounding failed (non-fatal):`, err instanceof Error ? err.message : err)
+        }
+    }
+
+    const result = await runParallelAndCompare(systemPrompt, groundedUserPrompt, stage, selectionCriteria)
+
+    console.info(
+        `[parallel-llm] callParallelAndCompare result for stage ${stage}: ` +
+        `winner=${result.winnerModel}, judgeUsed=${result.judgeUsed}, ` +
+        `reason=${result.selectionReason.slice(0, 100)}`,
+    )
+
+    return {
+        text: result.bestOutput,
+        tokensIn: 0,
+        tokensOut: 0,
+    }
+}
