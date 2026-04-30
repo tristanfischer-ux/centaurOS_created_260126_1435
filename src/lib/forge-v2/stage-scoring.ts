@@ -511,29 +511,9 @@ export async function checkFoundryCohortGate(
         return { allPassed: false, shouldResetAll: false, results: [] }
     }
 
-    // Only consider projects that are currently AT this stage
-    // (not already past it in completed_stages)
-    const atStage = projects.filter(p => {
-        const state = p.autopilot_state as Record<string, unknown> | null
-        if (!state) return false
-        return state.stage === stage
-    })
-
-    if (atStage.length < MIN_COHORT_SIZE) {
-        // Check if some already advanced past this stage — that means a
-        // previous partial advance happened. Log it but don't block.
-        const alreadyPast = projects.filter(p => {
-            const state = p.autopilot_state as Record<string, unknown> | null
-            if (!state) return false
-            const completed = (state.completed_stages ?? []) as string[]
-            return completed.includes(stage)
-        })
-        if (alreadyPast.length > 0 && atStage.length > 0) {
-            console.warn(
-                `[cohort-gate] SPLIT COHORT detected: ${alreadyPast.length} already past ${stage}, ${atStage.length} still at it. Total ${projects.length} in foundry.`,
-            )
-        }
-        return { allPassed: false, shouldResetAll: false, results: atStage.map(p => ({
+    if (projects.length < MIN_COHORT_SIZE) {
+        console.warn(`[cohort-gate] foundry=${foundryId} stage=${stage}: only ${projects.length} projects — need at least ${MIN_COHORT_SIZE}`)
+        return { allPassed: false, shouldResetAll: false, results: projects.map(p => ({
             projectId: p.id,
             projectName: p.name ?? p.id,
             composite: 0,
@@ -542,37 +522,50 @@ export async function checkFoundryCohortGate(
         })) }
     }
 
+    // ATOMIC FIX (2026-04-30): do NOT filter by state.stage === stage.
+    // Projects that already advanced past this stage have a different stage value,
+    // but their stage_scores[stage] entry is still persisted. Filtering by current
+    // stage caused 4/5 to advance, leaving the 5th project stranded with no way
+    // to detect it had already been scored and passed.
+    //
+    // The correct logic: check ALL foundry projects' stage_scores[stage].passed.
+    // A project that has already advanced will have passed=true stored.
+    // A project not yet scored will be missing the entry → gate correctly holds.
     const results: Array<{ projectId: string; projectName: string; composite: number; passed: boolean; currentStage: string }> = []
     let anyExhausted = false
 
-    for (const p of atStage) {
+    for (const p of projects) {
         const state = p.autopilot_state as Record<string, unknown>
+        if (!state) {
+            results.push({ projectId: p.id, projectName: p.name ?? p.id, composite: 0, passed: false, currentStage: "unknown" })
+            continue
+        }
         const stageScores = state.stage_scores as Record<string, StageScoreHistory> | undefined
         const stageScore = stageScores?.[stage]
         const attemptCount = getScoringAttemptCount(state, stage)
+        const currentStage = (state.stage as string) ?? "unknown"
 
         if (attemptCount >= MAX_SCORING_ATTEMPTS && (!stageScore || !stageScore.passed)) {
             anyExhausted = true
         }
 
         if (!stageScore) {
-            results.push({
-                projectId: p.id,
-                projectName: p.name ?? p.id,
-                composite: 0,
-                passed: false,
-                currentStage: (state.stage as string) ?? "unknown",
-            })
+            results.push({ projectId: p.id, projectName: p.name ?? p.id, composite: 0, passed: false, currentStage })
         } else {
             results.push({
                 projectId: p.id,
                 projectName: p.name ?? p.id,
                 composite: stageScore.composite,
                 passed: stageScore.passed,
-                currentStage: (state.stage as string) ?? "unknown",
+                currentStage,
             })
         }
     }
+
+    console.info(
+        `[cohort-gate] foundry=${foundryId} stage=${stage}: ` +
+        `${results.filter(r => r.passed).length}/${results.length} passed, anyExhausted=${anyExhausted}`,
+    )
 
     // If ANY project exhausted attempts without passing, signal full reset
     if (anyExhausted) {
