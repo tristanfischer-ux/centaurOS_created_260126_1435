@@ -88,6 +88,7 @@ import {
   callGeminiWithSearch,
   callGemini,
   callOpenAI,
+  callDeepSeek,
   callTogether,
   searchCadModels,
   executeOnModal,
@@ -542,7 +543,13 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         : ""
       const synthesisUserPrompt = `Product to research: ${description}\n\n${rawContext}${standardsSection}${engineeringDataSection}${marketplaceSupplierSection}${docSection}`
 
-      // Fallback chain: Gemini → OpenAI. Anthropic eliminated per 2026-04-29 directive.
+      // Fallback chain: Gemini → OpenAI → DeepSeek.
+      // Anthropic eliminated per 2026-04-29 directive.
+      // DeepSeek added 2026-04-30: Gemini 503 + OpenAI timeout cascades
+      // caused all 5 demo projects to fail synthesis simultaneously.
+      // DeepSeek is a different provider, different infrastructure, so a
+      // Gemini-wide 503 storm does not affect it. Trimmed timeout (90s)
+      // because DeepSeek is faster than GPT-5.5 for prose.
       try {
         console.info("[THE-FORGE] Step 1: Synthesizing report with Gemini (domain: %s)...", domain)
         const geminiResult = await callGemini(synthesisPrompt, synthesisUserPrompt, "gemini-3.1-pro-preview", 8192, 120_000)
@@ -556,9 +563,18 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
           report = openaiResult.text
           console.info("[THE-FORGE] Step 1: OpenAI synthesis succeeded (fallback)")
         } catch (openaiErr) {
-          console.error("[THE-FORGE] Step 1: ALL synthesis models failed:", openaiErr instanceof Error ? openaiErr.message : String(openaiErr))
-          report = "Research sources found but report synthesis failed — tap Retry to try again."
-          synthesisSucceeded = false
+          const openaiMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr)
+          console.warn("[THE-FORGE] Step 1: OpenAI synthesis failed, trying DeepSeek fallback:", openaiMsg.slice(0, 200))
+          try {
+            synthesisModel = "deepseek-chat"
+            const deepseekResult = await callDeepSeek(synthesisPrompt, synthesisUserPrompt, "deepseek-chat", 8192, 90_000)
+            report = deepseekResult.text
+            console.info("[THE-FORGE] Step 1: DeepSeek synthesis succeeded (second fallback)")
+          } catch (deepseekErr) {
+            console.error("[THE-FORGE] Step 1: ALL synthesis models failed:", deepseekErr instanceof Error ? deepseekErr.message : String(deepseekErr))
+            report = "Research sources found but report synthesis failed — tap Retry to try again."
+            synthesisSucceeded = false
+          }
         }
       }
     } catch (synthesisError) {

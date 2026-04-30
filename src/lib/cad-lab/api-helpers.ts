@@ -365,6 +365,69 @@ export async function callTogether(
   }
 }
 
+/**
+ * Call DeepSeek Chat API directly. Used as a third synthesis fallback
+ * when both Gemini and OpenAI are unavailable (503 / timeout).
+ * DeepSeek uses an OpenAI-compatible endpoint so the request shape is
+ * identical. The `reasoning_content` field is ignored here — we only
+ * need the `content` field for synthesis prose.
+ *
+ * NOTE: DeepSeek caps max_tokens at 8192. Do not pass values above that.
+ */
+export async function callDeepSeek(
+  systemPrompt: string,
+  userPrompt: string,
+  modelId: string = "deepseek-chat",
+  maxTokens: number = 8192,
+  timeoutMs: number = 120_000,
+): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
+  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()?.replace(/\\n$/, "")
+  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not configured")
+
+  const cappedMaxTokens = Math.min(maxTokens, 8192) // DeepSeek hard cap
+
+  const response = await fetchWithTimeout(
+    "https://api.deepseek.com/v1/chat/completions",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: modelId,
+        max_tokens: cappedMaxTokens,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+      }),
+    },
+    timeoutMs,
+  )
+
+  if (!response.ok) {
+    const errText = await response.text()
+    throw new Error(`DeepSeek API error (${response.status}): ${errText.slice(0, 300)}`)
+  }
+
+  const data = await response.json()
+  // DeepSeek reasoning models put output in `reasoning_content` field —
+  // use `content` (the visible reply) for synthesis. Fall back to
+  // reasoning_content only if content is empty.
+  const text: string =
+    data.choices?.[0]?.message?.content ||
+    data.choices?.[0]?.message?.reasoning_content ||
+    ""
+
+  return {
+    text,
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
+  }
+}
+
 // ─── Thingiverse CAD Model Search ────────────────────────────────────
 
 /** Search result from Thingiverse API */
