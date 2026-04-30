@@ -430,7 +430,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     )
                     if (attemptCount >= MAX_SCORING_ATTEMPTS) {
                         console.error(
-                            `[autopilot-tick] project=${project.id} stage=${stage} exhausted ${MAX_SCORING_ATTEMPTS} scoring attempts — marking stuck`,
+                            `[autopilot-tick] project=${project.id} stage=${stage} exhausted ${MAX_SCORING_ATTEMPTS} scoring attempts — triggering cohort reset`,
                         )
                         await recordFailure(
                             project.id,
@@ -445,6 +445,16 @@ async function tickOnce(request: Request): Promise<TickResult> {
                             reason: `scoring exhausted: ${attemptCount}/${MAX_SCORING_ATTEMPTS} attempts`,
                         })
                         failed++
+
+                        // ANY failure = full cohort restart (Tristan rule 2026-04-30).
+                        const exhaustedFoundryId = await getProjectFoundryId(project.id)
+                        if (exhaustedFoundryId) {
+                            console.error(
+                                `[autopilot-tick] COHORT FULL RESET from scoring exhaustion: project=${project.id} stage=${stage}`,
+                            )
+                            await resetCohortToChase(exhaustedFoundryId)
+                        }
+
                         continue
                     }
 
@@ -686,6 +696,18 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     reason: `${attempts} >= ${config.maxAttempts}`,
                 })
                 failed++
+
+                // ANY failure = full cohort restart (Tristan rule 2026-04-30).
+                // Do NOT just mark the one project failed — reset ALL 5 projects
+                // in the foundry back to waiting_chase so the full loop restarts.
+                const failedFoundryId = await getProjectFoundryId(project.id)
+                if (failedFoundryId) {
+                    console.error(
+                        `[autopilot-tick] COHORT FULL RESET from terminal_fail: project=${project.id} stage=${stage} attempts=${attempts}`,
+                    )
+                    await resetCohortToChase(failedFoundryId)
+                }
+
                 continue
             }
             // Else: fall through to fire (retry).
