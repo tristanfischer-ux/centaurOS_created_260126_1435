@@ -85,6 +85,7 @@ import type {
     SkeletonModule,
 } from "@/lib/cad-lab-types"
 import { extractStageSection, extractConstraintAnchors, compressReferenceDossier } from "@/lib/reference-dossier"
+import { loadGroundingData } from "@/lib/forge-v2/parallel-llm"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -406,13 +407,26 @@ async function runMaxDecompositionInternal(
             const modelId = (project.model_id || "claude-sonnet-4-6") as Parameters<
                 typeof skeletonDecompose
             >[2]
+            // Load DB grounding data for Max stage (design_standards). Non-fatal
+            // if it fails — skeleton proceeds without grounding context.
+            let maxGroundingSection = ""
+            try {
+                maxGroundingSection = await loadGroundingData("waiting_max", projectId)
+                if (maxGroundingSection) {
+                    console.info("[run-max-decomposition] Injected DB grounding for waiting_max")
+                }
+            } catch (groundingErr) {
+                console.warn("[run-max-decomposition] DB grounding failed (non-fatal):", groundingErr instanceof Error ? groundingErr.message : groundingErr)
+            }
+
             const maxDossierContext = (() => {
-                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return undefined
+                const groundingBlock = maxGroundingSection ? `\n\n${maxGroundingSection}` : ""
+                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return groundingBlock || undefined
                 const stageSection = extractStageSection(project.reference_dossier, "max")
                 const anchors = extractConstraintAnchors(project.reference_dossier)
-                if (stageSection && anchors) return `${stageSection}\n\n${anchors}`
-                if (stageSection) return stageSection
-                return compressReferenceDossier(project.reference_dossier)
+                if (stageSection && anchors) return `${stageSection}\n\n${anchors}${groundingBlock}`
+                if (stageSection) return `${stageSection}${groundingBlock}`
+                return compressReferenceDossier(project.reference_dossier) + groundingBlock
             })()
 
             const skeletonResult = await skeletonDecompose(
