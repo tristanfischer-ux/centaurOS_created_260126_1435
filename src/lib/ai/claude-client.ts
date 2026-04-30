@@ -1,31 +1,24 @@
 /**
- * @file claude-client.ts — Centralized Claude API client with prompt caching.
+ * @file claude-client.ts — Centralized LLM API client routed through OpenAI GPT-5.4.
  *
- * @description Single source of truth for all non-streaming Claude API calls.
- * Replaces 6 separate `callClaude` implementations across the codebase:
- *   - src/lib/cad-lab/api-helpers.ts (main, multimodal, 10min timeout)
- *   - src/actions/cad-grammar.ts (Sonnet, 2min timeout)
- *   - src/actions/cad-grammar-research.ts (Sonnet, 5min timeout)
- *   - src/actions/outreach.ts (Sonnet, 2min timeout)
- *   - src/lib/cad-lab/multi-model-consensus.ts (Opus, 30s timeout, 256 tokens)
- *   - src/lib/cad-lab/domain-prompts.ts (Sonnet, 15s timeout, 32 tokens)
+ * @description Single source of truth for all non-streaming LLM API calls.
+ * Originally called Anthropic's Claude API; now routes through OpenAI's
+ * GPT-5.4 to eliminate the Anthropic dependency from the production pipeline.
  *
- * The streaming path (src/lib/ai-providers/registry.ts) uses the Anthropic SDK
- * and remains separate — streaming has fundamentally different I/O patterns.
+ * The function name (`callClaudeCentral`) and return type (`ClaudeCallResult`)
+ * are preserved so that all ~25+ downstream call sites continue to work
+ * without changes.
  *
  * @security
  * - API key read from env, trimmed to prevent whitespace-related 401s
- * - Prompt caching via Anthropic's cache_control: ephemeral (5-min TTL)
  * - No secrets in error messages
  *
- * @audit Created 2026-04-07 during API cost profitability audit.
- * Prompt caching reduces input token costs by 90% on cache hits.
+ * @audit Migrated from Anthropic to OpenAI GPT-5.4 on 2026-04-30.
  */
 
 import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
 import { withRetry } from '@/lib/retry'
 import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
-import { callOpenRouter } from '@/lib/ai/openrouter'
 
 // ==========================================
 // TYPES
@@ -45,14 +38,12 @@ export interface ClaudeCallOptions {
   timeoutMs?: number
   maxRetries?: number
   /**
-   * Enable Anthropic prompt caching on the system prompt.
-   * Adds cache_control: { type: "ephemeral" } header (5-min TTL).
-   * Reduces input cost by 90% on cache hits, costs 25% more on writes.
-   * Default: true (opt-out with false for short/unique system prompts).
+   * @deprecated No-op. Retained for caller compatibility. OpenAI does not
+   * have the same prompt-caching API as Anthropic.
    */
   enableCache?: boolean
   /**
-   * Retry on 502/503 server errors (in addition to 429/529 rate limits).
+   * Retry on 502/503 server errors (in addition to 429 rate limits).
    * Default: false (fail fast to fallback). Set true for calls with no fallback.
    */
   retryOnServerErrors?: boolean
@@ -77,38 +68,43 @@ export interface ClaudeCallResult {
   tokensOut: number
   /** Whether the response was truncated (hit max_tokens) */
   truncated: boolean
-  /** Tokens read from prompt cache (0 if no cache hit) */
+  /** Tokens read from prompt cache (0 — not applicable for OpenAI) */
   cacheReadTokens: number
-  /** Tokens written to prompt cache (0 if cache hit or caching disabled) */
+  /** Tokens written to prompt cache (0 — not applicable for OpenAI) */
   cacheWriteTokens: number
 }
+
+// ==========================================
+// CONSTANTS
+// ==========================================
+
+/** The OpenAI model all calls are routed through. */
+const OPENAI_MODEL = 'gpt-5.4'
 
 // ==========================================
 // MAIN FUNCTION
 // ==========================================
 
 /**
- * Call a Claude model and return the response text with token counts.
+ * Call GPT-5.4 via the OpenAI chat-completions API and return the response
+ * text with token counts.
  *
- * @description Centralized, non-streaming Claude API client. Supports:
- * - Prompt caching (system prompt cached for 5 min, 90% input cost reduction)
- * - Multimodal input (PNG + SVG images)
+ * @description Centralized, non-streaming LLM client. Supports:
+ * - Multimodal input (PNG + SVG images via OpenAI vision content blocks)
  * - Configurable retry with exponential backoff
- * - Truncation detection via stop_reason
+ * - Truncation detection via finish_reason
  *
  * @param options - Call configuration
- * @returns Response text, token counts, and cache/truncation metadata
+ * @returns Response text, token counts, and truncation metadata
  * @throws On API errors after retry exhaustion
  */
 export async function callClaudeCentral(options: ClaudeCallOptions): Promise<ClaudeCallResult> {
   const {
     systemPrompt,
     userPrompt,
-    modelId = 'claude-sonnet-4-6',
     maxTokens = 16384,
     timeoutMs = 120_000,
     maxRetries = 2,
-    enableCache = true,
     retryOnServerErrors = false,
     imageBase64,
     renderedSvgBase64,
@@ -118,18 +114,20 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
     specialistId,
   } = options
 
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) throw new Error('ANTHROPIC_API_KEY not configured')
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!apiKey) throw new Error('OPENAI_API_KEY not configured')
 
   const makeRequest = async (): Promise<ClaudeCallResult> => {
-    // Build user content (text or multimodal)
-    type ContentBlock = { type: string; source?: { type: string; media_type: string; data: string }; text?: string }
-    let userContent: string | ContentBlock[]
+    // Build user content — text-only or multimodal (OpenAI vision format)
+    type TextPart = { type: 'text'; text: string }
+    type ImagePart = { type: 'image_url'; image_url: { url: string; detail?: string } }
+    type ContentPart = TextPart | ImagePart
+    let userContent: string | ContentPart[]
 
     if (imageBase64 && renderedSvgBase64) {
       userContent = [
-        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageBase64 } },
-        { type: 'image', source: { type: 'base64', media_type: 'image/svg+xml', data: renderedSvgBase64 } },
+        { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}` } },
+        { type: 'image_url', image_url: { url: `data:image/svg+xml;base64,${renderedSvgBase64}` } },
         {
           type: 'text',
           text: 'Image 1 is the TARGET product you must model. Image 2 is what your previous code produced.\nCompare them carefully — identify SPECIFIC geometric differences (wrong shape primitives, missing features, wrong proportions).\nFix your code so the output matches Image 1.\n\n' + userPrompt,
@@ -137,7 +135,7 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
       ]
     } else if (imageBase64) {
       userContent = [
-        { type: 'image', source: { type: 'base64', media_type: 'image/png', data: imageBase64 } },
+        { type: 'image_url', image_url: { url: `data:image/png;base64,${imageBase64}` } },
         {
           type: 'text',
           text: 'CRITICAL: The image above is the product you must model. Your primary goal is to produce CadQuery code whose 3D shape closely matches the proportions, silhouette, and features visible in this image. Study it carefully — every major geometric feature you see must appear in your model.\n\n' + userPrompt,
@@ -147,32 +145,25 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
       userContent = userPrompt
     }
 
-    // Build system prompt — with or without prompt caching
-    const systemField = enableCache
-      ? [{ type: 'text', text: systemPrompt, cache_control: { type: 'ephemeral' } }]
-      : systemPrompt
-
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      'x-api-key': apiKey,
-      'anthropic-version': '2023-06-01',
+      'Authorization': `Bearer ${apiKey}`,
     }
 
-    // Prompt caching requires the beta header
-    if (enableCache) {
-      headers['anthropic-beta'] = 'prompt-caching-2024-07-31'
-    }
-
+    // GPT-5.4 is a reasoning model — use max_completion_tokens, not max_tokens.
     const response = await fetchWithTimeout(
-      'https://api.anthropic.com/v1/messages',
+      'https://api.openai.com/v1/chat/completions',
       {
         method: 'POST',
         headers,
         body: JSON.stringify({
-          model: modelId,
-          max_tokens: maxTokens,
-          system: systemField,
-          messages: [{ role: 'user', content: userContent }],
+          model: OPENAI_MODEL,
+          max_completion_tokens: maxTokens,
+          temperature: 0.2,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
         }),
       },
       timeoutMs,
@@ -180,15 +171,13 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
 
     if (!response.ok) {
       const errText = await response.text()
-      // Cost-log the failure path: tokens unknown but model + status are useful for cost attribution.
-      // Cache-read/write tokens are 0 (no usage block from a non-OK response).
       const status: 'rate_limited' | 'timeout' | 'error' =
-        response.status === 429 || response.status === 529 ? 'rate_limited' :
+        response.status === 429 ? 'rate_limited' :
         response.status === 408 || response.status === 504 ? 'timeout' :
         'error'
       void logLlmUsage({
         action: actionSlug ?? 'claude_central_unknown',
-        modelUsed: modelId,
+        modelUsed: OPENAI_MODEL,
         tokensIn: 0,
         tokensOut: 0,
         status,
@@ -198,76 +187,24 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
         specialistId,
       })
 
-      // Loop 8 P5 (2026-04-26): credit-balance fallback. When the direct
-      // Anthropic key returns 400 + "credit balance is too low", route the
-      // same call through OpenRouter using `anthropic/<modelId>`. Separate
-      // credit pool, same model. Saves the entire engine from wedging when
-      // Tristan's Anthropic balance hits zero. Multimodal calls (image
-      // inputs) are not yet supported by this fallback — they'd need an
-      // OpenRouter multimodal request shape; rare enough to skip for now.
-      const isCreditDry =
-        response.status === 400 &&
-        /credit balance is too low/i.test(errText)
-      if (isCreditDry && !imageBase64 && !renderedSvgBase64 && process.env.OPENROUTER_API_KEY) {
-        console.warn(
-          `[ClaudeClient] Anthropic credit dry — falling back to OpenRouter for model=${modelId}`,
-        )
-        const orModel = `anthropic/${modelId}`
-        const or = await callOpenRouter({
-          model: orModel,
-          system: systemPrompt,
-          prompt: userPrompt,
-          maxTokens,
-          temperature: 0,
-          timeoutMs,
-        })
-        if (or.ok) {
-          void logLlmUsage({
-            action: actionSlug ?? 'claude_central_unknown',
-            modelUsed: orModel,
-            tokensIn: or.inputTokens,
-            tokensOut: or.outputTokens,
-            status: 'success',
-            errorMessage: 'fallback:openrouter:credit_dry',
-            foundryId,
-            userId,
-            specialistId,
-          })
-          return {
-            text: or.text,
-            tokensIn: or.inputTokens,
-            tokensOut: or.outputTokens,
-            truncated: false,
-            cacheReadTokens: 0,
-            cacheWriteTokens: 0,
-          }
-        }
-        // OpenRouter also failed — fall through to the original throw so
-        // upstream retry / fail-fast policy applies.
-        console.warn(
-          `[ClaudeClient] OpenRouter fallback also failed: ${or.error}`,
-        )
-      }
-
-      throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
+      throw new Error(`OpenAI API error (${response.status}): ${errText.slice(0, 300)}`)
     }
 
     const data = await response.json()
-    const text: string = data.content?.[0]?.text ?? ''
-    const truncated = data.stop_reason === 'max_tokens'
+    const choice = data.choices?.[0]
+    const text: string = choice?.message?.content ?? ''
+    const truncated = choice?.finish_reason === 'length'
 
     if (truncated) {
-      console.warn(`[ClaudeClient] Response truncated at ${maxTokens} tokens — model: ${modelId}`)
+      console.warn(`[ClaudeClient] Response truncated at ${maxTokens} tokens — model: ${OPENAI_MODEL}`)
     }
 
-    const tokensIn = data.usage?.input_tokens ?? 0
-    const tokensOut = data.usage?.output_tokens ?? 0
-    const cacheReadTokens = data.usage?.cache_read_input_tokens ?? 0
-    const cacheWriteTokens = data.usage?.cache_creation_input_tokens ?? 0
+    const tokensIn = data.usage?.prompt_tokens ?? 0
+    const tokensOut = data.usage?.completion_tokens ?? 0
 
     void logLlmUsage({
       action: actionSlug ?? 'claude_central_unknown',
-      modelUsed: modelId,
+      modelUsed: OPENAI_MODEL,
       tokensIn,
       tokensOut,
       status: 'success',
@@ -281,18 +218,18 @@ export async function callClaudeCentral(options: ClaudeCallOptions): Promise<Cla
       tokensIn,
       tokensOut,
       truncated,
-      cacheReadTokens,
-      cacheWriteTokens,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
     }
   }
 
-  return await withRetry(() => withLlmPermit('anthropic', modelId, makeRequest), {
+  return await withRetry(() => withLlmPermit('openai', OPENAI_MODEL, makeRequest), {
     maxRetries,
     baseDelay: 4000,
     maxDelay: 30000,
     shouldRetry: (error) => {
       const msg = error.message
-      const isRateLimit = msg.includes('429') || msg.includes('529') || msg.includes('overloaded')
+      const isRateLimit = msg.includes('429') || msg.includes('overloaded')
       const isServerError = msg.includes('502') || msg.includes('503')
       return isRateLimit || (retryOnServerErrors && isServerError)
     },
