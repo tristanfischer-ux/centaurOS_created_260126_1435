@@ -484,16 +484,20 @@ export async function getCouncilFeedbackForStage(
 
 // ── Foundry-wide cohort gate ──────────────────────────────────────────────
 
+const MIN_COHORT_SIZE = 5
+
 /**
  * Check if ALL projects in a foundry have passed scoring for a given stage.
- * Returns true only when every project at that stage has a composite ≥ 8.0.
+ * Queries by foundry ONLY (not by current stage) to avoid the race condition
+ * where early-advancing projects disappear from the stage-filtered query.
  *
- * This is the "no racing ahead" check — no project advances until all pass.
+ * 6-model council confirmed root cause 2026-04-30: filtering by stage caused
+ * 4/5 to advance, stranding Hedgerow permanently.
  */
 export async function checkFoundryCohortGate(
     foundryId: string,
     stage: AutopilotStage,
-): Promise<{ allPassed: boolean; results: Array<{ projectId: string; projectName: string; composite: number; passed: boolean }> }> {
+): Promise<{ allPassed: boolean; shouldResetAll: boolean; results: Array<{ projectId: string; projectName: string; composite: number; passed: boolean; currentStage: string }> }> {
     const admin = createAdminClient()
 
     const { data: projects } = await admin
@@ -502,20 +506,54 @@ export async function checkFoundryCohortGate(
         .eq("foundry_id", foundryId)
         .not("autopilot_state", "is", null)
         .not("autopilot_state->>started_at", "is", null)
-        .eq("autopilot_state->>stage", stage)
 
     if (!projects?.length) {
-        return { allPassed: false, results: [] }
+        return { allPassed: false, shouldResetAll: false, results: [] }
     }
 
-    const results: Array<{ projectId: string; projectName: string; composite: number; passed: boolean }> = []
-
-    for (const p of projects) {
+    // Only consider projects that are currently AT this stage
+    // (not already past it in completed_stages)
+    const atStage = projects.filter(p => {
         const state = p.autopilot_state as Record<string, unknown> | null
-        if (!state) continue
+        if (!state) return false
+        return state.stage === stage
+    })
 
-        const stageScores = state.stage_scores as Record<string, StageScoreResult> | undefined
+    if (atStage.length < MIN_COHORT_SIZE) {
+        // Check if some already advanced past this stage — that means a
+        // previous partial advance happened. Log it but don't block.
+        const alreadyPast = projects.filter(p => {
+            const state = p.autopilot_state as Record<string, unknown> | null
+            if (!state) return false
+            const completed = (state.completed_stages ?? []) as string[]
+            return completed.includes(stage)
+        })
+        if (alreadyPast.length > 0 && atStage.length > 0) {
+            console.warn(
+                `[cohort-gate] SPLIT COHORT detected: ${alreadyPast.length} already past ${stage}, ${atStage.length} still at it. Total ${projects.length} in foundry.`,
+            )
+        }
+        return { allPassed: false, shouldResetAll: false, results: atStage.map(p => ({
+            projectId: p.id,
+            projectName: p.name ?? p.id,
+            composite: 0,
+            passed: false,
+            currentStage: ((p.autopilot_state as Record<string, unknown>)?.stage as string) ?? "unknown",
+        })) }
+    }
+
+    const results: Array<{ projectId: string; projectName: string; composite: number; passed: boolean; currentStage: string }> = []
+    let anyExhausted = false
+
+    for (const p of atStage) {
+        const state = p.autopilot_state as Record<string, unknown>
+        const stageScores = state.stage_scores as Record<string, StageScoreHistory> | undefined
         const stageScore = stageScores?.[stage]
+        const attemptCount = getScoringAttemptCount(state, stage)
+
+        if (attemptCount >= MAX_SCORING_ATTEMPTS && (!stageScore || !stageScore.passed)) {
+            anyExhausted = true
+        }
 
         if (!stageScore) {
             results.push({
@@ -523,6 +561,7 @@ export async function checkFoundryCohortGate(
                 projectName: p.name ?? p.id,
                 composite: 0,
                 passed: false,
+                currentStage: (state.stage as string) ?? "unknown",
             })
         } else {
             results.push({
@@ -530,12 +569,142 @@ export async function checkFoundryCohortGate(
                 projectName: p.name ?? p.id,
                 composite: stageScore.composite,
                 passed: stageScore.passed,
+                currentStage: (state.stage as string) ?? "unknown",
             })
         }
     }
 
-    const allPassed = results.length > 0 && results.every((r) => r.passed)
-    return { allPassed, results }
+    // If ANY project exhausted attempts without passing, signal full reset
+    if (anyExhausted) {
+        console.error(
+            `[cohort-gate] FULL RESET NEEDED: at least one project exhausted ${MAX_SCORING_ATTEMPTS} attempts at ${stage}`,
+        )
+        return { allPassed: false, shouldResetAll: true, results }
+    }
+
+    const allPassed = results.length >= MIN_COHORT_SIZE && results.every((r) => r.passed)
+    return { allPassed, shouldResetAll: false, results }
+}
+
+/**
+ * Advance ALL projects in a foundry from one stage to the next atomically.
+ * Either all advance or none do. Prevents the split-cohort race condition.
+ */
+export async function advanceCohort(
+    foundryId: string,
+    fromStage: AutopilotStage,
+    toStage: AutopilotStage,
+): Promise<{ ok: boolean; advancedCount: number }> {
+    const admin = createAdminClient()
+
+    const { data: projects } = await admin
+        .from("cad_lab_projects")
+        .select("id, name, autopilot_state")
+        .eq("foundry_id", foundryId)
+        .eq("autopilot_state->>stage", fromStage)
+        .not("autopilot_state", "is", null)
+
+    if (!projects?.length || projects.length < MIN_COHORT_SIZE) {
+        console.error(
+            `[cohort-gate] advanceCohort aborted: only ${projects?.length ?? 0} projects at ${fromStage} (need ${MIN_COHORT_SIZE})`,
+        )
+        return { ok: false, advancedCount: 0 }
+    }
+
+    // Verify ALL have passed scoring for this stage before advancing any
+    for (const p of projects) {
+        const state = p.autopilot_state as Record<string, unknown>
+        const stageScores = state.stage_scores as Record<string, StageScoreHistory> | undefined
+        if (!stageScores?.[fromStage]?.passed) {
+            console.error(
+                `[cohort-gate] advanceCohort aborted: ${p.name ?? p.id} has not passed ${fromStage}`,
+            )
+            return { ok: false, advancedCount: 0 }
+        }
+    }
+
+    // Advance all projects atomically
+    let advancedCount = 0
+    for (const p of projects) {
+        const state = p.autopilot_state as Record<string, unknown>
+        const completed = Array.from(new Set([
+            ...((state.completed_stages ?? []) as string[]),
+            fromStage,
+        ]))
+        const updatedState = {
+            ...state,
+            stage: toStage,
+            completed_stages: completed,
+            status: "idle",
+        }
+        // Clear stale finished_at to prevent cron skip
+        delete (updatedState as Record<string, unknown>).finished_at
+
+        const { error } = await admin
+            .from("cad_lab_projects")
+            .update({ autopilot_state: updatedState } as unknown as never)
+            .eq("id", p.id)
+            .eq("autopilot_state->>stage", fromStage) // guard: only if still at fromStage
+
+        if (error) {
+            console.error(`[cohort-gate] advanceCohort failed for ${p.id}: ${error.message}`)
+        } else {
+            advancedCount++
+        }
+    }
+
+    if (advancedCount !== projects.length) {
+        console.error(
+            `[cohort-gate] PARTIAL ADVANCE: ${advancedCount}/${projects.length} — some projects may have been modified concurrently`,
+        )
+    }
+
+    console.info(
+        `[cohort-gate] advanceCohort ${fromStage} → ${toStage}: ${advancedCount}/${projects.length} projects advanced`,
+    )
+    return { ok: advancedCount === projects.length, advancedCount }
+}
+
+/**
+ * Reset ALL projects in a foundry back to waiting_chase when any project
+ * fails a stage permanently. Tristan's rule: any failure = full restart.
+ */
+export async function resetCohortToChase(foundryId: string): Promise<void> {
+    const admin = createAdminClient()
+
+    const { data: projects } = await admin
+        .from("cad_lab_projects")
+        .select("id, name")
+        .eq("foundry_id", foundryId)
+        .not("autopilot_state", "is", null)
+
+    if (!projects?.length) return
+
+    console.info(`[cohort-gate] FULL COHORT RESET: resetting ${projects.length} projects in foundry ${foundryId} to waiting_chase`)
+
+    for (const p of projects) {
+        const result = await resetToFounderBrief(p.id)
+        if (result.ok) {
+            // resetToFounderBrief sets status to "paused" — change to "idle" so cron picks them up
+            await admin
+                .from("cad_lab_projects")
+                .update({
+                    autopilot_state: {
+                        stage: "waiting_chase",
+                        status: "idle",
+                        attempts: 0,
+                        completed_stages: [],
+                        failed_stages: [],
+                        stage_scores: {},
+                        started_at: new Date().toISOString(),
+                    },
+                } as unknown as never)
+                .eq("id", p.id)
+            console.info(`[cohort-gate] reset project ${p.name ?? p.id} (${p.id})`)
+        } else {
+            console.error(`[cohort-gate] reset failed for ${p.id}: ${result.error}`)
+        }
+    }
 }
 
 /**

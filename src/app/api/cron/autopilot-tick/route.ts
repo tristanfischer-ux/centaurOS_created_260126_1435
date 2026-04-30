@@ -80,6 +80,8 @@ import {
     scoreStageOutput,
     storeStageScore,
     checkFoundryCohortGate,
+    advanceCohort,
+    resetCohortToChase,
     shouldScoreStage,
     conveneDiagnosticCouncil,
     loadStageDataForCouncil,
@@ -531,9 +533,28 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 }
 
                 // Foundry cohort check: ALL projects must pass before ANY advances
+                // Uses foundry-only query (not stage-filtered) to prevent split-cohort race
                 const foundryId = await getProjectFoundryId(project.id)
                 if (foundryId) {
                     const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
+
+                    if (cohort.shouldResetAll) {
+                        // A project exhausted scoring attempts — reset ALL to Chase
+                        console.error(
+                            `[autopilot-tick] COHORT FULL RESET triggered at stage=${stage}`,
+                        )
+                        await resetCohortToChase(foundryId)
+                        details.push({
+                            projectId: project.id,
+                            stage,
+                            action: "skip_running" as TickAction,
+                            ok: false,
+                            reason: `cohort gate: full reset — a project exhausted ${MAX_SCORING_ATTEMPTS} attempts`,
+                        })
+                        skipped++
+                        continue
+                    }
+
                     if (!cohort.allPassed) {
                         const failing = cohort.results
                             .filter((r) => !r.passed)
@@ -552,6 +573,28 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         skipped++
                         continue
                     }
+
+                    // ALL passed — advance the entire cohort atomically
+                    if (config.nextStage === "done") {
+                        await markDone(project.id, stage)
+                        details.push({
+                            projectId: project.id,
+                            stage,
+                            action: "advance_done",
+                            ok: true,
+                        })
+                    } else {
+                        const cohortResult = await advanceCohort(foundryId, stage as AutopilotStage, config.nextStage as AutopilotStage)
+                        details.push({
+                            projectId: project.id,
+                            stage,
+                            action: "advance" as TickAction,
+                            ok: cohortResult.ok,
+                            reason: `cohort advance: ${cohortResult.advancedCount} projects ${stage} → ${config.nextStage}`,
+                        })
+                    }
+                    advanced++
+                    continue
                 }
             }
             // ── end Stage Scoring + Council Auto-Fix Loop + Foundry Cohort Gate ──
