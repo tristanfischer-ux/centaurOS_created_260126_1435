@@ -31,6 +31,7 @@ import type {
 import { pickRulesForDomain, getRulesByDomain } from "./rules/_registry"
 import {
     CONTAINER_40FT_ISO,
+    CONTAINER_40FT_HC_REEFER,
     CONTAINER_20FT_ISO,
     CONTAINER_53FT_HC,
     WAREHOUSE_BAY_100,
@@ -422,6 +423,12 @@ export function inferEnvelopeFromBriefText(
 ): import("./types").Envelope | null {
     if (!text) return null
     const haystack = text.toLowerCase()
+
+    // 40ft high-cube reefer — must match before generic 40ft
+    if ((/\b(?:40[\s-]?ft|40[\s-]?foot|forty[\s-]?foot)\b/.test(haystack))
+        && (/\b(?:high[\s-]?cube|hc)\b/.test(haystack) || /\breefer\b/.test(haystack))) {
+        return CONTAINER_40FT_HC_REEFER
+    }
 
     // 40ft container — most common BESS / containerised farm signal
     if (/\b(?:40[\s-]?ft|40[\s-]?foot|40['']|forty[\s-]?foot)\b.*\b(?:iso|container|containerised|containerized|shipping)\b/i.test(haystack)

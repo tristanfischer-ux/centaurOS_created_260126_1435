@@ -27,6 +27,7 @@
 export interface Envelope {
     kind:
         | "container_40ft_iso"
+        | "container_40ft_hc_reefer"
         | "container_20ft_iso"
         | "container_53ft_hc"
         | "warehouse_bay"

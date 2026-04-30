@@ -41,6 +41,19 @@ export const CONTAINER_20FT_ISO = computeDerived({
 })
 
 /**
+ * 40ft high-cube reefer — vertical farms and temperature-controlled
+ * applications. Reefer unit occupies ~450mm at one end; thicker insulation
+ * reduces cross-section vs a dry container. Interior after insulation.
+ */
+export const CONTAINER_40FT_HC_REEFER = computeDerived({
+    kind: "container_40ft_hc_reefer",
+    label: "40ft high-cube reefer container",
+    interior_w_mm: 11_583,
+    interior_d_mm: 2_294,
+    interior_h_mm: 2_554,
+})
+
+/**
  * 53ft high-cube — preferred upgrade envelope for over-sized BESS (adds
  * ~20% floor area vs 40ft).
  */

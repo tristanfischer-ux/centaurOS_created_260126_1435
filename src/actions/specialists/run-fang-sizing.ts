@@ -113,7 +113,7 @@ function inferTargetsFromSubject(subject: string, domain: string | null): Record
         if (out.kwh !== undefined && out.kw === undefined) out.kw = Math.round(out.kwh * 0.2)
     } else if (domain === "vertical_farm") {
         const canopy = capture(/(\d+(?:\.\d+)?)\s*m(?:²|2|\^2)\s*(?:canopy|growing|grow)/i)
-        const tiers = capture(/(\d+)\s*tiers?/i)
+        const tiers = capture(/(\d+)\s*(?:tiers?|(?:growing\s+)?layers?)/i)
         if (canopy !== null) out.canopy_m2 = canopy
         if (tiers !== null) out.tiers = tiers
     } else if (domain === "heat_pump") {

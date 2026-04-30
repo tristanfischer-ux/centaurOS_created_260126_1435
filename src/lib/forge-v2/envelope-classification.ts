@@ -60,9 +60,10 @@ export type EnvelopeClassificationTag =
  * be conservative (pushback) than permissive (silent swap).
  */
 const ENVELOPE_TAG_MAP: Record<Envelope["kind"], EnvelopeClassificationTag> = {
-    container_20ft_iso: "transportable_container",
-    container_40ft_iso: "transportable_container",
-    container_53ft_hc:  "transportable_container",
+    container_20ft_iso:      "transportable_container",
+    container_40ft_iso:      "transportable_container",
+    container_40ft_hc_reefer:"transportable_container",
+    container_53ft_hc:       "transportable_container",
     warehouse_bay:      "fixed_building_bay",
     room:               "unknown",
     chassis:            "vehicle_mounted",
