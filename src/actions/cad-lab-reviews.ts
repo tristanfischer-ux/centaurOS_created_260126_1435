@@ -49,6 +49,8 @@ import type { ConversationMessage } from "@/lib/agent-memory"
 import { withLlmPermit } from "@/lib/ai/llm-permit"
 import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
+import { embedQuery } from "@/lib/embeddings"
+import { createAdminClient } from "@/lib/supabase/admin"
 
 // ─── Constants ──────────────────────────────────────────────────────
 
@@ -146,6 +148,28 @@ export interface ReviewRequest {
      */
     bomPartNumbersForModule?: string[]
     referenceDossierContext?: string
+    /**
+     * Pre-loaded supplier context for Fang (vp-manufacturing). Injected by
+     * run-fang-review.ts after a semantic search against match_marketplace_listings_v2
+     * scoped to Products + Services. When supplied, Fang can cite actual directory
+     * suppliers when assessing manufacturing feasibility rather than speaking in
+     * general terms about what "typical" suppliers offer.
+     *
+     * Format: a pre-formatted markdown block ready to inject into the prompt.
+     * Non-fatal — if absent the review still runs without supplier grounding.
+     */
+    matchedSuppliersContext?: string
+    /**
+     * Pre-loaded design standards context for Fang (vp-manufacturing). Injected
+     * by run-fang-review.ts from `project.research.designBrief.regulatory` cross-
+     * referenced against the `design_standards` table. Allows Fang to verify that
+     * the module's design is compatible with the applicable standards Chase identified
+     * during the research phase, closing the Chase → Fang standards loop.
+     *
+     * Format: a pre-formatted markdown block ready to inject into the prompt.
+     * Non-fatal — if absent the review still runs without standards grounding.
+     */
+    applicableStandardsContext?: string
 }
 
 export type ReviewResult =
@@ -259,6 +283,37 @@ export async function requestSpecialistReview(
             }
         }
 
+        // FIX 1 (2026-04-30): Inject matched supplier data for Fang so her
+        // manufacturing feasibility assessments can cite actual verified suppliers
+        // from the ForgeOS directory ("3 suppliers in our directory — X, Y, Z —
+        // offer CNC machining to ±0.05mm") rather than generic statements about
+        // what typical suppliers "should be able to achieve".
+        //
+        // The supplier context is pre-built by run-fang-review.ts (which has access
+        // to the admin Supabase client and embedQuery) and passed in via
+        // req.matchedSuppliersContext. This action stays free of direct DB calls.
+        //
+        // Non-fatal: if the caller didn't supply it (e.g. quickSpecialistVerdict
+        // or direct API callers), the review still runs without supplier grounding.
+        let supplierContextBlock = ""
+        if (req.specialistId === "vp-manufacturing" && req.matchedSuppliersContext) {
+            supplierContextBlock = `\n\n## Matched Suppliers for This Module (from ForgeOS directory — cite these in your review)\n${req.matchedSuppliersContext}`
+        }
+
+        // FIX 2 (2026-04-30): Inject applicable design standards so Fang can verify
+        // the module's design is compatible with the standards Chase identified during
+        // the research phase. This closes the Chase → Fang standards loop: Chase finds
+        // the regulatory requirements, Fang verifies the module design against them.
+        //
+        // Pre-built by run-fang-review.ts from project.research.designBrief.regulatory
+        // cross-referenced against the design_standards table.
+        //
+        // Non-fatal: if absent, the review still runs without standards grounding.
+        let standardsContextBlock = ""
+        if (req.specialistId === "vp-manufacturing" && req.applicableStandardsContext) {
+            standardsContextBlock = `\n\n## Applicable Design Standards (identified by Chase — verify this module's compliance)\n${req.applicableStandardsContext}`
+        }
+
         // DECISION: Fang (VP Manufacturing) owns the Specify stage. Her reviews
         // include Assembly Notes that carry forward to the Assemble stage as
         // constraints for Chase (VP Supply Chain).
@@ -284,7 +339,7 @@ Include these in your recommendations section with the prefix "ASSEMBLY:" so the
 
 ## Current Task: Design Review
 You are performing a structured design review of a CAD Lab module. Use your tools to verify claims with real data — never guess material properties or process constraints.
-${materialPropertiesBlock}
+${materialPropertiesBlock}${supplierContextBlock}${standardsContextBlock}
 
 ${reviewContext}${assemblyNotesInstructions}${refDossierBlock}`
 

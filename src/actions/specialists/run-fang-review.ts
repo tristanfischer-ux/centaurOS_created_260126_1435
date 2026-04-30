@@ -39,6 +39,7 @@
  */
 
 import { requestSpecialistReview, type ReviewModuleInput } from "@/actions/cad-lab-reviews"
+import { embedQuery } from "@/lib/embeddings"
 import {
     completePipelineRun,
     failPipelineRun,
@@ -334,7 +335,252 @@ async function runFangReviewInternal(
                 moduleId,
             )
 
-            // 6. Prepare reference dossier context for engineering review.
+            // 6a. FIX 1 (2026-04-30): Supplier lookup for Fang.
+            //
+            // Embed the module's description + materials + key parts, then run a
+            // semantic search against match_marketplace_listings_v2 scoped to
+            // Products + Services (filter out Finance/VC rows which would otherwise
+            // outrank manufacturers). Fetch the top 10 matches, pull their company
+            // details, and format a block Fang can cite in her review.
+            //
+            // This is additive — wrapped in try/catch, non-fatal. If the supplier
+            // lookup fails (OPENAI_API_KEY missing, pgvector timeout, etc.), Fang
+            // still runs without supplier grounding.
+            let matchedSuppliersContext: string | undefined
+            try {
+                const moduleTextForEmbed = [
+                    targetModule.name ?? "",
+                    targetModule.description ?? "",
+                    targetModule.purpose ?? "",
+                    (Array.isArray(targetModule.keyParts) ? targetModule.keyParts : []).join(" "),
+                ].filter(Boolean).join(" ").slice(0, 2000) // cap to avoid embedding oversized input
+
+                if (moduleTextForEmbed.length > 10) {
+                    const queryEmbedding = await embedQuery(moduleTextForEmbed, {
+                        actionSlug: "fang_supplier_match",
+                        foundryId,
+                    })
+
+                    // match_marketplace_listings_v2 takes query_embedding as a
+                    // stringified vector (PostgREST serialises number[] as a string
+                    // in the `[1,2,3]` format that pgvector understands).
+                    const { data: matchedListings, error: rpcErr } = await admin
+                        .rpc("match_marketplace_listings_v2", {
+                            query_embedding: `[${queryEmbedding.join(",")}]` as unknown as string,
+                            match_count: 10,
+                            match_threshold: 0.2,
+                        })
+
+                    if (rpcErr) {
+                        console.warn(
+                            "[run-fang-review:fix1] match_marketplace_listings_v2 failed (non-fatal):",
+                            rpcErr.message,
+                        )
+                    } else if (matchedListings && matchedListings.length > 0) {
+                        // Filter to manufacturing-relevant categories only.
+                        // Finance rows (VC funds, investors) must not appear in
+                        // Fang's supplier grounding — they have no process_capabilities.
+                        // See MEMORY.md §pdf-and-supplier-gotchas for the category leak.
+                        const manufacturingListings = matchedListings.filter(
+                            (l) => l.category === "Products" || l.category === "Services",
+                        )
+
+                        if (manufacturingListings.length > 0) {
+                            // Fetch full supplier details for the matched listings.
+                            const listingIds = manufacturingListings.map((l) => l.id)
+                            const { data: supplierDetails } = await admin
+                                .from("marketplace_listings")
+                                .select("id, title, company_size, process_capabilities, certifications, materials, country_iso, key_equipment, subcategory")
+                                .in("id", listingIds)
+
+                            if (supplierDetails && supplierDetails.length > 0) {
+                                // Build a lookup map so we can order by similarity rank
+                                const detailMap = new Map(supplierDetails.map((s) => [s.id, s]))
+
+                                const supplierLines = manufacturingListings
+                                    .map((listing) => {
+                                        const det = detailMap.get(listing.id)
+                                        if (!det) return null
+
+                                        const parts: string[] = [`**${det.title}**`]
+                                        if (det.country_iso) parts.push(`(${det.country_iso})`)
+                                        if (det.subcategory) parts.push(`— ${det.subcategory}`)
+
+                                        const details: string[] = []
+                                        if (det.process_capabilities) {
+                                            const procs = Array.isArray(det.process_capabilities)
+                                                ? (det.process_capabilities as string[]).slice(0, 5).join(", ")
+                                                : JSON.stringify(det.process_capabilities).slice(0, 200)
+                                            if (procs) details.push(`Processes: ${procs}`)
+                                        }
+                                        if (det.materials) {
+                                            const mats = Array.isArray(det.materials)
+                                                ? (det.materials as string[]).slice(0, 5).join(", ")
+                                                : JSON.stringify(det.materials).slice(0, 200)
+                                            if (mats) details.push(`Materials: ${mats}`)
+                                        }
+                                        if (det.certifications) {
+                                            const certs = Array.isArray(det.certifications)
+                                                ? (det.certifications as string[]).slice(0, 4).join(", ")
+                                                : JSON.stringify(det.certifications).slice(0, 150)
+                                            if (certs) details.push(`Certifications: ${certs}`)
+                                        }
+                                        if (det.key_equipment) {
+                                            const eq = Array.isArray(det.key_equipment)
+                                                ? (det.key_equipment as string[]).slice(0, 4).join(", ")
+                                                : JSON.stringify(det.key_equipment).slice(0, 150)
+                                            if (eq) details.push(`Key equipment: ${eq}`)
+                                        }
+
+                                        const header = parts.join(" ")
+                                        const body = details.length > 0 ? `\n  ${details.join(" | ")}` : ""
+                                        return `- ${header}${body}`
+                                    })
+                                    .filter((l): l is string => l !== null)
+
+                                if (supplierLines.length > 0) {
+                                    matchedSuppliersContext =
+                                        "The following verified suppliers in our directory can manufacture components for this module. " +
+                                        "Reference their actual capabilities when assessing manufacturing feasibility — cite the supplier name directly in your findings.\n\n" +
+                                        supplierLines.join("\n")
+
+                                    console.info(
+                                        `[run-fang-review:fix1] supplier context injected: module=${moduleId} suppliers=${supplierLines.length}`,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            } catch (supplierErr) {
+                // Non-fatal — Fang review still runs without supplier grounding
+                console.warn(
+                    "[run-fang-review:fix1] supplier lookup failed (non-fatal):",
+                    supplierErr instanceof Error ? supplierErr.message : supplierErr,
+                )
+            }
+
+            // 6b. FIX 2 (2026-04-30): Design standards lookup for Fang.
+            //
+            // Chase stores regulatory requirements in project.research.designBrief.regulatory
+            // during the research phase. Extract any standard codes and look them up in the
+            // design_standards table to give Fang the full detail (requirements_markdown,
+            // design_rules, dimensional_constraints, etc.) rather than just a code string.
+            //
+            // This closes the Chase → Fang loop: Chase identifies which standards apply,
+            // Fang verifies the module design actually meets them.
+            //
+            // Non-fatal — wrapped in try/catch.
+            let applicableStandardsContext: string | undefined
+            try {
+                // Extract regulatory info from the design brief.
+                // project.research.designBrief.regulatory may be:
+                //   - a string (space/comma-separated standard codes like "ISO 9001, IEC 60601")
+                //   - an array of strings
+                //   - an array of objects with { code, description, ... } shape
+                //   - absent / null
+                const regulatory = designBrief?.regulatory as unknown
+                const standardCodes: string[] = []
+                const regulatoryDescriptions: Array<{ code: string; description?: string }> = []
+
+                if (typeof regulatory === "string" && regulatory.length > 0) {
+                    // Split on comma or semicolon — handles "ISO 9001, IEC 60601" style
+                    const codes = regulatory.split(/[,;]+/).map((s) => s.trim()).filter(Boolean)
+                    standardCodes.push(...codes)
+                    codes.forEach((c) => regulatoryDescriptions.push({ code: c }))
+                } else if (Array.isArray(regulatory)) {
+                    for (const item of regulatory) {
+                        if (typeof item === "string" && item.trim()) {
+                            standardCodes.push(item.trim())
+                            regulatoryDescriptions.push({ code: item.trim() })
+                        } else if (item && typeof item === "object") {
+                            const obj = item as Record<string, unknown>
+                            const code = String(obj["code"] ?? obj["standard_code"] ?? obj["id"] ?? "").trim()
+                            const description = typeof obj["description"] === "string" ? obj["description"] : undefined
+                            if (code) {
+                                standardCodes.push(code)
+                                regulatoryDescriptions.push({ code, description })
+                            }
+                        }
+                    }
+                }
+
+                if (standardCodes.length > 0) {
+                    // Look up matching rows in design_standards — match on standard_code
+                    // using a case-insensitive ILIKE across the known codes (cap at 10 to
+                    // avoid bloating the prompt; most projects have 3-7 applicable standards).
+                    const codesSlice = standardCodes.slice(0, 10)
+
+                    // Build OR filter: standard_code.ilike.ISO 9001,standard_code.ilike.IEC 60601
+                    // PostgREST or() filter format.
+                    const orFilter = codesSlice
+                        .map((c) => `standard_code.ilike.%${c}%`)
+                        .join(",")
+
+                    const { data: standards, error: stdsErr } = await admin
+                        .from("design_standards")
+                        .select("standard_code, standard_name, summary, requirements_markdown, design_rules, issuing_body, region")
+                        .or(orFilter)
+                        .limit(10)
+
+                    if (stdsErr) {
+                        console.warn(
+                            "[run-fang-review:fix2] design_standards lookup failed (non-fatal):",
+                            stdsErr.message,
+                        )
+                    } else {
+                        // Combine DB results with any regulatory descriptions the brief had
+                        // (to surface codes that aren't in the DB yet with their brief-level description)
+                        const foundCodes = new Set((standards ?? []).map((s) => s.standard_code))
+
+                        const lines: string[] = []
+
+                        // Standards found in DB — include full detail
+                        for (const std of standards ?? []) {
+                            const parts: string[] = [
+                                `**${std.standard_code}** — ${std.standard_name}`,
+                            ]
+                            if (std.issuing_body) parts.push(`(${std.issuing_body})`)
+                            if (std.summary) lines.push(`${parts.join(" ")}`)
+                            if (std.summary) lines.push(`  Summary: ${std.summary}`)
+                            if (std.requirements_markdown) {
+                                // Truncate very long requirements to avoid bloating the prompt
+                                lines.push(`  Key requirements: ${std.requirements_markdown.slice(0, 500)}${std.requirements_markdown.length > 500 ? "…" : ""}`)
+                            }
+                        }
+
+                        // Standards mentioned in brief but not found in DB — surface with description
+                        for (const item of regulatoryDescriptions) {
+                            if (!foundCodes.has(item.code)) {
+                                const line = item.description
+                                    ? `**${item.code}** — ${item.description} *(not yet in ForgeOS standards database)*`
+                                    : `**${item.code}** *(not yet in ForgeOS standards database — use your domain knowledge)*`
+                                lines.push(line)
+                            }
+                        }
+
+                        if (lines.length > 0) {
+                            applicableStandardsContext =
+                                "The following design standards have been identified as applicable to this project by the research phase. " +
+                                "Your review should verify that this module's design is compatible with these requirements. " +
+                                "Flag any non-compliance as a CRITICAL issue.\n\n" +
+                                lines.join("\n")
+
+                            console.info(
+                                `[run-fang-review:fix2] standards context injected: module=${moduleId} standards_in_db=${(standards ?? []).length} total_codes=${standardCodes.length}`,
+                            )
+                        }
+                    }
+                }
+            } catch (stdsErr) {
+                // Non-fatal — Fang review still runs without standards grounding
+                console.warn(
+                    "[run-fang-review:fix2] design standards lookup threw (non-fatal):",
+                    stdsErr instanceof Error ? stdsErr.message : stdsErr,
+                )
+            }
+
+            // 6c. Prepare reference dossier context for engineering review.
             const fangDossierContext = (() => {
                 if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return undefined
                 const stageSection = extractStageSection(project.reference_dossier, "fang")
@@ -355,6 +601,8 @@ async function runFangReviewInternal(
                 projectSubject,
                 bomPartNumbersForModule,
                 referenceDossierContext: fangDossierContext,
+                matchedSuppliersContext,
+                applicableStandardsContext,
             }
             const reviewResult = await requestSpecialistReview(reviewRequest, trusted)
 
