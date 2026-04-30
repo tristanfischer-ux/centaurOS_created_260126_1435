@@ -2172,14 +2172,10 @@ export async function skeletonDecompose(
       : ""
     const userPrompt = `Product: ${description}\n\nResearch Report:\n${truncatedReport}${skeletonEngSection}${docSection}\n\nIdentify the physical modules (sub-assemblies). Output ONLY the JSON object with "modules" and "connections".`
 
-    // DECISION: Direct call with Opus — output is N modules × ~200 tokens
-    // each + schema overhead. Industrial BESS with 9 modules hit the 2048
-    // ceiling and Claude returned truncated JSON → parse failed → pipeline
-    // wedge. Observed run 9 2026-04-24. Doubled to 4096 for 2× headroom.
-    // GPT-5.5 is a reasoning model — needs extended timeout for internal
-    // chain-of-thought before emitting structured JSON.
+    // GPT-5.5 reasoning model consumes tokens for internal thinking before
+    // emitting visible output. 4096 was too low — truncated JSON → parse fail.
     const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 4096, 180_000, 1,
+      systemPrompt, userPrompt, modelId, 16384, 180_000, 1,
     )
 
     // Parse JSON response
