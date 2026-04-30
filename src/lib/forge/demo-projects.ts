@@ -81,11 +81,11 @@ export const FORGE_DEMOS: readonly ForgeDemo[] = [
     slug: 'bess',
     heading: 'Battery energy storage system',
     acronym: 'BESS',
-    subHeading: 'Forty-foot containerised, 3.5 megawatt-hour, 1.5 megawatt',
+    subHeading: 'Forty-foot containerised, 1.5 megawatt-hour, 500 kilowatt',
     summary:
       'Lithium iron phosphate cells, grid-forming bi-directional power conversion, liquid-cooled thermal management, certified fire detection and suppression. Built to ship on a flatbed lorry, install on a prepared concrete pad, and commission inside two days against the United Kingdom G99 grid code.',
     description:
-      'A forty-foot ISO container housing 3.5 megawatt-hours of lithium iron phosphate storage and a 1.5 megawatt bi-directional power conversion system. Six engineering modules cover the cell block, thermal management, power electronics, fire suppression, grid interconnect, and site works. The bill of materials runs to 53 rows across 29 suppliers. Unit cost came back at £1.28m against a £180k ceiling — the Forge surfaced that gap clearly so you can decide whether to descope, phase, or revise the brief.',
+      'A forty-foot ISO container housing 1.5 megawatt-hours of lithium iron phosphate storage and a 500 kilowatt bi-directional power conversion system. Engineering modules cover the cell block, thermal management, power electronics, fire suppression, grid interconnect, and site works. Target installed capital cost under £180k. Designed to ship complete on a flatbed lorry, install on a prepared concrete pad, and commission inside two days.',
     coverPath: '/forge-demos/thumbnails/01-BESS-cover.png',
     pdfPath: '/forge-demos/01-BESS.pdf',
     stats: {
@@ -138,11 +138,11 @@ export const FORGE_DEMOS: readonly ForgeDemo[] = [
   {
     slug: 'vertical-farm',
     heading: 'Modular vertical farm',
-    subHeading: 'Forty-foot container, year-round leafy greens',
+    subHeading: 'Forty-foot high cube reefer, year-round leafy greens',
     summary:
-      'Six thousand simultaneous plant slots across multi-tier hydroponic stacks, four tonnes of yield per container per year. Light-emitting-diode grow-lights with daily light integral control, climate and carbon-dioxide dosing, recirculating nutrient system, sensor mesh feeding a remote farm-management dashboard.',
+      'Five growing layers on two rack runs with a central walking aisle, housed in a forty-foot high cube reefer container. The reefer unit manages air handling, temperature, humidity, and carbon dioxide. A small fertigation unit at the front handles nutrient mixing and recirculating water supply. Light-emitting-diode grow-lights with daily light integral control, sensor mesh feeding a remote farm-management dashboard.',
     description:
-      'A self-contained forty-foot container farm producing roughly four tonnes of leafy greens per year. Eight modules cover the structure and environment, hydroponic water circuits, lighting, climate and carbon-dioxide control, plant logistics, sensing and data, power distribution, and external connections. The bill of materials runs to 70 rows from 32 suppliers. Unit capital cost came back at £69,555 against a £150,000 ceiling — £80k of headroom that leaves room for site works, commissioning, and contingency before the ceiling is hit.',
+      'A forty-foot high cube reefer container converted into a modular vertical farm for short leafy salad greens. Five growing layers on two rack runs down the length of the container — one on the left, one on the right — with a central walking aisle for operator access. The reefer unit manages air handling, temperature, humidity, and carbon dioxide levels, eliminating the need for a separate climate system. A small fertigation unit sits at the front by the door, handling nutrient mixing and recirculating water supply to all five tiers. Target yield four tonnes per year per container. Target installed capital cost under £150,000.',
     coverPath: '/forge-demos/thumbnails/03-Vertical-Farm-cover.png',
     pdfPath: '/forge-demos/03-Vertical-Farm.pdf',
     stats: {

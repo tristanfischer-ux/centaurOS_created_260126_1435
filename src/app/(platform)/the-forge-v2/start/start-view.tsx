@@ -93,7 +93,7 @@ export function StartView(): React.ReactElement {
                     id="sv2-brief"
                     value={subject}
                     onChange={(e) => setSubject(e.target.value)}
-                    placeholder="40ft ISO shipping container converted into a modular vertical farm for short leafy salad greens. Five tiers of hydroponic racks on both sides of a 1m walking aisle running down the centre. HVAC + dehumidifier, fertigation, air handling. Target canopy 40 m², yield 8 kg/week leafy greens, unit cost £45,000, first deployment 9 months out. Customers: UK supermarkets, institutional kitchens."
+                    placeholder="40ft high cube reefer container converted into a modular vertical farm for short leafy salad greens. Five growing layers on two rack runs down the length of the container, one on the left and one on the right, with a central walking aisle in the middle. The reefer manages air handling, temperature, humidity, and CO₂. Small fertigation unit at the front by the door. Target yield 4 tonnes/year, unit cost £150,000, first deployment 9 months out."
                     rows={12}
                     maxLength={SUBJECT_MAX + 200}
                     disabled={isPending}
