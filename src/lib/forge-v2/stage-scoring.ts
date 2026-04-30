@@ -276,6 +276,59 @@ async function loadStageData(
     }
 }
 
+// ── Chase hard gates ──────────────────────────────────────────────────────
+
+function applyChaseHardGates(
+  scores: Record<string, number>,
+  outputText: string
+): Record<string, number> {
+  const capped = { ...scores };
+
+  // Count academic sources (DOI patterns, "et al.", journal indicators)
+  const doiCount = (outputText.match(/10\.\d{4,}/g) || []).length;
+  const etAlCount = (outputText.match(/et al\./gi) || []).length;
+  const academicIndicators = Math.max(doiCount, etAlCount);
+  if (academicIndicators < 4 && capped.source_diversity !== undefined) {
+    capped.source_diversity = Math.min(capped.source_diversity, 8.5);
+  }
+
+  // Count patents (US/WO/EP patent number patterns)
+  const patentCount = (outputText.match(/\b(US|WO|EP|GB|CN|JP)\s*\d{4,}/gi) || []).length;
+  if (patentCount < 3 && capped.source_diversity !== undefined) {
+    capped.source_diversity = Math.min(capped.source_diversity, 8.5);
+  }
+
+  // Count competitors (look for competitor table rows or named companies)
+  const competitorSection = outputText.match(/competitor[s]?.*?(?=\n#{1,3}\s|\n={3,}|$)/is);
+  const competitorRows = competitorSection
+    ? (competitorSection[0].match(/\|.*\|.*\|.*\|/g) || []).length - 1 // minus header
+    : 0;
+  if (competitorRows < 8 && capped.competitor_analysis !== undefined) {
+    capped.competitor_analysis = Math.min(capped.competitor_analysis, 8.0);
+  }
+
+  // Check for generic differentiators
+  const genericPhrases = (outputText.match(/\b(innovative approach|cutting-edge|unique solution|state-of-the-art|world-class|best-in-class|industry-leading)\b/gi) || []).length;
+  if (genericPhrases > 2 && capped.competitor_analysis !== undefined) {
+    capped.competitor_analysis = Math.min(capped.competitor_analysis, 8.5);
+  }
+
+  // Check for specific standards (IEC, BS EN, ISO, EASA patterns)
+  const standardsCount = (outputText.match(/\b(IEC|BS\s*EN|ISO|EASA|IEEE|ASTM|UL|NFPA)\s*[\d-]+/gi) || []).length;
+  if (standardsCount < 3 && capped.regulatory_coverage !== undefined) {
+    capped.regulatory_coverage = Math.min(capped.regulatory_coverage, 8.5);
+  }
+
+  // Check for truncated tables
+  const hasTruncation = /\.\.\.|(\[truncated\])|(\[continued\])|(and\s+\d+\s+more)/i.test(outputText);
+  if (hasTruncation) {
+    if (capped.competitor_analysis !== undefined) capped.competitor_analysis = Math.min(capped.competitor_analysis, 7.5);
+    if (capped.source_diversity !== undefined) capped.source_diversity = Math.min(capped.source_diversity, 7.5);
+  }
+
+  return capped;
+}
+
 // ── Scoring function ──────────────────────────────────────────────────────
 
 export async function scoreStageOutput(
@@ -339,11 +392,24 @@ ${stageData}`
             overall_reasoning: string
         }
 
-        const dimensionScores: DimensionScore[] = parsed.scores.map((s) => ({
+        let dimensionScores: DimensionScore[] = parsed.scores.map((s) => ({
             dimension: s.dimension,
             score: Math.max(1, Math.min(10, Math.round(s.score))),
             reasoning: s.reasoning,
         }))
+
+        // Apply Chase-specific hard gates based on evidence found in the output text
+        if (stage === "waiting_chase") {
+            const scoreMap: Record<string, number> = {}
+            for (const ds of dimensionScores) {
+                scoreMap[ds.dimension] = ds.score
+            }
+            const gatedMap = applyChaseHardGates(scoreMap, stageData)
+            dimensionScores = dimensionScores.map((ds) => ({
+                ...ds,
+                score: gatedMap[ds.dimension] ?? ds.score,
+            }))
+        }
 
         let totalWeight = 0
         let weightedSum = 0

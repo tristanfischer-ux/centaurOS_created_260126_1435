@@ -1212,6 +1212,53 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
 
 Match this STYLE and DEPTH for any project. The fields applicability + designImpact + evidenceRequired + ownerRole + gapAction must be specific to the project's actual configuration — not generic boilerplate. For non-BESS projects the standards differ but the structure stays identical.
 
+=== MANDATORY EVIDENCE PORTFOLIO (your report WILL be scored on these) ===
+
+Your report MUST contain ALL of the following. Missing categories will cap your score:
+
+1. ACADEMIC SOURCES (minimum 4):
+   - Peer-reviewed papers with author, year, journal/conference, and DOI where available
+   - Technical reports from universities or research institutions
+   - If fewer than 4 exist for this domain, state "Exhaustive search yielded N academic sources" and explain why
+
+2. PATENTS (minimum 3):
+   - Patent numbers (e.g. US10,XXX,XXX or WO2024/XXXXXX) with assignee and filing year
+   - Include both granted patents and published applications
+   - If fewer than 3 exist, state "Patent landscape search yielded N results" and explain why
+
+3. GOVERNMENT & STANDARDS (minimum 4):
+   - Specific standard numbers (e.g. IEC 62619, BS EN 50604-1, EASA SC-RPAS)
+   - Government policy documents, grants programmes, or regulatory frameworks with document IDs
+   - Industry body guidelines (e.g. BEIS, Ofgem, DEFRA, HSE publications)
+
+4. COMPANY PRIMARY SOURCES (minimum 3):
+   - Direct quotes or data from company websites, press releases, annual reports, or SEC filings
+   - Named spokesperson quotes where available
+   - Product datasheets with specific performance figures
+
+5. MARKET REPORTS (minimum 3):
+   - Named reports from analysts (e.g. BloombergNEF, Wood Mackenzie, Mordor Intelligence)
+   - Include publication year and specific data points cited
+
+6. COMPETITORS (minimum 8):
+   - List at minimum 8 direct competitors with: company name, HQ country, founding year, key product, ONE measurable differentiator
+   - NEVER truncate this table. If you have more than 8, include ALL of them.
+   - Differentiators must be specific and measurable (e.g. "cycle life: 10,000 vs industry avg 5,000") not generic ("innovative approach")
+
+7. REGULATORY LANDSCAPE:
+   - For UK-based projects: specific UK and EU regulations with document numbers
+   - Compliance pathway with named standards, not just "regulatory approval required"
+   - Timeline estimates for certification where applicable
+
+=== SELF-AUDIT (perform before submitting) ===
+Before finalising your report, count your sources in each category above. If ANY category is below the minimum, go back and find more. State your counts at the end:
+- Academic: N sources
+- Patents: N sources
+- Government/Standards: N sources
+- Company primary: N sources
+- Market reports: N sources
+- Competitors: N listed
+
 MANDATORY EVIDENCE PORTFOLIO (your output will be auto-scored and rejected below these thresholds):
 - Academic Sources: ≥4 peer-reviewed papers with DOIs or conference proceedings with full citations
 - Patents: ≥3 granted or filed patents with patent numbers (e.g. US11,234,567B2)
