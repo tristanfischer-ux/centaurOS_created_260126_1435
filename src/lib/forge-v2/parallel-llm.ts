@@ -770,16 +770,21 @@ export async function runChaseMultiLineage(
 
     if (top3Candidates.length >= 2) {
         try {
-            const synthSystem = `You are a world-class hardware product research analyst. You will be given ${top3Candidates.length} research reports on the same product from different AI research models. Your task is to synthesise the BEST ELEMENTS from all of them into a single, unified research report that is more comprehensive, accurate, and useful than any individual report.
+            const synthSystem = `You are a world-class hardware product research analyst. You will be given ${top3Candidates.length} research reports on the same product from different AI research models. Your task is to synthesise the BEST ELEMENTS from all of them into a single, unified research report that is strictly better than any individual input.
 
-Rules:
-- Preserve factual specificity: keep specific numbers, regulations, competitor names, market figures
+You are synthesising the best Chase research output from ${top3Candidates.length} independent models. Do NOT pick a single winner — instead, for EACH section of the report, take the strongest version from whichever model produced it:
+- Competitors: use whichever model listed the most competitors with the best quantitative data (specific metrics, not adjectives)
+- Regulatory: use whichever model cited the most specific standard numbers and certification pathways (e.g. "IEC 62619:2022" not "battery safety standards")
+- Sources/Bibliography: MERGE all unique sources from all ${top3Candidates.length} models (deduplicate by DOI/URL) — the combined source list must be richer than any single model's list
+- Market sizing: use whichever model provided the most granular TAM/SAM/SOM with methodology and named sources
+- Technical specifications: use whichever model provided the most specific numbers with units
+
+Additional rules:
+- Preserve factual specificity: keep specific numbers, regulations, competitor names, market figures, patent numbers, DOIs
 - Resolve contradictions by picking the most credible/specific claim
-- Merge complementary sections that cover different aspects
-- Keep the strongest regulatory coverage from whichever model captured it best
-- Keep the strongest competitor analysis from whichever model captured it best
 - The output must be structured as a single coherent research report, not a comparison
 - Do NOT mention that this is synthesised from multiple sources
+- Never truncate — the combined report should be longer than any single input; if space is needed, drop the least relevant competitor rather than cutting mid-table
 - Output ONLY the final synthesised research text, nothing else`
 
             const synthUser = `Synthesise these ${top3Candidates.length} research reports into the best possible single report:\n\n` +

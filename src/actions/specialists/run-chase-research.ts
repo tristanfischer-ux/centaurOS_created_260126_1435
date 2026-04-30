@@ -1210,7 +1210,32 @@ FEW-SHOT EXAMPLE — what an expert UK-BESS regulatory section looks like (Loop 
   }
 ]
 
-Match this STYLE and DEPTH for any project. The fields applicability + designImpact + evidenceRequired + ownerRole + gapAction must be specific to the project's actual configuration — not generic boilerplate. For non-BESS projects the standards differ but the structure stays identical.`
+Match this STYLE and DEPTH for any project. The fields applicability + designImpact + evidenceRequired + ownerRole + gapAction must be specific to the project's actual configuration — not generic boilerplate. For non-BESS projects the standards differ but the structure stays identical.
+
+MANDATORY EVIDENCE PORTFOLIO (your output will be auto-scored and rejected below these thresholds):
+- Academic Sources: ≥4 peer-reviewed papers with DOIs or conference proceedings with full citations
+- Patents: ≥3 granted or filed patents with patent numbers (e.g. US11,234,567B2)
+- Government/Standards: ≥4 documents — named standards (e.g. IEC 62619:2022), government reports, or certification frameworks with document numbers
+- Company Primary Sources: ≥3 direct company sources — annual reports, SEC filings, press releases, or official product datasheets with URLs
+- Market Reports: ≥3 market research reports with publisher names and dates (e.g. "BloombergNEF, Q3 2025")
+
+COMPETITOR REQUIREMENTS:
+- List ≥8 direct competitors with measurable differentiators (specific metrics, not adjectives)
+- NEVER truncate a competitor table — if you run out of space, drop the least relevant competitor, never cut mid-table
+- Each competitor must have: company name, product name, 3+ quantitative specs, pricing if available, geographic presence
+
+REGULATORY REQUIREMENTS:
+- Cite exact standard numbers (e.g. "IEC 62619:2022" not "battery safety standards")
+- Include certification pathways with named test labs (e.g. "UL certification via Intertek or TÜV")
+- Estimate cost and timeline for each certification where possible
+
+SELF-AUDIT CHECKLIST (verify before submitting):
+□ ≥4 academic papers with DOIs cited
+□ ≥3 patents with numbers cited
+□ ≥4 government/standards docs with document numbers
+□ ≥8 competitors with quantitative specs
+□ No truncated tables
+□ Regulatory standards cited by exact number`
 
     const userPrompt = `Subject: ${subject}
 

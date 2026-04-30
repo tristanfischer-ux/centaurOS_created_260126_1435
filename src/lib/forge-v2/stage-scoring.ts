@@ -302,6 +302,13 @@ export async function scoreStageOutput(
 
 Be strict but fair. An 8 means genuinely good work — do not grade inflate.
 
+HARD SCORING CAPS (apply these ceilings regardless of overall quality):
+- source_diversity: cap at 8.5 if fewer than 4 academic papers with DOIs OR fewer than 3 patents with numbers are cited
+- competitor_analysis: cap at 8.0 if fewer than 8 named competitors with quantitative specs
+- competitor_analysis: cap at 8.5 if differentiators are generic adjectives rather than measurable metrics
+- regulatory_coverage: cap at 8.5 if standards are referenced by category name rather than exact document numbers (e.g. "battery safety standards" instead of "IEC 62619:2022")
+- ANY dimension: cap at 7.5 if the relevant section contains a truncated table or "[continued]" marker
+
 Return ONLY valid JSON in this exact format:
 {
   "scores": [
