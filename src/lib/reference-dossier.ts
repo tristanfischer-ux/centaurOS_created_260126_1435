@@ -83,6 +83,51 @@ function truncateToFirstParagraph(body: string): string {
   return first
 }
 
+const STAGE_KEYWORDS: Record<string, string[]> = {
+  chase: ["regulatory", "standards"],
+  brief: ["market", "competitors", "brief"],
+  max: ["subsystem", "architecture", "modules"],
+  sizing: ["dimension", "mass", "sizing"],
+  bom: ["component", "parts", "bill of materials"],
+  finn: ["cost data", "cost range", "economics"],
+  suppliers: ["manufacturer", "supplier"],
+  fang: ["engineering", "pitfall", "constraint", "design constraint"],
+  proofreader: ["terminology", "units"],
+  illustration: ["visual", "appearance"],
+}
+
+export function extractStageSection(
+  dossier: string,
+  stage: string,
+): string | undefined {
+  const keywords = STAGE_KEYWORDS[stage.toLowerCase()]
+  if (!keywords) return undefined
+
+  const sections = parseMarkdownSections(dossier)
+  const matched = sections.filter((s) => {
+    const lower = s.heading.toLowerCase()
+    return keywords.some((kw) => lower.includes(kw))
+  })
+
+  if (matched.length === 0) return undefined
+
+  return matched
+    .map((s) => `## ${s.heading}\n${s.body}`)
+    .join("\n\n")
+    .trim()
+}
+
+export function extractConstraintAnchors(
+  dossier: string,
+): string | undefined {
+  const sections = parseMarkdownSections(dossier)
+  const anchor = sections.find((s) =>
+    s.heading.toLowerCase().includes("constraint anchor"),
+  )
+  if (!anchor) return undefined
+  return `## ${anchor.heading}\n${anchor.body}`.trim()
+}
+
 export function compressReferenceDossier(fullDossier: string): string {
   if (fullDossier.length <= BUDGET) return fullDossier
 
