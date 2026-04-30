@@ -406,12 +406,21 @@ async function runMaxDecompositionInternal(
             const modelId = (project.model_id || "claude-sonnet-4-6") as Parameters<
                 typeof skeletonDecompose
             >[2]
+            const maxDossierContext = (() => {
+                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return undefined
+                const stageSection = extractStageSection(project.reference_dossier, "max")
+                const anchors = extractConstraintAnchors(project.reference_dossier)
+                if (stageSection && anchors) return `${stageSection}\n\n${anchors}`
+                if (stageSection) return stageSection
+                return compressReferenceDossier(project.reference_dossier)
+            })()
+
             const skeletonResult = await skeletonDecompose(
                 description,
                 reportToUse, // gate remediation context prepended when present (see step 2b)
                 modelId,
                 undefined, // domainHint
-                undefined, // documentContext
+                maxDossierContext, // documentContext — Stage 0 reference dossier
                 user.id ?? undefined, // trustedUserId — use resolved user.id (owner-fallback applied above) not raw userId param
             )
 
@@ -472,7 +481,7 @@ async function runMaxDecompositionInternal(
                         modelId,
                         undefined, // domainHint
                         undefined, // consistencyBrief — primaries don't need one
-                        undefined, // documentContext
+                        maxDossierContext, // Stage 0 reference dossier
                         user.id ?? undefined, // trustedUserId
                     ),
             )
@@ -522,7 +531,7 @@ async function runMaxDecompositionInternal(
                               modelId,
                               undefined, // domainHint
                               consistencyBrief,
-                              undefined, // documentContext
+                              maxDossierContext, // Stage 0 reference dossier
                               user.id ?? undefined,
                           )
                       },
