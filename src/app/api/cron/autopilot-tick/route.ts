@@ -59,6 +59,7 @@ import {
     recordFailure,
     markDone,
     lockBriefSynchronously,
+    getProjectFoundryId,
     type AutopilotStage,
     type AutopilotState,
 } from "@/actions/forge-v2-autopilot"
@@ -75,6 +76,12 @@ import {
 import { runGate, markUncertainty } from "@/lib/forge-v2/stage-gates/runner"
 import { STAGE_GATE_MAP } from "@/lib/forge-v2/stage-gates/registry"
 import { triggerRemediation } from "@/lib/forge-v2/stage-gates/remediation"
+import {
+    scoreStageOutput,
+    storeStageScore,
+    checkFoundryCohortGate,
+    shouldScoreStage,
+} from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
 export const maxDuration = 60
@@ -393,6 +400,61 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 }
             }
             // ── end Quality Gate hook ────────────────────────────────────
+
+            // ── Stage Scoring + Foundry Cohort Gate ────────────────────────
+            // Score the stage output via LLM rubric. ALL projects in the
+            // foundry must score ≥8/10 before ANY advances. This is the
+            // non-negotiable quality gate Tristan corrected 3 times 2026-04-30.
+            if (shouldScoreStage(stage as AutopilotStage)) {
+                const existingScores = (state as AutopilotState & { stage_scores?: Record<string, { passed: boolean }> }).stage_scores
+                const alreadyScored = existingScores?.[stage]?.passed
+
+                if (!alreadyScored) {
+                    const scoreResult = await scoreStageOutput(project.id, stage as AutopilotStage)
+                    if (scoreResult) {
+                        await storeStageScore(project.id, stage as AutopilotStage, scoreResult)
+                        console.info(
+                            `[autopilot-tick] scored project=${project.id} stage=${stage} composite=${scoreResult.composite} passed=${scoreResult.passed}`,
+                        )
+                        if (!scoreResult.passed) {
+                            details.push({
+                                projectId: project.id,
+                                stage,
+                                action: "skip_running" as TickAction,
+                                ok: false,
+                                reason: `stage scoring: composite ${scoreResult.composite}/10 < 8.0 threshold — holding at gate`,
+                            })
+                            skipped++
+                            continue
+                        }
+                    }
+                }
+
+                // Foundry cohort check: ALL projects must pass before ANY advances
+                const foundryId = await getProjectFoundryId(project.id)
+                if (foundryId) {
+                    const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
+                    if (!cohort.allPassed) {
+                        const failing = cohort.results
+                            .filter((r) => !r.passed)
+                            .map((r) => `${r.projectName}(${r.composite})`)
+                            .join(", ")
+                        console.info(
+                            `[autopilot-tick] cohort gate HOLD project=${project.id} stage=${stage} — not all projects passed: ${failing}`,
+                        )
+                        details.push({
+                            projectId: project.id,
+                            stage,
+                            action: "skip_running" as TickAction,
+                            ok: false,
+                            reason: `cohort gate: waiting for all projects to score ≥8/10 — failing: ${failing}`,
+                        })
+                        skipped++
+                        continue
+                    }
+                }
+            }
+            // ── end Stage Scoring + Foundry Cohort Gate ────────────────────
 
             if (config.nextStage === "done") {
                 await markDone(project.id, stage)
