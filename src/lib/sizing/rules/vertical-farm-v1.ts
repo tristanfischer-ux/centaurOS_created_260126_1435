@@ -39,22 +39,23 @@ import type {
 // Sources: Kozai & Niu "Plant Factory" 2020 Ch.11, Fischer Farms internal
 // data on baby lettuce / basil / microgreens under 200 DLI LED.
 const VF_RULES = {
-    /** Growing tray stack. Tier spacing 500mm suits short leafy greens
-     *  (baby lettuce, basil, microgreens) with close-coupled LED bars
-     *  mounted directly under the next shelf. 800mm is the taller-crop
-     *  (kale, chard) default. Modern container farms pack 5 tiers at
-     *  500mm in a 2697mm 40ft-HC interior (tier_clearance_mm=200 —
-     *  verified against a real installation 2026-04-24). */
+    /** Growing tray stack. Derived from Fischer Farms operational data
+     *  (40ft HC reefer, 5 tiers, leafy greens). Tier spacing is derived
+     *  at solve time from (interior_h - ducting_reserve) / tiers, not a
+     *  static constant — for a 5-tier HC reefer this yields ~430mm per
+     *  layer (18 inches: tray + LED + air gap). */
     trays: {
-        tier_h_mm: 500, // v1.1: dropped from 800 — short-crop-optimised
         tier_footprint_d_mm: 1_200,
-        aisle_efficiency: 0.85, // v1.1: lifted from 0.65 — narrow container
-                                // racks have less internal loss than wide
-                                // warehouse racks
-        tier_clearance_mm: 200, // v1.1: service space above top tier + deck
-                                // below bottom tier. Reduced from 400 after
-                                // a real-container check showed modern slim
-                                // LED bars + shallow trays pack tight.
+        aisle_efficiency: 0.85, // warehouse bays only; containers use
+                                // explicit geometry (rack_depth × usable_length)
+        ducting_reserve_mm: 406, // 16 inches top-of-container for HVAC ducting,
+                                 // air circulation, and utilities
+    },
+    container: {
+        front_reserve_mm: 2_300, // 7.5 ft reserved at container front for
+                                  // doors, workspace, and utility access
+        rack_depth_mm: 762,       // 30 inches — standard commercial wire shelving
+        aisle_width_mm: 813,      // 32 inches — minimum comfortable walkway
     },
     /** LED lighting for leafy greens at ~200 DLI. */
     lighting: {
@@ -102,9 +103,44 @@ const VF_RULES = {
         m2_per_m2_canopy: 0.05,
         min_m2: 0, // v1.1: zero unless explicitly requested via targets
     },
-    aisle_width_mm: 1_000, // v1.1: lifted from 900 for walkability in a
-                           // single-centre-aisle container layout
+    aisle_width_mm: 1_000, // warehouse bays only; containers use
+                           // container.aisle_width_mm above
 } as const
+
+// ─── Container geometry helpers ───────────────────────────────────────
+function isContainer(envelope: Envelope): boolean {
+    return envelope.kind.startsWith("container_")
+}
+
+function containerLayout(envelope: Envelope) {
+    const usable_length_mm = envelope.interior_w_mm - VF_RULES.container.front_reserve_mm
+    const target_rack_depth = VF_RULES.container.rack_depth_mm
+    const min_aisle_mm = 600
+    const available_for_racks = envelope.interior_d_mm - min_aisle_mm
+    const rack_depth_mm = Math.min(target_rack_depth, Math.floor(available_for_racks / 2))
+    const actual_aisle_mm = envelope.interior_d_mm - (rack_depth_mm * 2)
+    return { usable_length_mm, rack_depth_mm, actual_aisle_mm }
+}
+
+function containerGrowingArea(envelope: Envelope, tiers: number): {
+    canopy_m2: number
+    usable_length_mm: number
+    tier_h_mm: number
+    rack_depth_mm: number
+    actual_aisle_mm: number
+} {
+    const { usable_length_mm, rack_depth_mm, actual_aisle_mm } = containerLayout(envelope)
+    const area_per_layer_one_side_m2 = (usable_length_mm * rack_depth_mm) / 1_000_000
+    const canopy_m2 = area_per_layer_one_side_m2 * 2 * tiers
+    const usable_h_mm = envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm
+    const tier_h_mm = Math.floor(usable_h_mm / tiers)
+    return { canopy_m2, usable_length_mm, tier_h_mm, rack_depth_mm, actual_aisle_mm }
+}
+
+function containerTrayFloor(envelope: Envelope): number {
+    const { usable_length_mm, rack_depth_mm } = containerLayout(envelope)
+    return (usable_length_mm * rack_depth_mm * 2) / 1_000_000
+}
 
 // ─── Derived helpers ───────────────────────────────────────────────────
 function peakLoadKw(canopy_m2: number) {
@@ -147,8 +183,22 @@ function evaluateConfig(
     canopy_m2: number,
     tiers: number,
 ): ConfigOutcome {
-    const tray_floor_m2 = canopy_m2 / (tiers * VF_RULES.trays.aisle_efficiency)
-    const aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
+    let tray_floor_m2: number
+    let aisle_m2: number
+    let rack_h_mm: number
+
+    if (isContainer(envelope)) {
+        const layout = containerLayout(envelope)
+        tray_floor_m2 = containerTrayFloor(envelope)
+        aisle_m2 = (layout.usable_length_mm * layout.actual_aisle_mm) / 1_000_000
+        const usable_h_mm = envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm
+        rack_h_mm = usable_h_mm
+    } else {
+        tray_floor_m2 = canopy_m2 / (tiers * VF_RULES.trays.aisle_efficiency)
+        aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
+        rack_h_mm = tiers * 500 + VF_RULES.trays.ducting_reserve_mm
+    }
+
     const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
     const peak = peakLoadKw(canopy_m2)
     const hvac_floor_m2 = peak.peak_total_kw * VF_RULES.hvac.floor_m2_per_kw_thermal
@@ -162,7 +212,6 @@ function evaluateConfig(
     const used = tray_floor_m2 + hvac_floor_m2 + water_m2 + air_m2 + controls_m2 + harvest_m2
     const remaining = floor_budget_m2 - used
     const floor_fits = remaining >= 0
-    const rack_h_mm = tiers * VF_RULES.trays.tier_h_mm + VF_RULES.trays.tier_clearance_mm
     const ceiling_fits = rack_h_mm <= envelope.interior_h_mm
     const feasible = floor_fits && ceiling_fits
 
@@ -206,15 +255,6 @@ function buildOptimisationGrid(
     targetCanopy: number,
     targetTiers: number,
 ): OptimisationResult {
-    const canopySteps = [
-        Math.round(targetCanopy * 0.5),
-        Math.round(targetCanopy * 0.75),
-        Math.round(targetCanopy * 0.9),
-        targetCanopy,
-        Math.round(targetCanopy * 1.15),
-        Math.round(targetCanopy * 1.3),
-        Math.round(targetCanopy * 1.5),
-    ].filter((v, i, a) => v >= 10 && a.indexOf(v) === i)
     const tierSteps = Array.from(
         new Set([
             Math.max(1, targetTiers - 2),
@@ -225,10 +265,31 @@ function buildOptimisationGrid(
         ]),
     ).filter((v) => v >= 1 && v <= 10)
 
+    let canopySteps: number[]
+    if (isContainer(envelope)) {
+        canopySteps = tierSteps.map((t) => {
+            const { canopy_m2 } = containerGrowingArea(envelope, t)
+            return Math.round(canopy_m2)
+        }).filter((v, i, a) => v >= 10 && a.indexOf(v) === i)
+    } else {
+        canopySteps = [
+            Math.round(targetCanopy * 0.5),
+            Math.round(targetCanopy * 0.75),
+            Math.round(targetCanopy * 0.9),
+            targetCanopy,
+            Math.round(targetCanopy * 1.15),
+            Math.round(targetCanopy * 1.3),
+            Math.round(targetCanopy * 1.5),
+        ].filter((v, i, a) => v >= 10 && a.indexOf(v) === i)
+    }
+
     const trials: OptimisationResult["trials"] = []
     const cells: ConfigOutcome[] = []
     for (const tiers of tierSteps) {
-        for (const canopy of canopySteps) {
+        const sweepCanopies = isContainer(envelope)
+            ? [Math.round(containerGrowingArea(envelope, tiers).canopy_m2)]
+            : canopySteps
+        for (const canopy of sweepCanopies) {
             const cell = evaluateConfig(envelope, canopy, tiers)
             cells.push(cell)
             trials.push({
@@ -346,13 +407,29 @@ function solve(input: DomainSolveInput): DomainSolveResult {
     const targetCanopy = optimisation.winner.targets.canopy_m2
     const tiers = optimisation.winner.targets.tiers
 
-    // Effective floor footprint needed for the grow racks themselves:
-    //   canopy ÷ (tiers × aisle_efficiency)
-    const tray_floor_m2 =
-        targetCanopy / (tiers * VF_RULES.trays.aisle_efficiency)
+    let tray_floor_m2: number
+    let aisle_m2: number
+    let usable_length_mm: number | null = null
+    let tier_h_mm: number
 
-    // Overall aisle allocation — a couple of pick aisles span the bay.
-    const aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
+    let actual_rack_depth_mm: number = VF_RULES.container.rack_depth_mm
+    let actual_aisle_mm: number = VF_RULES.container.aisle_width_mm
+
+    if (isContainer(envelope)) {
+        const layout = containerLayout(envelope)
+        usable_length_mm = layout.usable_length_mm
+        actual_rack_depth_mm = layout.rack_depth_mm
+        actual_aisle_mm = layout.actual_aisle_mm
+        tray_floor_m2 = containerTrayFloor(envelope)
+        aisle_m2 = (usable_length_mm * actual_aisle_mm) / 1_000_000
+        const usable_h_mm = envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm
+        tier_h_mm = Math.floor(usable_h_mm / tiers)
+    } else {
+        tray_floor_m2 = targetCanopy / (tiers * VF_RULES.trays.aisle_efficiency)
+        aisle_m2 = (envelope.interior_w_mm * VF_RULES.aisle_width_mm) / 1_000_000
+        tier_h_mm = 500
+    }
+
     const floor_budget_m2 = envelope.interior_floor_m2 - aisle_m2
 
     const lighting_kw = targetCanopy * VF_RULES.lighting.kw_per_m2_canopy
@@ -399,18 +476,26 @@ function solve(input: DomainSolveInput): DomainSolveResult {
 
     const feasible = remaining_floor_m2 >= 0
 
-    const rack_h_mm = tiers * VF_RULES.trays.tier_h_mm + VF_RULES.trays.tier_clearance_mm
-    const rack_w_total = Math.round(Math.sqrt(tray_floor_m2) * 1_000)
+    const rack_h_mm = isContainer(envelope)
+        ? envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm
+        : tiers * 500 + VF_RULES.trays.ducting_reserve_mm
+    const rack_w_total = isContainer(envelope) && usable_length_mm
+        ? usable_length_mm
+        : Math.round(Math.sqrt(tray_floor_m2) * 1_000)
+
+    const rack_depth_label = isContainer(envelope)
+        ? `${actual_rack_depth_mm}mm deep racks × ${(usable_length_mm! / 1_000).toFixed(1)}m long × 2 sides × ${tiers} tiers`
+        : `canopy_m² ÷ tiers ÷ aisle_efficiency`
 
     const slot_dimensions: Record<string, ModuleDimensions> = {
         grow_racks: {
             w_mm: rack_w_total,
-            d_mm: VF_RULES.trays.tier_footprint_d_mm,
+            d_mm: isContainer(envelope) ? actual_rack_depth_mm : VF_RULES.trays.tier_footprint_d_mm,
             h_mm: rack_h_mm,
             floor_m2: +tray_floor_m2.toFixed(2),
             mount: "floor",
-            scaled_by: "canopy_m² ÷ tiers ÷ aisle_efficiency",
-            count_hint: `${tiers}-tier vertical grow racks · ${targetCanopy.toFixed(0)} m² canopy total`,
+            scaled_by: rack_depth_label,
+            count_hint: `${tiers}-tier vertical grow racks · ${targetCanopy.toFixed(0)} m² canopy total · ${tier_h_mm}mm per tier`,
             prompt_hint: `${tiers}-tier stacked grow racks, floor-to-ceiling, hydroponic trays, LED light bars between tiers`,
         },
         lighting: {
@@ -538,22 +623,37 @@ function solve(input: DomainSolveInput): DomainSolveResult {
         }
     }
 
-    const required_ceiling_h = rack_h_mm
-    if (required_ceiling_h > envelope.interior_h_mm) {
+    const required_ceiling_h = rack_h_mm + VF_RULES.trays.ducting_reserve_mm
+    if (isContainer(envelope)) {
+        const max_tiers = Math.floor((envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm) / 400)
+        if (tiers > max_tiers) {
+            conflicts.push(
+                `${tiers} tiers do not fit: ${envelope.interior_h_mm}mm interior minus ${VF_RULES.trays.ducting_reserve_mm}mm HVAC ducting = ${envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm}mm usable. At ${tiers} tiers each layer gets only ${Math.floor((envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm) / tiers)}mm — below 400mm minimum for tray + LED + air gap. Maximum ${max_tiers} tiers.`,
+            )
+        }
+    } else if (required_ceiling_h > envelope.interior_h_mm) {
         conflicts.push(
-            `Required ceiling height (${required_ceiling_h} mm for ${tiers} tiers × ${VF_RULES.trays.tier_h_mm}mm spacing + ${VF_RULES.trays.tier_clearance_mm}mm clearance) exceeds envelope interior height (${envelope.interior_h_mm} mm). Drop to ${Math.floor((envelope.interior_h_mm - VF_RULES.trays.tier_clearance_mm) / VF_RULES.trays.tier_h_mm)} tiers, tighten tier spacing, or raise the ceiling.`,
+            `Required ceiling height (${required_ceiling_h}mm for ${tiers} tiers × ${tier_h_mm}mm spacing + ${VF_RULES.trays.ducting_reserve_mm}mm ducting) exceeds envelope interior height (${envelope.interior_h_mm}mm). Drop to ${Math.floor((envelope.interior_h_mm - VF_RULES.trays.ducting_reserve_mm) / 500)} tiers, tighten tier spacing, or raise the ceiling.`,
         )
     }
 
+    const containerNotes = isContainer(envelope) ? [
+        `Container layout: ${VF_RULES.container.front_reserve_mm}mm front reservation (doors, workspace, utilities), ${(usable_length_mm! / 1_000).toFixed(1)}m usable rack length.`,
+        `Rack geometry: ${actual_rack_depth_mm}mm deep shelving × 2 sides, ${actual_aisle_mm}mm central aisle (derived from ${envelope.interior_d_mm}mm interior width).`,
+        `Tier spacing: ${tier_h_mm}mm per layer (${envelope.interior_h_mm}mm interior − ${VF_RULES.trays.ducting_reserve_mm}mm HVAC ducting ÷ ${tiers} tiers).`,
+    ] : [
+        `Canopy density: ${tiers} tiers × ${(VF_RULES.trays.aisle_efficiency * 100).toFixed(0)}% aisle-efficient packing.`,
+    ]
+
     return {
-        feasible: feasible && required_ceiling_h <= envelope.interior_h_mm,
+        feasible: feasible && (isContainer(envelope) || required_ceiling_h <= envelope.interior_h_mm),
         floor_budget_m2: +floor_budget_m2.toFixed(2),
         slot_dimensions,
         iterations,
         conflicts,
         recommendations,
         notes: [
-            `Canopy density: ${tiers} tiers × ${(VF_RULES.trays.aisle_efficiency * 100).toFixed(0)}% aisle-efficient packing.`,
+            ...containerNotes,
             `Lighting installed: ${VF_RULES.lighting.kw_per_m2_canopy * 1_000} W/m² (leafy greens at ~200 DLI).`,
             `Transpiration load: ${peak.daily_transpiration_l.toFixed(0)} L/day water evaporates from canopy — ALL of it must be condensed by the HVAC evaporator coil and drained out of the envelope or humidity spikes and powdery mildew appears within days.`,
             `Peak cooling budget: ${peak.peak_sensible_kw.toFixed(1)} kW sensible (LED heat) + ${peak.peak_latent_kw.toFixed(1)} kW latent (condensing transpiration) = ${peak.peak_total_kw.toFixed(1)} kW total during photoperiod.`,
