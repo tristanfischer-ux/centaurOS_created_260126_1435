@@ -756,10 +756,57 @@ export async function runChaseMultiLineage(
 
     console.info(`[parallel-llm] Chase multi-lineage winner: ${overallWinner.model}`)
 
+    // ── Synthesis step: take TOP 3 outputs and ask gpt-4.1-mini to synthesise
+    // the best elements of all three into a final output. This produces richer
+    // research than any single model alone (council recommendation 2026-04-30).
+    //
+    // The top-3 candidates are: the overall winner + the other Round 1 group
+    // winners (since they were the best from their respective lineage groups).
+    // We cap at 3 to keep the synthesis prompt focused.
+    let finalOutput = overallWinner.output
+    let winnerModelLabel = overallWinner.model
+
+    const top3Candidates = [overallWinner, ...round1Winners.filter(w => w.model !== overallWinner.model)].slice(0, 3)
+
+    if (top3Candidates.length >= 2) {
+        try {
+            const synthSystem = `You are a world-class hardware product research analyst. You will be given ${top3Candidates.length} research reports on the same product from different AI research models. Your task is to synthesise the BEST ELEMENTS from all of them into a single, unified research report that is more comprehensive, accurate, and useful than any individual report.
+
+Rules:
+- Preserve factual specificity: keep specific numbers, regulations, competitor names, market figures
+- Resolve contradictions by picking the most credible/specific claim
+- Merge complementary sections that cover different aspects
+- Keep the strongest regulatory coverage from whichever model captured it best
+- Keep the strongest competitor analysis from whichever model captured it best
+- The output must be structured as a single coherent research report, not a comparison
+- Do NOT mention that this is synthesised from multiple sources
+- Output ONLY the final synthesised research text, nothing else`
+
+            const synthUser = `Synthesise these ${top3Candidates.length} research reports into the best possible single report:\n\n` +
+                top3Candidates.map((c, i) => `=== REPORT ${i + 1} (${c.model}) ===\n${c.output}`).join("\n\n")
+
+            const { text: synthesised } = await callOpenAI(synthSystem, synthUser, "gpt-4.1-mini", 8192, 120_000)
+
+            if (synthesised && synthesised.length > 500) {
+                console.info(
+                    `[parallel-llm] Chase synthesis: merged top-${top3Candidates.length} (${top3Candidates.map(c => c.model).join(", ")}) → ${synthesised.length} chars`,
+                )
+                finalOutput = synthesised
+                winnerModelLabel = `synthesised(top-${top3Candidates.length}: ${overallWinner.model}+)`
+            }
+        } catch (synthErr) {
+            // Non-fatal: synthesis failed, fall back to tournament winner
+            console.warn(
+                `[parallel-llm] Chase synthesis failed (non-fatal), using tournament winner:`,
+                synthErr instanceof Error ? synthErr.message : synthErr,
+            )
+        }
+    }
+
     return {
-        bestOutput: overallWinner.output,
-        winnerModel: overallWinner.model,
-        selectionReason: `Tournament bracket (${successfulCandidates.length} models, ${round1Winners.length} finalists): ${overallWinner.model} won.`,
+        bestOutput: finalOutput,
+        winnerModel: winnerModelLabel,
+        selectionReason: `Tournament bracket (${successfulCandidates.length} models, ${round1Winners.length} finalists): ${overallWinner.model} won → synthesised with top-${top3Candidates.length}.`,
         allOutputs: allOutputs.map((o) => ({ model: o.model, output: o.output.slice(0, 500), error: o.error })),
         judgeUsed: true,
     }
