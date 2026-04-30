@@ -3,19 +3,18 @@
  *
  * @description Two-tier CAD generation pipeline:
  *
- * **System model (HERO):** Opus 4.6 generates CadQuery DIRECTLY from the full
- * XRay spec (32K tokens). No structural brief intermediary — Opus uses its own
+ * **System model (HERO):** GPT-5.5 generates CadQuery DIRECTLY from the full
+ * XRay spec (32K tokens). No structural brief intermediary — the model uses its
  * visual/domain knowledge of what the product looks like to produce realistic
- * geometry. This is the key insight: Claude knows what a drone/pump/robot looks
- * like and encodes that knowledge directly into parametric dimensions and shapes.
+ * geometry.
  *
  * **Module models (SCHEMATICS):** Gemini 2.5 Pro produces clean, reliable
  * schematic-quality CadQuery models via structural brief. These are supporting
  * visuals — recognizable but focused on clarity over manufacturing detail.
  *
  * @security
- * - ANTHROPIC_API_KEY for Opus (system model)
- * - GOOGLE_AI_API_KEY for Gemini (module models + Opus fallback)
+ * - OPENAI_API_KEY for GPT-5.5 (system model)
+ * - GOOGLE_AI_API_KEY for Gemini (module models + GPT fallback)
  * - MODAL_CAD_ENDPOINT_URL for CadQuery execution
  * - Modal containers are sandboxed (no ForgeOS infra access)
  *
@@ -304,14 +303,15 @@ Output just the Python code.`
 // ─── AI Provider Helpers ─────────────────────────────────────────────
 
 /**
- * Calls Claude Opus 4.6 for CadQuery code generation (non-streaming).
+ * Calls OpenAI GPT-5.5 for CadQuery code generation, then falls back to
+ * Gemini if it refuses or errors.
  *
  * @param systemPrompt - The system prompt
  * @param userPrompt - The user prompt
  * @param temperature - Sampling temperature (default 0.3)
  * @returns The generated text
  *
- * @throws Error if ANTHROPIC_API_KEY is missing or API call fails
+ * @throws Error if OPENAI_API_KEY is missing or all models fail
  */
 async function callOpus(
   systemPrompt: string,
@@ -319,66 +319,58 @@ async function callOpus(
   temperature: number = 0.3,
   maxTokens: number = 16384,
 ): Promise<string> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) {
-    throw new Error("[XRayCadGen] ANTHROPIC_API_KEY is not configured")
-  }
-
-  const Anthropic = (await import("@anthropic-ai/sdk")).default
-  const client = new Anthropic({ apiKey })
-
-  const ANTHROPIC_MODELS = ["claude-sonnet-4-6", "claude-opus-4-7", "claude-sonnet-4-6"] as const
-
-  for (const model of ANTHROPIC_MODELS) {
+  // ── Stage 1: Try OpenAI GPT-5.5 ──
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  if (openaiKey) {
     try {
-      const response = await client.messages.create({
-        model,
-        max_tokens: maxTokens,
-        temperature,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${openaiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-5.5",
+          max_completion_tokens: maxTokens,
+          temperature,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
       })
 
-      const blockTypes = response.content.map((b) => b.type)
-      console.info(`[XRayCadGen] ${model} response:`, {
-        stopReason: response.stop_reason,
-        blockTypes,
-        blockCount: response.content.length,
-        inputTokens: response.usage?.input_tokens,
-        outputTokens: response.usage?.output_tokens,
-      })
+      if (resp.ok) {
+        const data = await resp.json()
+        const text = data.choices?.[0]?.message?.content ?? ""
 
-      // Handle refusal — try next model
-      if (response.stop_reason === "refusal" || response.content.length === 0) {
-        console.warn(`[XRayCadGen] ${model} refused — trying fallback`)
-        continue
-      }
+        console.info("[XRayCadGen] gpt-5.5 response:", {
+          finishReason: data.choices?.[0]?.finish_reason,
+          promptTokens: data.usage?.prompt_tokens,
+          completionTokens: data.usage?.completion_tokens,
+        })
 
-      const texts: string[] = []
-      for (const block of response.content) {
-        if (block.type === "text") {
-          texts.push(block.text)
+        if (text.trim().length > 0) {
+          return text
         }
-      }
 
-      if (texts.length > 0) {
-        return texts.join("\n")
+        console.warn("[XRayCadGen] gpt-5.5 returned empty — trying Gemini fallback")
+      } else {
+        const errText = await resp.text()
+        console.warn(`[XRayCadGen] gpt-5.5 error (${resp.status}): ${errText.slice(0, 200)}`)
       }
-
-      console.warn(`[XRayCadGen] ${model} returned no text blocks — trying fallback`)
     } catch (error) {
-      console.warn(`[XRayCadGen] ${model} error:`, error instanceof Error ? error.message : error)
-      continue
+      console.warn("[XRayCadGen] gpt-5.5 error:", error instanceof Error ? error.message : error)
     }
   }
 
-  // ── Gemini fallback (different safety characteristics) ──
+  // ── Stage 2: Gemini fallback (different safety characteristics) ──
   const geminiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!geminiKey) {
-    throw new Error("[XRayCadGen] All Anthropic models refused and GOOGLE_AI_API_KEY is missing")
+    throw new Error("[XRayCadGen] GPT-5.5 failed and GOOGLE_AI_API_KEY is missing")
   }
 
-  console.info("[XRayCadGen] All Anthropic models refused — falling back to Gemini")
+  console.info("[XRayCadGen] GPT-5.5 unavailable or refused — falling back to Gemini")
 
   // SECURITY: Use x-goog-api-key header instead of URL query param (F6)
   const geminiModel = "gemini-3.1-pro-preview"

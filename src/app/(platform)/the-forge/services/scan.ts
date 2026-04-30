@@ -84,23 +84,19 @@ Return a JSON object matching the provided schema exactly. Every module's IO sho
  * Calls the AI to reverse engineer a product idea into a structured machine spec.
  *
  * @param idea - The raw product/machine idea text
- * @param researchReport - Optional product research report (from Gemini + Claude)
+ * @param researchReport - Optional product research report (from Gemini + GPT)
  *   to provide grounded real-world data for better module generation
  * @returns The AI-generated XRaySpec (without runtime fields)
  *
  * @throws Error if AI call fails or response doesn't match schema
  */
 async function callScanAI(idea: string, researchReport?: string): Promise<AIScanOutput> {
-  // DECISION: Use Claude Opus 4.6 instead of GPT-5.3 for module decomposition.
-  // Opus is already used for research synthesis — using it for decomposition too
-  // ensures consistent reasoning quality and allows the model to build on its own
-  // research output when the report is passed as context.
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    throw new Error("[XRayScan] ANTHROPIC_API_KEY is not configured")
+    throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
   }
 
-  console.info("[XRayScan] Starting AI scan with Claude Opus for idea:", {
+  console.info("[XRayScan] Starting AI scan with GPT-5.5 for idea:", {
     ideaLength: idea.length,
     hasResearch: !!researchReport,
   })
@@ -112,39 +108,38 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
     userMessage += `\n\n--- PRODUCT RESEARCH (from web search + internal engineering database) ---\n\n${researchReport.trim()}`
   }
 
-  // FLOW: Claude returns JSON matching our schema. We validate with Zod after.
-  // Wrapped in withRetry for transient API errors (429, 502, 503, network, timeout).
   const systemPrompt = SCAN_SYSTEM_PROMPT + "\n\nReturn ONLY valid JSON matching the schema. No markdown fences, no commentary outside the JSON object."
 
   const { withRetry } = await import("@/lib/retry")
 
   const parsed = await withRetry<AIScanOutput>(async () => {
     const resp = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
+      "https://api.openai.com/v1/chat/completions",
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
+          "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "claude-opus-4-7",
-          max_tokens: 32768,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userMessage }],
+          model: "gpt-5.5",
+          max_completion_tokens: 32768,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userMessage },
+          ],
         }),
       },
-      240_000, // 4 min — Opus with 32K output for thorough decomposition
+      240_000,
     )
 
     if (!resp.ok) {
       const errText = await resp.text()
-      throw new Error(`Claude API error (${resp.status}): ${errText.slice(0, 300)}`)
+      throw new Error(`OpenAI API error (${resp.status}): ${errText.slice(0, 300)}`)
     }
 
     const data = await resp.json()
-    const rawText: string = data.content?.[0]?.text ?? ""
+    const rawText: string = data.choices?.[0]?.message?.content ?? ""
 
     // Extract JSON from response (may have markdown fences)
     let jsonStr = rawText.trim()
@@ -156,7 +151,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
       const raw = JSON.parse(jsonStr)
       return AIScanOutputSchema.parse(raw)
     } catch (parseErr) {
-      console.error("[XRayScan] Failed to parse Claude output:", {
+      console.error("[XRayScan] Failed to parse AI output:", {
         error: parseErr instanceof Error ? parseErr.message : parseErr,
         responseLength: rawText.length,
         firstChars: rawText.slice(0, 200),
@@ -176,7 +171,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
   console.info("[XRayScan] AI scan complete:", {
     moduleCount: parsed.modules.length,
     gatingModule: parsed.modules.find((m: { isGatingModule?: boolean; name: string }) => m.isGatingModule)?.name,
-    model: "claude-opus-4-7",
+    model: "gpt-5.5",
   })
 
   return parsed
@@ -264,7 +259,7 @@ export async function deriveProcessClassAI(
     .join("\n\n")
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-5.4",
+    model: "gpt-5.5",
     messages: [
       {
         role: "system",
@@ -372,7 +367,7 @@ export async function refineScanAI(
   }
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-5.4",
+    model: "gpt-5.5",
     messages: [
       { role: "system", content: REFINE_SCAN_SYSTEM_PROMPT },
       { role: "user", content: userContent },
@@ -561,7 +556,7 @@ export async function refineModuleAI(
   })
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-5.4",
+    model: "gpt-5.5",
     messages: [
       { role: "system", content: REFINE_MODULE_SYSTEM_PROMPT },
       {

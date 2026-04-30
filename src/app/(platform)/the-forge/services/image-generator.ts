@@ -827,9 +827,9 @@ export async function analyseHeroBoundingBoxes(
   moduleNames: string[],
   heroMimeType: string = "image/png",
 ): Promise<Record<string, ModuleBoundingBox>> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    console.warn("[XRayImageGen] No ANTHROPIC_API_KEY — skipping bounding box analysis")
+    console.warn("[XRayImageGen] No OPENAI_API_KEY — skipping bounding box analysis")
     return {}
   }
 
@@ -840,41 +840,42 @@ export async function analyseHeroBoundingBoxes(
     : "image/png"
 
   try {
-    const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 1024,
-          system: `You are a vision analyst identifying component regions in engineering illustrations.
+    const systemPrompt = `You are a vision analyst identifying component regions in engineering illustrations.
 
 Given a technical illustration and a list of module/sub-assembly names, identify the approximate bounding box region for each module visible in the image. Return normalised coordinates (0-1 range, where 0,0 is top-left and 1,1 is bottom-right).
 
 Return ONLY valid JSON: { "ModuleName": { "x": 0.1, "y": 0.2, "w": 0.3, "h": 0.4 }, ... }
-If a module is not clearly visible, omit it from the result. Do not include text outside JSON.`,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: {
-                  type: "base64",
-                  media_type: normalizedMime,
-                  data: heroBase64,
+If a module is not clearly visible, omit it from the result. Do not include text outside JSON.`
+
+    const response = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-5.5",
+          max_completion_tokens: 1024,
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: `data:${normalizedMime};base64,${heroBase64}`,
+                  },
                 },
-              },
-              {
-                type: "text",
-                text: `Identify the bounding box region for each of these modules in the illustration:\n${moduleNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nReturn JSON with normalised 0-1 coordinates.`,
-              },
-            ],
-          }],
+                {
+                  type: "text",
+                  text: `Identify the bounding box region for each of these modules in the illustration:\n${moduleNames.map((n, i) => `${i + 1}. ${n}`).join("\n")}\n\nReturn JSON with normalised 0-1 coordinates.`,
+                },
+              ],
+            },
+          ],
         }),
       },
       20_000,
@@ -886,7 +887,7 @@ If a module is not clearly visible, omit it from the result. Do not include text
     }
 
     const data = await response.json()
-    const text = data?.content?.[0]?.text
+    const text = data?.choices?.[0]?.message?.content
     if (!text) return {}
 
     const jsonMatch = text.match(/\{[\s\S]*\}/)
@@ -1283,29 +1284,14 @@ async function scoreImageConsistency(
   moduleName: string,
   heroMimeType: string = "image/png",
 ): Promise<ConsistencyScoreResult | null> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) return null
 
-  // Claude Vision accepts image/png, image/jpeg, image/gif, image/webp.
-  // Normalise anything else back to PNG so the API call doesn't 400.
   const normalizedHeroMime = /^image\/(png|jpe?g|gif|webp)$/i.test(heroMimeType)
     ? heroMimeType.replace(/jpg/i, "jpeg")
     : "image/png"
 
-  try {
-    const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: 512,
-          system: `You are an engineering illustration quality inspector. Compare a hero/overview image (IMAGE 1) with a module detail image (IMAGE 2) and score geometric consistency on a scale of 1-10.
+  const systemPrompt = `You are an engineering illustration quality inspector. Compare a hero/overview image (IMAGE 1) with a module detail image (IMAGE 2) and score geometric consistency on a scale of 1-10.
 
 Scoring guide:
 - 9-10: Components in IMAGE 2 are geometrically identical to the corresponding region in IMAGE 1 — same shapes, proportions, and structural forms
@@ -1315,25 +1301,40 @@ Scoring guide:
 - 1-2: No geometric relationship — IMAGE 2 looks like a completely different design
 
 Return ONLY valid JSON: { "score": <number>, "issues": ["<specific geometric difference>", ...] }
-Do not include text outside JSON.`,
-          messages: [{
-            role: "user",
-            content: [
-              {
-                type: "image",
-                source: { type: "base64", media_type: normalizedHeroMime, data: heroBase64 },
-              },
-              {
-                type: "image",
-                // Module renders come from the provider as PNG — see uploadToStorage callsite.
-                source: { type: "base64", media_type: "image/png", data: moduleBase64 },
-              },
-              {
-                type: "text",
-                text: `Score the geometric consistency of the "${moduleName}" module (IMAGE 2) against the hero image (IMAGE 1). Return JSON only.`,
-              },
-            ],
-          }],
+Do not include text outside JSON.`
+
+  try {
+    const response = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: "gpt-5.5",
+          max_completion_tokens: 512,
+          messages: [
+            { role: "system", content: systemPrompt },
+            {
+              role: "user",
+              content: [
+                {
+                  type: "image_url",
+                  image_url: { url: `data:${normalizedHeroMime};base64,${heroBase64}` },
+                },
+                {
+                  type: "image_url",
+                  image_url: { url: `data:image/png;base64,${moduleBase64}` },
+                },
+                {
+                  type: "text",
+                  text: `Score the geometric consistency of the "${moduleName}" module (IMAGE 2) against the hero image (IMAGE 1). Return JSON only.`,
+                },
+              ],
+            },
+          ],
         }),
       },
       20_000,
@@ -1345,7 +1346,7 @@ Do not include text outside JSON.`,
     }
 
     const data = await response.json()
-    const text = data?.content?.[0]?.text
+    const text = data?.choices?.[0]?.message?.content
     if (!text) return null
 
     const jsonMatch = text.match(/\{[\s\S]*\}/)

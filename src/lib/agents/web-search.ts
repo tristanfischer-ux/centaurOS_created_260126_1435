@@ -3,10 +3,10 @@
  *
  * @description Web search integration for AI specialists. Provides two paths:
  *
- * 1. **Claude-tier specialists** — native Anthropic web_search tool injected
+ * 1. **Claude-tier specialists** — native web search tool injected
  *    directly into the streaming call (handled in registry.ts)
- * 2. **Non-Claude-tier specialists** — pre-search proxy via Claude Haiku with
- *    web_search, results injected into the system prompt as "Research Context"
+ * 2. **Non-Claude-tier specialists** — pre-search proxy via GPT-4.1-mini with
+ *    OpenAI web_search_preview, results injected into the system prompt as "Research Context"
  *
  * A lightweight heuristic determines when search is needed (not every message
  * requires real-world data).
@@ -19,11 +19,9 @@
 
 // ─── Constants ──────────────────────────────────────────────────────
 
-const WEB_SEARCH_BETA = "code-execution-web-tools-2026-02-09" as const
-const PRE_SEARCH_MODEL = "claude-haiku-4-5"
+const PRE_SEARCH_MODEL = "gpt-4.1-mini"
 const PRE_SEARCH_MAX_TOKENS = 4096
 const PRE_SEARCH_MAX_USES = 2
-const MAX_CONTINUE_LOOPS = 3
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -105,8 +103,9 @@ export function shouldTriggerWebSearch(userMessage: string, companyName?: string
 // ─── Citation Extraction ────────────────────────────────────────────
 
 /**
- * Extracts web sources from Anthropic response content blocks.
- * Same pattern as marketplace ai-search route.
+ * Extracts web sources from response content blocks.
+ * Legacy helper for Anthropic-style content blocks; kept for
+ * any remaining callers using the old format.
  */
 function collectWebSources(
   content: Array<{ type: string; text?: string; citations?: Array<{ url?: string; title?: string | null; cited_text?: string }> | null }>
@@ -130,7 +129,7 @@ function collectWebSources(
 }
 
 /**
- * Extracts text from Anthropic response content blocks.
+ * Extracts text from response content blocks.
  */
 function extractText(content: Array<{ type: string; text?: string }>): string {
   return content
@@ -142,76 +141,80 @@ function extractText(content: Array<{ type: string; text?: string }>): string {
 // ─── Pre-Search Proxy ───────────────────────────────────────────────
 
 /**
- * Runs a pre-search using Claude Haiku with web_search for non-Claude providers.
+ * Runs a pre-search using GPT-4.1-mini with web_search_preview for non-Claude providers.
  *
- * @description Makes a quick, cheap API call to Claude Haiku with the web_search
- * tool enabled. The results are then formatted and injected into the non-Claude
+ * @description Makes a quick, cheap API call to GPT-4.1-mini with the
+ * web_search_preview tool enabled. Results are formatted and injected into the
  * specialist's system prompt as "Research Context."
  *
  * @param query - The user's question or search intent
  * @param specialistDomain - The specialist's domain (e.g., "Growth Marketing")
- * @param maxSearches - Maximum web searches to allow (default: 2)
+ * @param _maxSearches - Unused (OpenAI manages search count internally)
  * @returns Search results with sources and cost estimate
  */
 export async function runPreSearch(
   query: string,
   specialistDomain: string,
-  maxSearches: number = PRE_SEARCH_MAX_USES,
+  _maxSearches: number = PRE_SEARCH_MAX_USES,
 ): Promise<WebSearchResult> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
     return { summary: '', sources: [], searchCount: 0, estimatedCostUsd: 0 }
   }
 
   try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey })
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: PRE_SEARCH_MODEL,
+        max_tokens: PRE_SEARCH_MAX_TOKENS,
+        messages: [
+          {
+            role: "system",
+            content: `You are a research assistant for a ${specialistDomain} specialist. Search the web and provide a concise summary of findings with key data points. Focus on facts, numbers, and recent developments. Be brief — this context will be injected into another AI's prompt.`,
+          },
+          { role: "user", content: query },
+        ],
+        tools: [{ type: "web_search_preview" }],
+      }),
+    })
 
-    const webSearchTool = {
-      type: "web_search_20260209",
-      name: "web_search",
-      max_uses: maxSearches,
+    if (!resp.ok) {
+      console.warn(`[WebSearch] Pre-search API returned ${resp.status}`)
+      return { summary: '', sources: [], searchCount: 0, estimatedCostUsd: 0 }
     }
 
-    const createParams = {
-      model: PRE_SEARCH_MODEL,
-      max_tokens: PRE_SEARCH_MAX_TOKENS,
-      system: `You are a research assistant for a ${specialistDomain} specialist. Search the web and provide a concise summary of findings with key data points. Focus on facts, numbers, and recent developments. Be brief — this context will be injected into another AI's prompt.`,
-      messages: [
-        { role: "user" as const, content: query },
-      ],
-      tools: [webSearchTool],
-      betas: [WEB_SEARCH_BETA],
+    const data = await resp.json()
+    const tokensIn = data.usage?.prompt_tokens ?? 0
+    const tokensOut = data.usage?.completion_tokens ?? 0
+    // GPT-4.1-mini pricing: $0.40/M input, $1.60/M output
+    const estimatedCostUsd = (tokensIn * 0.40 + tokensOut * 1.60) / 1_000_000
+
+    const summary = data.choices?.[0]?.message?.content ?? ''
+
+    // Extract sources from annotations if available
+    const sources: WebSearchSource[] = []
+    const annotations = data.choices?.[0]?.message?.annotations ?? []
+    const seen = new Set<string>()
+    for (const ann of annotations) {
+      if (ann.type === "url_citation" && ann.url && !seen.has(ann.url)) {
+        seen.add(ann.url)
+        sources.push({
+          title: ann.title ?? "Source",
+          url: ann.url,
+          snippet: (ann.text ?? "").slice(0, 200),
+        })
+      }
     }
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let response = await client.beta.messages.create(createParams as any) as any
-
-    // Handle pause_turn: continue until end_turn
-    let continueCount = 0
-    while (response.stop_reason === "pause_turn" && continueCount < MAX_CONTINUE_LOOPS) {
-      continueCount++
-      const prevMessages = [
-        { role: "user" as const, content: query },
-        { role: "assistant" as const, content: response.content },
-        { role: "user" as const, content: "Continue." },
-      ]
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      response = await client.beta.messages.create({ ...createParams, messages: prevMessages } as any) as any
-    }
-
-    const tokensIn = response.usage?.input_tokens ?? 0
-    const tokensOut = response.usage?.output_tokens ?? 0
-    // Haiku pricing: $0.80/M input, $4.00/M output
-    const estimatedCostUsd = (tokensIn * 0.80 + tokensOut * 4.00) / 1_000_000
-
-    const sources = collectWebSources(response.content ?? [])
-    const summary = extractText(response.content ?? [])
 
     return {
       summary,
       sources,
-      searchCount: continueCount + 1,
+      searchCount: 1,
       estimatedCostUsd,
     }
   } catch (err) {

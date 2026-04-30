@@ -23,7 +23,7 @@ import { logLlmUsage } from "@/lib/cost-logging/llm-usage"
 export const runtime = "nodejs"
 export const maxDuration = 300
 
-// ─── AI Call (DeepSeek first, Anthropic Haiku fallback) ─────────
+// ─── AI Call (DeepSeek first, OpenAI gpt-4.1-mini fallback) ─────
 
 async function callHaiku(
   systemPrompt: string,
@@ -74,7 +74,7 @@ async function callHaiku(
         foundryId,
         userId,
       })
-      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
+      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "openai-gpt-4.1-mini", reason: `HTTP ${response.status}`, timestamp: new Date().toISOString() }))
     } catch (err) {
       void logLlmUsage({
         action: 'investor_match',
@@ -86,35 +86,33 @@ async function callHaiku(
         foundryId,
         userId,
       })
-      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "anthropic-haiku", reason: err instanceof Error ? err.message : "unknown", timestamp: new Date().toISOString() }))
+      console.warn(JSON.stringify({ level: "warn", event: "ai_provider_fallback", feature: "investor_match", primaryProvider: "deepseek", fallbackProvider: "openai-gpt-4.1-mini", reason: err instanceof Error ? err.message : "unknown", timestamp: new Date().toISOString() }))
     }
   }
 
-  // Fallback: Anthropic Haiku
-  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!anthropicKey) throw new Error("No AI API key configured (DEEPSEEK_API_KEY or ANTHROPIC_API_KEY)")
+  // Fallback: OpenAI gpt-4.1-mini
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!openaiKey) throw new Error("No AI API key configured (DEEPSEEK_API_KEY or OPENAI_API_KEY)")
 
-  const anthropicModel = "claude-haiku-4-5-20251001"
+  const openaiModel = "gpt-4.1-mini"
   let response: Response
   try {
-    response = await fetch("https://api.anthropic.com/v1/messages", {
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
-        model: anthropicModel,
+        model: openaiModel,
         max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       }),
     })
   } catch (err) {
     void logLlmUsage({
       action: 'investor_match',
-      modelUsed: anthropicModel,
+      modelUsed: openaiModel,
       tokensIn: 0,
       tokensOut: 0,
       status: 'error',
@@ -133,7 +131,7 @@ async function callHaiku(
       'error'
     void logLlmUsage({
       action: 'investor_match',
-      modelUsed: anthropicModel,
+      modelUsed: openaiModel,
       tokensIn: 0,
       tokensOut: 0,
       status,
@@ -141,24 +139,24 @@ async function callHaiku(
       foundryId,
       userId,
     })
-    throw new Error(`Anthropic API error: ${response.status}`)
+    throw new Error(`OpenAI API error: ${response.status}`)
   }
   const data = await response.json()
   void logLlmUsage({
     action: 'investor_match',
-    modelUsed: anthropicModel,
-    tokensIn: data.usage?.input_tokens ?? 0,
-    tokensOut: data.usage?.output_tokens ?? 0,
+    modelUsed: openaiModel,
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
     status: 'success',
     foundryId,
     userId,
   })
-  return (data.content?.[0]?.text ?? "").trim()
+  return (data.choices?.[0]?.message?.content ?? "").trim()
 }
 
-// INTENT: Opus for high-quality draft emails — the most important user-facing content.
-// Rationales stay on Haiku (shorter, less critical). Opus produces substantially
-// better cold emails with more natural tone and specific portfolio references.
+// GPT-5.5 for high-quality draft emails — the most important user-facing content.
+// Rationales stay on gpt-4.1-mini (shorter, less critical). GPT-5.5 produces
+// substantially better cold emails with more natural tone and specific portfolio references.
 async function callOpus(
   systemPrompt: string,
   userPrompt: string,
@@ -166,24 +164,22 @@ async function callOpus(
   context: { foundryId?: string; userId?: string } = {},
 ): Promise<string> {
   const { foundryId, userId } = context
-  const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
+  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  if (!openaiKey) throw new Error("OPENAI_API_KEY not configured")
 
-  const opusModel = "claude-opus-4-20250514"
+  const opusModel = "gpt-5.5"
   let response: Response
   try {
-    response = await fetch("https://api.anthropic.com/v1/messages", {
+    response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "x-api-key": anthropicKey,
-        "anthropic-version": "2023-06-01",
+        "Authorization": `Bearer ${openaiKey}`,
       },
       body: JSON.stringify({
         model: opusModel,
-        max_tokens: maxTokens,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt }],
+        max_completion_tokens: maxTokens,
+        messages: [{ role: "system", content: systemPrompt }, { role: "user", content: userPrompt }],
       }),
     })
   } catch (err) {
@@ -216,21 +212,21 @@ async function callOpus(
       foundryId,
       userId,
     })
-    // Fallback to Haiku if Opus fails
-    console.warn("[InvestorMatch] Opus failed, falling back to Haiku")
+    // Fallback to gpt-4.1-mini if GPT-5.5 fails
+    console.warn("[InvestorMatch] GPT-5.5 failed, falling back to gpt-4.1-mini")
     return callHaiku(systemPrompt, userPrompt, maxTokens, context)
   }
   const data = await response.json()
   void logLlmUsage({
     action: 'investor_match',
     modelUsed: opusModel,
-    tokensIn: data.usage?.input_tokens ?? 0,
-    tokensOut: data.usage?.output_tokens ?? 0,
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
     status: 'success',
     foundryId,
     userId,
   })
-  return (data.content?.[0]?.text ?? "").trim()
+  return (data.choices?.[0]?.message?.content ?? "").trim()
 }
 
 function safeParseJSON<T>(text: string): T[] {
