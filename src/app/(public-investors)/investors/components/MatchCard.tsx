@@ -1,34 +1,32 @@
 /**
  * @file MatchCard.tsx
  *
- * @description Progressive-disclosure investor match card with two visual states:
+ * @description Progressive-disclosure investor match card with three visual states:
  *
  *   - **Closed** (scan): rank badge + firm name + type chip + composite match %
  *     + hardware fit badge + 2-line thesis excerpt + stage/sector/cheque chips
  *     + save button. Compact — designed for rapid scanning in a list.
  *
- *   - **Medium** (decide): everything from closed PLUS 6-pillar score bars
- *     (via MatchPillarBars), full thesis text, sector tags, and a collapsible
- *     "Why they might back you / How to pitch" section. Plus a "View full
- *     profile →" link that navigates to /investors/[id].
+ *   - **Medium** (decide): everything from closed PLUS 6-pillar score bars,
+ *     full thesis text, sector tags, and a "Why they might back you / How to pitch"
+ *     section. Plus a hint to click for the full inline profile.
  *
- * Click on a closed card → toggles to medium.
- * Click "View full profile →" → navigates to the investor detail page.
+ *   - **Full** (deep dive): everything from medium PLUS the FactStrip and
+ *     CollapsibleSection content rendered inline, populated from existing props.
+ *     Optionally enriched with a deep profile passed from the parent.
  *
- * Ported from the inline MatchCard in InvestorDeckSearchClient.tsx. The locked
- * (blurred/paywall) variant remains handled separately.
+ * Click cycle: closed → medium → full → medium → closed.
+ * Each single click advances one step. No double-click, no page navigation.
  *
  * @see InvestorDeckSearchClient.tsx — parent consumer
- * @see MatchPillarBars — 6-pillar bar visualisation
  */
 
 'use client'
 
-import { useCallback, useRef, useState, useTransition } from 'react'
-import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useCallback, useState, useTransition } from 'react'
 import { Loader2 } from 'lucide-react'
-import { MatchPillarBars } from '@/app/(platform)/investors/components/MatchPillarBars'
+import { CollapsibleSection } from '@/app/(platform)/investors/[id]/components/CollapsibleSection'
+import { FactStrip } from '@/app/(platform)/investors/[id]/components/FactStrip'
 import type {
   InvestorFirm,
   InvestorMatchOutputView,
@@ -38,13 +36,12 @@ import type {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const SCORECARD_PILLARS: Array<{ key: keyof FirmMatchResult['pillars']; label: string; weight: string }> = [
-  { key: 'thesis',     label: 'Thesis',     weight: '20' },
-  { key: 'stage',      label: 'Stage',      weight: '20' },
-  { key: 'geo',        label: 'Geo',        weight: '15' },
-  { key: 'cheque',     label: 'Cheque',     weight: '15' },
-  { key: 'activity',   label: 'Activity',   weight: '15' },
-  { key: 'data',       label: 'Data',       weight: '10' },
-  { key: 'hardware',   label: 'Hardware',   weight: '15' },
+  { key: 'thesis',   label: 'Thesis',     weight: '20' },
+  { key: 'stage',    label: 'Stage',      weight: '20' },
+  { key: 'geo',      label: 'Geo',        weight: '15' },
+  { key: 'cheque',   label: 'Cheque',     weight: '15' },
+  { key: 'activity', label: 'Activity',   weight: '15' },
+  { key: 'data',     label: 'Confidence', weight: '10' },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -72,9 +69,18 @@ function normaliseFirmType(raw: string): string {
   return map[raw] ?? raw
 }
 
+/** Format a number as a compact currency label. Returns null if value is absent. */
+function fmtCurrency(n: number | undefined | null): string | null {
+  if (n == null) return null
+  if (n >= 1_000_000_000) return `£${(n / 1_000_000_000).toFixed(1)}bn`
+  if (n >= 1_000_000) return `£${(n / 1_000_000).toFixed(1)}m`
+  if (n >= 1_000) return `£${Math.round(n / 1_000)}k`
+  return `£${n}`
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
-export type MatchCardState = 'closed' | 'medium'
+export type MatchCardState = 'closed' | 'medium' | 'full'
 
 export interface MatchCardProps {
   rank: number
@@ -96,6 +102,17 @@ export interface MatchCardProps {
   onTrackClick?: (clickType: 'open' | 'expand') => void
   /** Override the initial card state. Defaults to 'closed'. */
   initialCardState?: MatchCardState
+  /**
+   * Optional deep profile data fetched by the parent when the user enters
+   * the full state. Passed down once available; card shows a loading state
+   * while null and onRequestDeepProfile has been called.
+   */
+  deepProfile?: Record<string, unknown> | null
+  /**
+   * Called when the card transitions into the full state for the first time.
+   * The parent uses this to kick off a background fetch of the deep profile.
+   */
+  onRequestDeepProfile?: () => void
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -113,8 +130,13 @@ export function MatchCard({
   isPaid,
   onTrackClick,
   initialCardState = 'closed',
+  deepProfile,
+  onRequestDeepProfile,
 }: MatchCardProps) {
   const [cardState, setCardState] = useState<MatchCardState>(initialCardState)
+  // Track whether we've already requested the deep profile to avoid double-firing
+  const [deepProfileRequested, setDeepProfileRequested] = useState(false)
+
   const attrs = firm.attributes
   const firmType = attrs.firm_type
     ? normaliseFirmType(attrs.firm_type)
@@ -136,7 +158,7 @@ export function MatchCard({
   const thesis  = attrs.investment_thesis ?? attrs.ideal_company_profile ?? firm.description ?? null
   const sectors = attrs.sectors ?? []
 
-  // Why-fit / how-to-pitch — expand state (used in medium card state)
+  // Why-fit / how-to-pitch — expand state (used in medium + full card states)
   const [whyFitExpanded, setWhyFitExpanded] = useState(false)
   const [isEnriching, startEnrichTransition] = useTransition()
   const [enrichFailed, setEnrichFailed] = useState(false)
@@ -164,21 +186,33 @@ export function MatchCard({
     onSave?.()
   }
 
-  const router = useRouter()
+  // Simple 3-state cycle: closed → medium → full → medium → closed
+  const handleCardClick = useCallback(() => {
+    setCardState(prev => {
+      if (prev === 'closed') return 'medium'
+      if (prev === 'medium') return 'full'
+      return 'medium' // full → medium (one step back, not all the way to closed)
+    })
+  }, [])
 
-  const { onClick: handleCardClick, onDoubleClick: handleCardDoubleClick, onKeyDown: handleCardKeyDown } = useExpandNavigateHandlers({
-    onExpand: () => {
-      if (cardState === 'closed') {
-        setCardState('medium')
-      } else {
-        setCardState('closed')
-      }
-    },
-    onOpenProfile: () => {
-      onTrackClick?.('open')
-      router.push(`/investors/${firm.id}`)
-    },
-  })
+  const handleCardKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      handleCardClick()
+    }
+  }, [handleCardClick])
+
+  // Fire onRequestDeepProfile the first time we enter the full state
+  const handleEnterFull = useCallback(() => {
+    if (!deepProfileRequested && onRequestDeepProfile) {
+      setDeepProfileRequested(true)
+      onRequestDeepProfile()
+    }
+  }, [deepProfileRequested, onRequestDeepProfile])
+
+  // Derived labels for FactStrip
+  const fundSizeLabel = fmtCurrency((attrs as { fund_size_gbp?: number }).fund_size_gbp)
+  const aumLabel      = fmtCurrency((attrs as { aum_gbp?: number }).aum_gbp)
 
   // Hardware fit score badge (shared between states)
   const hwScoreBadge = (() => {
@@ -247,7 +281,6 @@ export function MatchCard({
         role="button"
         tabIndex={0}
         onClick={handleCardClick}
-        onDoubleClick={handleCardDoubleClick}
         onKeyDown={handleCardKeyDown}
       >
         {/* ── Header row: rank + name + type chip | composite % ── */}
@@ -329,22 +362,15 @@ export function MatchCard({
 
         {/* ── Expand hint ── */}
         <div className="text-[10px] text-muted-foreground mt-2 select-none">
-          ▼ Click to expand · Double-click for full profile
+          ▼ Click to expand
         </div>
       </div>
     )
   }
 
-  // ── Medium card state ────────────────────────────────────────────────────
-  return (
-    <div
-      className="relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px"
-      role="button"
-      tabIndex={0}
-      onClick={handleCardClick}
-      onDoubleClick={handleCardDoubleClick}
-      onKeyDown={handleCardKeyDown}
-    >
+  // ── Shared header block (used in both medium and full states) ──────────────
+  const sharedHeader = (
+    <>
       {/* ── Header row: rank + name + type chip | composite % ── */}
       <div className="flex items-start justify-between gap-3 mb-1.5">
         <div className="min-w-0 flex-1">
@@ -397,7 +423,7 @@ export function MatchCard({
       <ClosedChipRow attrs={attrs} firmType={firmType} />
 
       {/* ── 6-column scorecard grid (Forge Capital renderScoreDimS pattern) ── */}
-      <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(7, 1fr)' }}>
+      <div className="grid gap-1.5 mb-2.5" style={{ gridTemplateColumns: 'repeat(6, 1fr)' }}>
         {SCORECARD_PILLARS.map(({ key, label, weight }) => {
           const raw   = pillars?.[key]
           const hasScore = raw !== undefined
@@ -465,7 +491,7 @@ export function MatchCard({
         </p>
       )}
 
-      {/* ── Sector tags — show all in medium state ── */}
+      {/* ── Sector tags — show all in medium/full state ── */}
       {sectors.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2.5">
           {sectors.slice(0, 8).map(s => (
@@ -526,87 +552,133 @@ export function MatchCard({
           )}
         </div>
       )}
+    </>
+  )
 
-      {/* ── View full profile link + collapse hint ── */}
-      <div className="flex items-center justify-between mt-3 relative z-10">
-        <Link
-          href={`/investors/${firm.id}`}
-          className="text-xs text-international-orange font-semibold hover:underline"
-          onClick={(e) => {
-            e.stopPropagation()
-            onTrackClick?.('open')
-          }}
-        >
-          View full profile →
-        </Link>
-        <span className="text-[10px] text-muted-foreground select-none">
-          ▲ Click to collapse · Double-click to open full profile
-        </span>
+  // ── Medium card state ────────────────────────────────────────────────────
+  if (cardState === 'medium') {
+    return (
+      <div
+        className="relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md hover:-translate-y-px"
+        role="button"
+        tabIndex={0}
+        onClick={handleCardClick}
+        onKeyDown={handleCardKeyDown}
+      >
+        {sharedHeader}
+
+        {/* ── Hint ── */}
+        <div className="text-[10px] text-muted-foreground mt-3 select-none">
+          ▼ Click to see full profile
+        </div>
+      </div>
+    )
+  }
+
+  // ── Full card state ──────────────────────────────────────────────────────
+  // Fire the deep-profile request hook when we first render this state
+  if (!deepProfileRequested) {
+    handleEnterFull()
+  }
+
+  return (
+    <div
+      className="relative bg-card border border-border/40 shadow-sm rounded-xl p-3.5 mb-2.5 transition-all cursor-pointer hover:shadow-md"
+      role="button"
+      tabIndex={0}
+      onClick={handleCardClick}
+      onKeyDown={handleCardKeyDown}
+    >
+      {sharedHeader}
+
+      {/* ── Divider ── */}
+      <div className="border-t border-border/40 my-3" />
+
+      {/* ── Fact strip: key facts, focus, provenance ── */}
+      <div className="mb-4" onClick={e => e.stopPropagation()}>
+        <FactStrip
+          attrs={attrs as Parameters<typeof FactStrip>[0]['attrs']}
+          fundSizeLabel={fundSizeLabel}
+          aumLabel={aumLabel}
+        />
+      </div>
+
+      {/* ── Thesis deep-dive section ── */}
+      {thesis && (
+        <div className="mb-3" onClick={e => e.stopPropagation()}>
+          <CollapsibleSection number={1} title="Thesis" defaultOpen={true}>
+            <p className="text-sm text-foreground leading-relaxed">{thesis}</p>
+            {attrs.ideal_company_profile && attrs.ideal_company_profile !== thesis && (
+              <div className="mt-3">
+                <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Ideal company profile</p>
+                <p className="text-sm text-muted-foreground leading-relaxed">{attrs.ideal_company_profile}</p>
+              </div>
+            )}
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* ── Investment pattern section ── */}
+      {(stageFocusArr.length > 0 || sectors.length > 0 || attrs.geo_focus) && (
+        <div className="mb-3" onClick={e => e.stopPropagation()}>
+          <CollapsibleSection number={2} title="Investment Pattern" defaultOpen={false}>
+            <div className="space-y-3">
+              {stageFocusArr.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Stage focus</p>
+                  <div className="flex flex-wrap gap-1">
+                    {stageFocusArr.map(s => (
+                      <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground uppercase tracking-wide">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {sectors.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Sectors</p>
+                  <div className="flex flex-wrap gap-1">
+                    {sectors.map(s => (
+                      <span key={s} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{s}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {Array.isArray((attrs as { geo_focus?: string[] }).geo_focus) && (attrs as { geo_focus?: string[] }).geo_focus!.length > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Geography</p>
+                  <div className="flex flex-wrap gap-1">
+                    {(attrs as { geo_focus?: string[] }).geo_focus!.map(g => (
+                      <span key={g} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{g}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* ── Deep profile sections — shown when deepProfile is available ── */}
+      {deepProfileRequested && !deepProfile && (
+        <div className="flex items-center gap-2 text-sm text-muted-foreground my-3">
+          <Loader2 className="h-4 w-4 animate-spin" />
+          Loading full profile…
+        </div>
+      )}
+
+      {/* ── Collapse hint ── */}
+      <div className="text-[10px] text-muted-foreground mt-3 select-none">
+        ▲ Click to collapse
       </div>
     </div>
   )
 }
 
-// ─── Single/double-click handler ────────────────────────────────────────────
-
-function useExpandNavigateHandlers({
-  onExpand,
-  onOpenProfile,
-}: {
-  onExpand: () => void
-  onOpenProfile: () => void
-}) {
-  const timer = useRef<number | null>(null)
-
-  const clearTimer = useCallback(() => {
-    if (timer.current !== null) {
-      window.clearTimeout(timer.current)
-      timer.current = null
-    }
-  }, [])
-
-  const onClick = useCallback(
-    (e: React.MouseEvent) => {
-      if (e.defaultPrevented) return
-      clearTimer()
-      timer.current = window.setTimeout(() => {
-        onExpand()
-        timer.current = null
-      }, 220)
-    },
-    [onExpand, clearTimer],
-  )
-
-  const onDoubleClick = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      clearTimer()
-      onOpenProfile()
-    },
-    [onOpenProfile, clearTimer],
-  )
-
-  const onKeyDown = useCallback(
-    (e: React.KeyboardEvent) => {
-      if (e.key === 'Enter') {
-        e.preventDefault()
-        onOpenProfile()
-      } else if (e.key === ' ') {
-        e.preventDefault()
-        onExpand()
-      }
-    },
-    [onExpand, onOpenProfile],
-  )
-
-  return { onClick, onDoubleClick, onKeyDown }
-}
-
 // ─── Shared sub-components ───────────────────────────────────────────────────
 
 /**
- * Chip row shared between closed and medium states: firm type, stage focus,
- * cheque range, active deploying status.
+ * Chip row shared between closed, medium, and full states: firm type, stage
+ * focus, cheque range, active deploying status.
  */
 function ClosedChipRow({
   attrs,
