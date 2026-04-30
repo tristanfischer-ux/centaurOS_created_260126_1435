@@ -4080,11 +4080,16 @@ function SuppliersPage({
                         )}
                         {(() => {
                             const certText = formatJsonArrayField(s.certifications as string | string[] | null | undefined, "")
-                            // Strip scrape-failure placeholders from the formatted output
                             const filtered = certText
                                 ? certText
                                       .split(", ")
-                                      .filter((c) => !/^(MISSING\b|NOT STATED\b|NONE RECORDED\b|UNKNOWN\b|N\/A$)/i.test(c.trim()))
+                                      .filter((c) => {
+                                          const t = c.trim()
+                                          if (!t || t === "null" || t === "undefined" || t === "none") return false
+                                          if (/^(MISSING\b|NOT STATED\b|NONE RECORDED\b|UNKNOWN\b|N\/A$|NO CERTIF)/i.test(t)) return false
+                                          if (/^\\u[0-9a-f]{4}/i.test(t)) return false
+                                          return true
+                                      })
                                       .join(", ")
                                 : ""
                             return filtered ? (
