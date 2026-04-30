@@ -669,8 +669,8 @@ What specific changes to the AI pipeline (prompts, data extraction, validation l
         councilViaOpenRouter("qwen/qwen3-235b-a22b", "qwen3-235b:alibaba"),
         // 5. Kimi K2.6 (via OpenRouter — China/Moonshot)
         councilViaOpenRouter("moonshotai/kimi-k2.6", "kimi-k2.6:moonshot"),
-        // 6. GLM-5.1 (via OpenRouter — China/Zhipu)
-        councilViaOpenRouter("z-ai/glm-5.1", "glm-5.1:zhipu"),
+        // 6. Grok-3 (via OpenRouter — xAI)
+        councilViaOpenRouter("x-ai/grok-3", "grok-3:xai"),
     ]
 
     const individualFindings = await Promise.all(councilCalls)
