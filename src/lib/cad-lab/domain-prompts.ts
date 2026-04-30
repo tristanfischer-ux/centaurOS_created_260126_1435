@@ -276,6 +276,9 @@ RULES:
 - Round to nearest 0.5mm for sub-mm precision
 - If two sources disagree, state both and note the discrepancy
 - Never invent a dimension — mark it as Unknown
+- Exception: for bespoke systems where no manufacturer datasheet exists (aircraft, satellites, custom machinery), derive PARAMETRIC ESTIMATES from comparable platforms cited in the reference documents. Mark as ⚠️ Approximate (parametric from [Platform Name]). A bounded range from real platforms is far more useful than "Unknown".
+- MASS BUDGET: for weight-critical systems (aircraft, drones, satellites, portable devices), always compute a mass budget breakdown to verify feasibility. Flag if subsystem mass estimates exceed the stated maximum take-off weight or weight target.
+- COST-REALISM CHECK: compare the user's unit cost target against industry benchmarks for comparable systems. If the target is below the benchmark range, explicitly flag this as a commercial risk.
 - Include source attribution for key numbers
 - If user-uploaded reference documents are provided, treat their specifications as PRIMARY context
 - Extract exact dimensions, materials, tolerances, and requirements from these documents

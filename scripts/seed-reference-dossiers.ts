@@ -33,11 +33,11 @@ const DOSSIER_DIR = join(
 )
 
 const DEMO_PROJECTS = [
-    { namePattern: "hedgerow", file: "hedgerow-reference-dossier.md" },
-    { namePattern: "haps", file: "haps-reference-dossier.md" },
-    { namePattern: "desalination", file: "desalination-reference-dossier.md" },
-    { namePattern: "bess", file: "bess-reference-dossier.md" },
-    { namePattern: "vertical farm", file: "vertical-farm-reference-dossier.md" },
+    { namePattern: "hedgerow", file: "hedgerow-reference-dossier-v2.md" },
+    { namePattern: "haps", file: "haps-reference-dossier-v2.md" },
+    { namePattern: "desalination", file: "desalination-reference-dossier-v2.md" },
+    { namePattern: "bess", file: "bess-reference-dossier-v2.md" },
+    { namePattern: "vertical farm", file: "vertical-farm-reference-dossier-v2.md" },
 ]
 
 async function main() {

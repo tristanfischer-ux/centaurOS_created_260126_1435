@@ -388,7 +388,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       hardwareItemCount: number; processesApplied: string[];
       supplierTechniques: number; totalDataPoints: number;
     } | undefined
-    let synthesisModel = "claude-sonnet-4-6"
+    let synthesisModel = "gemini-3.1-pro-preview"
     try {
       const domain = await detectDomainFromProductDescription(description)
 
@@ -450,33 +450,23 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         : ""
       const synthesisUserPrompt = `Product to research: ${description}\n\n${rawContext}${standardsSection}${docSection}`
 
-      // DECISION: Fallback chain for synthesis — Claude → OpenAI → Gemini.
-      // If Anthropic credits are exhausted, fall through to alternatives.
+      // Fallback chain: Gemini → OpenAI. Anthropic eliminated per 2026-04-29 directive.
       try {
-        console.info("[THE-FORGE] Step 1: Synthesizing report with Claude (domain: %s)...", domain)
-        const claudeResult = await callClaude(synthesisPrompt, synthesisUserPrompt)
-        report = claudeResult.text
-      } catch (claudeErr) {
-        const claudeMsg = claudeErr instanceof Error ? claudeErr.message : String(claudeErr)
-        console.warn("[THE-FORGE] Step 1: Claude synthesis failed, trying OpenAI fallback:", claudeMsg.slice(0, 200))
+        console.info("[THE-FORGE] Step 1: Synthesizing report with Gemini (domain: %s)...", domain)
+        const geminiResult = await callGemini(synthesisPrompt, synthesisUserPrompt, "gemini-3.1-pro-preview", 8192, 120_000)
+        report = geminiResult.text
+      } catch (geminiErr) {
+        const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
+        console.warn("[THE-FORGE] Step 1: Gemini synthesis failed, trying OpenAI fallback:", geminiMsg.slice(0, 200))
         try {
           synthesisModel = "gpt-5.4"
           const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.4", 8192, 120_000)
           report = openaiResult.text
           console.info("[THE-FORGE] Step 1: OpenAI synthesis succeeded (fallback)")
         } catch (openaiErr) {
-          const openaiMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr)
-          console.warn("[THE-FORGE] Step 1: OpenAI synthesis failed, trying Gemini fallback:", openaiMsg.slice(0, 200))
-          try {
-            synthesisModel = "gemini-3.1-pro-preview"
-            const geminiResult = await callGemini(synthesisPrompt, synthesisUserPrompt, "gemini-3.1-pro-preview", 8192, 120_000)
-            report = geminiResult.text
-            console.info("[THE-FORGE] Step 1: Gemini synthesis succeeded (fallback)")
-          } catch (geminiErr) {
-            console.error("[THE-FORGE] Step 1: ALL synthesis models failed:", geminiErr instanceof Error ? geminiErr.message : String(geminiErr))
-            report = "Research sources found but report synthesis failed — tap Retry to try again."
-            synthesisSucceeded = false
-          }
+          console.error("[THE-FORGE] Step 1: ALL synthesis models failed:", openaiErr instanceof Error ? openaiErr.message : String(openaiErr))
+          report = "Research sources found but report synthesis failed — tap Retry to try again."
+          synthesisSucceeded = false
         }
       }
     } catch (synthesisError) {

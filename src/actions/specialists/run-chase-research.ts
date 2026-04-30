@@ -67,7 +67,7 @@ import {
     startPipelineRun,
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
-import { callClaude } from "@/lib/cad-lab/api-helpers"
+import { callClaude, callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import type {
     CadLabDesignBrief,
@@ -1203,13 +1203,12 @@ async function callExtractionViaAnthropic(
         // few-shot example block (UK-BESS regulatory matrix, ~3000 chars
         // with 8 standards × 9 fields each) inflates Sonnet's response
         // past 4096 tokens, truncating mid-JSON.
-        const { text, tokensIn, tokensOut } = await callClaude(
+        const { text, tokensIn, tokensOut } = await callOpenAI(
             systemPrompt,
             userPrompt,
-            "claude-sonnet-4-6",
-            8192,
+            "gpt-4.1-mini",
+            16384,
             120_000,
-            1, // maxRetries — fail fast; extraction is a nice-to-have
         )
         // INSTRUMENTATION (Gate 6): capture raw Sonnet text for diagnosis.
         const rawLlmText = text.length > 50000
