@@ -22,6 +22,7 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 import { isValidUUID } from '@/lib/validations'
 import { classifyAIError } from '@/lib/agents/error-classification'
 import { recordSpecialistCall } from '@/lib/audit/specialist-call'
+import { callOpenAI } from '@/lib/cad-lab/api-helpers'
 import type {
   Product,
   ProductSummary,
@@ -786,29 +787,21 @@ ${cadContext}${foundryContext}
 Provide your structured market assessment as JSON.`
 
     // ── Call Claude Sonnet ──────────────────────────────────────────
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return { error: 'OPENAI_API_KEY not configured' }
 
     const callStartedAt = Date.now()
     try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
+      const result = await callOpenAI(systemPrompt, userPrompt, "gpt-4.1-mini", 2000, 120_000)
 
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      })
-
-      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
+      const text = result.text
       if (!text) return { error: 'Empty response from AI' }
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-20250514',
-        promptTokens: response.usage?.input_tokens,
-        completionTokens: response.usage?.output_tokens,
+        model: 'gpt-4.1-mini',
+        promptTokens: result.tokensIn,
+        completionTokens: result.tokensOut,
       })
 
       // Money: write specialist_call event for ai_credits_ledger trigger.
@@ -817,9 +810,9 @@ Provide your structured market assessment as JSON.`
         foundryId,
         specialistId: 'priya',
         section: 'products',
-        model: 'sonnet',
-        inputTokens: response.usage?.input_tokens ?? 0,
-        outputTokens: response.usage?.output_tokens ?? 0,
+        model: 'gpt-4.1-mini',
+        inputTokens: result.tokensIn,
+        outputTokens: result.tokensOut,
         durationMs: Date.now() - callStartedAt,
         invokedByUserId: user.id,
         entityId: productId,
@@ -892,7 +885,7 @@ Provide your structured market assessment as JSON.`
           market_opportunities: 'ai_estimated',
         },
         assessed_at: new Date().toISOString(),
-        model_used: 'claude-sonnet-4-20250514',
+        model_used: 'gpt-4.1-mini',
       }
 
       // ── Save to product ────────────────────────────────────────
@@ -1011,14 +1004,11 @@ export async function scoreFundability(
 
     // ── AI improvement suggestions (Haiku, 5s timeout) ───────────────
     let improvement_suggestions: FundabilityScore['improvement_suggestions'] = []
-    const HAIKU_MODEL = 'claude-3-5-haiku-latest'
+    const HAIKU_MODEL = 'gpt-4.1-mini'
 
     try {
-      const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+      const apiKey = process.env.OPENAI_API_KEY?.trim()
       if (apiKey) {
-        const Anthropic = (await import('@anthropic-ai/sdk')).default
-        const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
-
         const scoresContext = JSON.stringify({
           market_size_score,
           margin_score,
@@ -1031,40 +1021,31 @@ export async function scoreFundability(
           lifecycle,
         })
 
-        const suggestionsPromise = client.messages.create({
-          model: HAIKU_MODEL,
-          max_tokens: 512,
-          system: `You are a concise investor advisor. Given a product's fundability sub-scores (0-100), suggest 2-3 specific actions to improve the overall score. Return ONLY a raw JSON array (no markdown, no code fences):
-[{"action": "short imperative action", "impact_description": "1 sentence on why", "estimated_score_lift": number_1_to_20}]`,
-          messages: [
-            { role: 'user', content: `Scores: ${scoresContext}` },
-          ],
-        })
+        const suggestionsSystem = `You are a concise investor advisor. Given a product's fundability sub-scores (0-100), suggest 2-3 specific actions to improve the overall score. Return ONLY a raw JSON array (no markdown, no code fences):
+[{"action": "short imperative action", "impact_description": "1 sentence on why", "estimated_score_lift": number_1_to_20}]`
 
-        // INTENT: 5s timeout — don't let Haiku delay the whole score
+        const suggestionsPromise = callOpenAI(suggestionsSystem, `Scores: ${scoresContext}`, "gpt-4.1-mini", 512, 5_000)
+
+        // INTENT: 5s timeout — don't let the AI delay the whole score
         const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000))
         const result = await Promise.race([suggestionsPromise, timeoutPromise])
 
-        if (result && 'content' in result) {
-          const textBlock = result.content.find((b: { type: string }) => b.type === 'text')
-          if (textBlock && textBlock.type === 'text') {
-            const raw = textBlock.text.trim().replace(/^```(?:json)?\s*\n?/, '').replace(/\n?\s*```$/, '')
-            const parsed = JSON.parse(raw)
-            if (Array.isArray(parsed)) {
-              improvement_suggestions = parsed.slice(0, 3).map((s: Record<string, unknown>) => ({
-                action: String(s.action || ''),
-                impact_description: String(s.impact_description || ''),
-                estimated_score_lift: typeof s.estimated_score_lift === 'number' ? s.estimated_score_lift : 5,
-              }))
-            }
+        if (result && 'text' in result) {
+          const raw = result.text.trim().replace(/^```(?:json)?\s*\n?/, '').replace(/\n?\s*```$/, '')
+          const parsed = JSON.parse(raw)
+          if (Array.isArray(parsed)) {
+            improvement_suggestions = parsed.slice(0, 3).map((s: Record<string, unknown>) => ({
+              action: String(s.action || ''),
+              impact_description: String(s.impact_description || ''),
+              estimated_score_lift: typeof s.estimated_score_lift === 'number' ? s.estimated_score_lift : 5,
+            }))
           }
 
           // FLOW: Track AI usage for billing
-          const usage = result.usage
           await trackUsage({
-            model: HAIKU_MODEL,
-            promptTokens: usage?.input_tokens,
-            completionTokens: usage?.output_tokens,
+            model: 'gpt-4.1-mini',
+            promptTokens: result.tokensIn,
+            completionTokens: result.tokensOut,
           })
         }
       }
@@ -1540,29 +1521,19 @@ Market Assessment Data:
 
 Produce the design brief JSON.`
 
-    // ── Call Claude Sonnet ──────────────────────────────────────────
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+    // ── Call OpenAI gpt-4.1-mini ──────────────────────────────────────
 
     try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
+      const result = await callOpenAI(systemPrompt, userPrompt, "gpt-4.1-mini", 2000, 120_000)
 
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      })
-
-      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
+      const text = result.text
       if (!text) return { error: 'Empty response from AI' }
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-20250514',
-        promptTokens: response.usage?.input_tokens,
-        completionTokens: response.usage?.output_tokens,
+        model: 'gpt-4.1-mini',
+        promptTokens: result.tokensIn,
+        completionTokens: result.tokensOut,
       })
 
       // ── Parse response ─────────────────────────────────────────
@@ -1726,29 +1697,19 @@ ${productContext.join('\n')}
 
 Generate the design brief JSON that will guide engineering changes to achieve this improvement.`
 
-    // ── Call Claude Sonnet ──────────────────────────────────────────
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+    // ── Call OpenAI gpt-4.1-mini ──────────────────────────────────────
 
     try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
+      const result = await callOpenAI(systemPrompt, userPrompt, "gpt-4.1-mini", 2000, 120_000)
 
-      const response = await client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 2000,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      })
-
-      const text = response.content[0]?.type === 'text' ? response.content[0].text : ''
+      const text = result.text
       if (!text) return { error: 'Empty response from AI' }
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-20250514',
-        promptTokens: response.usage?.input_tokens,
-        completionTokens: response.usage?.output_tokens,
+        model: 'gpt-4.1-mini',
+        promptTokens: result.tokensIn,
+        completionTokens: result.tokensOut,
       })
 
       // ── Parse response ─────────────────────────────────────────
@@ -1941,14 +1902,9 @@ export async function synthesizeProductStatus(
       manufacturing: manufacturingScore,
     }
 
-    // ── Call Sonnet for synthesis ──────────────────────────────────
-
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+    // ── Call OpenAI for synthesis ──────────────────────────────────
 
     try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
 
       const systemPrompt = `You are the cross-system synthesis engine for Fractional Forge, a platform helping hardware startups build, fund, and ship products. You are given a product's complete data across 4 dimensions:
 
@@ -2026,27 +1982,22 @@ Rules:
       const userPrompt = `Synthesize the status of this product and identify improvements:\n\n${JSON.stringify(productData, null, 2)}`
 
       // INTENT: 15s timeout — synthesis should not block the user
-      const synthesisPromise = client.messages.create({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1500,
-        system: systemPrompt,
-        messages: [{ role: 'user', content: userPrompt }],
-      })
+      const synthesisPromise = callOpenAI(systemPrompt, userPrompt, "gpt-4.1-mini", 1500, 15_000)
 
       const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000))
       const result = await Promise.race([synthesisPromise, timeoutPromise])
 
       if (!result) return { error: 'Synthesis timed out — please try again' }
-      if (!('content' in result)) return { error: 'Unexpected response from AI' }
+      if (!('text' in result)) return { error: 'Unexpected response from AI' }
 
-      const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+      const text = result.text
       if (!text) return { error: 'Empty response from AI' }
 
       // FLOW: Track AI usage for billing
       await trackUsage({
-        model: 'claude-sonnet-4-20250514',
-        promptTokens: result.usage?.input_tokens,
-        completionTokens: result.usage?.output_tokens,
+        model: 'gpt-4.1-mini',
+        promptTokens: result.tokensIn,
+        completionTokens: result.tokensOut,
       })
 
       // ── Parse response ─────────────────────────────────────────
@@ -2069,7 +2020,7 @@ Rules:
         nextAction: typeof parsed.nextAction === 'string' ? parsed.nextAction : 'Run market assessment to establish baseline data',
         isLocalOptimum: typeof parsed.isLocalOptimum === 'boolean' ? parsed.isLocalOptimum : false,
         synthesized_at: new Date().toISOString(),
-        model_used: 'claude-sonnet-4-20250514',
+        model_used: 'gpt-4.1-mini',
       }
 
       // ── Save to product ────────────────────────────────────────
@@ -2133,13 +2084,10 @@ export async function generateDesignBriefFromSynthesis(
       .eq('foundry_id', foundryId)
       .order('iteration_number', { ascending: true })
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return { error: 'OPENAI_API_KEY not configured' }
 
     try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
-
       const systemPrompt = `You are Max, the CTO of Fractional Forge. You translate business improvements into engineering design briefs for hardware products.
 
 Given a product's current data and a list of approved improvements from the synthesis engine, generate a coherent design brief that:
@@ -2184,25 +2132,26 @@ Return ONLY a valid JSON object (no markdown fences):
       }
 
       const result = await Promise.race([
-        client.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1500,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: `Generate a design brief for this product incorporating the approved improvements:\n\n${JSON.stringify(productContext, null, 2)}` }],
-        }),
+        callOpenAI(
+          systemPrompt,
+          `Generate a design brief for this product incorporating the approved improvements:\n\n${JSON.stringify(productContext, null, 2)}`,
+          'gpt-4.1-mini',
+          1500,
+          15000,
+        ),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 15000)),
       ])
 
       if (!result) return { error: 'Brief generation timed out' }
-      if (!('content' in result)) return { error: 'Unexpected AI response' }
+      if (!('text' in result)) return { error: 'Unexpected AI response' }
 
-      const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
+      const text = result.text
       if (!text) return { error: 'Empty AI response' }
 
       await trackUsage({
-        model: 'claude-sonnet-4-20250514',
-        promptTokens: result.usage?.input_tokens,
-        completionTokens: result.usage?.output_tokens,
+        model: 'gpt-4.1-mini',
+        promptTokens: result.tokensIn,
+        completionTokens: result.tokensOut,
       })
 
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
@@ -2350,13 +2299,10 @@ export async function reviewBriefFeasibility(
 
     if (fetchError || !brief) return { error: 'Brief not found' }
 
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { error: 'ANTHROPIC_API_KEY not configured' }
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return { error: 'OPENAI_API_KEY not configured' }
 
     try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
-
       const systemPrompt = `You are Max, CTO of Fractional Forge. You're a pragmatic engineer who's built hardware products from prototype to mass production. You review design briefs for technical feasibility.
 
 Assess this brief honestly:
@@ -2371,20 +2317,21 @@ Return ONLY a valid JSON object (no markdown):
 {"review": "your assessment text", "feasible": true/false}`
 
       const result = await Promise.race([
-        client.messages.create({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 500,
-          system: systemPrompt,
-          messages: [{ role: 'user', content: `Review this design brief:\n\n${JSON.stringify(brief.brief_content, null, 2)}` }],
-        }),
+        callOpenAI(
+          systemPrompt,
+          `Review this design brief:\n\n${JSON.stringify(brief.brief_content, null, 2)}`,
+          'gpt-4.1-mini',
+          500,
+          10000,
+        ),
         new Promise<null>((resolve) => setTimeout(() => resolve(null), 10000)),
       ])
 
       if (!result) return { error: 'Review timed out' }
-      if (!('content' in result)) return { error: 'Unexpected AI response' }
+      if (!('text' in result)) return { error: 'Unexpected AI response' }
 
-      const text = result.content[0]?.type === 'text' ? result.content[0].text : ''
-      await trackUsage({ model: 'claude-sonnet-4-20250514', promptTokens: result.usage?.input_tokens, completionTokens: result.usage?.output_tokens })
+      const text = result.text
+      await trackUsage({ model: 'gpt-4.1-mini', promptTokens: result.tokensIn, completionTokens: result.tokensOut })
 
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       try {

@@ -249,36 +249,32 @@ Do NOT:
 - Sound like a generic assistant — sound like ${specialist.name}${voiceReminder}`
 
     // ── 5. Generate deliverable via AI ────────────────────────────
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) return { error: 'AI service not configured' }
 
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 120_000)
 
-    // DECISION: Opus for high-judgment specialists AND data-heavy specialists.
-    // Round 3 testing: Opus scored 23-25/25 on strategy/legal tasks. Sal's prospect
-    // lists keep truncating with Sonnet (31KB+ incomplete). Opus produces more
-    // proportionate output that respects the 15KB scope cap.
-    // Sonnet is faster/cheaper for marketing content (Mia, Cal, Max, etc.).
+    // DECISION: GPT-5.4 for high-judgment specialists AND data-heavy specialists.
+    // GPT-4.1-mini is faster/cheaper for marketing content (Mia, Cal, Max, etc.).
     const taskDelegationModel = ['legal-counsel', 'finance-lead', 'fundraising-advisor', 'strategist', 'sales-lead'].includes(specialistId)
-      ? 'claude-opus-4-7'
-      : 'claude-sonnet-4-6'
+      ? 'gpt-5.4'
+      : 'gpt-4.1-mini'
 
     try {
       let response: Response
       try {
-        response = await fetch("https://api.anthropic.com/v1/messages", {
+        response = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            "x-api-key": apiKey,
-            "anthropic-version": "2023-06-01",
+            "Authorization": `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
             model: taskDelegationModel,
-            max_tokens: 8192,
-            system: executionPrompt,
+            max_completion_tokens: 8192,
             messages: [
+              { role: "system", content: executionPrompt },
               {
                 role: "user",
                 content: feedback
@@ -329,13 +325,13 @@ Do NOT:
       }
 
       const data = await response.json()
-      const content = (data.content?.[0]?.text ?? "").trim()
+      const content = (data.choices?.[0]?.message?.content ?? "").trim()
 
       void logLlmUsage({
         action: 'task_delegation',
         modelUsed: taskDelegationModel,
-        tokensIn: data.usage?.input_tokens ?? 0,
-        tokensOut: data.usage?.output_tokens ?? 0,
+        tokensIn: data.usage?.prompt_tokens ?? 0,
+        tokensOut: data.usage?.completion_tokens ?? 0,
         status: 'success',
         foundryId: profile.foundry_id ?? undefined,
         userId: user.id,

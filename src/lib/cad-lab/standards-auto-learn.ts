@@ -47,9 +47,9 @@ export async function generateAndStoreStandards(
   productDescription: string,
   existingStandardCodes: string[],
 ): Promise<DesignStandard[]> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    console.warn("[standards-auto-learn] ANTHROPIC_API_KEY not configured, skipping")
+    console.warn("[standards-auto-learn] OPENAI_API_KEY not configured, skipping")
     return []
   }
 
@@ -93,20 +93,11 @@ ${existingList}
 Identify 3-5 real engineering standards relevant to this product. Focus on standards that affect physical dimensions, materials, safety, and manufacturing.`
 
   try {
-    const Anthropic = (await import("@anthropic-ai/sdk")).default
-    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+    const { callOpenAI } = await import("@/lib/cad-lab/api-helpers")
 
-    const response = await client.messages.create({
-      model: "claude-opus-4-7",
-      max_tokens: 16384,
-      system: systemPrompt,
-      messages: [{ role: "user", content: userPrompt }],
-    })
+    const result = await callOpenAI(systemPrompt, userPrompt, "gpt-5.4", 16384, 240_000)
 
-    const text = response.content
-      .filter(block => block.type === "text")
-      .map(block => block.type === "text" ? block.text : "")
-      .join("")
+    const text = result.text
 
     // Parse JSON from response — find the outermost balanced braces,
     // tracking whether we're inside a JSON string to ignore braces in values

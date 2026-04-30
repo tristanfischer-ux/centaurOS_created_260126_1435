@@ -19,9 +19,9 @@
  */
 
 import { createClient } from "@/lib/supabase/server"
-import { withRetry } from "@/lib/retry"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { checkRateLimit } from '@/lib/security/rate-limit'
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 
 // ─── Types ──────────────────────────────────────────────────────────
@@ -42,56 +42,14 @@ export interface GrammarResearchResult {
   tokensOut: number
 }
 
-// ─── Claude API ─────────────────────────────────────────────────────
+// ─── AI Call (OpenAI — gpt-5.4 for research synthesis) ──────────────
 
-async function callClaude(
+async function callResearchAI(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 16384,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
-
-  return withRetry(async () => {
-    const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: maxTokens,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
-      },
-      280_000, // Clamped from 300_000 — Vercel 300s cap leaves no headroom
-    )
-
-    if (!response.ok) {
-      const errText = await response.text()
-      throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
-    }
-
-    const data = await response.json()
-    return {
-      text: data.content?.[0]?.text ?? "",
-      tokensIn: data.usage?.input_tokens ?? 0,
-      tokensOut: data.usage?.output_tokens ?? 0,
-    }
-  }, {
-    maxRetries: 2,
-    baseDelay: 3000,
-    shouldRetry: (error) => {
-      const msg = error.message.toLowerCase()
-      return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
-        msg.includes('network') || msg.includes('timeout') || msg.includes('529')
-    },
-  })
+  return callOpenAI(systemPrompt, userPrompt, "gpt-5.4", maxTokens, 280_000)
 }
 
 // ─── Grammar Template ───────────────────────────────────────────────
@@ -226,7 +184,7 @@ I need to create a parametric CAD grammar that can generate 3D models of this pr
 
 Be specific with dimensions and ranges. Focus on what a parametric model needs.`
 
-    const { text: researchText, tokensIn: rIn, tokensOut: rOut } = await callClaude(
+    const { text: researchText, tokensIn: rIn, tokensOut: rOut } = await callResearchAI(
       "You are a senior mechanical engineer. Provide precise engineering specifications.",
       researchPrompt,
       4096,
@@ -265,7 +223,7 @@ Requirements:
 
 Output ONLY the Python code.`
 
-    const { text: grammarCode, tokensIn: gIn, tokensOut: gOut } = await callClaude(
+    const { text: grammarCode, tokensIn: gIn, tokensOut: gOut } = await callResearchAI(
       GRAMMAR_TEMPLATE,
       generatePrompt,
       16384,
@@ -296,7 +254,7 @@ Output ONLY the Python code.`
     }
 
     // ── Step 4: Generate metadata ──
-    const { text: metadataText, tokensIn: mIn, tokensOut: mOut } = await callClaude(
+    const { text: metadataText, tokensIn: mIn, tokensOut: mOut } = await callResearchAI(
       `Extract metadata from this grammar code. Return ONLY a JSON object:
 {
   "domain_keywords": ["keyword1", "keyword2", ...],

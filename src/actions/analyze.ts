@@ -16,12 +16,12 @@ import {
 } from '@/lib/business-plan-types'
 import type { BusinessPlanAnalysis } from '@/lib/business-plan-types'
 
-// DECISION: Objectives extraction needs Opus — Sonnet returns empty arrays
-// on complex action plans because it can't synthesize day-by-day checklists
-// into structured objectives. Other sections (hires, funding, products) are
-// simpler extraction tasks that Sonnet handles fine.
-const OBJECTIVES_MODEL = 'claude-opus-4-7'
-const SECTION_MODEL = 'claude-sonnet-4-6'
+import { callOpenAI } from '@/lib/cad-lab/api-helpers'
+
+// DECISION: Objectives extraction needs a strong model — Sonnet returned empty
+// arrays on complex action plans. Other sections are simpler extraction tasks.
+const OBJECTIVES_MODEL = 'gpt-5.4'
+const SECTION_MODEL = 'gpt-4.1-mini'
 const OBJECTIVES_MAX_TOKENS = 8192
 const SECTION_MAX_TOKENS = 4096
 
@@ -167,14 +167,14 @@ function safeParseJSON(raw: string, sectionName: string): unknown | null {
 }
 
 /**
- * Call Claude for a single section extraction.
+ * Call OpenAI for a single section extraction.
  *
  * @description Each section gets its own focused prompt and runs as an
- * independent Sonnet call. The business plan text is passed identically
+ * independent call. The business plan text is passed identically
  * to all 5 calls.
  */
 async function extractSection(
-  client: InstanceType<typeof import('@anthropic-ai/sdk').default>,
+  _unused: unknown,
   businessPlanText: string,
   sectionPrompt: string,
   modelOverride?: string,
@@ -184,38 +184,36 @@ async function extractSection(
 ): Promise<string> {
   const callStartedAt = Date.now()
   const modelId = modelOverride ?? SECTION_MODEL
-  const response = await client.messages.create({
-    model: modelId,
-    max_tokens: maxTokensOverride ?? SECTION_MAX_TOKENS,
-    system: sectionPrompt,
-    messages: [
-      { role: 'user', content: `Analyze the following business plan:\n\n${businessPlanText}` },
-    ],
-  })
+  const result = await callOpenAI(
+    sectionPrompt,
+    `Analyze the following business plan:\n\n${businessPlanText}`,
+    modelId,
+    maxTokensOverride ?? SECTION_MAX_TOKENS,
+    240_000,
+  )
 
   // Money: log the LLM call to ai_credits_ledger (via SHARED audit_log trigger).
-  // Sage owns business-plan analysis. Map full model ids to the cost-rules key.
+  // Sage owns business-plan analysis.
   if (ledgerCtx) {
-    const costModelKey = modelId.includes('opus') ? 'opus' : modelId.includes('haiku') ? 'haiku' : 'sonnet'
+    const costModelKey = modelId.includes('5.4') ? 'opus' : 'sonnet'
     void recordSpecialistCall({
       foundryId: ledgerCtx.foundryId,
       specialistId: 'sage',
       section: 'plan',
       model: costModelKey,
-      inputTokens: response.usage?.input_tokens ?? 0,
-      outputTokens: response.usage?.output_tokens ?? 0,
+      inputTokens: result.tokensIn,
+      outputTokens: result.tokensOut,
       durationMs: Date.now() - callStartedAt,
       invokedByUserId: ledgerCtx.userId,
       entityId: ledgerCtx.sectionName,
     })
   }
 
-  const textBlock = response.content.find(block => block.type === 'text')
-  if (!textBlock || textBlock.type !== 'text') {
+  if (!result.text) {
     throw new Error('AI returned no text content')
   }
 
-  return stripFences(textBlock.text)
+  return stripFences(result.text)
 }
 
 // ─── Main Action ──────────────────────────────────────────────────────
@@ -233,7 +231,7 @@ export async function analyzeBusinessPlan(
   formData: FormData
 ): Promise<{ analysis?: BusinessPlanAnalysis; error?: string }> {
   return withAIGate('analyze', async ({ user, foundryId }) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) return { error: 'AI analysis service is not configured' }
 
     // SECURITY: Rate limit AI calls to prevent cost abuse
@@ -274,9 +272,6 @@ export async function analyzeBusinessPlan(
       // at ~100k chars to keep costs reasonable and avoid timeouts.
       const truncatedText = text.slice(0, 100000)
 
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
-
       // Money: ledger context for ai_credits_ledger via SHARED audit_log.
       const ledgerBase = { foundryId, userId: user.id }
 
@@ -292,12 +287,12 @@ export async function analyzeBusinessPlan(
         productsRaw,
         summaryRaw,
       ] = await Promise.all([
-        extractSection(client, truncatedText, OBJECTIVES_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'objectives' }),
-        extractSection(client, truncatedText, HIRING_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'hiring' }),
-        extractSection(client, truncatedText, CAPACITY_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'capacity' }),
-        extractSection(client, truncatedText, FUNDING_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'funding' }),
-        extractSection(client, truncatedText, PRODUCTS_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'products' }),
-        extractSection(client, truncatedText, SUMMARY_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'summary' }),
+        extractSection(null, truncatedText, OBJECTIVES_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'objectives' }),
+        extractSection(null, truncatedText, HIRING_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'hiring' }),
+        extractSection(null, truncatedText, CAPACITY_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'capacity' }),
+        extractSection(null, truncatedText, FUNDING_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'funding' }),
+        extractSection(null, truncatedText, PRODUCTS_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'products' }),
+        extractSection(null, truncatedText, SUMMARY_PROMPT, undefined, undefined, { ...ledgerBase, sectionName: 'summary' }),
       ])
 
       // ── Parse and validate each section independently ──

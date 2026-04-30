@@ -1,7 +1,7 @@
 /**
  * @file investor-intel.ts
  *
- * @description Server actions for investor news intelligence. Uses Anthropic web search
+ * @description Server actions for investor news intelligence. Uses OpenAI
  * to find current news, social media activity, and deal signals about investor firms.
  * Results are cached in the investor_news_intel table for 7 days.
  *
@@ -14,8 +14,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getAnthropicKey } from '@/lib/ai/api-keys'
-import Anthropic from '@anthropic-ai/sdk'
+import { callOpenAI } from '@/lib/cad-lab/api-helpers'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -128,7 +127,7 @@ export async function getInvestorIntelBatch(
 // ---------------------------------------------------------------------------
 
 /**
- * Generates fresh intelligence for an investor firm using Anthropic web search.
+ * Generates fresh intelligence for an investor firm using OpenAI.
  * Upserts the result into investor_news_intel (replacing any previous intel).
  *
  * @returns The generated intel, or null if generation failed.
@@ -168,9 +167,9 @@ export async function generateInvestorIntel(
     return null
   }
 
-  const apiKey = getAnthropicKey()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    console.error('[generateInvestorIntel] No Anthropic API key')
+    console.error('[generateInvestorIntel] No OPENAI_API_KEY')
     return null
   }
 
@@ -198,29 +197,15 @@ export async function generateInvestorIntel(
   const searchPrompt = buildIntelPrompt(firmName, firmType, website, sectors, location)
 
   try {
-    const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
+    const result = await callOpenAI(
+      `You are an investor intelligence analyst. Research the specified investment firm and provide a structured intelligence briefing based on your knowledge and any publicly available information. Focus on: recent fund activity, portfolio news, team changes, social media presence, and market signals. Be factual. If you're not confident about recent information, say so honestly rather than fabricating. Include source URLs where possible.`,
+      searchPrompt,
+      'gpt-4.1-mini',
+      2000,
+      240_000,
+    )
 
-    // DECISION: Use web_search tool to get current data about the firm.
-    // Non-streaming because we need to parse the structured response.
-    // GOTCHA: Use non-beta messages.create with a structured prompt instead
-    // of beta.messages.create — the beta web_search tool types are unstable
-    // and cause TS errors. The non-beta API + explicit web research prompt
-    // achieves the same result without type gymnastics.
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 2000,
-      system: `You are an investor intelligence analyst. Research the specified investment firm and provide a structured intelligence briefing based on your knowledge and any publicly available information. Focus on: recent fund activity, portfolio news, team changes, social media presence, and market signals. Be factual. If you're not confident about recent information, say so honestly rather than fabricating. Include source URLs where possible.`,
-      messages: [{ role: 'user', content: searchPrompt }],
-    })
-
-    // Extract text content from response
-    let textContent = ''
-    for (const block of response.content) {
-      if (block.type === 'text') {
-        textContent += block.text
-      }
-    }
-
+    const textContent = result.text
     if (!textContent) {
       console.error('[generateInvestorIntel] No text content in response')
       return null
@@ -245,7 +230,7 @@ export async function generateInvestorIntel(
         current_focus: intel.currentFocus?.slice(0, 2000) ?? null,
         recent_deals: intel.recentDeals?.slice(0, 2000) ?? null,
         generated_at: new Date().toISOString(),
-        generated_by: 'anthropic-sonnet',
+        generated_by: 'openai-gpt-4.1-mini',
         generated_by_user_id: user.id,
       }, { onConflict: 'listing_id' })
       .select()

@@ -9,7 +9,7 @@
  * text if JSON extraction fails.
  */
 
-import Anthropic from "@anthropic-ai/sdk"
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 
@@ -249,7 +249,7 @@ function extractPriceFromMeta(html: string): { price: number; title: string } | 
  * 3. Quality-gated Haiku extraction (paid, skipped for SPA skeletons)
  *
  * @param url - Product page URL to verify
- * @param apiKey - Anthropic API key for Haiku fallback
+ * @param apiKey - OpenAI API key for GPT fallback
  * @param partName - Original part name for accurate matching on search result pages
  * @returns Extracted price data or null if all tiers fail
  */
@@ -285,16 +285,11 @@ async function verifyProductPrice(
     return null
   }
 
-  // Tier 3: Haiku extraction (paid)
+  // Tier 3: GPT-4.1-mini extraction (paid)
   try {
-    const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 256,
-      messages: [
-        {
-          role: "user",
-          content: `Find the product that best matches "${partName}" and extract its unit price in GBP (£).
+    const result = await callOpenAI(
+      "You extract product pricing data from web page content. Return only valid JSON.",
+      `Find the product that best matches "${partName}" and extract its unit price in GBP (£).
 Return ONLY valid JSON, no markdown:
 {"title": "Product name", "price": 12.34, "url": "https://..."}
 
@@ -304,20 +299,18 @@ Page URL: ${page.finalUrl}
 
 Page content (first 4000 chars):
 ${strippedText.slice(0, 4000)}`,
-        },
-      ],
-    })
+      "gpt-4.1-mini",
+      256,
+      120_000,
+    )
 
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("")
+    const text = result.text
 
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
       if (parsed.price && parsed.price > 0) {
-        console.log(`[BUY-VERIFY] Haiku hit for "${partName}": £${parsed.price.toFixed(2)} — "${parsed.title || ""}"`)
+        console.log(`[BUY-VERIFY] GPT hit for "${partName}": £${parsed.price.toFixed(2)} — "${parsed.title || ""}"`)
         return {
           price: parsed.price,
           title: parsed.title || "",
@@ -326,10 +319,10 @@ ${strippedText.slice(0, 4000)}`,
       }
     }
 
-    console.log(`[BUY-VERIFY] Haiku miss for "${partName}": no valid price extracted`)
+    console.log(`[BUY-VERIFY] GPT miss for "${partName}": no valid price extracted`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.log(`[BUY-VERIFY] Haiku error for "${partName}": ${message}`)
+    console.log(`[BUY-VERIFY] GPT error for "${partName}": ${message}`)
   }
 
   return null
@@ -471,7 +464,7 @@ function pickBestProduct(products: RSProduct[], cleanedQuery: string): RSProduct
  * 4. If extraction fails → use Haiku on stripped text as fallback
  *
  * @param partName - Original BOM part name
- * @param apiKey - Anthropic API key for Haiku fallback
+ * @param apiKey - OpenAI API key for GPT fallback
  * @returns Search result with products array
  */
 async function scrapePartFromRS(
@@ -531,14 +524,9 @@ async function scrapePartFromRS(
   }
 
   try {
-    const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
-    const response = await client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 256,
-      messages: [
-        {
-          role: "user",
-          content: `This is an RS Components (uk.rs-online.com) search results page for "${cleaned}".
+    const result = await callOpenAI(
+      "You extract product data from RS Components search results. Return only valid JSON.",
+      `This is an RS Components (uk.rs-online.com) search results page for "${cleaned}".
 Find the best matching product and extract its details.
 
 Return ONLY valid JSON, no markdown:
@@ -548,20 +536,18 @@ If you cannot find a matching product, return: {"title": "", "price": 0, "url": 
 
 Page content (first 4000 chars):
 ${strippedText.slice(0, 4000)}`,
-        },
-      ],
-    })
+      "gpt-4.1-mini",
+      256,
+      120_000,
+    )
 
-    const text = response.content
-      .filter((b): b is Anthropic.TextBlock => b.type === "text")
-      .map((b) => b.text)
-      .join("")
+    const text = result.text
 
     const jsonMatch = text.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
       if (parsed.price && parsed.price > 0) {
-        console.log(`[BUY-SEARCH] Haiku search page hit for "${partName}": £${parsed.price.toFixed(2)} — "${parsed.title || ""}"`)
+        console.log(`[BUY-SEARCH] GPT search page hit for "${partName}": £${parsed.price.toFixed(2)} — "${parsed.title || ""}"`)
         return {
           partName,
           products: [
@@ -577,10 +563,10 @@ ${strippedText.slice(0, 4000)}`,
       }
     }
 
-    console.log(`[BUY-SEARCH] Haiku search page miss for "${partName}"`)
+    console.log(`[BUY-SEARCH] GPT search page miss for "${partName}"`)
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
-    console.log(`[BUY-SEARCH] Haiku fallback error for "${partName}": ${message}`)
+    console.log(`[BUY-SEARCH] GPT fallback error for "${partName}": ${message}`)
   }
 
   return { partName, products: [] }
@@ -619,19 +605,17 @@ async function withConcurrencyLimit<T>(
 // ─── Web Search Fallback (pre-v7 Sonnet approach) ───────────────────
 
 /**
- * Fallback: use Sonnet + web_search tool to find buy part products.
- * Restores the pre-v7 approach for when RS direct scraping fails (IP blocking on Vercel).
- * Anthropic handles the web fetching, so no IP blocking issues.
+ * Fallback: use GPT-4.1-mini to find buy part products from knowledge.
+ * Used when RS direct scraping fails (IP blocking on Vercel).
  *
  * @param partNames - Array of original BOM part names to search
- * @param apiKey - Anthropic API key
+ * @param _apiKey - API key (unused, callOpenAI reads from env)
  * @returns Search results for each part
  */
 async function searchViaWebSearch(
   partNames: string[],
-  apiKey: string,
+  _apiKey: string,
 ): Promise<BuyPartSearchResult[]> {
-  const client = new Anthropic({ apiKey, timeout: 240_000, maxRetries: 0 })
   const allResults: BuyPartSearchResult[] = []
 
   // INTENT: Batch parts into groups of 5 to balance cost vs quality
@@ -643,42 +627,15 @@ async function searchViaWebSearch(
     const partList = cleanedBatch.map((p, idx) => `${idx + 1}. "${p.cleaned}"`).join("\n")
 
     try {
-      let messages: Anthropic.MessageParam[] = [
-        {
-          role: "user",
-          content: `Find UK supplier products (with prices in GBP) for these parts. Search RS Components, Farnell, DigiKey, or McMaster-Carr.\n\n${partList}\n\nFor each part, return the best matching product with title, URL, price (GBP), and source.\nReturn a JSON array:\n[{"partName": "original name", "title": "Product Title", "url": "https://...", "price": 12.34, "source": "RS Components"}]\n\nIf you cannot find a product for a part, omit it from the array.`,
-        },
-      ]
+      const result = await callOpenAI(
+        "You are a procurement assistant. Find real products from UK electronic/mechanical component suppliers. Always search for actual products with real prices. Return only valid JSON.",
+        `Find UK supplier products (with prices in GBP) for these parts. Search RS Components, Farnell, DigiKey, or McMaster-Carr.\n\n${partList}\n\nFor each part, return the best matching product with title, URL, price (GBP), and source.\nReturn a JSON array:\n[{"partName": "original name", "title": "Product Title", "url": "https://...", "price": 12.34, "source": "RS Components"}]\n\nIf you cannot find a product for a part, omit it from the array.`,
+        "gpt-4.1-mini",
+        4096,
+        240_000,
+      )
 
-      let finalText = ""
-      const maxTurns = 8
-
-      for (let turn = 0; turn < maxTurns; turn++) {
-        const response = await client.messages.create({
-          model: "claude-sonnet-4-6",
-          max_tokens: 4096,
-          system: "You are a procurement assistant. Find real products from UK electronic/mechanical component suppliers. Always search for actual products with real prices. Return only valid JSON.",
-          tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 10 }],
-          messages,
-        })
-
-        // INTENT: Collect text blocks from the response
-        for (const block of response.content) {
-          if (block.type === "text") finalText += block.text
-        }
-
-        // INTENT: Handle pause_turn — model needs more tool calls to finish
-        if (response.stop_reason === "pause_turn") {
-          messages = [
-            ...messages,
-            { role: "assistant", content: response.content },
-            { role: "user", content: "Continue searching for the remaining parts." },
-          ]
-          continue
-        }
-
-        break // end_turn or max_tokens — done
-      }
+      const finalText = result.text
 
       // INTENT: Parse JSON array from response text
       const jsonMatch = finalText.match(/\[[\s\S]*\]/)
@@ -750,9 +707,9 @@ export async function searchBuyPartProducts(
     return partNames.map((name) => ({ partName: name, products: [] }))
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
-    console.error("[BUY-SEARCH] ANTHROPIC_API_KEY not set")
+    console.error("[BUY-SEARCH] OPENAI_API_KEY not set")
     return partNames.map((name) => ({ partName: name, products: [] }))
   }
 
@@ -781,7 +738,7 @@ export async function searchBuyPartProducts(
   }
 
   // INTENT: If RS blocked (>60% failure), fall back to web_search for failed parts only.
-  // RS blocks Vercel IPs intermittently — Sonnet web_search bypasses this since Anthropic handles fetching.
+  // RS blocks Vercel IPs intermittently — GPT-4.1-mini web search fallback used when RS direct scraping fails.
   const failedParts = allResults.filter((r) => r.products.length === 0).map((r) => r.partName)
   const failRate = allResults.length > 0 ? failedParts.length / allResults.length : 0
 

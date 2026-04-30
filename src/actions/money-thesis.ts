@@ -196,7 +196,7 @@ export async function saveThesisVersion(
 // Business-plan → thesis extraction
 // ============================================================================
 
-const THESIS_EXTRACTION_MODEL = 'claude-opus-4-7'
+const THESIS_EXTRACTION_MODEL = 'gpt-5.4'
 const THESIS_EXTRACTION_MAX_TOKENS = 2048
 const THESIS_EXTRACTION_MAX_CHARS = 20_000
 
@@ -261,8 +261,8 @@ function safeParseExtractedThesis(raw: string): ExtractedThesis | null {
 }
 
 /**
- * Parse a raw business-plan text blob into a structured thesis. Uses Claude
- * Opus via the Anthropic SDK and records the LLM call to the shared specialist
+ * Parse a raw business-plan text blob into a structured thesis. Uses OpenAI
+ * via callOpenAI and records the LLM call to the shared specialist
  * audit log so it shows up in the Money credits ledger. Never throws — callers
  * receive a tagged error string on any failure.
  */
@@ -270,7 +270,7 @@ export async function extractThesisFromBusinessPlan(args: {
   text: string
 }): Promise<{ error: string } | { success: true; extracted: ExtractedThesis }> {
   return withAuth(async ({ user, foundryId }) => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
     if (!apiKey) return { error: 'ai_not_configured' }
 
     const raw = (args.text ?? '').trim()
@@ -279,21 +279,16 @@ export async function extractThesisFromBusinessPlan(args: {
     const planText = raw.slice(0, THESIS_EXTRACTION_MAX_CHARS)
 
     try {
-      const Anthropic = (await import('@anthropic-ai/sdk')).default
-      const client = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 })
+      const { callOpenAI } = await import('@/lib/cad-lab/api-helpers')
 
       const startedAt = Date.now()
-      const response = await client.messages.create({
-        model: THESIS_EXTRACTION_MODEL,
-        max_tokens: THESIS_EXTRACTION_MAX_TOKENS,
-        system: THESIS_EXTRACTION_SYSTEM_PROMPT,
-        messages: [
-          {
-            role: 'user',
-            content: `Here is the business plan:\n\n${planText}\n\nReturn the JSON object only.`,
-          },
-        ],
-      })
+      const result = await callOpenAI(
+        THESIS_EXTRACTION_SYSTEM_PROMPT,
+        `Here is the business plan:\n\n${planText}\n\nReturn the JSON object only.`,
+        THESIS_EXTRACTION_MODEL,
+        THESIS_EXTRACTION_MAX_TOKENS,
+        120_000,
+      )
 
       // Log the call to the shared specialist audit log (hooks into the
       // ai_credits_ledger trigger). Fiona owns fundraising.
@@ -302,22 +297,21 @@ export async function extractThesisFromBusinessPlan(args: {
         specialistId: 'fundraising-advisor',
         section: 'money',
         model: 'opus',
-        inputTokens: response.usage?.input_tokens ?? 0,
-        outputTokens: response.usage?.output_tokens ?? 0,
+        inputTokens: result.tokensIn,
+        outputTokens: result.tokensOut,
         durationMs: Date.now() - startedAt,
         invokedByUserId: user.id,
         entityId: 'thesis_extraction',
       })
 
-      const textBlock = response.content.find((b) => b.type === 'text')
-      if (!textBlock || textBlock.type !== 'text') return { error: 'extraction_failed' }
+      if (!result.text) return { error: 'extraction_failed' }
 
-      const extracted = safeParseExtractedThesis(textBlock.text)
+      const extracted = safeParseExtractedThesis(result.text)
       if (!extracted) return { error: 'extraction_failed' }
 
       return { success: true as const, extracted }
     } catch (err) {
-      console.error('[extractThesisFromBusinessPlan] Anthropic call failed:', err)
+      console.error('[extractThesisFromBusinessPlan] OpenAI call failed:', err)
       return { error: 'extraction_failed' }
     }
   })

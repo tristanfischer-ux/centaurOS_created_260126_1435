@@ -527,33 +527,34 @@ export async function deleteContacts(
 // ═══════════════════════════════════════════════════════════════════════════════
 
 /**
- * Calls Claude for any outreach AI task (research, email generation, etc.).
+ * Calls OpenAI for any outreach AI task (research, email generation, etc.).
  */
 async function callClaude(
     systemPrompt: string,
     userPrompt: string,
     context: { foundryId?: string; userId?: string } = {},
 ): Promise<{ text: string }> {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
     const { foundryId, userId } = context
-    const outreachComposeModel = "claude-sonnet-4-6"
+    const outreachComposeModel = "gpt-4.1-mini"
 
     return withRetry(async () => {
         let response: Response
         try {
-            response = await fetch("https://api.anthropic.com/v1/messages", {
+            response = await fetch("https://api.openai.com/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
-                    "x-api-key": apiKey,
-                    "anthropic-version": "2023-06-01",
+                    "Authorization": `Bearer ${apiKey}`,
                 },
                 body: JSON.stringify({
                     model: outreachComposeModel,
                     max_tokens: 4096,
-                    system: systemPrompt,
-                    messages: [{ role: "user", content: userPrompt }],
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt },
+                    ],
                 }),
                 signal: AbortSignal.timeout(120_000),
             })
@@ -587,20 +588,20 @@ async function callClaude(
                 foundryId,
                 userId,
             })
-            throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
+            throw new Error(`OpenAI API error (${response.status}): ${errText.slice(0, 300)}`)
         }
 
         const data = await response.json()
         void logLlmUsage({
             action: 'outreach_compose',
             modelUsed: outreachComposeModel,
-            tokensIn: data.usage?.input_tokens ?? 0,
-            tokensOut: data.usage?.output_tokens ?? 0,
+            tokensIn: data.usage?.prompt_tokens ?? 0,
+            tokensOut: data.usage?.completion_tokens ?? 0,
             status: 'success',
             foundryId,
             userId,
         })
-        return { text: data.content?.[0]?.text ?? "" }
+        return { text: data.choices?.[0]?.message?.content ?? "" }
     }, {
         maxRetries: 2,
         baseDelay: 2000,

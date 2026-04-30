@@ -23,9 +23,9 @@ import { createClient } from "@/lib/supabase/server"
 import { researchAndCreateGrammar } from "@/actions/cad-grammar-research"
 import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 import { checkRateLimit } from '@/lib/security/rate-limit'
-import { withRetry } from '@/lib/retry'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -122,17 +122,13 @@ interface ModalGrammarResponse {
   } | null
 }
 
-// ─── Claude API Call (shared utility) ────────────────────────────────
+// ─── AI Call (OpenAI — gpt-4.1-mini for grammar selection/extraction) ────
 
 /**
- * Calls Claude API directly for grammar-related AI operations.
- *
- * @param systemPrompt - System instruction
- * @param userPrompt - User message
- * @param maxTokens - Max output tokens
- * @returns Response text and token counts
+ * Calls OpenAI gpt-4.1-mini for grammar-related AI operations (small structured output).
+ * Replaces previous direct Anthropic API call.
  */
-async function callClaude(
+async function callGrammarAI(
   systemPrompt: string,
   userPrompt: string,
   maxTokens: number = 4096,
@@ -141,51 +137,7 @@ async function callClaude(
   tokensIn: number
   tokensOut: number
 }> {
-  const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-  if (!apiKey) throw new Error("ANTHROPIC_API_KEY not configured")
-
-  return withRetry(async () => {
-    const response = await fetchWithTimeout(
-      "https://api.anthropic.com/v1/messages",
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-sonnet-4-6",
-          max_tokens: maxTokens,
-          system: systemPrompt,
-          messages: [{ role: "user", content: userPrompt }],
-        }),
-      },
-      120_000, // 2 min — grammar selection/extraction is fast
-    )
-
-    if (!response.ok) {
-      const errText = await response.text()
-      throw new Error(`Claude API error (${response.status}): ${errText.slice(0, 300)}`)
-    }
-
-    const data = await response.json()
-    const text: string = data.content?.[0]?.text ?? ""
-
-    return {
-      text,
-      tokensIn: data.usage?.input_tokens ?? 0,
-      tokensOut: data.usage?.output_tokens ?? 0,
-    }
-  }, {
-    maxRetries: 2,
-    baseDelay: 2000,
-    shouldRetry: (error) => {
-      const msg = error.message.toLowerCase()
-      return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
-        msg.includes('network') || msg.includes('timeout') || msg.includes('529')
-    },
-  })
+  return callOpenAI(systemPrompt, userPrompt, "gpt-4.1-mini", maxTokens, 120_000)
 }
 
 // ─── Supabase Queries ───────────────────────────────────────────────
@@ -423,7 +375,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
   const userPrompt = `Product to design: "${productDescription}"`
 
   try {
-    const { text } = await callClaude(systemPrompt, userPrompt, 1024)
+    const { text } = await callGrammarAI(systemPrompt, userPrompt, 1024)
 
     // Parse JSON response
     const jsonStr = text.replace(/```json?\n?/g, "").replace(/```/g, "").trim()
@@ -558,7 +510,7 @@ Respond with ONLY a JSON object (no markdown, no explanation):
   const userPrompt = `Design request: "${productDescription}"`
 
   try {
-    const { text, tokensIn, tokensOut } = await callClaude(systemPrompt, userPrompt, 2048)
+    const { text, tokensIn, tokensOut } = await callGrammarAI(systemPrompt, userPrompt, 2048)
 
     // Parse JSON response
     const jsonStr = text.replace(/```json?\n?/g, "").replace(/```/g, "").trim()

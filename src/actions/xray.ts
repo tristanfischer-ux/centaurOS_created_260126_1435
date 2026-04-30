@@ -2621,32 +2621,33 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
         console.warn("[Forge] Internal DB query failed (non-blocking):", dbErr instanceof Error ? dbErr.message : dbErr)
       }
 
-      // 3. Send raw data + internal DB context to Claude Opus for synthesis
-      console.info("[Forge] Concept research: Synthesizing report with Claude Opus...")
-      const anthropicKey = process.env.ANTHROPIC_API_KEY?.trim()
-      if (!anthropicKey) throw new Error("ANTHROPIC_API_KEY not configured")
+      // 3. Send raw data + internal DB context to OpenAI for synthesis
+      console.info("[Forge] Concept research: Synthesizing report with GPT-5.4...")
+      const openaiKey = process.env.OPENAI_API_KEY?.trim()
+      if (!openaiKey) throw new Error("OPENAI_API_KEY not configured")
 
-      const xrayModel = "claude-opus-4-7"
+      const xrayModel = "gpt-5.4"
       const claudeData = await withRetry(async () => {
         let resp: Response
         try {
-          resp = await fetch("https://api.anthropic.com/v1/messages", {
+          resp = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              "x-api-key": anthropicKey,
-              "anthropic-version": "2023-06-01",
+              "Authorization": `Bearer ${openaiKey}`,
             },
             body: JSON.stringify({
               model: xrayModel,
-              max_tokens: 16384,
-              system: CONCEPT_RESEARCH_PROMPT,
-              messages: [{
-                role: "user",
-                content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}${internalDbContext}`,
-              }],
+              max_completion_tokens: 16384,
+              messages: [
+                { role: "system", content: CONCEPT_RESEARCH_PROMPT },
+                {
+                  role: "user",
+                  content: `Product concept to research: ${idea.trim()}\n\n=== RAW WEB RESEARCH DATA ===\n${webText || "(No web data available — synthesize from your knowledge)"}${internalDbContext}`,
+                },
+              ],
             }),
-            signal: AbortSignal.timeout(180_000), // 3 min — Opus with 16K output + internal DB context
+            signal: AbortSignal.timeout(180_000), // 3 min — GPT-5.4 with 16K output + internal DB context
           })
         } catch (err) {
           void logLlmUsage({
@@ -2678,15 +2679,15 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
             foundryId,
             userId: user.id,
           })
-          throw new Error(`Claude API error (${resp.status}): ${errText.slice(0, 300)}`)
+          throw new Error(`OpenAI API error (${resp.status}): ${errText.slice(0, 300)}`)
         }
 
         const json = await resp.json()
         void logLlmUsage({
           action: 'xray',
           modelUsed: xrayModel,
-          tokensIn: json.usage?.input_tokens ?? 0,
-          tokensOut: json.usage?.output_tokens ?? 0,
+          tokensIn: json.usage?.prompt_tokens ?? 0,
+          tokensOut: json.usage?.completion_tokens ?? 0,
           status: 'success',
           foundryId,
           userId: user.id,
@@ -2702,7 +2703,7 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
         },
       })
 
-      const report: string = claudeData.content?.[0]?.text ?? ""
+      const report: string = claudeData.choices?.[0]?.message?.content ?? ""
 
       const researchTime = Date.now() - start
 

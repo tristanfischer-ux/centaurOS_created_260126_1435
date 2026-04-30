@@ -28,10 +28,8 @@
  *   - Regen engine: src/actions/forge-v2-generate-one-module-image.ts
  */
 
-import Anthropic from "@anthropic-ai/sdk"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
-import { getAnthropicKey } from "@/lib/ai/api-keys"
 import { generateOneModuleImage } from "@/actions/forge-v2-generate-one-module-image"
 import type { CadLabModule } from "@/lib/cad-lab-types"
 
@@ -84,12 +82,12 @@ async function fetchImageAsBase64(
         const res = await fetch(url)
         if (!res.ok) return null
         const buf = Buffer.from(await res.arrayBuffer())
-        // Anthropic vision accepts up to ~5 MB per image. We cap at 1.5 MB
+        // OpenAI vision accepts up to ~20 MB per image. We cap at 1.5 MB
         // per image to stay well under the multi-image submission limit
         // (9 × 1.5 MB = 13.5 MB, fits comfortably in a single request).
         if (buf.length > 1_500_000) return null
         const mediaType = res.headers.get("content-type") ?? "image/png"
-        // Anthropic's vision API only accepts a specific whitelist.
+        // OpenAI's vision API only accepts a specific whitelist.
         const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"]
         const safeMedia = allowed.includes(mediaType) ? mediaType : "image/png"
         return { base64: buf.toString("base64"), mediaType: safeMedia }
@@ -100,7 +98,7 @@ async function fetchImageAsBase64(
 
 // ─── Action ────────────────────────────────────────────────────────────
 
-const MODEL = "claude-opus-4-20250514"
+const MODEL = "gpt-5.4"
 const MAX_REGENS_PER_INVOCATION = 3
 
 export async function reviewImageCoherence(
@@ -156,11 +154,11 @@ export async function reviewImageCoherence(
             }
         }
 
-        const apiKey = getAnthropicKey()
+        const apiKey = process.env.OPENAI_API_KEY?.trim()
         if (!apiKey) {
             return {
                 ok: false,
-                error: "ANTHROPIC_API_KEY not configured.",
+                error: "OPENAI_API_KEY not configured.",
                 errorCode: "NO_API_KEY",
             }
         }
@@ -195,45 +193,37 @@ export async function reviewImageCoherence(
             }
         }
 
-        // 3. Build the Opus vision call. Image 1 = cover (the reference
+        // 3. Build the OpenAI vision call. Image 1 = cover (the reference
         //    for "what the group should look like"), images 2..N =
-        //    modules. Ask Opus for a structured JSON response so we can
+        //    modules. Ask GPT for a structured JSON response so we can
         //    parse + drive the regen loop.
-        const client = new Anthropic({ apiKey })
 
         const moduleIndex: string[] = []
-        const imageBlocks: Anthropic.ContentBlockParam[] = []
-        imageBlocks.push({
-            type: "image",
-            source: {
-                type: "base64",
-                media_type: cover.mediaType as "image/png",
-                data: cover.base64,
-            },
+        // Build OpenAI-style content parts for the user message
+        const contentParts: Array<{ type: "image_url"; image_url: { url: string } } | { type: "text"; text: string }> = []
+        contentParts.push({
+            type: "image_url",
+            image_url: { url: `data:${cover.mediaType};base64,${cover.base64}` },
         })
-        imageBlocks.push({
+        contentParts.push({
             type: "text",
             text: "Image 1 above is the COVER illustration — this defines the visual language (palette, line weight, composition, background) that every other image in this project should match.",
         })
         let imgIdx = 2
         for (const m of modulesReady) {
             moduleIndex.push(m.moduleId)
-            imageBlocks.push({
-                type: "image",
-                source: {
-                    type: "base64",
-                    media_type: m.image.mediaType as "image/png",
-                    data: m.image.base64,
-                },
+            contentParts.push({
+                type: "image_url",
+                image_url: { url: `data:${m.image.mediaType};base64,${m.image.base64}` },
             })
-            imageBlocks.push({
+            contentParts.push({
                 type: "text",
                 text: `Image ${imgIdx} above is the MODULE render for module index ${imgIdx - 1} (module id: "${m.moduleId}", name: "${m.name}").`,
             })
             imgIdx += 1
         }
 
-        imageBlocks.push({
+        contentParts.push({
             type: "text",
             text: `You are a design reviewer. Compare images 2 through ${imgIdx - 1} against image 1 (the cover).
 
@@ -259,23 +249,36 @@ Rank outliers by severity desc (major first). Be conservative — only flag imag
 
         let rawJson: string
         try {
-            const response = await client.messages.create({
-                model: MODEL,
-                max_tokens: 2048,
-                messages: [{ role: "user", content: imageBlocks }],
+            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${apiKey}`,
+                },
+                body: JSON.stringify({
+                    model: MODEL,
+                    max_completion_tokens: 2048,
+                    messages: [{ role: "user", content: contentParts }],
+                }),
+                signal: AbortSignal.timeout(180_000),
             })
-            const firstBlock = response.content.find((c) => c.type === "text")
-            if (!firstBlock || firstBlock.type !== "text") {
+            if (!response.ok) {
+                const errText = await response.text().catch(() => "")
+                throw new Error(`OpenAI vision error (${response.status}): ${errText.slice(0, 300)}`)
+            }
+            const data = await response.json()
+            const text = data.choices?.[0]?.message?.content ?? ""
+            if (!text) {
                 return {
                     ok: false,
                     error: "Vision call returned no text block.",
                     errorCode: "VISION_FAILED",
                 }
             }
-            rawJson = firstBlock.text.trim()
+            rawJson = text.trim()
         } catch (err) {
             console.error(
-                "[review-image-coherence] Opus vision call threw:",
+                "[review-image-coherence] Vision call threw:",
                 err instanceof Error ? err.message : err,
             )
             return {
@@ -297,7 +300,7 @@ Rank outliers by severity desc (major first). Be conservative — only flag imag
             parsed = JSON.parse(cleaned)
         } catch {
             console.error(
-                "[review-image-coherence] failed to parse Opus JSON. First 500:",
+                "[review-image-coherence] failed to parse vision JSON. First 500:",
                 cleaned.slice(0, 500),
             )
             return {

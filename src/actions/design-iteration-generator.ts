@@ -23,8 +23,8 @@ import { createClient } from "@/lib/supabase/server"
 import { isValidUUID } from "@/lib/validations"
 import type { DesignAlternative } from "@/lib/cad-lab/design-iteration-types"
 
-// Use the latest Opus for reasoning quality on design trade-offs.
-const GENERATOR_MODEL = "claude-opus-4-7"
+// Use GPT-5.4 for reasoning quality on design trade-offs.
+const GENERATOR_MODEL = "gpt-5.4"
 const GENERATOR_MAX_TOKENS = 4096
 const GENERATOR_TIMEOUT_MS = 240_000
 
@@ -57,8 +57,8 @@ export async function generateInfeasibilityAlternatives(
   if (!isValidUUID(req.projectId)) return { alternatives: [], error: "Invalid project ID" }
 
   return withAIGate('cad_lab_review', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { alternatives: [], error: "Anthropic API key not configured" }
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return { alternatives: [], error: "OPENAI_API_KEY not configured" }
 
     const supabase = await createClient()
     const [project, priorRejections] = await Promise.all([
@@ -135,8 +135,8 @@ export async function generateCostReductionAlternatives(
   if (!(req.targetUnitCostGbp > 0)) return { alternatives: [], error: "Target unit cost must be > 0" }
 
   return withAIGate('cad_lab_review', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { alternatives: [], error: "Anthropic API key not configured" }
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return { alternatives: [], error: "OPENAI_API_KEY not configured" }
 
     const supabase = await createClient()
     const [project, priorRejections] = await Promise.all([
@@ -210,8 +210,8 @@ export async function generateManualAlternatives(
   }
 
   return withAIGate('cad_lab_review', async () => {
-    const apiKey = process.env.ANTHROPIC_API_KEY?.trim()
-    if (!apiKey) return { alternatives: [], error: "Anthropic API key not configured" }
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return { alternatives: [], error: "OPENAI_API_KEY not configured" }
 
     const supabase = await createClient()
     const [project, priorRejections] = await Promise.all([
@@ -257,33 +257,30 @@ interface RawParsed {
 }
 
 /**
- * Call Claude once, retry once with a sharper nudge if the response doesn't
+ * Call OpenAI once, retry once with a sharper nudge if the response doesn't
  * parse or doesn't match shape.
  */
 async function callGeneratorWithRetry(
-  apiKey: string,
+  _apiKey: string,
   systemPrompt: string,
   userPrompt: string,
 ): Promise<RawParsed | null> {
-  const Anthropic = (await import("@anthropic-ai/sdk")).default
-  const client = new Anthropic({ apiKey, timeout: GENERATOR_TIMEOUT_MS, maxRetries: 0 })
+  const { callOpenAI } = await import("@/lib/cad-lab/api-helpers")
 
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const hint = attempt === 0
         ? ""
         : "\n\nIMPORTANT: Your previous response was not valid JSON matching the required shape. Return ONLY the JSON object this time, starting with { and ending with }. No prose."
-      const response = await client.messages.create({
-        model: GENERATOR_MODEL,
-        max_tokens: GENERATOR_MAX_TOKENS,
-        system: systemPrompt,
-        messages: [{ role: "user", content: userPrompt + hint }],
-      })
+      const result = await callOpenAI(
+        systemPrompt,
+        userPrompt + hint,
+        GENERATOR_MODEL,
+        GENERATOR_MAX_TOKENS,
+        GENERATOR_TIMEOUT_MS,
+      )
 
-      const text = response.content
-        .filter((b) => b.type === "text")
-        .map((b) => (b.type === "text" ? b.text : ""))
-        .join("")
+      const text = result.text
 
       const parsed = extractAndParseJson(text)
       if (parsed && Array.isArray(parsed.alternatives) && parsed.alternatives.length > 0) {

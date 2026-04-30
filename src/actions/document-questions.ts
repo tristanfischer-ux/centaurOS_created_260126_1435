@@ -97,24 +97,18 @@ Rules:
       `# User Brief\n\n${userContext.trim()}`,
     ].join('')
 
-    const Anthropic = (await import('@anthropic-ai/sdk')).default
-    const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY?.trim(), timeout: 120_000, maxRetries: 0 })
+    const { callOpenAI } = await import('@/lib/cad-lab/api-helpers')
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) return { success: false, error: 'OPENAI_API_KEY not configured' }
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 1024,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    })
+    const result = await callOpenAI(systemPrompt, userMessage, 'gpt-4.1-mini', 1024, 120_000)
 
-    // Parse response
-    const textBlock = response.content.find(b => b.type === 'text')
-    if (!textBlock || textBlock.type !== 'text') {
+    if (!result.text) {
       return { success: false, error: 'No response from AI' }
     }
 
     // Strip markdown fences if present
-    let jsonText = textBlock.text.trim()
+    let jsonText = result.text.trim()
     if (jsonText.startsWith('```')) {
       jsonText = jsonText.replace(/^```(?:json)?\n?/, '').replace(/\n?```$/, '')
     }
