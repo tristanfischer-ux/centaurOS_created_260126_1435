@@ -638,7 +638,7 @@ All costs in GBP (£).`
             "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
           },
           body: JSON.stringify({
-            model: "deepseek/deepseek-v4-flash",
+            model: "openai/gpt-4.1-mini",
             max_tokens: 16000,
             messages: [
               { role: "user", content: synthesisPrompt },
@@ -663,10 +663,10 @@ All costs in GBP (£).`
           }
           console.info("[CAD-LAB-COST] Sensitivity analysis + benchmark grounding generated")
         } catch (parseErr) {
-          console.warn("[CAD-LAB-COST] Failed to parse sensitivity/benchmark JSON — skipping. First 200 chars:", synthJson.slice(0, 200))
+          console.error("[CAD-LAB-COST] Failed to parse sensitivity/benchmark JSON:", parseErr instanceof Error ? parseErr.message : parseErr, "Raw text (first 500):", synthText.slice(0, 500))
         }
       } else {
-        console.warn(`[CAD-LAB-COST] Synthesis HTTP ${synthResponse.status}: ${await synthResponse.text().catch(() => "unreadable")}`)
+        console.error(`[CAD-LAB-COST] Synthesis HTTP ${synthResponse.status}: ${await synthResponse.text().catch(() => "unreadable")}`)
       }
     } catch (synthErr) {
       console.warn("[CAD-LAB-COST] Sensitivity/benchmark synthesis failed (non-fatal):", synthErr instanceof Error ? synthErr.message : synthErr)
