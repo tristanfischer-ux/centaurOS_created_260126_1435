@@ -16,6 +16,8 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { callOpenAI, callGemini, callDeepSeek } from "@/lib/cad-lab/api-helpers"
 import { callOpenRouter } from "@/lib/ai/openrouter"
+import { runJudgePanel, getJudgePanelConfig } from "@/lib/forge-v2/judge-panels"
+import type { JudgePanelResult } from "@/lib/forge-v2/judge-panels"
 import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
 // ── Canonical cohort project IDs ─────────────────────────────────────────
@@ -656,26 +658,72 @@ ${dimensionList}
 Stage data:
 ${stageData}`
 
+    // ── Multi-model judge panel scoring ────────────────────────────────────
+    // Fire a lineage-diverse judge panel instead of a single LLM scorer.
+    // High-risk stages get 3 judges, medium-risk get 2, low-risk get 1.
+    // Falls back to single DeepSeek if all judges fail.
+
     try {
-        const { text } = await callDeepSeek(
-            systemPrompt,
-            userPrompt,
-            "deepseek-chat",
-            4096,
-            30_000,
-        )
+        const panelConfig = getJudgePanelConfig(stage)
+        let panelResult: JudgePanelResult
+        let dimensionScores: DimensionScore[]
 
-        const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
-        const parsed = JSON.parse(cleaned) as {
-            scores: Array<{ dimension: string; score: number; reasoning: string }>
-            overall_reasoning: string
+        if (panelConfig && panelConfig.length > 0) {
+            // Route through judge panel
+            panelResult = await runJudgePanel(
+                stage,
+                stageData,
+                `project-${projectId}`,
+                `${systemPrompt}\n\n${userPrompt}`,
+            )
+
+            console.info(
+                `[stage-scoring] Judge panel for ${stage}: ${panelResult.successfulJudgeCount}/${panelResult.judgeCount} judges responded, ` +
+                `score=${panelResult.score}, blockers=${panelResult.blockers.length}, warnings=${panelResult.warnings.length}`,
+            )
+
+            // Map panel score back to dimension scores for backward compatibility
+            dimensionScores = rubric.dimensions.map((d) => ({
+                dimension: d.name,
+                score: panelResult.score,
+                reasoning: `Judge panel composite (${panelResult.successfulJudgeCount} judges). ` +
+                    `Blockers: ${panelResult.blockers.length}, Warnings: ${panelResult.warnings.length}`,
+            }))
+
+            // Incorporate individual judge scores per dimension if available
+            // (judges return a single score, so all dimensions share it)
+        } else {
+            // No panel configured — use legacy single DeepSeek call
+            const { text } = await callDeepSeek(
+                systemPrompt,
+                userPrompt,
+                "deepseek-chat",
+                4096,
+                30_000,
+            )
+
+            const cleaned = text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
+            const parsed = JSON.parse(cleaned) as {
+                scores: Array<{ dimension: string; score: number; reasoning: string }>
+                overall_reasoning: string
+            }
+
+            dimensionScores = parsed.scores.map((s) => ({
+                dimension: s.dimension,
+                score: Math.max(1, Math.min(10, Math.round(s.score))),
+                reasoning: s.reasoning,
+            }))
+
+            panelResult = {
+                score: 0, // will be computed below
+                findings: [],
+                blockers: [],
+                warnings: [],
+                rawJudgeResults: [],
+                judgeCount: 1,
+                successfulJudgeCount: 1,
+            }
         }
-
-        let dimensionScores: DimensionScore[] = parsed.scores.map((s) => ({
-            dimension: s.dimension,
-            score: Math.max(1, Math.min(10, Math.round(s.score))),
-            reasoning: s.reasoning,
-        }))
 
         // Apply Chase-specific hard gates based on evidence found in the output text
         if (stage === "waiting_chase") {
@@ -698,9 +746,17 @@ ${stageData}`
             weightedSum += ds.score * w
             totalWeight += w
         }
-        let composite = totalWeight > 0
-            ? Math.round((weightedSum / totalWeight) * 100) / 100
-            : 0
+
+        // Use panel score when a panel was used (it's the average of judge scores),
+        // otherwise compute from dimension weights
+        let composite: number
+        if (panelConfig && panelConfig.length > 0) {
+            composite = panelResult.score
+        } else {
+            composite = totalWeight > 0
+                ? Math.round((weightedSum / totalWeight) * 100) / 100
+                : 0
+        }
 
         // BOM skeleton detector: hard-cap score when skeleton parts exist.
         // Council diagnosis (6/6 consensus 2026-05-01): skeleton parts with
@@ -727,13 +783,28 @@ ${stageData}`
             }
         }
 
+        // Build reasoning string — include panel metadata when available
+        const panelMeta = panelConfig && panelConfig.length > 0
+            ? `[Judge panel: ${panelResult.successfulJudgeCount}/${panelResult.judgeCount} judges, ` +
+              `${panelResult.blockers.length} blockers, ${panelResult.warnings.length} warnings] `
+            : ""
+        const reasoningText = panelConfig && panelConfig.length > 0
+            ? `${panelMeta}Score ${composite}/10. ` +
+              (panelResult.blockers.length > 0
+                  ? `Blockers: ${panelResult.blockers.map((b) => b.description).join("; ")}`
+                  : "No cross-lineage blockers found.")
+            : dimensionScores.map((ds) => ds.reasoning).join(" ")
+
         return {
             stage,
             scores: dimensionScores,
             composite,
             passed: composite >= 8.0,
-            reasoning: parsed.overall_reasoning,
+            reasoning: reasoningText,
             scored_at: new Date().toISOString(),
+            note: panelConfig && panelConfig.length > 0
+                ? `judge_panel:${panelResult.successfulJudgeCount}/${panelResult.judgeCount}:blockers=${panelResult.blockers.length}:warnings=${panelResult.warnings.length}`
+                : undefined,
         }
     } catch (err) {
         console.error(
