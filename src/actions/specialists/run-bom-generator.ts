@@ -343,7 +343,7 @@ async function runBomGeneratorInternal(
             .delete({ count: "exact" })
             .eq("cad_lab_project_id", projectId)
             .or(
-                "material.is.null,material.eq.,estimated_unit_cost_gbp.is.null,estimated_unit_cost_gbp.eq.0,cost_provenance.eq.todo",
+                "material.is.null,material.eq.,estimated_unit_cost_gbp.is.null,cost_provenance.eq.todo",
             )
         if (deletedSkeletons && deletedSkeletons > 0) {
             console.info(
