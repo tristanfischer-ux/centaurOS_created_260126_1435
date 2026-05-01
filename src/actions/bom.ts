@@ -1478,25 +1478,55 @@ export async function generateBomFromModules(
       if (deadlineTimer) clearTimeout(deadlineTimer)
     }
 
-    // Merge all successful expansions. Failed batches leave their parts
-    // without expansions — filled with skeleton-only defaults below.
+    // Merge successful expansions; collect failed batches for retry.
     const mergedExpansions: BomExpansionResult["expansions"] = {}
-    let failedBatchCount = 0
-    for (const result of batchResults) {
-      if (result.success) {
-        Object.assign(mergedExpansions, result.expansions)
+    const failedBatches: (typeof batches)[number][] = []
+    for (let i = 0; i < batchResults.length; i++) {
+      if (batchResults[i].success) {
+        Object.assign(mergedExpansions, batchResults[i].expansions)
       } else {
-        failedBatchCount += 1
+        failedBatches.push(batches[i])
       }
     }
 
-    // If EVERY batch failed, the run isn't recoverable. Return the first
-    // error so the pipeline_run gets a useful message.
-    if (failedBatchCount === batchResults.length && batchResults.length > 0) {
+    // If EVERY batch failed, the run isn't recoverable.
+    if (failedBatches.length === batches.length && batches.length > 0) {
       const firstErr = batchResults.find((r) => !r.success)?.error
       return {
         success: false,
         error: firstErr ?? "Failed to parse BOM generation response",
+      }
+    }
+
+    // Retry failed batches serially (avoid overwhelming the provider).
+    for (const batch of failedBatches) {
+      try {
+        const retry = await expandBomPartsBatchInternal({
+          batchParts: batch,
+          moduleContext,
+          briefContext,
+          catalogueRef,
+        })
+        if (retry.success) {
+          Object.assign(mergedExpansions, retry.expansions)
+        } else {
+          console.warn(`[generateBomFromModules] Batch retry failed: ${retry.error}`)
+        }
+      } catch (err) {
+        console.warn(`[generateBomFromModules] Batch retry threw:`, err)
+      }
+    }
+
+    // Quality gate: if >20% of parts are still unexpanded after retry,
+    // fail the run rather than writing skeleton-only nulls that will
+    // cause downstream scoring failures.
+    const expandedCount = Object.keys(mergedExpansions).length
+    const totalParts = skeleton.parts.length
+    const unexpandedRatio = totalParts > 0 ? 1 - expandedCount / totalParts : 0
+    if (unexpandedRatio > 0.2 && totalParts > 5) {
+      return {
+        success: false,
+        error: `Bill of materials expansion incomplete: ${expandedCount}/${totalParts} parts expanded (${Math.round(unexpandedRatio * 100)}% missing). ${failedBatches.length} batch(es) failed even after retry.`,
       }
     }
 
