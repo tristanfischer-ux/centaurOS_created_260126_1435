@@ -227,6 +227,19 @@ async function tickOnce(request: Request): Promise<TickResult> {
             continue
         }
 
+        const autopilotStatus = (state as Record<string, unknown>).status as string | undefined
+        if (autopilotStatus === "manual_review") {
+            details.push({
+                projectId: project.id,
+                stage,
+                action: "skip_terminal" as TickAction,
+                ok: true,
+                reason: "manual_review — circuit breaker tripped, requires human intervention",
+            })
+            skipped++
+            continue
+        }
+
         const config = STAGE_CONFIG[stage as Exclude<AutopilotStage, "done" | "failed" | "solver_error" | "preflight_blocked" | "waiting_max_redecomposition" | "gate_1_blocked">]
         if (!config) {
             details.push({
@@ -294,7 +307,6 @@ async function tickOnce(request: Request): Promise<TickResult> {
         // ── awaiting_gate: scoring done in autopilot-step, cron runs cohort check ──
         // Set by autopilot-step score_and_gate action when a project scores ≥8/10.
         // Cohort check is fast (DB queries only, no LLM calls) — safe in the cron.
-        const autopilotStatus = (state as AutopilotState & { status?: string }).status
         if (autopilotStatus === "awaiting_gate" && shouldScoreStage(stage as AutopilotStage)) {
             const foundryId = await getProjectFoundryId(project.id)
             if (foundryId) {
@@ -409,10 +421,34 @@ async function tickOnce(request: Request): Promise<TickResult> {
             }
         }
 
-        // ── terminal_fail / stage_failed: reset for unlimited retries ────
+        // ── terminal_fail / stage_failed: reset with circuit breaker ────
         if (autopilotStatus === "terminal_fail" || autopilotStatus === "stage_failed") {
+            const totalResets = ((state as Record<string, unknown>).total_resets as number) ?? 0
+            if (totalResets >= 3) {
+                console.error(
+                    `[autopilot-tick] project=${project.id} stage=${stage} hit circuit breaker (${totalResets} total resets) — moving to manual_review`,
+                )
+                await createAdminClient()
+                    .from("cad_lab_projects")
+                    .update({
+                        autopilot_state: {
+                            ...(state as Record<string, unknown>),
+                            status: "manual_review",
+                        },
+                    } as never)
+                    .eq("id", project.id)
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "terminal_fail" as TickAction,
+                    ok: true,
+                    reason: `${autopilotStatus} → manual_review (${totalResets} resets, circuit breaker tripped)`,
+                })
+                skipped++
+                continue
+            }
             console.warn(
-                `[autopilot-tick] ${autopilotStatus} detected for project=${project.id} stage=${stage} — resetting to idle for retry (unlimited retries)`,
+                `[autopilot-tick] ${autopilotStatus} detected for project=${project.id} stage=${stage} — resetting to idle for retry (reset ${totalResets + 1}/3)`,
             )
             const { error: resetErr } = await createAdminClient()
                 .from("cad_lab_projects")
@@ -422,6 +458,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         status: "idle",
                         current_stage_attempts: 0,
                         failed_stages: [],
+                        total_resets: totalResets + 1,
                     },
                 } as never)
                 .eq("id", project.id)
@@ -783,10 +820,32 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 // Fall through to fire logic below — do NOT continue/skip.
             }
             if (attempts >= config.maxAttempts) {
-                // Instead of permanent stage_failed, reset attempts for unlimited retries.
-                // The cohort gate quality bar (≥8/10) is the real gatekeeper, not attempt count.
+                const totalResets = ((state as Record<string, unknown>).total_resets as number) ?? 0
+                if (totalResets >= 3) {
+                    console.error(
+                        `[autopilot-tick] project=${project.id} stage=${stage} hit circuit breaker (${totalResets} total resets after ${attempts} attempts) — moving to manual_review`,
+                    )
+                    await createAdminClient()
+                        .from("cad_lab_projects")
+                        .update({
+                            autopilot_state: {
+                                ...(state as Record<string, unknown>),
+                                status: "manual_review",
+                            },
+                        } as never)
+                        .eq("id", project.id)
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "terminal_fail" as TickAction,
+                        ok: true,
+                        reason: `${attempts} >= ${config.maxAttempts}, circuit breaker (${totalResets} resets) — manual_review`,
+                    })
+                    skipped++
+                    continue
+                }
                 console.warn(
-                    `[autopilot-tick] project=${project.id} exhausted ${attempts}/${config.maxAttempts} attempts at stage=${stage} — resetting attempts for retry`,
+                    `[autopilot-tick] project=${project.id} exhausted ${attempts}/${config.maxAttempts} attempts at stage=${stage} — resetting (reset ${totalResets + 1}/3)`,
                 )
                 await createAdminClient()
                     .from("cad_lab_projects")
@@ -795,6 +854,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                             ...(state as Record<string, unknown>),
                             status: "idle",
                             current_stage_attempts: 0,
+                            total_resets: totalResets + 1,
                         },
                     } as never)
                     .eq("id", project.id)
