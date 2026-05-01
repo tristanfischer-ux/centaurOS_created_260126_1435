@@ -379,17 +379,14 @@ export async function validateDeterministicStage(
 
     const { data } = await admin
         .from("cad_lab_projects")
-        .select("research, autopilot_state")
+        .select("research, autopilot_state, dimension_sheet, spatial_plan")
         .eq("id", projectId)
         .maybeSingle()
 
     const research = data?.research as Record<string, unknown> | null
 
     if (stage === "waiting_sizing") {
-        const dimensionSheet =
-            research?.dimensionSheet ??
-            research?.dimension_sheet ??
-            null
+        const dimensionSheet = (data?.dimension_sheet as Record<string, unknown> | null) ?? null
 
         const failures: string[] = []
 
@@ -448,18 +445,15 @@ export async function validateDeterministicStage(
     }
 
     if (stage === "waiting_layout") {
-        const layoutData =
-            research?.layout ??
-            research?.layoutResult ??
-            null
+        const spatialPlan = (data?.spatial_plan as Record<string, unknown> | null) ?? null
 
         const failures: string[] = []
 
-        if (!layoutData) {
-            failures.push("layout data is missing")
+        if (!spatialPlan) {
+            failures.push("spatial_plan is missing")
         } else {
-            const ld = layoutData as Record<string, unknown>
-            const modules = ld.modules ?? ld.moduleList ?? null
+            const ld = spatialPlan
+            const modules = ld.modules ?? ld.moduleList ?? ld.placements ?? null
             if (!Array.isArray(modules) || modules.length === 0) {
                 failures.push("modules array is empty or missing")
             }
@@ -469,8 +463,8 @@ export async function validateDeterministicStage(
         const scores: DimensionScore[] = [
             {
                 dimension: "layout_exists",
-                score: !layoutData ? 0 : 10,
-                reasoning: !layoutData ? "No layout data found" : "Layout data present",
+                score: !spatialPlan ? 0 : 10,
+                reasoning: !spatialPlan ? "No spatial_plan found" : "Spatial plan present",
             },
             {
                 dimension: "modules_populated",
@@ -485,7 +479,7 @@ export async function validateDeterministicStage(
             composite: passed ? 10 : 0,
             passed,
             reasoning: passed
-                ? "All hard gates passed: layout data present with non-empty modules array."
+                ? "All hard gates passed: spatial_plan present with non-empty modules array."
                 : `Hard gate failures: ${failures.join("; ")}`,
             scored_at: new Date().toISOString(),
         }
