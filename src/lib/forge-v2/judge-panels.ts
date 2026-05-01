@@ -98,12 +98,14 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
         { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
     ],
-    // Low-risk (1 judge)
+    // Low-risk (2 judges — multimodal vision)
     waiting_pdf: [
-        { model: "google/gemini-3.1-pro-preview", role: "depth", lineage: "google" },
+        { model: "google/gemini-3.1-pro-preview", role: "multimodal vision", lineage: "google" },
+        { model: "moonshotai/kimi-k2.6", role: "multimodal vision", lineage: "moonshot" },
     ],
     generating_pdf: [
-        { model: "google/gemini-3.1-pro-preview", role: "depth", lineage: "google" },
+        { model: "google/gemini-3.1-pro-preview", role: "multimodal vision", lineage: "google" },
+        { model: "moonshotai/kimi-k2.6", role: "multimodal vision", lineage: "moonshot" },
     ],
 }
 

@@ -570,6 +570,104 @@ CRITICAL: Return ONLY valid JSON, no markdown fences.
     console.info(`[CAD-LAB-COST] Distribution: ${buyCount} buy, ${makeCount} make, ${processes.size} unique processes: ${[...processes].join(", ")}`)
     if (buyCount === 0) console.warn("[CAD-LAB-COST] WARNING: Zero buy parts detected — prompt may need strengthening")
 
+    // ── Post-batch: generate sensitivity analysis + benchmark grounding ──
+    // These are 2 of 4 Finn scoring rubric dimensions that were missing from
+    // per-module output. A lightweight synthesis call over the assembled estimates.
+    try {
+      const moduleSummaryForSynthesis = Object.values(estimates).map(e => ({
+        moduleId: e.moduleId,
+        totalPerUnit: e.totalPerUnit,
+        partCount: e.parts?.length ?? 0,
+        buyParts: e.parts?.filter(p => p.type === "buy").length ?? 0,
+        makeParts: e.parts?.filter(p => p.type === "make").length ?? 0,
+        topCostParts: (e.parts ?? [])
+          .sort((a, b) => b.cost - a.cost)
+          .slice(0, 3)
+          .map(p => ({ name: p.name, cost: p.cost, type: p.type })),
+        labourCost: e.labourCost,
+      }))
+      const totalUnitCost = Object.values(estimates).reduce(
+        (sum, e) => sum + (e.totalPerUnit ?? 0), 0,
+      )
+
+      const synthesisPrompt = `You are a UK manufacturing cost analyst. Given the per-module cost breakdown below, produce TWO analyses.
+
+PRODUCT: ${productOverview?.slice(0, 300) ?? "Hardware product"}
+TOTAL UNIT COST: £${totalUnitCost.toFixed(2)}
+MODULE BREAKDOWN:
+${JSON.stringify(moduleSummaryForSynthesis, null, 2)}
+
+Return ONLY valid JSON (no markdown fences):
+{
+  "_sensitivity_analysis": {
+    "summary": "<1-2 sentence overview of cost sensitivity>",
+    "variables": [
+      {
+        "name": "<variable name, e.g. 'Raw material prices'>",
+        "baselineAssumption": "<what the current estimate assumes>",
+        "impactIfPlus20Pct": "<£ and % change to total unit cost if this rises 20%>",
+        "impactIfMinus20Pct": "<£ and % change to total unit cost if this falls 20%>",
+        "riskLevel": "low"|"medium"|"high"
+      }
+    ]
+  },
+  "_benchmark_grounding": {
+    "summary": "<1-2 sentence comparison to industry>",
+    "comparisons": [
+      {
+        "benchmark": "<comparable product or industry reference>",
+        "benchmarkCost": "<£ value or range>",
+        "source": "<where this benchmark comes from>",
+        "ourEstimateVsBenchmark": "<how our estimate compares — above/below/in-line and by how much>"
+      }
+    ],
+    "costPositioning": "<1 sentence: where this product sits relative to market — premium/competitive/budget>"
+  }
+}
+
+Include at LEAST 3 sensitivity variables (e.g. raw materials, labour rates, component pricing, energy, tooling amortisation).
+Include at LEAST 2 benchmark comparisons from publicly known products or industry cost studies.
+All costs in GBP (£).`
+
+      const synthResponse = await fetchWithTimeout(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "deepseek/deepseek-v4-flash",
+            max_tokens: 4000,
+            messages: [
+              { role: "user", content: synthesisPrompt },
+            ],
+          }),
+        },
+        60_000,
+      )
+      if (synthResponse.ok) {
+        const synthData = await synthResponse.json()
+        const synthText: string = synthData.choices?.[0]?.message?.content ?? ""
+        const synthJson = synthText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+        try {
+          const parsed = JSON.parse(synthJson)
+          if (parsed._sensitivity_analysis) {
+            ;(estimates as Record<string, unknown>)["_sensitivity_analysis"] = parsed._sensitivity_analysis
+          }
+          if (parsed._benchmark_grounding) {
+            ;(estimates as Record<string, unknown>)["_benchmark_grounding"] = parsed._benchmark_grounding
+          }
+          console.info("[CAD-LAB-COST] Sensitivity analysis + benchmark grounding generated")
+        } catch {
+          console.warn("[CAD-LAB-COST] Failed to parse sensitivity/benchmark JSON — skipping (non-fatal)")
+        }
+      }
+    } catch (synthErr) {
+      console.warn("[CAD-LAB-COST] Sensitivity/benchmark synthesis failed (non-fatal):", synthErr instanceof Error ? synthErr.message : synthErr)
+    }
+
     // AUDIT: Track model + token usage so the cost dashboard sees real data
     // instead of 'unknown'. The withAIGate auto-tracker fires with no model
     // when trackUsage is never called — this prevents that.
