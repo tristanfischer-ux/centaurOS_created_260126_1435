@@ -639,7 +639,7 @@ All costs in GBP (£).`
           },
           body: JSON.stringify({
             model: "deepseek/deepseek-v4-flash",
-            max_tokens: 4000,
+            max_tokens: 16000,
             messages: [
               { role: "user", content: synthesisPrompt },
             ],
@@ -649,8 +649,10 @@ All costs in GBP (£).`
       )
       if (synthResponse.ok) {
         const synthData = await synthResponse.json()
-        const synthText: string = synthData.choices?.[0]?.message?.content ?? ""
-        const synthJson = synthText.replace(/```json\s*/g, "").replace(/```\s*/g, "").trim()
+        const msg = synthData.choices?.[0]?.message
+        const synthText: string = msg?.content || msg?.reasoning_content || ""
+        console.info(`[CAD-LAB-COST] Synthesis response length: ${synthText.length}, has content: ${!!msg?.content}, has reasoning_content: ${!!msg?.reasoning_content}`)
+        const synthJson = synthText.replace(/```json\s*/g, "").replace(/```\s*/g, "").replace(/^[\s\S]*?(\{)/, "$1").trim()
         try {
           const parsed = JSON.parse(synthJson)
           if (parsed._sensitivity_analysis) {
@@ -660,9 +662,11 @@ All costs in GBP (£).`
             ;(estimates as Record<string, unknown>)["_benchmark_grounding"] = parsed._benchmark_grounding
           }
           console.info("[CAD-LAB-COST] Sensitivity analysis + benchmark grounding generated")
-        } catch {
-          console.warn("[CAD-LAB-COST] Failed to parse sensitivity/benchmark JSON — skipping (non-fatal)")
+        } catch (parseErr) {
+          console.warn("[CAD-LAB-COST] Failed to parse sensitivity/benchmark JSON — skipping. First 200 chars:", synthJson.slice(0, 200))
         }
+      } else {
+        console.warn(`[CAD-LAB-COST] Synthesis HTTP ${synthResponse.status}: ${await synthResponse.text().catch(() => "unreadable")}`)
       }
     } catch (synthErr) {
       console.warn("[CAD-LAB-COST] Sensitivity/benchmark synthesis failed (non-fatal):", synthErr instanceof Error ? synthErr.message : synthErr)
