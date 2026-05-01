@@ -77,18 +77,11 @@ import { runGate, markUncertainty } from "@/lib/forge-v2/stage-gates/runner"
 import { STAGE_GATE_MAP } from "@/lib/forge-v2/stage-gates/registry"
 import { triggerRemediation } from "@/lib/forge-v2/stage-gates/remediation"
 import {
-    scoreStageOutput,
-    storeStageScore,
     checkFoundryCohortGate,
     advanceCohort,
     resetCohortToChase,
     shouldScoreStage,
-    conveneDiagnosticCouncil,
-    loadStageDataForCouncil,
-    getScoringAttemptCount,
     MAX_SCORING_ATTEMPTS,
-    STAGE_VALIDATION_MODE,
-    validateDeterministicStage,
 } from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
@@ -296,6 +289,97 @@ async function tickOnce(request: Request): Promise<TickResult> {
             .limit(1)
             .maybeSingle()
 
+        // ── awaiting_gate: scoring done in autopilot-step, cron runs cohort check ──
+        // Set by autopilot-step score_and_gate action when a project scores ≥8/10.
+        // Cohort check is fast (DB queries only, no LLM calls) — safe in the cron.
+        const autopilotStatus = (state as AutopilotState & { status?: string }).status
+        if (autopilotStatus === "awaiting_gate" && shouldScoreStage(stage as AutopilotStage)) {
+            const foundryId = await getProjectFoundryId(project.id)
+            if (foundryId) {
+                const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
+
+                if (cohort.shouldResetAll) {
+                    console.error(
+                        `[autopilot-tick] COHORT FULL RESET triggered at stage=${stage} (awaiting_gate)`,
+                    )
+                    await resetCohortToChase(foundryId)
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "skip_running" as TickAction,
+                        ok: false,
+                        reason: `cohort gate: full reset — a project exhausted ${MAX_SCORING_ATTEMPTS} attempts`,
+                    })
+                    skipped++
+                    continue
+                }
+
+                if (!cohort.allPassed) {
+                    const failing = cohort.results
+                        .filter((r) => !r.passed)
+                        .map((r) => `${r.projectName}(${r.composite})`)
+                        .join(", ")
+                    console.info(
+                        `[autopilot-tick] cohort gate HOLD project=${project.id} stage=${stage} — not all projects passed: ${failing}`,
+                    )
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "skip_running" as TickAction,
+                        ok: false,
+                        reason: `cohort gate: waiting for all projects to score ≥8/10 — failing: ${failing}`,
+                    })
+                    skipped++
+                    continue
+                }
+
+                // ALL passed — advance the entire cohort atomically
+                if (config.nextStage === "done") {
+                    await markDone(project.id, stage)
+                    details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
+                } else {
+                    const cohortResult = await advanceCohort(foundryId, stage as AutopilotStage, config.nextStage as AutopilotStage)
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "advance" as TickAction,
+                        ok: cohortResult.ok,
+                        reason: `cohort advance: ${cohortResult.advancedCount} projects ${stage} → ${config.nextStage}`,
+                    })
+                }
+                advanced++
+                continue
+            }
+        }
+
+        // ── terminal_fail set by score_and_gate in autopilot-step ────────
+        if (autopilotStatus === "terminal_fail") {
+            console.error(
+                `[autopilot-tick] terminal_fail detected for project=${project.id} stage=${stage} — triggering cohort reset`,
+            )
+            await recordFailure(
+                project.id,
+                stage,
+                `Stage quality gate exhausted ${MAX_SCORING_ATTEMPTS} attempts without reaching 8/10 threshold`,
+            )
+            details.push({
+                projectId: project.id,
+                stage,
+                action: "terminal_fail",
+                ok: false,
+                reason: `scoring exhausted: terminal_fail status set by score_and_gate`,
+            })
+            failed++
+            const terminalFoundryId = await getProjectFoundryId(project.id)
+            if (terminalFoundryId) {
+                console.error(
+                    `[autopilot-tick] COHORT FULL RESET from terminal_fail: project=${project.id} stage=${stage}`,
+                )
+                await resetCohortToChase(terminalFoundryId)
+            }
+            continue
+        }
+
         if (trackingRow?.status === "done") {
             // ── Quality Gate hook (flag-gated, default off) ──────────────
             // Runs AFTER the stage is done, BEFORE advancing to the next
@@ -409,215 +493,96 @@ async function tickOnce(request: Request): Promise<TickResult> {
             }
             // ── end Quality Gate hook ────────────────────────────────────
 
-            // ── Stage Scoring + Council Auto-Fix Loop + Foundry Cohort Gate ──
-            // Score the stage output via LLM rubric. ALL projects in the
-            // foundry must score ≥8/10 before ANY advances. This is the
-            // non-negotiable quality gate Tristan corrected 3 times 2026-04-30.
-            //
-            // CLOSED LOOP (2026-04-30):
-            //   1. Score fails (<8/10) → await 6-model council → store diagnosis
-            //   2. Supersede the done tracking row → next tick re-fires the stage
-            //   3. Specialist reads council_diagnosis from autopilot_state as
-            //      additional context on re-run
-            //   4. Re-score → loop until pass or max attempts exhausted
+            // ── Stage Scoring — dispatch to autopilot-step ───────────────
+            // Scoring + 6-model council can take 2+ minutes, causing 504 timeouts.
+            // Dispatch to autopilot-step (maxDuration=800) which sets status to
+            // 'awaiting_gate' (pass), 'idle' (retry after council), or
+            // 'terminal_fail' (exhausted). Cron handles cohort advance/reset above.
             if (shouldScoreStage(stage as AutopilotStage)) {
                 const existingScores = (state as AutopilotState & { stage_scores?: Record<string, { passed: boolean }> }).stage_scores
                 const alreadyScored = existingScores?.[stage]?.passed
 
                 if (!alreadyScored) {
-                    // Check if we've exhausted scoring attempts
-                    const attemptCount = getScoringAttemptCount(
-                        state as unknown as Record<string, unknown>,
-                        stage,
-                    )
-                    if (attemptCount >= MAX_SCORING_ATTEMPTS) {
-                        console.error(
-                            `[autopilot-tick] project=${project.id} stage=${stage} exhausted ${MAX_SCORING_ATTEMPTS} scoring attempts — triggering cohort reset`,
-                        )
-                        await recordFailure(
-                            project.id,
-                            stage,
-                            `Stage quality gate exhausted ${MAX_SCORING_ATTEMPTS} attempts without reaching 8/10 threshold`,
-                        )
+                    if (!renderSecret) {
                         details.push({
                             projectId: project.id,
                             stage,
-                            action: "terminal_fail",
+                            action: "fire",
                             ok: false,
-                            reason: `scoring exhausted: ${attemptCount}/${MAX_SCORING_ATTEMPTS} attempts`,
+                            reason: "FORGE_RENDER_STAGE_SECRET missing — cannot dispatch score_and_gate",
                         })
                         failed++
-
-                        // ANY failure = full cohort restart (Tristan rule 2026-04-30).
-                        const exhaustedFoundryId = await getProjectFoundryId(project.id)
-                        if (exhaustedFoundryId) {
-                            console.error(
-                                `[autopilot-tick] COHORT FULL RESET from scoring exhaustion: project=${project.id} stage=${stage}`,
-                            )
-                            await resetCohortToChase(exhaustedFoundryId)
-                        }
-
                         continue
                     }
 
-                    // Route to the appropriate validator: deterministic stages use hard
-                    // programmatic checks; generative stages use the LLM judge.
-                    // This prevents infinite retry loops on solver stages (waiting_sizing,
-                    // waiting_layout) where identical input always produces identical output
-                    // and the LLM judge may randomly score < 8/10. Council-confirmed 2026-04-30.
-                    const validationMode = STAGE_VALIDATION_MODE[stage] ?? 'generative'
-                    const scoreResult = validationMode === 'deterministic'
-                        ? await validateDeterministicStage(project.id, stage as AutopilotStage)
-                        : await scoreStageOutput(project.id, stage as AutopilotStage)
-                    if (scoreResult) {
-                        await storeStageScore(project.id, stage as AutopilotStage, scoreResult)
-                        console.info(
-                            `[autopilot-tick] scored project=${project.id} stage=${stage} ` +
-                                `composite=${scoreResult.composite} passed=${scoreResult.passed} ` +
-                                `attempt=${attemptCount + 1}/${MAX_SCORING_ATTEMPTS}`,
-                        )
-                        if (!scoreResult.passed) {
-                            // ── Council auto-fix loop (AWAITED, not fire-and-forget) ──
-                            // 1. Convene 6-model council and WAIT for diagnosis
-                            // 2. Store diagnosis in autopilot_state.council_diagnosis
-                            // 3. Supersede the current done tracking row so next tick re-fires
-                            // 4. On re-fire, specialist reads council_diagnosis as context
-                            try {
-                                const stageData = await loadStageDataForCouncil(
-                                    project.id,
-                                    stage as AutopilotStage,
-                                )
-                                const diagnosis = await conveneDiagnosticCouncil(
-                                    project.id,
-                                    stage as AutopilotStage,
-                                    scoreResult,
-                                    stageData,
-                                )
-                                console.info(
-                                    `[autopilot-tick] council complete for project=${project.id} stage=${stage} ` +
-                                        `consensusFindings=${diagnosis.consensusFindings.length} ` +
-                                        `fixes=${diagnosis.consensusFixes.length}: ` +
-                                        diagnosis.consensusFindings.slice(0, 2).join(" | "),
-                                )
-
-                                // Supersede the done tracking row so next tick re-fires this stage
-                                await admin
-                                    .from("pipeline_runs")
-                                    .update({
-                                        status: "failed",
-                                        error_code: "COUNCIL_SUPERSEDED",
-                                        error_message: `Scored ${scoreResult.composite}/10 < 8.0 — council diagnosed, re-running (attempt ${attemptCount + 1})`,
-                                        finished_at: new Date().toISOString(),
-                                    } as never)
-                                    .eq("id", trackingRow.id)
-
-                                console.info(
-                                    `[autopilot-tick] superseded tracking row for project=${project.id} stage=${stage} — will re-fire on next tick with council context`,
-                                )
-
-                                // Reset autopilot_state to 'idle' so the next cron tick
-                                // re-fires this stage. The council_diagnosis written above
-                                // remains in the state; the specialist reads it on the re-fire.
-                                const currentState = project.autopilot_state as Record<string, unknown>
-                                const prevAttempts = typeof currentState.attempts === "number" ? currentState.attempts : 0
-                                const updatedState = {
-                                    ...currentState,
-                                    status: "idle",
-                                    attempts: prevAttempts + 1,
-                                }
-                                await admin
-                                    .from("cad_lab_projects")
-                                    .update({ autopilot_state: updatedState } as unknown as never)
-                                    .eq("id", project.id)
-                                console.info(
-                                    `[autopilot-tick] reset autopilot_state to idle for project=${project.id} stage=${stage} attempts=${updatedState.attempts}`,
-                                )
-                            } catch (councilErr) {
-                                console.warn(
-                                    `[autopilot-tick] council failed for project=${project.id} stage=${stage}:`,
-                                    councilErr instanceof Error ? councilErr.message : councilErr,
-                                )
-                            }
-
-                            details.push({
+                    try {
+                        await fetch(fireUrl, {
+                            method: "POST",
+                            headers: {
+                                Authorization: `Bearer ${renderSecret}`,
+                                "Content-Type": "application/json",
+                            },
+                            body: JSON.stringify({
                                 projectId: project.id,
+                                action: "score_and_gate",
                                 stage,
-                                action: "skip_running" as TickAction,
-                                ok: false,
-                                reason: `stage scoring: composite ${scoreResult.composite}/10 < 8.0 threshold — council diagnosed, tracking row superseded for re-run (attempt ${attemptCount + 1}/${MAX_SCORING_ATTEMPTS})`,
-                            })
-                            skipped++
-                            continue
+                            }),
+                            signal: AbortSignal.timeout(FIRE_TIMEOUT_MS),
+                        })
+                    } catch (err) {
+                        const msg = err instanceof Error ? err.message : String(err)
+                        const isExpectedAbort =
+                            msg.toLowerCase().includes("aborted") ||
+                            msg.includes("AbortError") ||
+                            (err instanceof Error && err.name === "TimeoutError")
+                        if (!isExpectedAbort) {
+                            console.warn(
+                                `[autopilot-tick] score_and_gate dispatch for ${project.id} unexpected error:`, msg,
+                            )
                         }
                     }
+
+                    console.info(
+                        `[autopilot-tick] dispatched score_and_gate for project=${project.id} stage=${stage}`,
+                    )
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "skip_running" as TickAction,
+                        ok: true,
+                        reason: `score_and_gate dispatched to autopilot-step — waiting for awaiting_gate status`,
+                    })
+                    skipped++
+                    continue
                 }
 
-                // Foundry cohort check: ALL projects must pass before ANY advances
-                // Uses foundry-only query (not stage-filtered) to prevent split-cohort race
+                // alreadyScored=true: belt-and-suspenders if awaiting_gate wasn't set.
                 const foundryId = await getProjectFoundryId(project.id)
                 if (foundryId) {
                     const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
-
                     if (cohort.shouldResetAll) {
-                        // A project exhausted scoring attempts — reset ALL to Chase
-                        console.error(
-                            `[autopilot-tick] COHORT FULL RESET triggered at stage=${stage}`,
-                        )
                         await resetCohortToChase(foundryId)
-                        details.push({
-                            projectId: project.id,
-                            stage,
-                            action: "skip_running" as TickAction,
-                            ok: false,
-                            reason: `cohort gate: full reset — a project exhausted ${MAX_SCORING_ATTEMPTS} attempts`,
-                        })
+                        details.push({ projectId: project.id, stage, action: "skip_running" as TickAction, ok: false, reason: `cohort gate: full reset` })
                         skipped++
                         continue
                     }
-
                     if (!cohort.allPassed) {
-                        const failing = cohort.results
-                            .filter((r) => !r.passed)
-                            .map((r) => `${r.projectName}(${r.composite})`)
-                            .join(", ")
-                        console.info(
-                            `[autopilot-tick] cohort gate HOLD project=${project.id} stage=${stage} — not all projects passed: ${failing}`,
-                        )
-                        details.push({
-                            projectId: project.id,
-                            stage,
-                            action: "skip_running" as TickAction,
-                            ok: false,
-                            reason: `cohort gate: waiting for all projects to score ≥8/10 — failing: ${failing}`,
-                        })
+                        details.push({ projectId: project.id, stage, action: "skip_running" as TickAction, ok: false, reason: `cohort gate: waiting for all projects` })
                         skipped++
                         continue
                     }
-
-                    // ALL passed — advance the entire cohort atomically
                     if (config.nextStage === "done") {
                         await markDone(project.id, stage)
-                        details.push({
-                            projectId: project.id,
-                            stage,
-                            action: "advance_done",
-                            ok: true,
-                        })
+                        details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
                     } else {
                         const cohortResult = await advanceCohort(foundryId, stage as AutopilotStage, config.nextStage as AutopilotStage)
-                        details.push({
-                            projectId: project.id,
-                            stage,
-                            action: "advance" as TickAction,
-                            ok: cohortResult.ok,
-                            reason: `cohort advance: ${cohortResult.advancedCount} projects ${stage} → ${config.nextStage}`,
-                        })
+                        details.push({ projectId: project.id, stage, action: "advance" as TickAction, ok: cohortResult.ok, reason: `cohort advance: ${cohortResult.advancedCount} projects ${stage} → ${config.nextStage}` })
                     }
                     advanced++
                     continue
                 }
             }
-            // ── end Stage Scoring + Council Auto-Fix Loop + Foundry Cohort Gate ──
+            // ── end Stage Scoring dispatch ───────────────────────────────
 
             if (config.nextStage === "done") {
                 await markDone(project.id, stage)

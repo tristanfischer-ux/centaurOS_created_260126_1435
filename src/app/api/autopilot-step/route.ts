@@ -39,6 +39,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import {
     getProjectFoundryId,
     type AutopilotState,
+    type AutopilotStage,
 } from "@/actions/forge-v2-autopilot"
 import {
     AUTOPILOT_TRACKING_SPECIALIST,
@@ -54,12 +55,7 @@ import {
     getScoringAttemptCount,
     MAX_SCORING_ATTEMPTS,
     shouldScoreStage,
-    type AutopilotStage as ScoringAutopilotStage,
 } from "@/lib/forge-v2/stage-scoring"
-import { markDone } from "@/actions/forge-v2-autopilot"
-import {
-    STAGE_CONFIG,
-} from "@/lib/forge-v2/stage-config"
 
 export const dynamic = "force-dynamic"
 // Each fire gets a fresh Vercel Lambda with its own 800 s budget. Most
@@ -156,10 +152,10 @@ export async function POST(request: Request): Promise<NextResponse> {
             return NextResponse.json({ ok: true, ran: false, reason: "no_state" }, { status: 200 })
         }
 
-        const scoreResult = await scoreStageOutput(projectId, rawStage as ScoringAutopilotStage)
+        const scoreResult = await scoreStageOutput(projectId, rawStage as AutopilotStage)
 
         if (scoreResult) {
-            await storeStageScore(projectId, rawStage as ScoringAutopilotStage, scoreResult)
+            await storeStageScore(projectId, rawStage as AutopilotStage, scoreResult)
             console.info(
                 `[autopilot-step:score_and_gate] scored project=${projectId} stage=${rawStage} ` +
                     `composite=${scoreResult.composite} passed=${scoreResult.passed}`,
@@ -189,10 +185,10 @@ export async function POST(request: Request): Promise<NextResponse> {
 
                 // Council + retry path
                 try {
-                    const stageData = await loadStageDataForCouncil(projectId, rawStage as ScoringAutopilotStage)
+                    const stageData = await loadStageDataForCouncil(projectId, rawStage as AutopilotStage)
                     const diagnosis = await conveneDiagnosticCouncil(
                         projectId,
-                        rawStage as ScoringAutopilotStage,
+                        rawStage as AutopilotStage,
                         scoreResult,
                         stageData,
                     )
