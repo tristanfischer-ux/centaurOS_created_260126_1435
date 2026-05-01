@@ -465,8 +465,8 @@ function buildChaseFullLineup(): ModelConfig[] {
         makeQwenModel(),
         // 6. US xAI — adversarial lineage, willing to challenge consensus
         {
-            id: "x-ai/grok-3",
-            displayName: "Grok-3",
+            id: "x-ai/grok-4.3",
+            displayName: "Grok 4.3",
             lineage: "xAI (US)",
             call: async (system, user) => {
                 const apiKey = process.env.OPENROUTER_API_KEY?.trim()
@@ -477,7 +477,7 @@ function buildChaseFullLineup(): ModelConfig[] {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
                         body: JSON.stringify({
-                            model: "x-ai/grok-3",
+                            model: "x-ai/grok-4.3",
                             max_tokens: 16000,
                             temperature: 0.2,
                             messages: [
