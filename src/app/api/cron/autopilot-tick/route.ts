@@ -718,6 +718,24 @@ async function tickOnce(request: Request): Promise<TickResult> {
             const stateObj = state as AutopilotState & { current_stage_attempts?: number }
             const wasReset = (stateObj.current_stage_attempts ?? 0) === 0
 
+            // If the project was reset (current_stage_attempts=0), delete old
+            // failed/error pipeline_runs BEFORE counting — stale rows from prior
+            // cycles must not poison the retry-count guard.
+            if (wasReset) {
+                const { count: staleCount, error: delErr } = await createAdminClient()
+                    .from("pipeline_runs")
+                    .delete({ count: "exact" })
+                    .eq("project_id", project.id)
+                    .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+                    .eq("stage", stage)
+                    .in("status", ["failed", "error"])
+                if (delErr) {
+                    console.error(`[autopilot-tick] failed to delete stale pipeline_runs for project=${project.id} stage=${stage}:`, delErr.message)
+                } else {
+                    console.info(`[autopilot-tick] wasReset=true — deleted ${staleCount ?? 0} stale pipeline_runs for project=${project.id} stage=${stage}`)
+                }
+            }
+
             // Real failure (not just stale). Check attempt count: how many
             // failed rows already exist for this (project, stage)?
             const { count: failedCount } = await admin
