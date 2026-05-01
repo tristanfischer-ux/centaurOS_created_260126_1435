@@ -743,7 +743,7 @@ export async function checkFoundryCohortGate(
     const { data: projects } = await admin
         .from("cad_lab_projects")
         .select("id, name, autopilot_state")
-        .eq("foundry_id", foundryId)
+        .in("id", FORGE_GUILD_COHORT_IDS)
         .not("autopilot_state", "is", null)
         .not("autopilot_state->>started_at", "is", null)
 
@@ -752,7 +752,7 @@ export async function checkFoundryCohortGate(
     }
 
     if (projects.length < MIN_COHORT_SIZE) {
-        console.warn(`[cohort-gate] foundry=${foundryId} stage=${stage}: only ${projects.length} projects — need at least ${MIN_COHORT_SIZE}`)
+        console.warn(`[cohort-gate] foundry=${foundryId} stage=${stage}: only ${projects.length} of ${FORGE_GUILD_COHORT_IDS.length} cohort projects found — need at least ${MIN_COHORT_SIZE}`)
         return { allPassed: false, shouldResetAll: false, results: projects.map(p => ({
             projectId: p.id,
             projectName: p.name ?? p.id,
@@ -899,45 +899,99 @@ export async function advanceCohort(
 }
 
 /**
- * Reset ALL projects in a foundry back to waiting_chase when any project
- * fails a stage permanently. Tristan's rule: any failure = full restart.
+ * Reset cohort projects back to waiting_chase when any project fails a stage
+ * permanently. Tristan's rule: any failure = full restart.
+ *
+ * @param foundryId - The foundry owning the cohort (used for logging only).
+ * @param cohortProjectIds - Optional explicit list of project IDs to reset.
+ *   Defaults to FORGE_GUILD_COHORT_IDS. Pass this when the caller already
+ *   has the list to avoid a redundant DB fetch.
+ *
+ * ATOMIC (2026-04-30): all projects are reset in a SINGLE .update().in() call.
+ * The previous per-project loop left partial state when a timeout interrupted
+ * mid-loop (some projects reset, others still at their failed stage).
+ * A single bulk update either succeeds for all rows or fails for all rows —
+ * no mid-reset partial state is possible.
  */
-export async function resetCohortToChase(foundryId: string): Promise<void> {
+export async function resetCohortToChase(
+    foundryId: string,
+    cohortProjectIds?: string[],
+): Promise<void> {
     const admin = createAdminClient()
+    const ids = cohortProjectIds ?? FORGE_GUILD_COHORT_IDS
 
-    const { data: projects } = await admin
+    console.info(`[cohort-gate] FULL COHORT RESET: atomically resetting ${ids.length} projects to waiting_chase (foundry=${foundryId})`)
+
+    // Step 1 — Clear all generated content in a single bulk update.
+    // This is the equivalent of resetToFounderBrief() but without the
+    // per-project loop — all rows updated in one round-trip.
+    const resetAt = new Date().toISOString()
+    const { error: contentErr } = await admin
         .from("cad_lab_projects")
-        .select("id, name")
-        .eq("foundry_id", foundryId)
-        .not("autopilot_state", "is", null)
+        .update({
+            research: null,
+            modules: null,
+            reviews: null,
+            ai_cost_estimates: null,
+            proofread_findings: null,
+            feasibility_verdict: null,
+            oracle_findings: null,
+            executive_summary: null,
+            cost_reconciliation: null,
+            dimension_sheet: null,
+            spatial_plan: null,
+            bom_generation_state: null,
+            image_render_state: null,
+            concept_render_url: null,
+            system_illustration_url: null,
+            interior_overview_url: null,
+            reference_dossier: null,
+            brief_locked_at: null,
+            brief_locked_by: null,
+            gate_remediation_context: null,
+            council_diagnosis: null,
+            autopilot_state: {
+                stage: "waiting_chase",
+                status: "idle",
+                attempts: 0,
+                completed_stages: [],
+                failed_stages: [],
+                stage_scores: {},
+                council_diagnosis: null,
+                started_at: resetAt,
+                finished_at: null,
+            },
+        } as never)
+        .in("id", ids)
 
-    if (!projects?.length) return
-
-    console.info(`[cohort-gate] FULL COHORT RESET: resetting ${projects.length} projects in foundry ${foundryId} to waiting_chase`)
-
-    for (const p of projects) {
-        const result = await resetToFounderBrief(p.id)
-        if (result.ok) {
-            // resetToFounderBrief sets status to "paused" — change to "idle" so cron picks them up
-            await admin
-                .from("cad_lab_projects")
-                .update({
-                    autopilot_state: {
-                        stage: "waiting_chase",
-                        status: "idle",
-                        attempts: 0,
-                        completed_stages: [],
-                        failed_stages: [],
-                        stage_scores: {},
-                        started_at: new Date().toISOString(),
-                    },
-                } as unknown as never)
-                .eq("id", p.id)
-            console.info(`[cohort-gate] reset project ${p.name ?? p.id} (${p.id})`)
-        } else {
-            console.error(`[cohort-gate] reset failed for ${p.id}: ${result.error}`)
-        }
+    if (contentErr) {
+        console.error(`[cohort-gate] COHORT RESET content clear failed:`, contentErr.message)
+        // Non-fatal — still attempt to clear pipeline artefacts below
+    } else {
+        console.info(`[cohort-gate] COHORT RESET content cleared for ${ids.length} projects`)
     }
+
+    // Step 2 — Bulk-delete pipeline_runs for all cohort projects.
+    const { error: pipelineErr } = await admin
+        .from("pipeline_runs")
+        .delete()
+        .in("project_id", ids)
+
+    if (pipelineErr) {
+        console.error(`[cohort-gate] COHORT RESET pipeline_runs cleanup failed:`, pipelineErr.message)
+    }
+
+    // Step 3 — Bulk-delete report_downloads for all cohort projects.
+    const { error: reportErr } = await admin
+        .from("report_downloads")
+        .delete()
+        .in("project_id", ids)
+
+    if (reportErr) {
+        console.error(`[cohort-gate] COHORT RESET report_downloads cleanup failed:`, reportErr.message)
+    }
+
+    console.info(`[cohort-gate] COHORT RESET complete — ${ids.length} projects at waiting_chase, pipeline_runs + report_downloads cleared`)
 }
 
 /**

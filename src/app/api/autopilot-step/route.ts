@@ -46,6 +46,20 @@ import {
     isAutopilotStepName,
     type AutopilotStepName,
 } from "@/lib/forge-v2/stage-config"
+import {
+    scoreStageOutput,
+    storeStageScore,
+    conveneDiagnosticCouncil,
+    loadStageDataForCouncil,
+    getScoringAttemptCount,
+    MAX_SCORING_ATTEMPTS,
+    shouldScoreStage,
+    type AutopilotStage as ScoringAutopilotStage,
+} from "@/lib/forge-v2/stage-scoring"
+import { markDone } from "@/actions/forge-v2-autopilot"
+import {
+    STAGE_CONFIG,
+} from "@/lib/forge-v2/stage-config"
 
 export const dynamic = "force-dynamic"
 // Each fire gets a fresh Vercel Lambda with its own 800 s budget. Most
@@ -65,6 +79,10 @@ const MIN_BRIEF_REPORT_CHARS = 200
 interface AutopilotStepRequestBody {
     projectId?: unknown
     step?: unknown
+    /** score_and_gate: run scoring + council for an already-completed stage */
+    action?: unknown
+    /** stage name for score_and_gate action */
+    stage?: unknown
 }
 
 function verifyStageSecret(req: Request): NextResponse | null {
@@ -111,6 +129,159 @@ export async function POST(request: Request): Promise<NextResponse> {
         )
     }
 
+    // ── score_and_gate action path ──────────────────────────────────
+    // Dispatched by the cron when a stage tracking row reaches status='done'.
+    // Runs scoring + council in this Lambda (maxDuration=800) to avoid
+    // cron 504 timeouts that the 6-model council + scoring calls caused.
+    const action = typeof body.action === "string" ? body.action : ""
+    if (action === "score_and_gate") {
+        const rawStage = typeof body.stage === "string" ? body.stage : ""
+        if (!rawStage) {
+            return NextResponse.json(
+                { error: "stage is required for score_and_gate action" },
+                { status: 400 },
+            )
+        }
+        const admin = createAdminClient()
+        const { data: project, error: projectErr } = await admin
+            .from("cad_lab_projects")
+            .select("id, foundry_id, autopilot_state")
+            .eq("id", projectId)
+            .maybeSingle()
+        if (projectErr || !project) {
+            return NextResponse.json({ error: "Project not found" }, { status: 404 })
+        }
+        const state = project.autopilot_state as Record<string, unknown>
+        if (!state) {
+            return NextResponse.json({ ok: true, ran: false, reason: "no_state" }, { status: 200 })
+        }
+
+        const scoreResult = await scoreStageOutput(projectId, rawStage as ScoringAutopilotStage)
+
+        if (scoreResult) {
+            await storeStageScore(projectId, rawStage as ScoringAutopilotStage, scoreResult)
+            console.info(
+                `[autopilot-step:score_and_gate] scored project=${projectId} stage=${rawStage} ` +
+                    `composite=${scoreResult.composite} passed=${scoreResult.passed}`,
+            )
+
+            if (!scoreResult.passed) {
+                const attemptCount = getScoringAttemptCount(state, rawStage)
+
+                if (attemptCount >= MAX_SCORING_ATTEMPTS) {
+                    // Terminal fail — signal cron to reset cohort
+                    console.error(
+                        `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} ` +
+                            `exhausted ${MAX_SCORING_ATTEMPTS} scoring attempts — terminal_fail`,
+                    )
+                    await admin
+                        .from("cad_lab_projects")
+                        .update({
+                            autopilot_state: {
+                                ...state,
+                                status: "terminal_fail",
+                                terminal_fail_reason: `Scoring exhausted: ${attemptCount}/${MAX_SCORING_ATTEMPTS} attempts without reaching 8/10`,
+                            },
+                        } as unknown as never)
+                        .eq("id", projectId)
+                    return NextResponse.json({ ok: true, action: "terminal_fail", stage: rawStage }, { status: 200 })
+                }
+
+                // Council + retry path
+                try {
+                    const stageData = await loadStageDataForCouncil(projectId, rawStage as ScoringAutopilotStage)
+                    const diagnosis = await conveneDiagnosticCouncil(
+                        projectId,
+                        rawStage as ScoringAutopilotStage,
+                        scoreResult,
+                        stageData,
+                    )
+                    console.info(
+                        `[autopilot-step:score_and_gate] council complete for project=${projectId} stage=${rawStage} ` +
+                            `consensusFindings=${diagnosis.consensusFindings.length} ` +
+                            `fixes=${diagnosis.consensusFixes.length}`,
+                    )
+                } catch (councilErr) {
+                    console.warn(
+                        `[autopilot-step:score_and_gate] council failed for project=${projectId} stage=${rawStage}:`,
+                        councilErr instanceof Error ? councilErr.message : councilErr,
+                    )
+                }
+
+                // Supersede the done tracking row so next tick re-fires this stage
+                const { data: doneRow } = await admin
+                    .from("pipeline_runs")
+                    .select("id")
+                    .eq("project_id", projectId)
+                    .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+                    .eq("stage", rawStage)
+                    .eq("status", "done")
+                    .order("created_at", { ascending: false })
+                    .limit(1)
+                    .maybeSingle()
+
+                if (doneRow) {
+                    await admin
+                        .from("pipeline_runs")
+                        .update({
+                            status: "failed",
+                            error_code: "COUNCIL_SUPERSEDED",
+                            error_message: `Scored ${scoreResult.composite}/10 < 8.0 — council diagnosed, re-running (attempt ${attemptCount + 1})`,
+                            finished_at: new Date().toISOString(),
+                        } as never)
+                        .eq("id", doneRow.id)
+                }
+
+                // Reset status to idle so the next cron tick re-fires this stage
+                const prevAttempts = typeof state.attempts === "number" ? state.attempts : 0
+                await admin
+                    .from("cad_lab_projects")
+                    .update({
+                        autopilot_state: {
+                            ...state,
+                            status: "idle",
+                            attempts: prevAttempts + 1,
+                        },
+                    } as unknown as never)
+                    .eq("id", projectId)
+
+                console.info(
+                    `[autopilot-step:score_and_gate] reset project=${projectId} stage=${rawStage} to idle for re-fire (attempt ${attemptCount + 1}/${MAX_SCORING_ATTEMPTS})`,
+                )
+                return NextResponse.json({ ok: true, action: "retry_after_council", stage: rawStage }, { status: 200 })
+            }
+
+            // Score passed — set awaiting_gate so cron can run cohort check
+            await admin
+                .from("cad_lab_projects")
+                .update({
+                    autopilot_state: {
+                        ...state,
+                        status: "awaiting_gate",
+                    },
+                } as unknown as never)
+                .eq("id", projectId)
+
+            console.info(
+                `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} scored PASS — status set to awaiting_gate`,
+            )
+            return NextResponse.json({ ok: true, action: "awaiting_gate", stage: rawStage }, { status: 200 })
+        }
+
+        // scoreResult is null — stage not scoreable, treat as pass
+        console.info(
+            `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} — no rubric, skipping scoring`,
+        )
+        await admin
+            .from("cad_lab_projects")
+            .update({
+                autopilot_state: { ...state, status: "awaiting_gate" },
+            } as unknown as never)
+            .eq("id", projectId)
+        return NextResponse.json({ ok: true, action: "awaiting_gate_no_rubric", stage: rawStage }, { status: 200 })
+    }
+
+    // ── Normal step (fire) path ─────────────────────────────────────
     const rawStep = typeof body.step === "string" ? body.step : ""
     if (!rawStep || !isAutopilotStepName(rawStep)) {
         return NextResponse.json(
