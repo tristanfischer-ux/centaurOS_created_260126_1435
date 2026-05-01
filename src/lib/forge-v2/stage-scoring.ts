@@ -18,6 +18,18 @@ import { callOpenAI, callGemini } from "@/lib/cad-lab/api-helpers"
 import { callOpenRouter } from "@/lib/ai/openrouter"
 import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
+// ── Canonical cohort project IDs ─────────────────────────────────────────
+// The 5 Forge Guild demo projects that constitute the authoritative cohort.
+// Scoping the cohort gate and reset to these IDs prevents rogue or sentinel
+// projects from blocking or polluting the pipeline.
+export const FORGE_GUILD_COHORT_IDS = [
+    '0ab0457a-ab32-4d2a-b1e3-32d8b877222c',
+    '365eb5bf-69ff-475a-8ef9-f18d4adb8135',
+    '3acf3007-b720-400b-8dc4-818394df102d',
+    '330e1bec-58f8-422c-b225-ea42b18580d1',
+    '517ae649-b3d3-42ad-94d7-99ac408e428b',
+]
+
 // ── Rubric types ──────────────────────────────────────────────────────────
 
 export interface ScoringDimension {
@@ -55,6 +67,24 @@ export interface StageScoreHistory {
 }
 
 const MAX_SCORING_ATTEMPTS = 5
+
+// ── Validation mode map ────────────────────────────────────────────────────
+// Deterministic stages produce identical output for identical input and must
+// NOT be LLM-scored — an LLM judge can randomly score them < 8/10, triggering
+// infinite retries. These stages get hard programmatic validators instead.
+// Confirmed by 6-model unanimous council 2026-04-30.
+export const STAGE_VALIDATION_MODE: Record<string, 'generative' | 'deterministic'> = {
+    waiting_chase: 'generative',
+    waiting_brief_lock: 'generative',
+    waiting_max: 'generative',
+    waiting_sizing: 'deterministic',
+    waiting_layout: 'deterministic',
+    waiting_bom: 'generative',
+    waiting_finn: 'generative',
+    waiting_suppliers: 'generative',
+    waiting_fang: 'generative',
+    waiting_proofreader: 'generative',
+}
 
 // ── Per-stage rubric definitions ──────────────────────────────────────────
 
@@ -327,6 +357,143 @@ function applyChaseHardGates(
   }
 
   return capped;
+}
+
+// ── Deterministic stage validator ─────────────────────────────────────────
+
+/**
+ * Hard programmatic validator for deterministic solver stages.
+ * Returns a StageScoreResult with passed=true if all gates pass, false otherwise.
+ * Used instead of the LLM judge for waiting_sizing and waiting_layout.
+ *
+ * Rationale: these stages produce identical output for identical input.
+ * An LLM judge can score them < 8/10 non-deterministically, causing
+ * infinite retries. 6-model council unanimously agreed: use hard checks.
+ */
+export async function validateDeterministicStage(
+    projectId: string,
+    stage: AutopilotStage,
+    _supabase?: unknown,
+): Promise<StageScoreResult | null> {
+    const admin = createAdminClient()
+
+    const { data } = await admin
+        .from("cad_lab_projects")
+        .select("research, autopilot_state")
+        .eq("id", projectId)
+        .maybeSingle()
+
+    const research = data?.research as Record<string, unknown> | null
+
+    if (stage === "waiting_sizing") {
+        const dimensionSheet =
+            research?.dimensionSheet ??
+            research?.dimension_sheet ??
+            null
+
+        const failures: string[] = []
+
+        if (!dimensionSheet) {
+            failures.push("dimension_sheet is missing")
+        } else {
+            const ds = dimensionSheet as Record<string, unknown>
+            // Solver must not have returned INFEASIBLE
+            const solverStatus = (ds.solver_status ?? ds.solverStatus ?? "") as string
+            if (typeof solverStatus === "string" && solverStatus.toUpperCase() === "INFEASIBLE") {
+                failures.push("solver returned INFEASIBLE")
+            }
+
+            // At least 3 of the key physical parameters must be numeric
+            const keyParams = ["length", "width", "height", "mass", "power"]
+            const numericCount = keyParams.filter((k) => {
+                const val = ds[k]
+                return typeof val === "number" && isFinite(val)
+            }).length
+            if (numericCount < 3) {
+                failures.push(`only ${numericCount}/5 key sizing parameters are numeric (need ≥3)`)
+            }
+        }
+
+        const passed = failures.length === 0
+        const scores: DimensionScore[] = [
+            {
+                dimension: "dimension_sheet_exists",
+                score: !dimensionSheet ? 0 : 10,
+                reasoning: !dimensionSheet ? "No dimension sheet found" : "Dimension sheet present",
+            },
+            {
+                dimension: "solver_feasible",
+                score: failures.some(f => f.includes("INFEASIBLE")) ? 0 : 10,
+                reasoning: failures.some(f => f.includes("INFEASIBLE"))
+                    ? "Solver returned INFEASIBLE"
+                    : "Solver converged to a feasible solution",
+            },
+            {
+                dimension: "parameters_numeric",
+                score: failures.some(f => f.includes("sizing parameters")) ? 4 : 10,
+                reasoning: failures.find(f => f.includes("sizing parameters")) ?? "Key sizing parameters are numeric",
+            },
+        ]
+
+        return {
+            stage,
+            scores,
+            composite: passed ? 10 : 0,
+            passed,
+            reasoning: passed
+                ? "All hard gates passed: dimension sheet present, solver feasible, key parameters numeric."
+                : `Hard gate failures: ${failures.join("; ")}`,
+            scored_at: new Date().toISOString(),
+        }
+    }
+
+    if (stage === "waiting_layout") {
+        const layoutData =
+            research?.layout ??
+            research?.layoutResult ??
+            null
+
+        const failures: string[] = []
+
+        if (!layoutData) {
+            failures.push("layout data is missing")
+        } else {
+            const ld = layoutData as Record<string, unknown>
+            const modules = ld.modules ?? ld.moduleList ?? null
+            if (!Array.isArray(modules) || modules.length === 0) {
+                failures.push("modules array is empty or missing")
+            }
+        }
+
+        const passed = failures.length === 0
+        const scores: DimensionScore[] = [
+            {
+                dimension: "layout_exists",
+                score: !layoutData ? 0 : 10,
+                reasoning: !layoutData ? "No layout data found" : "Layout data present",
+            },
+            {
+                dimension: "modules_populated",
+                score: failures.some(f => f.includes("modules")) ? 0 : 10,
+                reasoning: failures.find(f => f.includes("modules")) ?? "Modules array is non-empty",
+            },
+        ]
+
+        return {
+            stage,
+            scores,
+            composite: passed ? 10 : 0,
+            passed,
+            reasoning: passed
+                ? "All hard gates passed: layout data present with non-empty modules array."
+                : `Hard gate failures: ${failures.join("; ")}`,
+            scored_at: new Date().toISOString(),
+        }
+    }
+
+    // Unknown deterministic stage — log a warning and return null (caller falls back to LLM)
+    console.warn(`[stage-scoring] validateDeterministicStage called for unhandled stage=${stage}`)
+    return null
 }
 
 // ── Scoring function ──────────────────────────────────────────────────────

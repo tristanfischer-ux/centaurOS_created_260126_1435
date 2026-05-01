@@ -87,6 +87,8 @@ import {
     loadStageDataForCouncil,
     getScoringAttemptCount,
     MAX_SCORING_ATTEMPTS,
+    STAGE_VALIDATION_MODE,
+    validateDeterministicStage,
 } from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
@@ -458,7 +460,15 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         continue
                     }
 
-                    const scoreResult = await scoreStageOutput(project.id, stage as AutopilotStage)
+                    // Route to the appropriate validator: deterministic stages use hard
+                    // programmatic checks; generative stages use the LLM judge.
+                    // This prevents infinite retry loops on solver stages (waiting_sizing,
+                    // waiting_layout) where identical input always produces identical output
+                    // and the LLM judge may randomly score < 8/10. Council-confirmed 2026-04-30.
+                    const validationMode = STAGE_VALIDATION_MODE[stage] ?? 'generative'
+                    const scoreResult = validationMode === 'deterministic'
+                        ? await validateDeterministicStage(project.id, stage as AutopilotStage)
+                        : await scoreStageOutput(project.id, stage as AutopilotStage)
                     if (scoreResult) {
                         await storeStageScore(project.id, stage as AutopilotStage, scoreResult)
                         console.info(
