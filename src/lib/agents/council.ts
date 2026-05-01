@@ -55,13 +55,26 @@ export type CouncilTier = "quick" | "full" | "deep" | "strategy"
 export const MODEL_TIER_LATENCY_WEIGHT: Record<string, number> = {
     haiku:            1,
     "gpt-mini":       1,
+    // Grok 4.3: 203 tok/s — fastest frontier model (xAI, May 2026 benchmarks).
+    // Weight 1 matches haiku; it genuinely returns first in practice.
+    grok:             1,
     sonnet:           2,
     deepseek:         3,
     google:           3,
     qwen:             3,
     minimax:          3,
+    // MiMo V2.5 Pro (Xiaomi): similar latency profile to Gemini/DeepSeek.
+    mimo:             3,
+    // GLM-5.1 (Zhipu): tool-use focused, fast JSON responses.
+    glm:              3,
+    // Kimi K2.6 (Moonshot): reasoning model — uses `reasoning` field, slightly
+    // slower than DeepSeek V4-Flash but faster than V4-Pro.
+    kimi:             4,
     "qwen-235b":      4,
     claude:           4,
+    // Opus 4.7 via Anthropic: deep synthesis, slower than Sonnet.
+    // Weight 5 so Fiona fires last in mixed councils.
+    "claude-opus":    5,
     "deepseek-v4-pro": 5,
     "qwen-local":     3,
 }

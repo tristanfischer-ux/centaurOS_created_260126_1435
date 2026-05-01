@@ -19,13 +19,20 @@
  *   tier='deep'     → 2 rounds (4 specialists)
  *   tier='strategy' → 2 rounds (5 specialists)
  *
- * Model mapping (OpenRouter, non-Anthropic per cost-discipline rule):
- *   Cal   (host/closer)    → mistralai/mistral-large-2407
- *   Sage  (strategist)     → google/gemini-3.1-pro-preview
- *   Finn  (finance-lead)   → deepseek/deepseek-v4-flash
- *   Max   (cto)            → deepseek/deepseek-v4-flash
- *   Sal   (sales-lead)     → deepseek/deepseek-v4-flash
- *   Fiona (fundraising)    → deepseek/deepseek-v4-flash (specialist, no longer host)
+ * Model mapping (OpenRouter, diverse multi-lineage per Artificial Analysis
+ *   Intelligence Index May 2026 — see COUNCIL_MODEL_MAP below for full table):
+ *   Cal   (chief-of-staff)  → x-ai/grok-4.3
+ *   Sage  (strategist)      → google/gemini-3.1-pro-preview
+ *   Fiona (fundraising)     → anthropic/claude-opus-4.7
+ *   Finn  (finance-lead)    → moonshotai/kimi-k2.6
+ *   Fang  (vp-manufacturing)→ xiaomi/mimo-v2.5-pro
+ *   Max   (cto)             → deepseek/deepseek-v4-pro
+ *   Priya (product-lead)    → qwen/qwen3.6-max-preview
+ *   Mia   (growth-marketer) → x-ai/grok-4.3
+ *   Sal   (sales-lead)      → x-ai/grok-4.3
+ *   Jian  (vp-engineering)  → xiaomi/mimo-v2.5-pro
+ *   Harper (hiring-team)    → moonshotai/kimi-k2.6
+ *   Leo   (legal-counsel)   → z-ai/glm-5.1
  *
  * W51 fix: specialist maxTokens raised from 800 → 4096 so Gemini 3.1 Pro
  * (a reasoning model) has enough budget for its internal reasoning trace
@@ -41,46 +48,102 @@ import { callOpenRouter } from "@/lib/ai/openrouter"
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // ─── Council model map — OpenRouter IDs keyed by specialist id ──────────────
+//
+// Lineage diversity principle (Artificial Analysis Intelligence Index, May 2026):
+// A same-lineage council is an echo chamber. Every specialist slot pulls from
+// a DIFFERENT model family so blind spots from one training lineage are caught
+// by another. The table below spans six lineages:
+//   US xAI     → x-ai/grok-4.3           (IFBench 81%, non-hallucination 75%, 203 tok/s)
+//   US Google  → google/gemini-3.1-pro-preview (HLE 45%, Intelligence 57 — best reasoner)
+//   US Anthropic → anthropic/claude-opus-4.7  (Fiona: +0.21 composite benchmark win)
+//   China Moonshot → moonshotai/kimi-k2.6     (Intelligence 54, different RLHF lineage)
+//   China Xiaomi   → xiaomi/mimo-v2.5-pro     (non-hallucination 75%, IFBench 80%)
+//   China DeepSeek → deepseek/deepseek-v4-pro (structured reasoning, Intelligence 52)
+//   China Alibaba  → qwen/qwen3.6-max-preview (IFBench 77%, Intelligence 52)
+//   China Zhipu    → z-ai/glm-5.1            (tool-use 98%, non-hallucination 74%)
+//
+// IMPORTANT — prose vs reasoning models:
+//   deepseek/deepseek-v4-pro returns reasoning chain in `reasoning_content`, not
+//   `content`. The callOpenRouter wrapper must extract BOTH fields (see memory:
+//   forgeos_deepseek_reasoning_content_separate_field.md).
+//   moonshotai/kimi-k2.6 uses the `reasoning` field — always pass max_tokens>=4096.
+//   All specialists below already use maxTokens:4096 (W51 fix).
+//
+// Note on V4-Flash removal: V4-Flash was previously the default for 10 of 13
+// specialists, creating a same-family echo chamber. V4-Pro replaces it for Max
+// (cto) only — as a structured reasoning upgrade, not a prose model. All other
+// slots are now on non-DeepSeek models.
 
 const COUNCIL_MODEL_MAP: Record<string, string> = {
-    // All specialists use V4-Flash or Mistral/Gemini for clean prose output.
-    // V4-Pro is reasoning-mode and leaks chain-of-thought into the visible
-    // response when asked for short prose (verified 2026-04-26: Finn dumped
-    // his entire trace including "I am Finn... Key points I might hit...
-    // Sharpest take..." into the user-facing card). Per cost-discipline
-    // rule: V4-Pro is for STRUCTURED reasoning only, never prose.
-    // Cal is now host — Mistral Large handles opening + closing synthesis.
-    // Fiona is now a regular specialist (fundraising domain).
-    "chief-of-staff":      "mistralai/mistral-large-2407",  // host (Cal)
-    "fundraising-advisor": "deepseek/deepseek-v4-flash",    // specialist (Fiona)
+    // US xAI — Grok 4.3: fastest (203 tok/s), IFBench #1 (81%), honest (75%).
+    // Best host/opener: sets up sessions fast, follows format precisely.
+    // Also used for sales-lead and growth-marketer when Cal isn't in session.
+    "chief-of-staff":      "x-ai/grok-4.3",
+
+    // US Google — Gemini 3.1 Pro: Intelligence 57, HLE 45% (#1 hardest problems).
+    // Best strategic reasoner. Kept from prior mapping (no regression risk).
     "strategist":          "google/gemini-3.1-pro-preview",
-    "finance-lead":        "deepseek/deepseek-v4-flash",
-    "cto":                 "deepseek/deepseek-v4-flash",
-    "sales-lead":          "deepseek/deepseek-v4-flash",
-    "vp-manufacturing":    "deepseek/deepseek-v4-flash",
+
+    // US Anthropic — Opus 4.7: Fiona's +0.21 composite benchmark win confirmed
+    // 2026-04-25. Best fundraising synthesis. Cleanest win in the benchmark suite.
+    "fundraising-advisor": "anthropic/claude-opus-4.7",
+
+    // China Moonshot — Kimi K2.6: Intelligence 54, different RLHF lineage from
+    // DeepSeek/Alibaba/Xiaomi. $1.70/M. Reasoning model — uses `reasoning` field;
+    // max_tokens>=4096 is already set in all callers (W51 fix).
+    "finance-lead":        "moonshotai/kimi-k2.6",
+
+    // China Xiaomi — MiMo V2.5 Pro: Intelligence 54, non-hallucination 75%,
+    // IFBench 80%. Grounds manufacturing claims in reality rather than optimism.
+    "vp-manufacturing":    "xiaomi/mimo-v2.5-pro",
+
+    // China DeepSeek — V4-Pro: Intelligence 52, structured reasoner. Upgrade from
+    // V4-Flash for Max (cto) only — the engineering domain benefits from deeper
+    // reasoning. NOTE: returns reasoning in `reasoning_content` not `content`.
+    "cto":                 "deepseek/deepseek-v4-pro",
+
+    // China Alibaba — Qwen 3.6 Max Preview: Intelligence 52, IFBench 77%.
+    // Different Alibaba lineage adds genuine diversity vs Moonshot/DeepSeek/Xiaomi.
+    "product-lead":        "qwen/qwen3.6-max-preview",
+
+    // US xAI — Grok 4.3 (same as Cal): used when Cal isn't in the session.
+    // Intelligence 53, non-hallucination 75%, fast.
+    "growth-marketer":     "x-ai/grok-4.3",
+    "sales-lead":          "x-ai/grok-4.3",
+
+    // China Xiaomi — MiMo V2.5 Pro (same as Fang): Intelligence 54, honest,
+    // good IFBench. Engineering and manufacturing share the same honest-grounding
+    // lineage.
+    "vp-engineering":      "xiaomi/mimo-v2.5-pro",
+
+    // China Moonshot — Kimi K2.6 (same as Finn): Intelligence 54, different lineage.
+    "hiring-team":         "moonshotai/kimi-k2.6",
+
+    // China Zhipu (Tsinghua-derived) — GLM-5.1: Intelligence 51, non-hallucination
+    // 74%, tool-use 98% (#1 tied). Best model for precise legal reasoning — won't
+    // invent statutes or fabricate case law.
+    "legal-counsel":       "z-ai/glm-5.1",
+
+    // vp-supply-chain retains Gemini 3.1 Pro (same strategic-reasoning lineage
+    // as Sage; supply-chain decisions are reasoning-heavy).
     "vp-supply-chain":     "google/gemini-3.1-pro-preview",
-    "product-lead":        "deepseek/deepseek-v4-flash",
-    "growth-marketer":     "deepseek/deepseek-v4-flash",
-    "vp-engineering":      "deepseek/deepseek-v4-flash",
-    "hiring-team":         "deepseek/deepseek-v4-flash",
-    "legal-counsel":       "deepseek/deepseek-v4-flash",
 }
 
 // Model label shown in the response card
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
-    "chief-of-staff":      "Mistral Large",
-    "fundraising-advisor": "DeepSeek V4-Flash",
+    "chief-of-staff":      "Grok 4.3",
+    "fundraising-advisor": "Claude Opus 4.7",
     "strategist":          "Gemini 3.1 Pro",
-    "finance-lead":        "DeepSeek V4-Flash",
-    "cto":                 "DeepSeek V4-Flash",
-    "sales-lead":          "DeepSeek V4-Flash",
-    "vp-manufacturing":    "DeepSeek V4-Flash",
+    "finance-lead":        "Kimi K2.6",
+    "cto":                 "DeepSeek V4-Pro",
+    "sales-lead":          "Grok 4.3",
+    "vp-manufacturing":    "MiMo V2.5 Pro",
     "vp-supply-chain":     "Gemini 3.1 Pro",
-    "product-lead":        "DeepSeek V4-Flash",
-    "growth-marketer":     "DeepSeek V4-Flash",
-    "vp-engineering":      "DeepSeek V4-Flash",
-    "hiring-team":         "DeepSeek V4-Flash",
-    "legal-counsel":       "DeepSeek V4-Flash",
+    "product-lead":        "Qwen 3.6 Max",
+    "growth-marketer":     "Grok 4.3",
+    "vp-engineering":      "MiMo V2.5 Pro",
+    "hiring-team":         "Kimi K2.6",
+    "legal-counsel":       "GLM-5.1",
 }
 
 // W50: Signature close headers used in Round 2 prompts so each specialist
