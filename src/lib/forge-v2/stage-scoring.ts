@@ -417,12 +417,37 @@ export async function validateDeterministicStage(
                 failures.push("solver returned INFEASIBLE")
             }
 
-            // At least 3 of the key physical parameters must be numeric
-            const keyParams = ["length", "width", "height", "mass", "power"]
-            const numericCount = keyParams.filter((k) => {
-                const val = ds[k]
-                return typeof val === "number" && isFinite(val)
-            }).length
+            // Check that the dimension sheet has substantive numeric content.
+            // The sizing engine produces different schemas per domain, so we
+            // check multiple possible locations for numeric parameters:
+            //   - Top-level: length, width, height, mass, power (legacy/simple)
+            //   - envelope.*_mm fields (container-based projects)
+            //   - module_dimensions entries with d_mm/h_mm/w_mm (all domains)
+            //   - target.kw / target.kwh (energy projects)
+            let numericCount = 0
+            const topLevel = ["length", "width", "height", "mass", "power"]
+            numericCount += topLevel.filter((k) => typeof ds[k] === "number" && isFinite(ds[k] as number)).length
+            const envelope = ds.envelope as Record<string, unknown> | null
+            if (envelope && typeof envelope === "object") {
+                const envKeys = ["interior_w_mm", "interior_d_mm", "interior_h_mm", "interior_floor_m2"]
+                numericCount += envKeys.filter((k) => typeof envelope[k] === "number").length
+            }
+            const moduleDims = ds.module_dimensions as Record<string, unknown> | null
+            if (moduleDims && typeof moduleDims === "object") {
+                for (const mod of Object.values(moduleDims)) {
+                    if (mod && typeof mod === "object") {
+                        const m = mod as Record<string, unknown>
+                        if (typeof m.d_mm === "number" || typeof m.h_mm === "number" || typeof m.w_mm === "number") {
+                            numericCount++
+                        }
+                    }
+                }
+            }
+            const target = ds.target as Record<string, unknown> | null
+            if (target && typeof target === "object") {
+                if (typeof target.kw === "number") numericCount++
+                if (typeof target.kwh === "number") numericCount++
+            }
             if (numericCount < 3) {
                 failures.push(`only ${numericCount}/5 key sizing parameters are numeric (need ≥3)`)
             }
