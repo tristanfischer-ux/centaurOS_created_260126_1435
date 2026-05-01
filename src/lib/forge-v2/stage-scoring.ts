@@ -311,7 +311,7 @@ async function loadStageData(
             const coverageSummary = `BOM EXPANSION COVERAGE: ${expandedParts}/${totalParts} parts fully expanded (${coveragePercent}%). ${skeletonParts} parts are skeleton-only (missing specs/costs — batch expansion failed on these). Score part_completeness based on coverage percentage, not binary pass/fail. A bill of materials with ≥85% coverage should score ≥7/10 on part_completeness.\n\n`
             return coverageSummary + JSON.stringify(data, null, 2).slice(0, 11000)
         }
-        case "cost_analysis": {
+        case "ai_cost_estimates": {
             const { data } = await admin
                 .from("cad_lab_projects")
                 .select("ai_cost_estimates")
