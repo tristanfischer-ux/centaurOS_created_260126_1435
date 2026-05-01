@@ -118,7 +118,7 @@ export interface StageScoreHistory {
     latest_scored_at: string
 }
 
-const MAX_SCORING_ATTEMPTS = 5
+const MAX_SCORING_ATTEMPTS = 15
 
 // ── Validation mode map ────────────────────────────────────────────────────
 // Deterministic stages produce identical output for identical input and must
@@ -944,12 +944,13 @@ export async function checkFoundryCohortGate(
         `${results.filter(r => r.passed).length}/${results.length} passed, anyExhausted=${anyExhausted}`,
     )
 
-    // If ANY project exhausted attempts without passing, signal full reset
+    // If ANY project exhausted attempts, log but do NOT reset — autopilot-tick
+    // handles retry reset individually. The cohort gate just reports status.
     if (anyExhausted) {
-        console.error(
-            `[cohort-gate] FULL RESET NEEDED: at least one project exhausted ${MAX_SCORING_ATTEMPTS} attempts at ${stage}`,
+        console.warn(
+            `[cohort-gate] Some projects exhausted ${MAX_SCORING_ATTEMPTS} attempts at ${stage} — autopilot-tick will reset them individually`,
         )
-        return { allPassed: false, shouldResetAll: true, results }
+        return { allPassed: false, shouldResetAll: false, results }
     }
 
     const allPassed = results.length >= MIN_COHORT_SIZE && results.every((r) => r.passed)

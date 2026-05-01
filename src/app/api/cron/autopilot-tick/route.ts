@@ -409,39 +409,42 @@ async function tickOnce(request: Request): Promise<TickResult> {
             }
         }
 
-        // ── terminal_fail set by score_and_gate in autopilot-step ────────
-        if (autopilotStatus === "terminal_fail") {
-            console.error(
-                `[autopilot-tick] terminal_fail detected for project=${project.id} stage=${stage} — triggering cohort reset`,
+        // ── terminal_fail / stage_failed: reset for unlimited retries ────
+        if (autopilotStatus === "terminal_fail" || autopilotStatus === "stage_failed") {
+            console.warn(
+                `[autopilot-tick] ${autopilotStatus} detected for project=${project.id} stage=${stage} — resetting to idle for retry (unlimited retries)`,
             )
-            await recordFailure(
-                project.id,
-                stage,
-                `Stage quality gate exhausted ${MAX_SCORING_ATTEMPTS} attempts without reaching 8/10 threshold`,
-            )
-            details.push({
-                projectId: project.id,
-                stage,
-                action: "terminal_fail",
-                ok: false,
-                reason: `scoring exhausted: terminal_fail status set by score_and_gate`,
-            })
-            failed++
-            // Mark ONLY this project as stage_failed — do NOT reset the entire cohort.
-            const { error: sfErr } = await createAdminClient()
+            const { error: resetErr } = await createAdminClient()
                 .from("cad_lab_projects")
                 .update({
                     autopilot_state: {
                         ...(state as Record<string, unknown>),
-                        status: "stage_failed",
+                        status: "idle",
+                        current_stage_attempts: 0,
+                        failed_stages: [],
                     },
                 } as never)
                 .eq("id", project.id)
-            if (sfErr) {
-                console.error(`[autopilot-tick] Failed to set stage_failed for project=${project.id}:`, sfErr.message)
+            if (resetErr) {
+                console.error(`[autopilot-tick] Failed to reset ${autopilotStatus} for project=${project.id}:`, resetErr.message)
             } else {
-                console.info(`[autopilot-tick] project=${project.id} marked stage_failed at stage=${stage}`)
+                console.info(`[autopilot-tick] project=${project.id} reset from ${autopilotStatus} to idle at stage=${stage} — will retry`)
             }
+            // Delete stale pipeline_runs so retry guard doesn't block
+            await createAdminClient()
+                .from("pipeline_runs")
+                .delete()
+                .eq("project_id", project.id)
+                .eq("stage", stage)
+                .in("status", ["failed", "error"])
+            details.push({
+                projectId: project.id,
+                stage,
+                action: "terminal_fail" as TickAction,
+                ok: true,
+                reason: `${autopilotStatus} → reset to idle for retry`,
+            })
+            skipped++
             continue
         }
 
@@ -780,37 +783,36 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 // Fall through to fire logic below — do NOT continue/skip.
             }
             if (attempts >= config.maxAttempts) {
-                await recordFailure(
-                    project.id,
-                    stage,
-                    trackingRow.error_message ??
-                        `Stage failed after ${attempts} attempts`,
+                // Instead of permanent stage_failed, reset attempts for unlimited retries.
+                // The cohort gate quality bar (≥8/10) is the real gatekeeper, not attempt count.
+                console.warn(
+                    `[autopilot-tick] project=${project.id} exhausted ${attempts}/${config.maxAttempts} attempts at stage=${stage} — resetting attempts for retry`,
                 )
-                details.push({
-                    projectId: project.id,
-                    stage,
-                    action: "terminal_fail",
-                    ok: false,
-                    reason: `${attempts} >= ${config.maxAttempts}`,
-                })
-                failed++
-
-                // Mark ONLY this project as stage_failed — do NOT reset the entire cohort.
-                const { error: sfErr2 } = await createAdminClient()
+                await createAdminClient()
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
                             ...(state as Record<string, unknown>),
-                            status: "stage_failed",
+                            status: "idle",
+                            current_stage_attempts: 0,
                         },
                     } as never)
                     .eq("id", project.id)
-                if (sfErr2) {
-                    console.error(`[autopilot-tick] Failed to set stage_failed for project=${project.id}:`, sfErr2.message)
-                } else {
-                    console.info(`[autopilot-tick] project=${project.id} marked stage_failed at stage=${stage} attempts=${attempts}`)
-                }
-
+                // Delete stale pipeline_runs so retry guard doesn't block
+                await createAdminClient()
+                    .from("pipeline_runs")
+                    .delete()
+                    .eq("project_id", project.id)
+                    .eq("stage", stage)
+                    .in("status", ["failed", "error"])
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "terminal_fail" as TickAction,
+                    ok: true,
+                    reason: `${attempts} >= ${config.maxAttempts} — reset to idle for retry`,
+                })
+                skipped++
                 continue
             }
             // Else: fall through to fire (retry).
