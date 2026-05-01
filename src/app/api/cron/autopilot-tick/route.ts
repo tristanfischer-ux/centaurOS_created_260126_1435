@@ -330,7 +330,12 @@ async function tickOnce(request: Request): Promise<TickResult> {
                                 await adminClient
                                     .from("cad_lab_projects")
                                     .update({
-                                        autopilot_state: { ...freshState, status: "idle" },
+                                        autopilot_state: {
+                                            ...freshState,
+                                            status: "idle",
+                                            failed_stages: [],
+                                            current_stage_attempts: 0,
+                                        },
                                     } as unknown as never)
                                     .eq("id", project.id)
                             }
@@ -705,6 +710,13 @@ async function tickOnce(request: Request): Promise<TickResult> {
             trackingRow?.status === "failed" &&
             trackingRow.error_code !== "STALE_ABANDONED"
         ) {
+            // If the project was reset (status=idle, current_stage_attempts=0),
+            // old failed pipeline_runs from before the reset must not count
+            // against the retry budget. Skip the failed-count guard and fall
+            // through to fire — the project deserves a fresh start.
+            const stateObj = state as AutopilotState & { current_stage_attempts?: number }
+            const wasReset = autopilotStatus === "idle" && (stateObj.current_stage_attempts ?? 0) === 0
+
             // Real failure (not just stale). Check attempt count: how many
             // failed rows already exist for this (project, stage)?
             const { count: failedCount } = await admin
@@ -716,7 +728,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 .eq("status", "failed")
 
             const attempts = failedCount ?? 0
-            if (attempts >= config.maxAttempts) {
+            if (!wasReset && attempts >= config.maxAttempts) {
                 await recordFailure(
                     project.id,
                     stage,
