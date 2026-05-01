@@ -262,6 +262,14 @@ export async function POST(request: Request): Promise<NextResponse> {
             }
 
             // Score passed — set awaiting_gate so cron can run cohort check
+            // Guard: if the project has already been advanced past this stage
+            // (e.g. by advanceCohort in the cron tick), this score is stale — discard it.
+            if (freshState.stage !== rawStage) {
+                console.warn(
+                    `[autopilot-step:score_and_gate] STALE score for project=${projectId}: scored stage=${rawStage} but project is now at ${freshState.stage} — discarding`,
+                )
+                return NextResponse.json({ ok: true, action: "stale_score_discarded", stage: rawStage }, { status: 200 })
+            }
             await admin
                 .from("cad_lab_projects")
                 .update({
@@ -283,6 +291,12 @@ export async function POST(request: Request): Promise<NextResponse> {
             `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} — no rubric, skipping scoring`,
         )
         const noRubricState = await refetchState()
+        if (noRubricState.stage !== rawStage) {
+            console.warn(
+                `[autopilot-step:score_and_gate] STALE no-rubric pass for project=${projectId}: stage=${rawStage} but project is now at ${noRubricState.stage} — discarding`,
+            )
+            return NextResponse.json({ ok: true, action: "stale_score_discarded", stage: rawStage }, { status: 200 })
+        }
         await admin
             .from("cad_lab_projects")
             .update({
