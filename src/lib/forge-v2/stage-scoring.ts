@@ -14,7 +14,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { callOpenAI, callGemini, callDeepSeek } from "@/lib/cad-lab/api-helpers"
+import { callDeepSeek } from "@/lib/cad-lab/api-helpers"
 import { callOpenRouter } from "@/lib/ai/openrouter"
 import { runJudgePanel, getJudgePanelConfig } from "@/lib/forge-v2/judge-panels"
 import type { JudgePanelResult } from "@/lib/forge-v2/judge-panels"
@@ -1411,30 +1411,12 @@ What specific changes to the AI pipeline (prompts, data extraction, validation l
         }
     }
 
-    // 6-model multi-lineage diagnostic council
+    // 6-model multi-lineage diagnostic council (all via OpenRouter)
     const councilCalls: Promise<CouncilFinding>[] = [
-        // 1. GPT-5.5 (OpenAI — US) — reasoning model: no temperature override
-        (async (): Promise<CouncilFinding> => {
-            try {
-                const { text } = await callOpenAI(systemPrompt, userPrompt, "gpt-5.5", 16384, 120_000)
-                const parsed = parseCouncilResponse(text)
-                return { model: "gpt-5.5:openai", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
-            } catch (err) {
-                console.warn(`[stage-scoring] council gpt-5.5 failed:`, err instanceof Error ? err.message : err)
-                return { model: "gpt-5.5:openai", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
-            }
-        })(),
-        // 2. Gemini 3.1 Pro (Google — US)
-        (async (): Promise<CouncilFinding> => {
-            try {
-                const { text } = await callGemini(systemPrompt, userPrompt, "gemini-3.1-pro-preview", 16384, 120_000)
-                const parsed = parseCouncilResponse(text)
-                return { model: "gemini-3.1-pro:google", findings: parsed.findings ?? [], suggestedFixes: parsed.suggested_fixes ?? [], rawResponse: text.slice(0, 2000) }
-            } catch (err) {
-                console.warn(`[stage-scoring] council gemini failed:`, err instanceof Error ? err.message : err)
-                return { model: "gemini-3.1-pro:google", findings: [], suggestedFixes: [], rawResponse: `ERROR: ${err instanceof Error ? err.message : String(err)}` }
-            }
-        })(),
+        // 1. GPT-5.4 (via OpenRouter — US/OpenAI) — cheaper than 5.5, avoids direct API quota
+        councilViaOpenRouter("openai/gpt-5.4", "gpt-5.4:openai"),
+        // 2. Gemini 3.1 Pro (via OpenRouter — US/Google) — avoids direct API quota
+        councilViaOpenRouter("google/gemini-3.1-pro-preview", "gemini-3.1-pro:google"),
         // 3. DeepSeek V4-Pro (via OpenRouter — China)
         councilViaOpenRouter("deepseek/deepseek-v4-pro", "deepseek-v4-pro:deepseek"),
         // 4. Qwen 3 235B (via OpenRouter — China/Alibaba)
