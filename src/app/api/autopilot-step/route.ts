@@ -154,6 +154,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
         const scoreResult = await scoreStageOutput(projectId, rawStage as AutopilotStage)
 
+        // Re-fetch state after scoring to avoid overwriting scores that
+        // storeStageScore just persisted. The `state` captured at line 150
+        // has stale stage_scores: {} — spreading it would erase the scores.
+        const refetchState = async (): Promise<Record<string, unknown>> => {
+            const { data: fresh } = await admin
+                .from("cad_lab_projects")
+                .select("autopilot_state")
+                .eq("id", projectId)
+                .single()
+            return (fresh?.autopilot_state as Record<string, unknown>) ?? state
+        }
+
         if (scoreResult) {
             await storeStageScore(projectId, rawStage as AutopilotStage, scoreResult)
             console.info(
@@ -161,11 +173,12 @@ export async function POST(request: Request): Promise<NextResponse> {
                     `composite=${scoreResult.composite} passed=${scoreResult.passed}`,
             )
 
+            const freshState = await refetchState()
+
             if (!scoreResult.passed) {
-                const attemptCount = getScoringAttemptCount(state, rawStage)
+                const attemptCount = getScoringAttemptCount(freshState, rawStage)
 
                 if (attemptCount >= MAX_SCORING_ATTEMPTS) {
-                    // Terminal fail — signal cron to reset cohort
                     console.error(
                         `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} ` +
                             `exhausted ${MAX_SCORING_ATTEMPTS} scoring attempts — terminal_fail`,
@@ -174,7 +187,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
-                                ...state,
+                                ...freshState,
                                 status: "terminal_fail",
                                 terminal_fail_reason: `Scoring exhausted: ${attemptCount}/${MAX_SCORING_ATTEMPTS} attempts without reaching 8/10`,
                             },
@@ -228,13 +241,14 @@ export async function POST(request: Request): Promise<NextResponse> {
                         .eq("id", doneRow.id)
                 }
 
-                // Reset status to idle so the next cron tick re-fires this stage
-                const prevAttempts = typeof state.attempts === "number" ? state.attempts : 0
+                // Re-fetch again after council may have written diagnosis
+                const postCouncilState = await refetchState()
+                const prevAttempts = typeof postCouncilState.attempts === "number" ? postCouncilState.attempts : 0
                 await admin
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
-                            ...state,
+                            ...postCouncilState,
                             status: "idle",
                             attempts: prevAttempts + 1,
                         },
@@ -252,7 +266,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                 .from("cad_lab_projects")
                 .update({
                     autopilot_state: {
-                        ...state,
+                        ...freshState,
                         status: "awaiting_gate",
                     },
                 } as unknown as never)
@@ -268,10 +282,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         console.info(
             `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} — no rubric, skipping scoring`,
         )
+        const noRubricState = await refetchState()
         await admin
             .from("cad_lab_projects")
             .update({
-                autopilot_state: { ...state, status: "awaiting_gate" },
+                autopilot_state: { ...noRubricState, status: "awaiting_gate" },
             } as unknown as never)
             .eq("id", projectId)
         return NextResponse.json({ ok: true, action: "awaiting_gate_no_rubric", stage: rawStage }, { status: 200 })
