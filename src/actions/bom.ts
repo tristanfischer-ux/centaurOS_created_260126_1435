@@ -1089,8 +1089,21 @@ For each part number in the skeleton, provide:
 - mpn (Loop 5 P2 — REQUIRED for every purchased row): every row with isPurchased=true MUST have an mpn value — either a real Manufacturer Part Number from the catalogue ABOVE if it matches ("Texas Instruments BQ40Z80RHBR", "Schneider NSXm160F4M2"), OR the literal string "placeholder — RFQ pending" when no catalogue match exists. The previous loop verified Sonnet silently drops this field when allowed to set it to null — DO NOT do that. For non-purchased (make) parts, set mpn=null. The mpn field MUST be present in every part's expansion record, even if the value is null. Skipping the field entirely is forbidden.
 - costJustification (Loop 5 P3 — REQUIRED for every row): every row's expansion record MUST include costJustification — a string when the estimated cost deviates noticeably from typical UK market norms, or the explicit string "in line with market" when it does not. Treat costJustification as a forcing function: if you cannot articulate why the number is what it is, the number is probably wrong. Reference benchmarks for sanity checks: £80 for a Wi-Fi/BLE module is wrong (typical ESP32/nRF52 is £1.50); £508k for a 1.5 MW grid-forming PCS is wrong (typical UK market £105-150k); £49k total for a 6,000-slot containerised vertical farm is too LOW (typical £100-200k). The costJustification field MUST be present — never skip it.
 
+PART CLASSIFICATION — APPLY BEFORE FILLING FIELDS:
+Before specifying each part, classify it as one of:
+1. "commercial_off_the_shelf" — a purchasable product with a known manufacturer (pumps, membranes, LED panels, motors, sensors, valves). Extract the manufacturer and model/MPN directly from the part name if present (e.g. "DuPont FilmTec SW30HRLE-440i" → manufacturer="DuPont", mpn="SW30HRLE-440i"). If exact MPN is uncertain but the item is clearly commercial, provide manufacturer plus best-fit series and set aiConfidence=0.4.
+2. "custom_fabricated" — a part made to order (enclosures, brackets, frames, mounting rails, manifolds). Set mpn="CUSTOM". Material MUST be inferred from engineering context (e.g. seawater-wetted manifolds → "316L Stainless Steel"; structural frames → "304 Stainless Steel" or "6061 Aluminium"; ISO container shells → "Corten A weathering steel").
+3. "assembly" — a multi-component subsystem or package (e.g. "Climate and CO2 Conditioning Assembly", "Feed Pre-treatment and Conditioning"). Provide the DOMINANT structural/housing material (e.g. "Galvanized steel, aluminium"), a basis-of-estimate cost, and mpn="ASSEMBLY".
+
 CRITICAL — NO NULL OR EMPTY FIELDS:
-Every part expansion MUST include non-null values for: description, material, materialSpec, estimatedUnitCostGbp, massKg, and dimensions (envelopeXMm/Y/Z). If the exact specification is unknown, infer the most common industrial equivalent and set aiConfidence to a lower value (0.3-0.5). Setting any of these fields to null or leaving them empty is FORBIDDEN — it causes downstream scoring failures. Use your engineering knowledge to provide best-effort estimates. A part with aiConfidence=0.3 and a reasonable guess is infinitely better than a null field.
+Every part expansion MUST include non-null values for: description, material, materialSpec, estimatedUnitCostGbp, massKg, and dimensions (envelopeXMm/Y/Z). Returning null or empty string for material is FORBIDDEN — it is the #1 cause of scoring failures. If the exact specification is unknown, infer from the operating environment:
+- Desalination/seawater-wetted parts → 316L or 2205 Duplex Stainless Steel
+- Pressure vessels → Glass-fibre reinforced epoxy (GRP/FRP)
+- LED/horticultural lighting → 6063 Aluminium heatsink + PMMA lens
+- Pumps/motors → Cast iron housing, stainless steel impeller
+- Electrical enclosures → 316L Stainless Steel or powder-coated mild steel
+- Container shells → Corten A weathering steel
+Set aiConfidence to 0.3-0.5 for inferred values. A part with aiConfidence=0.3 and a reasonable material inference is infinitely better than a null field.
 
 Respond with ONLY valid JSON:
 {
@@ -1220,8 +1233,21 @@ For each part number in the skeleton, provide:
 - mpn (Loop 5 P2 — REQUIRED for every purchased row): every row with isPurchased=true MUST have an mpn value — either a real Manufacturer Part Number from the catalogue ABOVE if it matches ("Texas Instruments BQ40Z80RHBR", "Schneider NSXm160F4M2"), OR the literal string "placeholder — RFQ pending" when no catalogue match exists. The previous loop verified Sonnet silently drops this field when allowed to set it to null — DO NOT do that. For non-purchased (make) parts, set mpn=null. The mpn field MUST be present in every part's expansion record, even if the value is null. Skipping the field entirely is forbidden.
 - costJustification (Loop 5 P3 — REQUIRED for every row): every row's expansion record MUST include costJustification — a string when the estimated cost deviates noticeably from typical UK market norms, or the explicit string "in line with market" when it does not. Treat costJustification as a forcing function: if you cannot articulate why the number is what it is, the number is probably wrong. Reference benchmarks for sanity checks: £80 for a Wi-Fi/BLE module is wrong (typical ESP32/nRF52 is £1.50); £508k for a 1.5 MW grid-forming PCS is wrong (typical UK market £105-150k); £49k total for a 6,000-slot containerised vertical farm is too LOW (typical £100-200k). The costJustification field MUST be present — never skip it.
 
+PART CLASSIFICATION — APPLY BEFORE FILLING FIELDS:
+Before specifying each part, classify it as one of:
+1. "commercial_off_the_shelf" — a purchasable product with a known manufacturer (pumps, membranes, LED panels, motors, sensors, valves). Extract the manufacturer and model/MPN directly from the part name if present (e.g. "DuPont FilmTec SW30HRLE-440i" → manufacturer="DuPont", mpn="SW30HRLE-440i"). If exact MPN is uncertain but the item is clearly commercial, provide manufacturer plus best-fit series and set aiConfidence=0.4.
+2. "custom_fabricated" — a part made to order (enclosures, brackets, frames, mounting rails, manifolds). Set mpn="CUSTOM". Material MUST be inferred from engineering context (e.g. seawater-wetted manifolds → "316L Stainless Steel"; structural frames → "304 Stainless Steel" or "6061 Aluminium"; ISO container shells → "Corten A weathering steel").
+3. "assembly" — a multi-component subsystem or package (e.g. "Climate and CO2 Conditioning Assembly", "Feed Pre-treatment and Conditioning"). Provide the DOMINANT structural/housing material (e.g. "Galvanized steel, aluminium"), a basis-of-estimate cost, and mpn="ASSEMBLY".
+
 CRITICAL — NO NULL OR EMPTY FIELDS:
-Every part expansion MUST include non-null values for: description, material, materialSpec, estimatedUnitCostGbp, massKg, and dimensions (envelopeXMm/Y/Z). If the exact specification is unknown, infer the most common industrial equivalent and set aiConfidence to a lower value (0.3-0.5). Setting any of these fields to null or leaving them empty is FORBIDDEN — it causes downstream scoring failures. Use your engineering knowledge to provide best-effort estimates. A part with aiConfidence=0.3 and a reasonable guess is infinitely better than a null field.
+Every part expansion MUST include non-null values for: description, material, materialSpec, estimatedUnitCostGbp, massKg, and dimensions (envelopeXMm/Y/Z). Returning null or empty string for material is FORBIDDEN — it is the #1 cause of scoring failures. If the exact specification is unknown, infer from the operating environment:
+- Desalination/seawater-wetted parts → 316L or 2205 Duplex Stainless Steel
+- Pressure vessels → Glass-fibre reinforced epoxy (GRP/FRP)
+- LED/horticultural lighting → 6063 Aluminium heatsink + PMMA lens
+- Pumps/motors → Cast iron housing, stainless steel impeller
+- Electrical enclosures → 316L Stainless Steel or powder-coated mild steel
+- Container shells → Corten A weathering steel
+Set aiConfidence to 0.3-0.5 for inferred values. A part with aiConfidence=0.3 and a reasonable material inference is infinitely better than a null field.
 
 Respond with ONLY valid JSON:
 {
@@ -1527,6 +1553,78 @@ export async function generateBomFromModules(
       return {
         success: false,
         error: `Bill of materials expansion incomplete: ${expandedCount}/${totalParts} parts expanded (${Math.round(unexpandedRatio * 100)}% missing). ${failedBatches.length} batch(es) failed even after retry.`,
+      }
+    }
+
+    // ── Phase 2b: Gap-fill pass for parts with null material ──
+    // Even "successful" expansions can return empty material for assemblies
+    // and process-industrial parts. Identify gaps and re-prompt with targeted
+    // context so the model fills them rather than looping 143 times.
+    const gapParts = skeleton.parts.filter((s) => {
+      const exp = mergedExpansions[s.partNumber]
+      if (!exp) return true
+      return !exp.material || exp.material.trim() === ""
+    })
+
+    if (gapParts.length > 0 && gapParts.length <= totalParts) {
+      console.info(
+        `[generateBomFromModules] Gap-fill: ${gapParts.length} parts with null/empty material. Running targeted re-prompt.`,
+      )
+      const gapSummary = gapParts.map((p) =>
+        `- ${p.partNumber}: "${p.name}" (${p.process}, ${p.isPurchased ? "purchased" : "manufactured"}, module: ${p.sourceModuleId})`
+      ).join("\n")
+
+      const gapPrompt = `The following parts were previously expanded but returned with NULL or empty material fields. This is unacceptable — every part MUST have a material.
+
+For each part below, you MUST provide material by inferring from the part name and engineering context:
+- If the part name contains a manufacturer/model (e.g. "DuPont FilmTec SW30HRLE-440i"), extract it and provide the membrane material (polyamide thin-film composite).
+- If the part is an assembly or package, provide the dominant structural material.
+- If the part is a pump, motor, or rotating equipment, provide the housing/casing material.
+- If the part is an enclosure or container, provide the structural shell material.
+
+Parts needing material fill:
+${gapSummary}
+
+Module context:
+${moduleContext}${briefContext}
+
+Return ONLY the expansions for these specific parts. Every part MUST have non-null, non-empty material.`
+
+      try {
+        const gapResult = await expandBomPartsBatchInternal({
+          batchParts: gapParts,
+          moduleContext,
+          briefContext,
+          catalogueRef,
+        })
+        if (gapResult.success) {
+          for (const [pn, gapExp] of Object.entries(gapResult.expansions)) {
+            if (gapExp.material && gapExp.material.trim() !== "") {
+              if (mergedExpansions[pn]) {
+                // Patch only the missing fields, keep existing good data
+                if (!mergedExpansions[pn].material || mergedExpansions[pn].material.trim() === "") {
+                  mergedExpansions[pn].material = gapExp.material
+                }
+                if (!mergedExpansions[pn].materialSpec || mergedExpansions[pn].materialSpec.trim() === "") {
+                  mergedExpansions[pn].materialSpec = gapExp.materialSpec
+                }
+                if (mergedExpansions[pn].estimatedUnitCostGbp === 0) {
+                  mergedExpansions[pn].estimatedUnitCostGbp = gapExp.estimatedUnitCostGbp
+                }
+                if (!mergedExpansions[pn].mpn) {
+                  mergedExpansions[pn].mpn = gapExp.mpn
+                }
+              } else {
+                mergedExpansions[pn] = gapExp
+              }
+            }
+          }
+          console.info(
+            `[generateBomFromModules] Gap-fill recovered ${Object.keys(gapResult.expansions).length} parts`,
+          )
+        }
+      } catch (err) {
+        console.warn("[generateBomFromModules] Gap-fill pass failed:", err instanceof Error ? err.message : err)
       }
     }
 
