@@ -14,7 +14,7 @@ import type { OpenRouterCallResult } from "@/lib/ai/openrouter"
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export type JudgeLineage = "xiaomi" | "xai" | "zhipu" | "google" | "moonshot"
+export type JudgeLineage = "xiaomi" | "xai" | "zhipu" | "google" | "moonshot" | "deepseek"
 
 export interface JudgeConfig {
     model: string
@@ -54,12 +54,12 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
     waiting_chase: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
         { model: "x-ai/grok-4.3", role: "honest adversary", lineage: "xai" },
-        { model: "google/gemini-3.1-pro-preview", role: "depth seat", lineage: "google" },
+        { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_max: [
         { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
         { model: "z-ai/glm-5.1", role: "schema enforcer", lineage: "zhipu" },
-        { model: "google/gemini-3.1-pro-preview", role: "depth seat", lineage: "google" },
+        { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_bom: [
         { model: "z-ai/glm-5.1", role: "schema enforcer", lineage: "zhipu" },
@@ -69,15 +69,15 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
     waiting_finn: [
         { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "google/gemini-3.1-pro-preview", role: "depth seat", lineage: "google" },
+        { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_fang: [
-        { model: "google/gemini-3.1-pro-preview", role: "depth", lineage: "google" },
+        { model: "deepseek/deepseek-v4-pro", role: "depth", lineage: "deepseek" },
         { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
         { model: "moonshotai/kimi-k2.6", role: "multimodal", lineage: "moonshot" },
     ],
     running_fang_reviews: [
-        { model: "google/gemini-3.1-pro-preview", role: "depth", lineage: "google" },
+        { model: "deepseek/deepseek-v4-pro", role: "depth", lineage: "deepseek" },
         { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
         { model: "moonshotai/kimi-k2.6", role: "multimodal", lineage: "moonshot" },
     ],
@@ -100,11 +100,11 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
     ],
     // Low-risk (2 judges — multimodal vision)
     waiting_pdf: [
-        { model: "google/gemini-3.1-pro-preview", role: "multimodal vision", lineage: "google" },
+        { model: "deepseek/deepseek-v4-pro", role: "multimodal vision", lineage: "deepseek" },
         { model: "moonshotai/kimi-k2.6", role: "multimodal vision", lineage: "moonshot" },
     ],
     generating_pdf: [
-        { model: "google/gemini-3.1-pro-preview", role: "multimodal vision", lineage: "google" },
+        { model: "deepseek/deepseek-v4-pro", role: "multimodal vision", lineage: "deepseek" },
         { model: "moonshotai/kimi-k2.6", role: "multimodal vision", lineage: "moonshot" },
     ],
 }
