@@ -301,7 +301,7 @@ async function loadStageData(
             const { data } = await admin
                 .from("parts")
                 .select("*")
-                .eq("project_id", projectId)
+                .eq("cad_lab_project_id", projectId)
                 .limit(200)
             if (!data?.length) return "No parts data found."
             return JSON.stringify(data, null, 2).slice(0, 12000)
