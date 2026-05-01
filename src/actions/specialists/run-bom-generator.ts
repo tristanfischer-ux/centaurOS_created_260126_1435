@@ -331,6 +331,26 @@ async function runBomGeneratorInternal(
         //    runs that hung before the schema change).
         await sweepStalledRuns(projectId).catch(() => {})
 
+        // 5b. Pre-run cleanup: delete skeleton/stub parts from previous
+        //     failed expansions. These are parts with null material, null
+        //     cost, or placeholder provenance that tank BOM quality scores.
+        //     Council diagnosis (6/6 consensus 2026-05-01): stale skeleton
+        //     parts from pre-quality-gate runs bypass the new gate because
+        //     they're already in the DB. Cleaning before re-run ensures the
+        //     quality gate evaluates only fresh expansion output.
+        const { count: deletedSkeletons } = await admin
+            .from("parts")
+            .delete({ count: "exact" })
+            .eq("cad_lab_project_id", projectId)
+            .or(
+                "material.is.null,material.eq.,estimated_unit_cost_gbp.is.null,estimated_unit_cost_gbp.eq.0,cost_provenance.eq.todo",
+            )
+        if (deletedSkeletons && deletedSkeletons > 0) {
+            console.info(
+                `[run-bom-generator] pre-run cleanup: deleted ${deletedSkeletons} skeleton/stub parts for ${projectId}`,
+            )
+        }
+
         // 6. Start pipeline_run. Once this returns, every exit path MUST
         //    either complete or fail it.
         let runId: string

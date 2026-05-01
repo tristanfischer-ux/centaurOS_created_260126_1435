@@ -1105,6 +1105,32 @@ Every part expansion MUST include non-null values for: description, material, ma
 - Container shells → Corten A weathering steel
 Set aiConfidence to 0.3-0.5 for inferred values. A part with aiConfidence=0.3 and a reasonable material inference is infinitely better than a null field.
 
+MATERIAL GRADE ENFORCEMENT (council mandate 2026-05-01):
+Never output generic material families. You MUST specify exact industry-standard grades:
+- "316L Stainless Steel" not "Steel" or "Stainless Steel"
+- "Schedule 80 PVC, ASTM D1785" not "PVC"
+- "C11000 Copper, ASTM B152" not "Copper"
+- "6061-T6 Aluminium, ASTM B221" not "Aluminium"
+- "EPDM, peroxide-cured, 70A Shore" not "Rubber"
+
+COST JUSTIFICATION ENFORCEMENT (council mandate 2026-05-01):
+Cost justifications must be quantitative and auditable. Include pricing basis:
+- Material mass × market rate: "2.5 kg of 304 SS at £4/kg + 2 hrs CNC at £60/hr = £134"
+- Supplier catalogue: "Digi-Key qty 10 price for TI BQ40Z80 = £8.50/unit"
+- Comparable component: "Similar 500 m³/day RO membrane from DuPont = £1,200-1,800"
+Unsupported phrases like "estimated market price" or "standard cost" are forbidden.
+
+MPN ENFORCEMENT (council mandate 2026-05-01):
+For purchased parts: provide a real MPN from a standard supplier (McMaster-Carr, RS Components, Digi-Key, Misumi) or a plausible model series. For custom fabricated parts: set mpn to "CUSTOM-[MATERIAL]-[FUNCTION]" (e.g. "CUSTOM-316L-MANIFOLD"). Never use "placeholder", "TBD", or "unknown".
+
+SELF-CHECK BEFORE RETURNING JSON:
+Before emitting the final JSON, verify:
+1. No part has null/empty material, materialSpec, description, or estimatedUnitCostGbp
+2. No material is a generic element name without a grade (Steel, Copper, PVC, Aluminium)
+3. No MPN is a placeholder string
+4. All costs are > 0
+5. All costJustification values are quantitative
+
 Respond with ONLY valid JSON:
 {
   "expansions": {
@@ -1248,6 +1274,32 @@ Every part expansion MUST include non-null values for: description, material, ma
 - Electrical enclosures → 316L Stainless Steel or powder-coated mild steel
 - Container shells → Corten A weathering steel
 Set aiConfidence to 0.3-0.5 for inferred values. A part with aiConfidence=0.3 and a reasonable material inference is infinitely better than a null field.
+
+MATERIAL GRADE ENFORCEMENT (council mandate 2026-05-01):
+Never output generic material families. You MUST specify exact industry-standard grades:
+- "316L Stainless Steel" not "Steel" or "Stainless Steel"
+- "Schedule 80 PVC, ASTM D1785" not "PVC"
+- "C11000 Copper, ASTM B152" not "Copper"
+- "6061-T6 Aluminium, ASTM B221" not "Aluminium"
+- "EPDM, peroxide-cured, 70A Shore" not "Rubber"
+
+COST JUSTIFICATION ENFORCEMENT (council mandate 2026-05-01):
+Cost justifications must be quantitative and auditable. Include pricing basis:
+- Material mass × market rate: "2.5 kg of 304 SS at £4/kg + 2 hrs CNC at £60/hr = £134"
+- Supplier catalogue: "Digi-Key qty 10 price for TI BQ40Z80 = £8.50/unit"
+- Comparable component: "Similar 500 m³/day RO membrane from DuPont = £1,200-1,800"
+Unsupported phrases like "estimated market price" or "standard cost" are forbidden.
+
+MPN ENFORCEMENT (council mandate 2026-05-01):
+For purchased parts: provide a real MPN from a standard supplier (McMaster-Carr, RS Components, Digi-Key, Misumi) or a plausible model series. For custom fabricated parts: set mpn to "CUSTOM-[MATERIAL]-[FUNCTION]" (e.g. "CUSTOM-316L-MANIFOLD"). Never use "placeholder", "TBD", or "unknown".
+
+SELF-CHECK BEFORE RETURNING JSON:
+Before emitting the final JSON, verify:
+1. No part has null/empty material, materialSpec, description, or estimatedUnitCostGbp
+2. No material is a generic element name without a grade (Steel, Copper, PVC, Aluminium)
+3. No MPN is a placeholder string
+4. All costs are > 0
+5. All costJustification values are quantitative
 
 Respond with ONLY valid JSON:
 {

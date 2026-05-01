@@ -305,7 +305,7 @@ async function loadStageData(
                 .limit(200)
             if (!data?.length) return "No parts data found."
             const totalParts = data.length
-            const expandedParts = data.filter((p: Record<string, unknown>) => p.cost_provenance !== 'todo' && p.description !== null && p.material_spec !== null).length
+            const expandedParts = data.filter((p: Record<string, unknown>) => p.cost_provenance !== 'todo' && p.description !== null && p.material !== null && p.material !== '' && p.estimated_unit_cost_gbp !== null && p.estimated_unit_cost_gbp !== 0).length
             const skeletonParts = totalParts - expandedParts
             const coveragePercent = totalParts > 0 ? Math.round((expandedParts / totalParts) * 100) : 0
             const coverageSummary = `BOM EXPANSION COVERAGE: ${expandedParts}/${totalParts} parts fully expanded (${coveragePercent}%). ${skeletonParts} parts are skeleton-only (missing specs/costs — batch expansion failed on these). Score part_completeness based on coverage percentage, not binary pass/fail. A bill of materials with ≥85% coverage should score ≥7/10 on part_completeness.\n\n`
@@ -698,9 +698,34 @@ ${stageData}`
             weightedSum += ds.score * w
             totalWeight += w
         }
-        const composite = totalWeight > 0
+        let composite = totalWeight > 0
             ? Math.round((weightedSum / totalWeight) * 100) / 100
             : 0
+
+        // BOM skeleton detector: hard-cap score when skeleton parts exist.
+        // Council diagnosis (6/6 consensus 2026-05-01): skeleton parts with
+        // null material/cost/description from failed batch expansions must
+        // deterministically cap the score, not rely on LLM judgement.
+        if (stage === "waiting_bom") {
+            const skeletonMatch = stageData.match(/BOM EXPANSION COVERAGE: (\d+)\/(\d+)/)
+            if (skeletonMatch) {
+                const expanded = parseInt(skeletonMatch[1], 10)
+                const total = parseInt(skeletonMatch[2], 10)
+                const skeletonCount = total - expanded
+                const skeletonRatio = total > 0 ? skeletonCount / total : 0
+                if (skeletonRatio > 0.10) {
+                    composite = Math.min(composite, 6.0)
+                    console.warn(
+                        `[stage-scoring] BOM skeleton cap applied: ${skeletonCount}/${total} skeletons (${Math.round(skeletonRatio * 100)}%) → capped at 6.0`,
+                    )
+                } else if (skeletonCount > 0) {
+                    composite = Math.min(composite, 7.5)
+                    console.warn(
+                        `[stage-scoring] BOM skeleton cap applied: ${skeletonCount} skeletons → capped at 7.5`,
+                    )
+                }
+            }
+        }
 
         return {
             stage,
