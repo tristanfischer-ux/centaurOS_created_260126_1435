@@ -322,7 +322,34 @@ async function loadStageData(
                 .maybeSingle()
             const cost = data?.ai_cost_estimates as Record<string, unknown> | null
             if (!cost) return "No cost analysis found."
-            return JSON.stringify(cost, null, 2).slice(0, 12000)
+            // Sensitivity + benchmark are at the END of the JSON and were getting
+            // truncated by the 12K limit. Extract them first so judges always see them.
+            const sensitivity = cost["_sensitivity_analysis"]
+            const benchmark = cost["_benchmark_grounding"]
+            const moduleEntries = Object.entries(cost)
+                .filter(([k]) => !k.startsWith("_"))
+            const moduleSummary = moduleEntries.map(([id, est]) => {
+                const e = est as Record<string, unknown>
+                return {
+                    moduleId: id,
+                    totalPerUnit: e.totalPerUnit,
+                    partCount: Array.isArray(e.parts) ? (e.parts as unknown[]).length : 0,
+                    labourCost: e.labourCost,
+                    confidence: e.confidence,
+                    topParts: Array.isArray(e.parts)
+                        ? (e.parts as Array<Record<string, unknown>>)
+                            .sort((a, b) => ((b.cost as number) ?? 0) - ((a.cost as number) ?? 0))
+                            .slice(0, 3)
+                            .map(p => ({ name: p.name, cost: p.cost, type: p.type }))
+                        : [],
+                }
+            })
+            const structured = {
+                _sensitivity_analysis: sensitivity ?? "NOT PROVIDED",
+                _benchmark_grounding: benchmark ?? "NOT PROVIDED",
+                module_cost_summaries: moduleSummary,
+            }
+            return JSON.stringify(structured, null, 2).slice(0, 24000)
         }
         case "supplier_matches": {
             const { data } = await admin
