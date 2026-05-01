@@ -186,10 +186,10 @@ const RUBRICS: Partial<Record<AutopilotStage, StageRubric>> = {
     waiting_bom: {
         stage: "waiting_bom",
         dimensions: [
-            { name: "part_completeness", description: "Does every module have a bill of materials with specific parts (not just categories)?", weight: 1 },
-            { name: "specification_accuracy", description: "Are part specifications (material, grade, dimensions) precise enough to source?", weight: 1 },
-            { name: "cost_realism", description: "Are estimated costs within reasonable industry ranges for the specified parts?", weight: 1 },
-            { name: "sourcing_feasibility", description: "Are parts commercially available from multiple suppliers?", weight: 1 },
+            { name: "part_completeness", description: "What percentage of parts have complete specifications? Score proportionally: ≥95% expanded = 9-10, ≥85% = 7-8, ≥70% = 5-6, <70% = 1-4. Skeleton-only parts (null description/material/cost) are expansion failures, not missing modules.", weight: 1 },
+            { name: "specification_accuracy", description: "For expanded parts (non-null specs), are material grades, dimensions, and process types precise enough to source? Ignore skeleton-only parts in this assessment.", weight: 1 },
+            { name: "cost_realism", description: "For costed parts, are estimates within ±50% of typical United Kingdom industry ranges? Minor variance is acceptable. Only flag costs that are wildly off (>2x or <0.5x benchmark).", weight: 1 },
+            { name: "sourcing_feasibility", description: "Are the specified parts commercially available components? Purchased/COTS parts with manufacturer part numbers or clear specifications score highest.", weight: 1 },
         ],
         dataQuery: "parts",
     },
@@ -304,7 +304,12 @@ async function loadStageData(
                 .eq("cad_lab_project_id", projectId)
                 .limit(200)
             if (!data?.length) return "No parts data found."
-            return JSON.stringify(data, null, 2).slice(0, 12000)
+            const totalParts = data.length
+            const expandedParts = data.filter((p: Record<string, unknown>) => p.cost_provenance !== 'todo' && p.description !== null && p.material_spec !== null).length
+            const skeletonParts = totalParts - expandedParts
+            const coveragePercent = totalParts > 0 ? Math.round((expandedParts / totalParts) * 100) : 0
+            const coverageSummary = `BOM EXPANSION COVERAGE: ${expandedParts}/${totalParts} parts fully expanded (${coveragePercent}%). ${skeletonParts} parts are skeleton-only (missing specs/costs — batch expansion failed on these). Score part_completeness based on coverage percentage, not binary pass/fail. A bill of materials with ≥85% coverage should score ≥7/10 on part_completeness.\n\n`
+            return coverageSummary + JSON.stringify(data, null, 2).slice(0, 11000)
         }
         case "cost_analysis": {
             const { data } = await admin
