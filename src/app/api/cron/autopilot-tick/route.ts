@@ -472,6 +472,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 .from("pipeline_runs")
                 .delete()
                 .eq("project_id", project.id)
+                .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
                 .eq("stage", stage)
                 .in("status", ["failed", "error"])
             details.push({
@@ -863,6 +864,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .from("pipeline_runs")
                     .delete()
                     .eq("project_id", project.id)
+                    .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
                     .eq("stage", stage)
                     .in("status", ["failed", "error"])
                 details.push({
