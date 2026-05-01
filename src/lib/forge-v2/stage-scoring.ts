@@ -201,7 +201,7 @@ const RUBRICS: Partial<Record<AutopilotStage, StageRubric>> = {
             { name: "sensitivity_analysis", description: "Does the analysis show how costs change with key variables?", weight: 1 },
             { name: "benchmark_grounding", description: "Are costs compared to industry benchmarks or comparable products?", weight: 1 },
         ],
-        dataQuery: "cost_analysis",
+        dataQuery: "ai_cost_estimates",
     },
     matching_suppliers: {
         stage: "matching_suppliers",
@@ -314,10 +314,10 @@ async function loadStageData(
         case "cost_analysis": {
             const { data } = await admin
                 .from("cad_lab_projects")
-                .select("cost_analysis")
+                .select("ai_cost_estimates")
                 .eq("id", projectId)
                 .maybeSingle()
-            const cost = data?.cost_analysis as Record<string, unknown> | null
+            const cost = data?.ai_cost_estimates as Record<string, unknown> | null
             if (!cost) return "No cost analysis found."
             return JSON.stringify(cost, null, 2).slice(0, 12000)
         }
