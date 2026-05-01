@@ -1622,26 +1622,6 @@ export async function generateBomFromModules(
       console.info(
         `[generateBomFromModules] Gap-fill: ${gapParts.length} parts with null/empty material. Running targeted re-prompt.`,
       )
-      const gapSummary = gapParts.map((p) =>
-        `- ${p.partNumber}: "${p.name}" (${p.process}, ${p.isPurchased ? "purchased" : "manufactured"}, module: ${p.sourceModuleId})`
-      ).join("\n")
-
-      const gapPrompt = `The following parts were previously expanded but returned with NULL or empty material fields. This is unacceptable — every part MUST have a material.
-
-For each part below, you MUST provide material by inferring from the part name and engineering context:
-- If the part name contains a manufacturer/model (e.g. "DuPont FilmTec SW30HRLE-440i"), extract it and provide the membrane material (polyamide thin-film composite).
-- If the part is an assembly or package, provide the dominant structural material.
-- If the part is a pump, motor, or rotating equipment, provide the housing/casing material.
-- If the part is an enclosure or container, provide the structural shell material.
-
-Parts needing material fill:
-${gapSummary}
-
-Module context:
-${moduleContext}${briefContext}
-
-Return ONLY the expansions for these specific parts. Every part MUST have non-null, non-empty material.`
-
       try {
         const gapResult = await expandBomPartsBatchInternal({
           batchParts: gapParts,
