@@ -980,7 +980,6 @@ export async function resetCohortToChase(
             brief_locked_at: null,
             brief_locked_by: null,
             gate_remediation_context: null,
-            council_diagnosis: null,
             autopilot_state: {
                 stage: "waiting_chase",
                 status: "idle",
@@ -1012,17 +1011,7 @@ export async function resetCohortToChase(
         console.error(`[cohort-gate] COHORT RESET pipeline_runs cleanup failed:`, pipelineErr.message)
     }
 
-    // Step 3 — Bulk-delete report_downloads for all cohort projects.
-    const { error: reportErr } = await admin
-        .from("report_downloads")
-        .delete()
-        .in("project_id", ids)
-
-    if (reportErr) {
-        console.error(`[cohort-gate] COHORT RESET report_downloads cleanup failed:`, reportErr.message)
-    }
-
-    console.info(`[cohort-gate] COHORT RESET complete — ${ids.length} projects at waiting_chase, pipeline_runs + report_downloads cleared`)
+    console.info(`[cohort-gate] COHORT RESET complete — ${ids.length} projects at waiting_chase, pipeline_runs cleared`)
 }
 
 /**

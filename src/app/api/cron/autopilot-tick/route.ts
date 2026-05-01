@@ -79,7 +79,6 @@ import { triggerRemediation } from "@/lib/forge-v2/stage-gates/remediation"
 import {
     checkFoundryCohortGate,
     advanceCohort,
-    resetCohortToChase,
     shouldScoreStage,
     MAX_SCORING_ATTEMPTS,
 } from "@/lib/forge-v2/stage-scoring"
@@ -299,16 +298,17 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
 
                 if (cohort.shouldResetAll) {
-                    console.error(
-                        `[autopilot-tick] COHORT FULL RESET triggered at stage=${stage} (awaiting_gate)`,
+                    // Gate check failed — log and skip, do NOT reset the whole cohort.
+                    // The gate will re-check on the next cron tick.
+                    console.warn(
+                        `[autopilot-tick] cohort gate failed at stage=${stage} (awaiting_gate) — skipping, will re-check next tick`,
                     )
-                    await resetCohortToChase(foundryId)
                     details.push({
                         projectId: project.id,
                         stage,
                         action: "skip_running" as TickAction,
                         ok: false,
-                        reason: `cohort gate: full reset — a project exhausted ${MAX_SCORING_ATTEMPTS} attempts`,
+                        reason: `cohort gate: a project exhausted ${MAX_SCORING_ATTEMPTS} attempts — leaving projects at current stage`,
                     })
                     skipped++
                     continue
@@ -370,12 +370,20 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 reason: `scoring exhausted: terminal_fail status set by score_and_gate`,
             })
             failed++
-            const terminalFoundryId = await getProjectFoundryId(project.id)
-            if (terminalFoundryId) {
-                console.error(
-                    `[autopilot-tick] COHORT FULL RESET from terminal_fail: project=${project.id} stage=${stage}`,
-                )
-                await resetCohortToChase(terminalFoundryId)
+            // Mark ONLY this project as stage_failed — do NOT reset the entire cohort.
+            const { error: sfErr } = await createAdminClient()
+                .from("cad_lab_projects")
+                .update({
+                    autopilot_state: {
+                        ...(state as Record<string, unknown>),
+                        status: "stage_failed",
+                    },
+                } as never)
+                .eq("id", project.id)
+            if (sfErr) {
+                console.error(`[autopilot-tick] Failed to set stage_failed for project=${project.id}:`, sfErr.message)
+            } else {
+                console.info(`[autopilot-tick] project=${project.id} marked stage_failed at stage=${stage}`)
             }
             continue
         }
@@ -561,8 +569,8 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 if (foundryId) {
                     const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
                     if (cohort.shouldResetAll) {
-                        await resetCohortToChase(foundryId)
-                        details.push({ projectId: project.id, stage, action: "skip_running" as TickAction, ok: false, reason: `cohort gate: full reset` })
+                        console.warn(`[autopilot-tick] cohort gate failed at stage=${stage} (belt-and-suspenders) — skipping, will re-check next tick`)
+                        details.push({ projectId: project.id, stage, action: "skip_running" as TickAction, ok: false, reason: `cohort gate: a project failed — leaving projects at current stage` })
                         skipped++
                         continue
                     }
@@ -672,15 +680,20 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 })
                 failed++
 
-                // ANY failure = full cohort restart (Tristan rule 2026-04-30).
-                // Do NOT just mark the one project failed — reset ALL 5 projects
-                // in the foundry back to waiting_chase so the full loop restarts.
-                const failedFoundryId = await getProjectFoundryId(project.id)
-                if (failedFoundryId) {
-                    console.error(
-                        `[autopilot-tick] COHORT FULL RESET from terminal_fail: project=${project.id} stage=${stage} attempts=${attempts}`,
-                    )
-                    await resetCohortToChase(failedFoundryId)
+                // Mark ONLY this project as stage_failed — do NOT reset the entire cohort.
+                const { error: sfErr2 } = await createAdminClient()
+                    .from("cad_lab_projects")
+                    .update({
+                        autopilot_state: {
+                            ...(state as Record<string, unknown>),
+                            status: "stage_failed",
+                        },
+                    } as never)
+                    .eq("id", project.id)
+                if (sfErr2) {
+                    console.error(`[autopilot-tick] Failed to set stage_failed for project=${project.id}:`, sfErr2.message)
+                } else {
+                    console.info(`[autopilot-tick] project=${project.id} marked stage_failed at stage=${stage} attempts=${attempts}`)
                 }
 
                 continue
