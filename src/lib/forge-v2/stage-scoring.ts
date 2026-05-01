@@ -30,6 +30,57 @@ export const FORGE_GUILD_COHORT_IDS = [
     '517ae649-b3d3-42ad-94d7-99ac408e428b',
 ]
 
+// ── Stage ordering (for catch-up logic) ──────────────────────────────────
+// Canonical pipeline order. Used to determine if a project is "behind" the
+// rest of the cohort and should advance individually to catch up.
+export const STAGE_ORDER: AutopilotStage[] = [
+    'waiting_chase' as AutopilotStage,
+    'locking_brief' as AutopilotStage,
+    'waiting_max' as AutopilotStage,
+    'waiting_sizing' as AutopilotStage,
+    'waiting_layout' as AutopilotStage,
+    'waiting_bom' as AutopilotStage,
+    'waiting_finn' as AutopilotStage,
+    'matching_suppliers' as AutopilotStage,
+    'running_fang_reviews' as AutopilotStage,
+    'proofreading' as AutopilotStage,
+    'generating_illustration' as AutopilotStage,
+    'generating_pdf' as AutopilotStage,
+]
+
+export function getStageIndex(stage: AutopilotStage): number {
+    const idx = STAGE_ORDER.indexOf(stage)
+    return idx === -1 ? 999 : idx
+}
+
+/**
+ * Determine the leading (most advanced) stage in the cohort.
+ * Returns the stage where the majority of projects are, or the most
+ * advanced stage if there's no majority.
+ */
+export async function getCohortLeadingStage(): Promise<AutopilotStage | null> {
+    const admin = createAdminClient()
+    const { data: projects } = await admin
+        .from("cad_lab_projects")
+        .select("id, autopilot_state")
+        .in("id", FORGE_GUILD_COHORT_IDS)
+        .not("autopilot_state", "is", null)
+
+    if (!projects?.length) return null
+
+    let maxIndex = -1
+    for (const p of projects) {
+        const state = p.autopilot_state as Record<string, unknown>
+        const stage = state?.stage as AutopilotStage
+        if (stage) {
+            const idx = getStageIndex(stage)
+            if (idx > maxIndex) maxIndex = idx
+        }
+    }
+
+    return maxIndex >= 0 ? STAGE_ORDER[maxIndex] : null
+}
+
 // ── Rubric types ──────────────────────────────────────────────────────────
 
 export interface ScoringDimension {

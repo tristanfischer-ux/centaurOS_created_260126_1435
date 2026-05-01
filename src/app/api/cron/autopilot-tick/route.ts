@@ -81,6 +81,9 @@ import {
     advanceCohort,
     shouldScoreStage,
     MAX_SCORING_ATTEMPTS,
+    FORGE_GUILD_COHORT_IDS,
+    getCohortLeadingStage,
+    getStageIndex,
 } from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
@@ -295,6 +298,37 @@ async function tickOnce(request: Request): Promise<TickResult> {
         if (autopilotStatus === "awaiting_gate" && shouldScoreStage(stage as AutopilotStage)) {
             const foundryId = await getProjectFoundryId(project.id)
             if (foundryId) {
+                // ── Catch-up logic: if this project is BEHIND the cohort, advance individually ──
+                // When a project was reset (e.g. stage_failed → re-run), it may be at an
+                // earlier stage than the rest of the cohort. The cohort already passed this
+                // stage, so the behind project should advance individually to catch up.
+                // The cohort gate only holds projects at the LEADING stage.
+                const isCohortProject = FORGE_GUILD_COHORT_IDS.includes(project.id)
+                if (isCohortProject) {
+                    const leadingStage = await getCohortLeadingStage()
+                    if (leadingStage && getStageIndex(stage as AutopilotStage) < getStageIndex(leadingStage)) {
+                        // This project is behind — advance individually to catch up
+                        console.info(
+                            `[autopilot-tick] CATCH-UP: project=${project.id} at ${stage} is behind leading stage ${leadingStage} — advancing individually`,
+                        )
+                        if (config.nextStage === "done") {
+                            await markDone(project.id, stage)
+                            details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
+                        } else {
+                            await advance(project.id, stage, config.nextStage)
+                            details.push({
+                                projectId: project.id,
+                                stage,
+                                action: "advance" as TickAction,
+                                ok: true,
+                                reason: `catch-up advance: ${stage} → ${config.nextStage} (leading: ${leadingStage})`,
+                            })
+                        }
+                        advanced++
+                        continue
+                    }
+                }
+
                 const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
 
                 if (cohort.shouldResetAll) {
