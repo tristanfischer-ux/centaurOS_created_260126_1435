@@ -710,12 +710,12 @@ async function tickOnce(request: Request): Promise<TickResult> {
             trackingRow?.status === "failed" &&
             trackingRow.error_code !== "STALE_ABANDONED"
         ) {
-            // If the project was reset (status=idle, current_stage_attempts=0),
-            // old failed pipeline_runs from before the reset must not count
-            // against the retry budget. Skip the failed-count guard and fall
-            // through to fire — the project deserves a fresh start.
+            // If the project was reset (current_stage_attempts=0), old failed
+            // pipeline_runs from before the reset must not count against the
+            // retry budget. Skip the failed-count guard, reset status to idle,
+            // and let the next tick fire the specialist fresh.
             const stateObj = state as AutopilotState & { current_stage_attempts?: number }
-            const wasReset = autopilotStatus === "idle" && (stateObj.current_stage_attempts ?? 0) === 0
+            const wasReset = (stateObj.current_stage_attempts ?? 0) === 0
 
             // Real failure (not just stale). Check attempt count: how many
             // failed rows already exist for this (project, stage)?
@@ -728,7 +728,28 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 .eq("status", "failed")
 
             const attempts = failedCount ?? 0
-            if (!wasReset && attempts >= config.maxAttempts) {
+            if (wasReset) {
+                // Project was reset but stale pipeline_runs remain. Clear the
+                // stage_failed status so the next tick picks it up as idle.
+                console.info(
+                    `[autopilot-tick] wasReset=true for project=${project.id} stage=${stage} — clearing stale stage_failed, ${attempts} old failed runs ignored`,
+                )
+                const adminClient = createAdminClient()
+                await adminClient
+                    .from("cad_lab_projects")
+                    .update({
+                        autopilot_state: {
+                            ...(state as Record<string, unknown>),
+                            status: "idle",
+                            failed_stages: [],
+                            current_stage_attempts: 0,
+                        },
+                    } as unknown as never)
+                    .eq("id", project.id)
+                skipped++
+                continue
+            }
+            if (attempts >= config.maxAttempts) {
                 await recordFailure(
                     project.id,
                     stage,
