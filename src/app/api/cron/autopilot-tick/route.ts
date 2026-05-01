@@ -708,7 +708,8 @@ async function tickOnce(request: Request): Promise<TickResult> {
 
         if (
             trackingRow?.status === "failed" &&
-            trackingRow.error_code !== "STALE_ABANDONED"
+            trackingRow.error_code !== "STALE_ABANDONED" &&
+            trackingRow.error_code !== "RESET_SUPERSEDED"
         ) {
             // If the project was reset (current_stage_attempts=0), old failed
             // pipeline_runs from before the reset must not count against the
@@ -729,12 +730,24 @@ async function tickOnce(request: Request): Promise<TickResult> {
 
             const attempts = failedCount ?? 0
             if (wasReset) {
-                // Project was reset but stale pipeline_runs remain. Clear the
-                // stage_failed status so the next tick picks it up as idle.
+                // Project was reset but stale pipeline_runs remain. Supersede
+                // old failed runs so the next tick doesn't re-enter this block,
+                // bump csa to 1 so wasReset=false on subsequent ticks, and fall
+                // through to fire the stage immediately (no skip/continue).
                 console.info(
-                    `[autopilot-tick] wasReset=true for project=${project.id} stage=${stage} — clearing stale stage_failed, ${attempts} old failed runs ignored`,
+                    `[autopilot-tick] wasReset=true for project=${project.id} stage=${stage} — superseding ${attempts} old failed runs, will fire stage`,
                 )
                 const adminClient = createAdminClient()
+                await adminClient
+                    .from("pipeline_runs")
+                    .update({
+                        error_code: "RESET_SUPERSEDED",
+                        error_message: "Superseded by wasReset — old failed runs from before reset",
+                    } as never)
+                    .eq("project_id", project.id)
+                    .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+                    .eq("stage", stage)
+                    .eq("status", "failed")
                 await adminClient
                     .from("cad_lab_projects")
                     .update({
@@ -742,12 +755,11 @@ async function tickOnce(request: Request): Promise<TickResult> {
                             ...(state as Record<string, unknown>),
                             status: "idle",
                             failed_stages: [],
-                            current_stage_attempts: 0,
+                            current_stage_attempts: 1,
                         },
                     } as unknown as never)
                     .eq("id", project.id)
-                skipped++
-                continue
+                // Fall through to fire logic below — do NOT continue/skip.
             }
             if (attempts >= config.maxAttempts) {
                 await recordFailure(
