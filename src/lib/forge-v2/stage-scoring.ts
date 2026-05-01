@@ -18,6 +18,7 @@ import { callOpenAI, callGemini, callDeepSeek } from "@/lib/cad-lab/api-helpers"
 import { callOpenRouter } from "@/lib/ai/openrouter"
 import { runJudgePanel, getJudgePanelConfig } from "@/lib/forge-v2/judge-panels"
 import type { JudgePanelResult } from "@/lib/forge-v2/judge-panels"
+import { routeAndApplyFixes, DATA_QUERY_TO_COLUMN } from "@/lib/forge-v2/fix-router"
 import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
 // ── Canonical cohort project IDs ─────────────────────────────────────────
@@ -783,6 +784,96 @@ ${stageData}`
             }
         }
 
+        // ── Role 3: Fix Router — auto-fix BLOCKER findings ─────────────────
+        // If score < 8.0 and judge panel found blockers, route to a coding model
+        // to produce corrected output. One fix attempt per scoring round — no loops.
+        let fixRouterNote = ""
+        if (
+            panelConfig && panelConfig.length > 0 &&
+            composite < 8.0 &&
+            panelResult.blockers.length > 0 &&
+            rubric.dataQuery
+        ) {
+            console.info(
+                `[stage-scoring] Score ${composite} < 8.0 with ${panelResult.blockers.length} blockers — ` +
+                `routing to fix model for ${stage}`,
+            )
+
+            try {
+                const fixResult = await routeAndApplyFixes(panelResult, {
+                    projectId,
+                    stage,
+                    stageData,
+                    dataQuery: rubric.dataQuery,
+                })
+
+                fixRouterNote = ` | fix_router:applied=${fixResult.fixesApplied}:skipped=${fixResult.fixesSkipped}`
+                if (fixResult.crossChecksFailed > 0) {
+                    fixRouterNote += `:cross_check_failed=${fixResult.crossChecksFailed}`
+                }
+
+                if (fixResult.correctedOutput && fixResult.fixesApplied > 0) {
+                    // Write corrected output back to the database
+                    const columnMapping = DATA_QUERY_TO_COLUMN[rubric.dataQuery]
+                    if (columnMapping) {
+                        const admin = createAdminClient()
+                        await admin
+                            .from(columnMapping.table)
+                            .update({ [columnMapping.column]: fixResult.correctedOutput })
+                            .eq(columnMapping.idColumn, projectId)
+
+                        console.info(
+                            `[stage-scoring] Fix router wrote corrected output to ` +
+                            `${columnMapping.table}.${columnMapping.column} for project ${projectId}`,
+                        )
+
+                        // Re-score with the corrected data
+                        const correctedData = JSON.stringify(fixResult.correctedOutput, null, 2).slice(0, 12000)
+                        const reScoreResult = await runJudgePanel(
+                            stage,
+                            correctedData,
+                            `project-${projectId}`,
+                            `${systemPrompt}\n\n${userPrompt}`,
+                        )
+
+                        console.info(
+                            `[stage-scoring] Re-score after fix: ${reScoreResult.score}/10 ` +
+                            `(was ${composite}/10). Blockers: ${reScoreResult.blockers.length}`,
+                        )
+
+                        if (reScoreResult.score >= composite) {
+                            composite = reScoreResult.score
+                            panelResult = reScoreResult
+                            dimensionScores = rubric.dimensions.map((d) => ({
+                                dimension: d.name,
+                                score: reScoreResult.score,
+                                reasoning: `Post-fix re-score (${reScoreResult.successfulJudgeCount} judges). ` +
+                                    `Blockers: ${reScoreResult.blockers.length}`,
+                            }))
+                            fixRouterNote += `:re_scored=${reScoreResult.score}`
+                        } else {
+                            fixRouterNote += `:re_score_worse=${reScoreResult.score}`
+                        }
+                    }
+                }
+
+                // Log fix router actions
+                for (const entry of fixResult.log) {
+                    console.info(
+                        `[fix-router] ${entry.applied ? "APPLIED" : "SKIPPED"}: ` +
+                        `${entry.finding.slice(0, 80)} → ${entry.model} (${entry.complexity})` +
+                        (entry.reason ? ` — ${entry.reason}` : ""),
+                    )
+                }
+            } catch (fixErr) {
+                console.warn(
+                    `[stage-scoring] Fix router failed for ${stage}:`,
+                    fixErr instanceof Error ? fixErr.message : fixErr,
+                )
+                fixRouterNote = " | fix_router:error"
+            }
+        }
+
         // Build reasoning string — include panel metadata when available
         const panelMeta = panelConfig && panelConfig.length > 0
             ? `[Judge panel: ${panelResult.successfulJudgeCount}/${panelResult.judgeCount} judges, ` +
@@ -803,7 +894,7 @@ ${stageData}`
             reasoning: reasoningText,
             scored_at: new Date().toISOString(),
             note: panelConfig && panelConfig.length > 0
-                ? `judge_panel:${panelResult.successfulJudgeCount}/${panelResult.judgeCount}:blockers=${panelResult.blockers.length}:warnings=${panelResult.warnings.length}`
+                ? `judge_panel:${panelResult.successfulJudgeCount}/${panelResult.judgeCount}:blockers=${panelResult.blockers.length}:warnings=${panelResult.warnings.length}${fixRouterNote}`
                 : undefined,
         }
     } catch (err) {
