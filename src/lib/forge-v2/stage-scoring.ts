@@ -531,6 +531,10 @@ export async function scoreStageOutput(
 ): Promise<StageScoreResult | null> {
     if (SKIP_SCORING_STAGES.includes(stage)) return null
 
+    if (STAGE_VALIDATION_MODE[stage] === 'deterministic') {
+        return validateDeterministicStage(projectId, stage)
+    }
+
     const rubric = RUBRICS[stage]
     if (!rubric) return null
 
