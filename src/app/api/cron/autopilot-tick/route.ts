@@ -316,6 +316,24 @@ async function tickOnce(request: Request): Promise<TickResult> {
                             details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
                         } else {
                             await advance(project.id, stage, config.nextStage)
+                            // Set status to idle so the cron runs the stage work.
+                            // advance() preserves the existing status (awaiting_gate),
+                            // but the project hasn't done work for the next stage yet.
+                            const adminClient = createAdminClient()
+                            const { data: freshProject } = await adminClient
+                                .from("cad_lab_projects")
+                                .select("autopilot_state")
+                                .eq("id", project.id)
+                                .maybeSingle()
+                            if (freshProject?.autopilot_state) {
+                                const freshState = freshProject.autopilot_state as AutopilotState
+                                await adminClient
+                                    .from("cad_lab_projects")
+                                    .update({
+                                        autopilot_state: { ...freshState, status: "idle" },
+                                    } as unknown as never)
+                                    .eq("id", project.id)
+                            }
                             details.push({
                                 projectId: project.id,
                                 stage,
