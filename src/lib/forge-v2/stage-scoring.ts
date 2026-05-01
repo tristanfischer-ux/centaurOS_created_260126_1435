@@ -14,7 +14,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin"
-import { callOpenAI, callGemini } from "@/lib/cad-lab/api-helpers"
+import { callOpenAI, callGemini, callDeepSeek } from "@/lib/cad-lab/api-helpers"
 import { callOpenRouter } from "@/lib/ai/openrouter"
 import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
@@ -652,10 +652,10 @@ Stage data:
 ${stageData}`
 
     try {
-        const { text } = await callOpenAI(
+        const { text } = await callDeepSeek(
             systemPrompt,
             userPrompt,
-            "gpt-4.1-mini",
+            "deepseek-chat",
             4096,
             30_000,
         )
@@ -710,7 +710,7 @@ ${stageData}`
             `[stage-scoring] Failed to score project=${projectId} stage=${stage}:`,
             err instanceof Error ? err.message : err,
         )
-        return null
+        throw err
     }
 }
 

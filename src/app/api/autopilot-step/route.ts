@@ -152,7 +152,21 @@ export async function POST(request: Request): Promise<NextResponse> {
             return NextResponse.json({ ok: true, ran: false, reason: "no_state" }, { status: 200 })
         }
 
-        const scoreResult = await scoreStageOutput(projectId, rawStage as AutopilotStage)
+        let scoreResult: Awaited<ReturnType<typeof scoreStageOutput>> = null
+        try {
+            scoreResult = await scoreStageOutput(projectId, rawStage as AutopilotStage)
+        } catch (scoringErr) {
+            console.error(
+                `[autopilot-step:score_and_gate] scoring FAILED for project=${projectId} stage=${rawStage}: ${scoringErr instanceof Error ? scoringErr.message : scoringErr} — setting idle for retry`,
+            )
+            await admin
+                .from("cad_lab_projects")
+                .update({
+                    autopilot_state: { ...state, status: "idle" },
+                } as unknown as never)
+                .eq("id", projectId)
+            return NextResponse.json({ ok: true, action: "scoring_error_retry", stage: rawStage, error: scoringErr instanceof Error ? scoringErr.message : String(scoringErr) }, { status: 200 })
+        }
 
         // Re-fetch state after scoring to avoid overwriting scores that
         // storeStageScore just persisted. The `state` captured at line 150
