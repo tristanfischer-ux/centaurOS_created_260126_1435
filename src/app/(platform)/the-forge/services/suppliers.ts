@@ -17,6 +17,7 @@ import { createHash } from "crypto"
 import { embedText } from "@/lib/search/semantic-search"
 
 import type { ModuleSpec } from "./xray-schema"
+import { filterSupplierUrls } from "@/actions/cad-lab-supplier-match"
 
 // ─── Cache ──────────────────────────────────────────────────────────
 
@@ -139,9 +140,22 @@ export async function matchSuppliersForModule(
 
   const matches: SupplierMatch[] = []
 
+  // Filter listings whose website_url points at a non-supplier surface
+  // (blog, academic page, social media, marketplace stall, government page).
+  // Applied after the DB fetch so non-supplier URLs never enter the scoring loop.
+  const filteredListings = listings
+    ? listings.filter((l) => {
+        const url = (l.attributes as Record<string, unknown> | null)?.website_url
+        if (typeof url === "string") {
+          return filterSupplierUrls([url]).length > 0
+        }
+        return true
+      })
+    : null
+
   // Score marketplace listings
-  if (listings) {
-    for (const listing of listings) {
+  if (filteredListings) {
+    for (const listing of filteredListings) {
       const listingText = `${listing.title} ${listing.description || ""} ${listing.subcategory || ""}`.toLowerCase()
       const attrs = listing.attributes as Record<string, unknown> | null
 
