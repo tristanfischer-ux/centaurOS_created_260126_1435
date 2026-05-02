@@ -62,8 +62,10 @@ export async function startPipelineRun(
         .limit(1)
         .maybeSingle()
       if (inFlight) {
-        const startedMs = inFlight.started_at
-          ? new Date(inFlight.started_at).getTime()
+        const latestTimestamp = (inFlight as Record<string, unknown>).heartbeat_at as string | null
+          ?? inFlight.started_at
+        const startedMs = latestTimestamp
+          ? new Date(latestTimestamp).getTime()
           : Date.now()
         const ageMs = Date.now() - startedMs
         if (ageMs > STALE_RUNNING_MS) {
@@ -140,15 +142,6 @@ export async function startPipelineRun(
     throw new Error(`startPipelineRun failed: ${error?.message}`)
   }
   return { runId: data.id }
-}
-
-export async function updatePipelineHeartbeat(runId: string): Promise<void> {
-  const db = createAdminClient()
-  await db
-    .from("pipeline_runs")
-    .update({ heartbeat_at: new Date().toISOString() } as never)
-    .eq("id", runId)
-    .eq("status", "running")
 }
 
 export async function completePipelineRun(
