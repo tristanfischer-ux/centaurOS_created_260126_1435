@@ -86,8 +86,6 @@ import {
   extractJsonObject,
   callClaude,
   callGeminiWithSearch,
-  callGemini,
-  callOpenAI,
   callDeepSeek,
   callTogether,
   searchCadModels,
@@ -342,6 +340,15 @@ I need precise engineering dimensions for 3D CAD modelling. Search for:
 6. MATERIAL — primary materials and wall thicknesses
 7. STANDARD PARTS — propeller size, bolt sizes, mounting standards
 
+You MUST also include the following structured output sections:
+
+**Sources**: Require a "Sources" section listing at least 10 sources, each with title, organization, source type, URL, jurisdiction, and publication date. Require diversity: ≥2 manufacturer datasheets, ≥2 regulatory/standards docs, ≥2 market reports, ≥2 competitor pages.
+**Regulatory Matrix**: Require a "Regulatory Compliance" table with columns: requirement, jurisdiction, applies_to, mandatory_or_guidance, evidence, design_implication, status. Pre-seed categories: G99 grid code, DNO connection, UKCA/CE, EMC/LVD, UN38.3/ADR transport, NFCC guidance, BS/IEC 62933. Minimum 8 items, ≥5 UK-specific.
+**Market Sizing**: Require "Market Sizing" section with TAM, SAM, SOM in GBP, methodology (top-down and bottom-up), assumptions, calculation steps, and customer segments. Require at least one UK government/grid source and one market report.
+**Competitor Analysis**: Require a "Competitor Analysis" table with columns: company, product_name, energy_MWh, power_MW, chemistry, certifications, cost_or_price_signal, lead_time, source_url. Minimum 5 named competitors.
+**Inline Citations**: Every numeric claim, compliance reference, or cost figure must include [Source: <source_id>] inline.
+**Assumptions vs Facts**: Require claims to be labeled as "Fact (cited)" or "Inference (reasoned)" or "Assumption (unverified)".
+
 Format your response as a structured specification sheet with exact numbers in millimetres. If a dimension is approximate, say so. If you find conflicting specs from different sources, list both.
 
 Do NOT guess dimensions. Only include measurements you found from real sources.${intakeContext}`,
@@ -563,14 +570,30 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         console.warn("[THE-FORGE] Step 1: Parallel-and-compare failed, falling back to single-model chain:", parallelErr instanceof Error ? parallelErr.message : String(parallelErr))
         try {
           console.info("[THE-FORGE] Step 1: Synthesizing report with Gemini (domain: %s)...", domain)
-          const geminiResult = await callGemini(synthesisPrompt, synthesisUserPrompt, "gemini-3.1-pro-preview", 8192, 120_000)
+          const { callOpenRouter } = await import("@/lib/ai/openrouter")
+          const geminiResult = await callOpenRouter({
+            model: "google/gemini-3.1-pro-preview",
+            system: synthesisPrompt,
+            prompt: synthesisUserPrompt,
+            maxTokens: 8192,
+            timeoutMs: 120_000
+          })
+          if (!geminiResult.ok) throw new Error(geminiResult.error || "OpenRouter Gemini failed")
           report = geminiResult.text
         } catch (geminiErr) {
           const geminiMsg = geminiErr instanceof Error ? geminiErr.message : String(geminiErr)
           console.warn("[THE-FORGE] Step 1: Gemini synthesis failed, trying OpenAI fallback:", geminiMsg.slice(0, 200))
           try {
             synthesisModel = "gpt-5.5"
-            const openaiResult = await callOpenAI(synthesisPrompt, synthesisUserPrompt, "gpt-5.5", 8192, 120_000)
+            const { callOpenRouter } = await import("@/lib/ai/openrouter")
+            const openaiResult = await callOpenRouter({
+              model: "openai/gpt-5.5",
+              system: synthesisPrompt,
+              prompt: synthesisUserPrompt,
+              maxTokens: 8192,
+              timeoutMs: 120_000
+            })
+            if (!openaiResult.ok) throw new Error(openaiResult.error || "OpenRouter OpenAI failed")
             report = openaiResult.text
           } catch (openaiErr) {
             const openaiMsg = openaiErr instanceof Error ? openaiErr.message : String(openaiErr)
@@ -1253,10 +1276,28 @@ ${finalCode}
         const msg = claudeCodeErr instanceof Error ? claudeCodeErr.message : String(claudeCodeErr)
         console.warn(`[THE-FORGE] Step 3: Claude code gen failed (attempt ${attempt + 1}), trying OpenAI:`, msg.slice(0, 200))
         try {
-          codeResult = await callOpenAI(systemPrompt, userPrompt, "gpt-5.5", maxOut, 120_000)
+          const { callOpenRouter } = await import("@/lib/ai/openrouter")
+          const orOpenAI = await callOpenRouter({
+            model: "openai/gpt-5.5",
+            system: systemPrompt,
+            prompt: userPrompt,
+            maxTokens: maxOut,
+            timeoutMs: 120_000
+          })
+          if (!orOpenAI.ok) throw new Error(orOpenAI.error || "OpenRouter OpenAI failed")
+          codeResult = { text: orOpenAI.text, tokensIn: orOpenAI.inputTokens ?? 0, tokensOut: orOpenAI.outputTokens ?? 0 }
         } catch (openaiCodeErr) {
           console.warn(`[THE-FORGE] Step 3: OpenAI code gen failed, trying Gemini:`, openaiCodeErr instanceof Error ? openaiCodeErr.message.slice(0, 200) : "")
-          codeResult = await callGemini(systemPrompt, userPrompt, "gemini-3.1-pro-preview", maxOut, 120_000)
+          const { callOpenRouter } = await import("@/lib/ai/openrouter")
+          const orGemini = await callOpenRouter({
+            model: "google/gemini-3.1-pro-preview",
+            system: systemPrompt,
+            prompt: userPrompt,
+            maxTokens: maxOut,
+            timeoutMs: 120_000
+          })
+          if (!orGemini.ok) throw new Error(orGemini.error || "OpenRouter Gemini failed")
+          codeResult = { text: orGemini.text, tokensIn: orGemini.inputTokens ?? 0, tokensOut: orGemini.outputTokens ?? 0 }
         }
       }
       totalTokensIn += codeResult.tokensIn
@@ -2778,8 +2819,16 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
       dlog(">>> GEMINI fallback (timeout=90s)")
       const geminiStart = Date.now()
       try {
-        const r = await callGemini(modulePrompt, userPrompt, "gemini-3.1-pro-preview", 8192, 90_000)
-        text = r.text; tokensIn = r.tokensIn; tokensOut = r.tokensOut
+        const { callOpenRouter } = await import("@/lib/ai/openrouter")
+        const rGemini = await callOpenRouter({
+          model: "google/gemini-3.1-pro-preview",
+          system: modulePrompt,
+          prompt: userPrompt,
+          maxTokens: 8192,
+          timeoutMs: 90_000
+        })
+        if (!rGemini.ok) throw new Error(rGemini.error || "OpenRouter Gemini failed")
+        text = rGemini.text; tokensIn = rGemini.inputTokens ?? 0; tokensOut = rGemini.outputTokens ?? 0
         winnerModel = "Gemini"
         dlog(`<<< GEMINI SUCCEEDED in ${Date.now() - geminiStart}ms`)
       } catch (geminiErr) {
@@ -2790,7 +2839,16 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         dlog(">>> OPENAI final fallback (timeout=30s)")
         const openaiStart = Date.now()
         try {
-          ;({ text, tokensIn, tokensOut } = await callOpenAI(modulePrompt, userPrompt, "gpt-5.5", 8192, 30_000))
+          const { callOpenRouter } = await import("@/lib/ai/openrouter")
+          const rOpenAI = await callOpenRouter({
+            model: "openai/gpt-5.5",
+            system: modulePrompt,
+            prompt: userPrompt,
+            maxTokens: 8192,
+            timeoutMs: 30_000
+          })
+          if (!rOpenAI.ok) throw new Error(rOpenAI.error || "OpenRouter OpenAI failed")
+          text = rOpenAI.text; tokensIn = rOpenAI.inputTokens ?? 0; tokensOut = rOpenAI.outputTokens ?? 0
           winnerModel = "GPT-5.3"
           dlog(`<<< OPENAI SUCCEEDED in ${Date.now() - openaiStart}ms`)
         } catch (openaiErr) {
@@ -2830,7 +2888,15 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         try {
           ({ text: repairedText } = await callClaude(repairSystem, text, modelId, 8192))
         } catch {
-          ({ text: repairedText } = await callGemini(repairSystem, text))
+          const { callOpenRouter } = await import("@/lib/ai/openrouter")
+          const rGemini = await callOpenRouter({
+            model: "google/gemini-3.1-pro-preview",
+            system: repairSystem,
+            prompt: text,
+            maxTokens: 8192
+          })
+          if (!rGemini.ok) throw new Error(rGemini.error || "OpenRouter repair failed")
+          repairedText = rGemini.text
         }
         // Try object first, then array
         try {
