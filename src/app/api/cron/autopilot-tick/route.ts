@@ -323,7 +323,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
         // Most-recent autopilot tracking row for this (project, stage).
         const { data: trackingRow } = await admin
             .from("pipeline_runs")
-            .select("id, status, started_at, last_heartbeat, error_code, error_message")
+            .select("id, status, started_at, heartbeat_at, error_code, error_message")
             .eq("project_id", project.id)
             .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
             .eq("stage", stage)
@@ -697,24 +697,35 @@ async function tickOnce(request: Request): Promise<TickResult> {
         }
 
         if (trackingRow?.status === "running") {
-            const age = Date.now() - new Date(trackingRow.started_at).getTime()
-            // L9-FANG-STALE (2026-04-27): per-stage threshold override.
-            // running_fang_reviews fanout takes 12-24min on 8-module
-            // projects; the 9-min default fires STALE_ABANDONED mid-fanout
-            // and refires runFangReviewsForAllModules, burning Sonnet
-            // credits on still-running modules. Stage-specific overrides
-            // give honest fanouts headroom.
+            // Heartbeat-based stale detection: if the specialist updated
+            // heartbeat_at within the last 3 minutes it's alive — skip.
+            // Falls back to age-based check (started_at) for rows that
+            // pre-date the heartbeat column or where no heartbeat was written.
+            // Per-stage staleMsOverride still applies in the fallback path so
+            // long fanouts (Fang reviews 12-24 min) retain their headroom.
+            // L9-FANG-STALE (2026-04-27): per-stage threshold override preserved
+            // in the fallback path for rows without heartbeat data.
+            const HEARTBEAT_STALE_MS = 3 * 60 * 1000 // 3 minutes
+            const heartbeat = (trackingRow as Record<string, unknown>).heartbeat_at as string | null | undefined
             const stageStaleMs =
                 config.kind === "fire" && typeof config.staleMsOverride === "number"
                     ? config.staleMsOverride
                     : STALE_RUNNING_MS
-            if (age < stageStaleMs) {
+            const isStale = heartbeat
+                ? Date.now() - new Date(heartbeat).getTime() > HEARTBEAT_STALE_MS
+                : Date.now() - new Date(trackingRow.started_at).getTime() > stageStaleMs
+            const age = heartbeat
+                ? Date.now() - new Date(heartbeat).getTime()
+                : Date.now() - new Date(trackingRow.started_at).getTime()
+            if (!isStale) {
                 details.push({
                     projectId: project.id,
                     stage,
                     action: "skip_running",
                     ok: true,
-                    reason: `running for ${Math.round(age / 1000)}s`,
+                    reason: heartbeat
+                        ? `heartbeat ${Math.round(age / 1000)}s ago`
+                        : `running for ${Math.round(age / 1000)}s (no heartbeat)`,
                 })
                 skipped++
                 continue
@@ -725,7 +736,9 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 .update({
                     status: "failed",
                     error_code: "STALE_ABANDONED",
-                    error_message: `Tracking row stale (${Math.round(age / 1000)}s > ${Math.round(stageStaleMs / 1000)}s threshold)`,
+                    error_message: heartbeat
+                        ? `Tracking row stale: no heartbeat for ${Math.round(age / 1000)}s (threshold: ${Math.round(HEARTBEAT_STALE_MS / 1000)}s)`
+                        : `Tracking row stale: ${Math.round(age / 1000)}s > ${Math.round(stageStaleMs / 1000)}s threshold (no heartbeat data)`,
                     finished_at: new Date().toISOString(),
                 } as never)
                 .eq("id", trackingRow.id)
