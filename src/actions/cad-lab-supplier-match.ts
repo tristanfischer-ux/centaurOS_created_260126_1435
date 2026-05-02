@@ -301,21 +301,38 @@ const NON_SUPPLIER_URL_PATH_PATTERNS = [
 ] as const
 
 const NON_SUPPLIER_TLD_PATTERNS = [
+  // Academic / research / government — not suppliers
   ".edu",
   ".edu.",
   ".ac.uk",
   ".ac.",
   ".gov",
   ".gov.uk",
+  "researchgate.net",
+  "academia.edu",
+  "arxiv.org",
+  // Social / content platforms — no supply capability
   "wikipedia.org",
   "youtube.com",
   "youtu.be",
   "linkedin.com",
+  "twitter.com",
+  "x.com",
+  "facebook.com",
+  "instagram.com",
+  "reddit.com",
+  // Blog / newsletter platforms — editorial, not manufacturers
   "medium.com",
   "substack.com",
   "wordpress.com",
-  // L9-P4: marketplace aggregators that index third-party listings.
+  "blogspot.com",
+  // Marketplaces / aggregators that index third-party listings.
   // Founders need direct supplier homepages, not marketplace stalls.
+  "amazon.com",
+  "amazon.co.uk",
+  "ebay.com",
+  "ebay.co.uk",
+  "aliexpress.com",
   "grelly.",
   "grelly.uk",
   "made-in-china.com",
@@ -344,6 +361,24 @@ function isNonSupplierUrl(url: string | null | undefined): boolean {
     if (lower.includes(path)) return true
   }
   return false
+}
+
+/**
+ * Filters a list of URLs, removing any that resolve to non-supplier surfaces
+ * (blogs, academic pages, social media, marketplace stalls, government pages).
+ *
+ * Designed as the standard post-match filter to apply before returning supplier
+ * results to any caller. Conservative: URLs that cannot be classified are
+ * passed through so legitimate suppliers with unusual URL shapes are not dropped.
+ *
+ * @example
+ *   const cleanUrls = filterSupplierUrls(rawUrls)
+ *
+ * @param urls - Raw website URL strings (may include null/undefined — both are excluded)
+ * @returns Only the URLs that look like genuine supplier homepages or product pages
+ */
+export function filterSupplierUrls(urls: string[]): string[] {
+  return urls.filter((url) => !isNonSupplierUrl(url))
 }
 
 // ─── Region Match ────────────────────────────────────────────────────

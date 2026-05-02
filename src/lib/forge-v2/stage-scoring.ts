@@ -251,6 +251,312 @@ const SKIP_SCORING_STAGES: AutopilotStage[] = [
     "waiting_max_redecomposition",
 ]
 
+// ── Stage-data summarisers (produce readable text for LLM judges) ─────────
+
+function summariseResearch(research: Record<string, unknown> | null): string {
+    if (!research) return "No research data found."
+    const lines: string[] = ["=== RESEARCH SUMMARY ===\n"]
+
+    // Brief / overview
+    const overview = (research.overview ?? research.executiveSummary ?? research.summary) as string | undefined
+    if (overview) lines.push(`OVERVIEW:\n${String(overview).slice(0, 600)}\n`)
+
+    // Market size
+    const market = (research.marketAnalysis ?? research.market ?? research.marketData) as Record<string, unknown> | undefined
+    if (market) {
+        lines.push("MARKET DATA:")
+        const tam = market.tam ?? market.totalAddressableMarket ?? market.marketSize
+        const growth = market.cagr ?? market.growthRate ?? market.growthCagr
+        const geography = market.geography ?? market.regions
+        if (tam) lines.push(`  TAM: ${tam}`)
+        if (growth) lines.push(`  Growth rate: ${growth}`)
+        if (geography) lines.push(`  Geography: ${Array.isArray(geography) ? (geography as string[]).join(", ") : String(geography)}`)
+        lines.push("")
+    }
+
+    // Sources
+    const sources = research.sources ?? research.references ?? research.citations
+    const sourceCount = Array.isArray(sources) ? (sources as unknown[]).length : 0
+    lines.push(`SOURCES COUNT: ${sourceCount}`)
+    if (Array.isArray(sources) && sourceCount > 0) {
+        const topSources = (sources as Array<Record<string, unknown>>).slice(0, 8)
+        topSources.forEach(s => {
+            const title = s.title ?? s.name ?? s.url ?? JSON.stringify(s).slice(0, 80)
+            lines.push(`  - ${title}`)
+        })
+        lines.push("")
+    }
+
+    // Competitive landscape
+    const competitors = research.competitorAnalysis ?? research.competitors ?? research.competitiveLandscape
+    if (competitors) {
+        lines.push("COMPETITIVE LANDSCAPE:")
+        if (Array.isArray(competitors)) {
+            const comp = competitors as Array<Record<string, unknown>>
+            lines.push(`  ${comp.length} competitors identified`)
+            comp.slice(0, 8).forEach(c => {
+                const name = c.name ?? c.company ?? c.title
+                const pos = c.positioning ?? c.differentiator ?? c.notes
+                lines.push(`  - ${name}${pos ? `: ${String(pos).slice(0, 100)}` : ""}`)
+            })
+        } else {
+            lines.push(`  ${String(competitors).slice(0, 400)}`)
+        }
+        lines.push("")
+    }
+
+    // Key findings
+    const findings = research.keyFindings ?? research.findings ?? research.insights
+    if (findings) {
+        lines.push("KEY FINDINGS:")
+        if (Array.isArray(findings)) {
+            (findings as string[]).slice(0, 8).forEach(f => lines.push(`  - ${String(f).slice(0, 200)}`))
+        } else {
+            lines.push(`  ${String(findings).slice(0, 600)}`)
+        }
+        lines.push("")
+    }
+
+    // Regulatory / standards mentioned
+    const regulatory = research.regulatory ?? research.standards ?? research.regulations
+    if (regulatory) {
+        lines.push("REGULATORY NOTES:")
+        lines.push(`  ${String(regulatory).slice(0, 400)}`)
+        lines.push("")
+    }
+
+    return lines.join("\n").slice(0, 2200)
+}
+
+function summariseModules(modules: Record<string, unknown> | null): string {
+    if (!modules) return "No modules data found."
+    const moduleEntries = Object.entries(modules)
+    if (moduleEntries.length === 0) return "Modules object is empty."
+
+    const lines: string[] = [`=== MODULES SUMMARY (${moduleEntries.length} modules) ===\n`]
+
+    for (const [id, mod] of moduleEntries) {
+        const m = mod as Record<string, unknown>
+        const name = m.name ?? m.title ?? id
+        const description = m.description ?? m.summary
+        const material = m.material ?? m.primaryMaterial ?? m.materials
+        const dims = m.dimensions ?? m.size ?? m.keyDimensions
+        const specs = m.specifications ?? m.keySpecs ?? m.technicalSpecs
+        const cost = m.estimatedCost ?? m.costGbp ?? m.unitCost
+
+        lines.push(`MODULE: ${name} (${id})`)
+        if (description) lines.push(`  Description: ${String(description).slice(0, 200)}`)
+        if (material) lines.push(`  Material: ${typeof material === "object" ? JSON.stringify(material).slice(0, 120) : String(material)}`)
+        if (dims) lines.push(`  Dimensions: ${typeof dims === "object" ? JSON.stringify(dims).slice(0, 120) : String(dims)}`)
+        if (specs) lines.push(`  Key specs: ${typeof specs === "object" ? JSON.stringify(specs).slice(0, 200) : String(specs).slice(0, 200)}`)
+        if (cost != null) lines.push(`  Estimated cost: £${cost}`)
+        lines.push("")
+    }
+
+    return lines.join("\n").slice(0, 2200)
+}
+
+function summariseBOM(parts: Array<Record<string, unknown>> | null): string {
+    if (!parts || parts.length === 0) return "No parts data found."
+
+    const totalParts = parts.length
+    const categoryCounts: Record<string, number> = {}
+    let totalCost = 0
+    let missingDescription = 0
+    let missingMaterial = 0
+    let missingCost = 0
+
+    for (const p of parts) {
+        const cat = String(p.category ?? p.type ?? "Uncategorised")
+        categoryCounts[cat] = (categoryCounts[cat] ?? 0) + 1
+        if (!p.description) missingDescription++
+        if (!p.material && p.material !== "") missingMaterial++
+        const unitCost = typeof p.estimated_unit_cost_gbp === "number" ? p.estimated_unit_cost_gbp : 0
+        const qty = typeof p.quantity === "number" ? p.quantity : 1
+        totalCost += unitCost * qty
+        if (!unitCost) missingCost++
+    }
+
+    const lines: string[] = [`=== BILL OF MATERIALS SUMMARY (${totalParts} parts) ===\n`]
+    lines.push(`TOTAL ESTIMATED COST: £${totalCost.toFixed(2)}`)
+    lines.push(`MISSING FIELDS: ${missingDescription} without description, ${missingMaterial} without material, ${missingCost} without cost\n`)
+
+    lines.push("CATEGORIES:")
+    for (const [cat, count] of Object.entries(categoryCounts).sort((a, b) => b[1] - a[1])) {
+        lines.push(`  ${cat}: ${count} parts`)
+    }
+    lines.push("")
+
+    // Sample parts (top 20 by cost)
+    const sorted = [...parts].sort((a, b) => {
+        const ac = typeof a.estimated_unit_cost_gbp === "number" ? a.estimated_unit_cost_gbp : 0
+        const bc = typeof b.estimated_unit_cost_gbp === "number" ? b.estimated_unit_cost_gbp : 0
+        return bc - ac
+    }).slice(0, 20)
+
+    lines.push("TOP PARTS BY COST:")
+    for (const p of sorted) {
+        const name = p.name ?? p.part_name ?? p.description ?? "Unknown"
+        const cost = p.estimated_unit_cost_gbp ?? "?"
+        const qty = p.quantity ?? 1
+        const mat = p.material ? ` [${p.material}]` : ""
+        lines.push(`  - ${String(name).slice(0, 80)}${mat} × ${qty} @ £${cost}`)
+    }
+
+    return lines.join("\n").slice(0, 2200)
+}
+
+function summariseSuppliers(suppliers: Record<string, unknown> | null): string {
+    if (!suppliers) return "No supplier matches found."
+    const lines: string[] = ["=== SUPPLIER SHORTLIST SUMMARY ===\n"]
+
+    // Suppliers may be keyed by BOM row or by category
+    let totalCount = 0
+    let missingContact = 0
+    const categoryCounts: Record<string, number> = {}
+
+    const allSuppliers: Array<Record<string, unknown>> = []
+
+    // Try to flatten — could be object of arrays or flat array
+    for (const [key, val] of Object.entries(suppliers)) {
+        if (Array.isArray(val)) {
+            const group = val as Array<Record<string, unknown>>
+            categoryCounts[key] = group.length
+            totalCount += group.length
+            allSuppliers.push(...group.map(s => ({ ...s, _category: key })))
+        } else if (val && typeof val === "object") {
+            // nested object — treat as single supplier
+            allSuppliers.push({ ...(val as Record<string, unknown>), _category: key })
+            categoryCounts[key] = (categoryCounts[key] ?? 0) + 1
+            totalCount++
+        }
+    }
+
+    if (allSuppliers.length === 0) {
+        // Flat array fallback
+        lines.push(`Supplier data present but format unrecognised. Keys: ${Object.keys(suppliers).join(", ")}`)
+        return lines.join("\n")
+    }
+
+    for (const s of allSuppliers) {
+        const hasContact = !!(s.email ?? s.phone ?? s.contactName ?? s.contact)
+        if (!hasContact) missingContact++
+    }
+
+    lines.push(`TOTAL SUPPLIERS: ${totalCount}`)
+    lines.push(`MISSING CONTACT INFO: ${missingContact}\n`)
+
+    lines.push("BY CATEGORY:")
+    for (const [cat, count] of Object.entries(categoryCounts)) {
+        lines.push(`  ${cat}: ${count} suppliers`)
+    }
+    lines.push("")
+
+    lines.push("TOP SUPPLIERS:")
+    for (const s of allSuppliers.slice(0, 20)) {
+        const name = s.name ?? s.companyName ?? s.supplier ?? "Unknown"
+        const url = s.url ?? s.website ?? s.homepage ?? ""
+        const country = s.country ?? s.location ?? ""
+        const cat = s._category ?? ""
+        const contact = s.email ?? s.contactName ?? ""
+        lines.push(`  - ${String(name).slice(0, 60)}${country ? ` (${country})` : ""} [${cat}]`)
+        if (url) lines.push(`    URL: ${String(url).slice(0, 100)}`)
+        if (contact) lines.push(`    Contact: ${String(contact).slice(0, 80)}`)
+    }
+
+    return lines.join("\n").slice(0, 2200)
+}
+
+function summariseFangReviews(reviews: Record<string, unknown> | null): string {
+    if (!reviews || Object.keys(reviews).length === 0) return "No engineering reviews found in modules."
+    const lines: string[] = [`=== ENGINEERING REVIEW SUMMARY (${Object.keys(reviews).length} modules) ===\n`]
+
+    const severityCounts: Record<string, number> = { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
+
+    for (const [moduleId, review] of Object.entries(reviews)) {
+        const r = review as Record<string, unknown>
+        const moduleName = r.moduleName ?? r.name ?? moduleId
+        const issues = r.issues ?? r.findings ?? r.critiques ?? []
+        const overallScore = r.overallScore ?? r.score ?? r.rating
+        const summary = r.summary ?? r.overview
+
+        lines.push(`MODULE: ${moduleName} (${moduleId})`)
+        if (overallScore != null) lines.push(`  Overall score: ${overallScore}`)
+        if (summary) lines.push(`  Summary: ${String(summary).slice(0, 200)}`)
+
+        if (Array.isArray(issues)) {
+            lines.push(`  Issues found: ${(issues as unknown[]).length}`)
+            for (const issue of (issues as Array<Record<string, unknown>>).slice(0, 5)) {
+                const sev = String(issue.severity ?? issue.level ?? "info").toLowerCase()
+                severityCounts[sev] = (severityCounts[sev] ?? 0) + 1
+                const desc = issue.description ?? issue.issue ?? issue.text ?? JSON.stringify(issue).slice(0, 100)
+                lines.push(`    [${sev}] ${String(desc).slice(0, 150)}`)
+            }
+        }
+        lines.push("")
+    }
+
+    lines.push("SEVERITY DISTRIBUTION:")
+    for (const [sev, count] of Object.entries(severityCounts)) {
+        if (count > 0) lines.push(`  ${sev}: ${count}`)
+    }
+
+    return lines.join("\n").slice(0, 2200)
+}
+
+function summariseProofreader(report: Record<string, unknown> | null): string {
+    if (!report) return "No proofreader report found."
+    const lines: string[] = ["=== PROOFREADER REPORT SUMMARY ===\n"]
+
+    // Overall pass/fail
+    const passed = report.passed ?? report.overallPass ?? report.status
+    const score = report.score ?? report.overallScore
+    if (passed != null) lines.push(`OVERALL PASS: ${passed}`)
+    if (score != null) lines.push(`SCORE: ${score}`)
+    lines.push("")
+
+    // Sections checked
+    const sections = report.sections ?? report.checks ?? report.sectionResults
+    if (Array.isArray(sections)) {
+        lines.push(`SECTIONS CHECKED: ${(sections as unknown[]).length}`)
+        for (const sec of sections as Array<Record<string, unknown>>) {
+            const name = sec.name ?? sec.section ?? sec.title ?? "Unknown"
+            const status = sec.status ?? sec.result ?? sec.pass
+            const issues = sec.issues ?? sec.errors ?? []
+            const issueCount = Array.isArray(issues) ? (issues as unknown[]).length : 0
+            lines.push(`  ${name}: ${status ?? "checked"}${issueCount > 0 ? ` (${issueCount} issues)` : ""}`)
+        }
+        lines.push("")
+    } else if (sections && typeof sections === "object") {
+        lines.push("SECTIONS:")
+        for (const [key, val] of Object.entries(sections as Record<string, unknown>)) {
+            lines.push(`  ${key}: ${String(val).slice(0, 120)}`)
+        }
+        lines.push("")
+    }
+
+    // Issues / corrections
+    const issues = report.issues ?? report.errors ?? report.corrections ?? report.findings
+    if (Array.isArray(issues)) {
+        lines.push(`ISSUES FOUND: ${(issues as unknown[]).length}`)
+        for (const issue of (issues as Array<Record<string, unknown>>).slice(0, 12)) {
+            const desc = issue.description ?? issue.message ?? issue.text ?? JSON.stringify(issue).slice(0, 120)
+            const field = issue.field ?? issue.section ?? issue.location
+            lines.push(`  - ${field ? `[${field}] ` : ""}${String(desc).slice(0, 180)}`)
+        }
+        lines.push("")
+    }
+
+    // Summary / notes
+    const summary = report.summary ?? report.notes ?? report.recommendations
+    if (summary) {
+        lines.push("SUMMARY:")
+        lines.push(`  ${String(summary).slice(0, 500)}`)
+    }
+
+    return lines.join("\n").slice(0, 2200)
+}
+
 // ── Data loading ──────────────────────────────────────────────────────────
 
 async function loadStageData(
@@ -267,8 +573,7 @@ async function loadStageData(
                 .eq("id", projectId)
                 .maybeSingle()
             const research = data?.research as Record<string, unknown> | null
-            if (!research) return "No research data found."
-            return JSON.stringify(research, null, 2).slice(0, 12000)
+            return summariseResearch(research)
         }
         case "modules": {
             const { data } = await admin
@@ -277,8 +582,7 @@ async function loadStageData(
                 .eq("id", projectId)
                 .maybeSingle()
             const modules = data?.modules as Record<string, unknown> | null
-            if (!modules) return "No modules data found."
-            return JSON.stringify(modules, null, 2).slice(0, 12000)
+            return summariseModules(modules)
         }
         case "dimension_sheet": {
             const { data } = await admin
@@ -312,7 +616,7 @@ async function loadStageData(
             const skeletonParts = totalParts - expandedParts
             const coveragePercent = totalParts > 0 ? Math.round((expandedParts / totalParts) * 100) : 0
             const coverageSummary = `BOM EXPANSION COVERAGE: ${expandedParts}/${totalParts} parts fully expanded (${coveragePercent}%). ${skeletonParts} parts are skeleton-only (missing specs/costs — batch expansion failed on these). Score part_completeness based on coverage percentage, not binary pass/fail. A bill of materials with ≥85% coverage should score ≥7/10 on part_completeness.\n\n`
-            return coverageSummary + JSON.stringify(data, null, 2).slice(0, 11000)
+            return coverageSummary + summariseBOM(data as Array<Record<string, unknown>>)
         }
         case "ai_cost_estimates": {
             const { data } = await admin
@@ -358,8 +662,7 @@ async function loadStageData(
                 .eq("id", projectId)
                 .maybeSingle()
             const suppliers = data?.supplier_shortlist as Record<string, unknown> | null
-            if (!suppliers) return "No supplier matches found."
-            return JSON.stringify(suppliers, null, 2).slice(0, 12000)
+            return summariseSuppliers(suppliers)
         }
         case "fang_reviews": {
             const { data } = await admin
@@ -376,7 +679,7 @@ async function loadStageData(
                 }
             }
             if (!Object.keys(reviews).length) return "No engineering reviews found in modules."
-            return JSON.stringify(reviews, null, 2).slice(0, 12000)
+            return summariseFangReviews(reviews)
         }
         case "proofreader_report": {
             const { data } = await admin
@@ -385,8 +688,7 @@ async function loadStageData(
                 .eq("id", projectId)
                 .maybeSingle()
             const report = data?.proofreader_report as Record<string, unknown> | null
-            if (!report) return "No proofreader report found."
-            return JSON.stringify(report, null, 2).slice(0, 12000)
+            return summariseProofreader(report)
         }
         default:
             return "Unknown data query type."
