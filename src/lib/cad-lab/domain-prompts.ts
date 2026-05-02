@@ -287,6 +287,13 @@ RULES:
 - Exception: for bespoke systems where no manufacturer datasheet exists (aircraft, satellites, custom machinery), derive PARAMETRIC ESTIMATES from comparable platforms cited in the reference documents. Mark as ⚠️ Approximate (parametric from [Platform Name]). A bounded range from real platforms is far more useful than "Unknown".
 - MASS BUDGET: for weight-critical systems (aircraft, drones, satellites, portable devices), always compute a mass budget breakdown to verify feasibility. Flag if subsystem mass estimates exceed the stated maximum take-off weight or weight target.
 - COST-REALISM CHECK: compare the user's unit cost target against industry benchmarks for comparable systems. If the target is below the benchmark range, explicitly flag this as a commercial risk.
+- FORM-FACTOR PHYSICAL FEASIBILITY: if the brief specifies a physical enclosure or form factor, validate that ALL dimensions, weights, and floor-area figures are physically achievable within that form factor's hard limits. Reference constraints:
+  • 20 ft shipping container: internal footprint ≈ 5.9 m × 2.35 m (≈ 14 m²), internal height ≈ 2.39 m, max payload ≈ 28 tonnes
+  • 40 ft shipping container: internal footprint ≈ 12.0 m × 2.35 m (≈ 28 m²), internal height ≈ 2.39 m, max payload ≈ 28 tonnes
+  • Standard 19-inch server rack: 42U height (≈ 1.87 m usable), footprint ≈ 0.6 m × 1.0 m, typical max load ≈ 900–1,400 kg
+  • EUR pallet: 1.2 m × 0.8 m; standard pallet: 1.2 m × 1.0 m
+  • Desktop / benchtop enclosure: ≤ 0.5 m × 0.5 m footprint
+  If any system-level area, volume, weight, or count figure CANNOT fit within the stated form factor, you MUST explicitly flag it as physically infeasible, quantify the shortfall, and propose the nearest feasible configuration (e.g. multi-container, split rack, modular approach) with a brief explanation of the trade-offs.
 - Include source attribution for key numbers
 - If user-uploaded reference documents are provided, treat their specifications as PRIMARY context
 - Extract exact dimensions, materials, tolerances, and requirements from these documents
