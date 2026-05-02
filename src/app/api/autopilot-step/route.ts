@@ -56,6 +56,7 @@ import {
     MAX_SCORING_ATTEMPTS,
     shouldScoreStage,
 } from "@/lib/forge-v2/stage-scoring"
+import { updatePipelineHeartbeat } from "@/actions/pipeline-runs"
 
 export const dynamic = "force-dynamic"
 // Each fire gets a fresh Vercel Lambda with its own 800 s budget. Most
@@ -410,6 +411,18 @@ export async function POST(request: Request): Promise<NextResponse> {
     const trackingId = trackingInsert?.id ?? null
 
     // ── 2. Run the specialist ───────────────────────────────────────
+    // ── Heartbeat: keep the tracking row alive during long-running steps ──
+    // Fires every 60 s so the cron's 3-minute heartbeat threshold doesn't
+    // mark this row STALE_ABANDONED mid-execution (e.g. Fang fanout taking
+    // 12-24 min). Cleared in the finally block regardless of outcome.
+    const heartbeatInterval = trackingId
+        ? setInterval(() => {
+              updatePipelineHeartbeat(trackingId).catch((e) =>
+                  console.warn("[autopilot-step] heartbeat update failed:", e),
+              )
+          }, 60_000)
+        : null
+
     let outcome: { ok: true } | { ok: false; error: string }
     try {
         outcome = await runStep(projectId, step, state)
@@ -418,6 +431,8 @@ export async function POST(request: Request): Promise<NextResponse> {
             ok: false,
             error: err instanceof Error ? err.message : String(err),
         }
+    } finally {
+        if (heartbeatInterval) clearInterval(heartbeatInterval)
     }
 
     // ── 3. Stamp tracking row to terminal status ────────────────────
