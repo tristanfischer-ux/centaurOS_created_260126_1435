@@ -557,6 +557,96 @@ function summariseProofreader(report: Record<string, unknown> | null): string {
     return lines.join("\n").slice(0, 2200)
 }
 
+function summariseDimensionSheet(ds: Record<string, unknown>): string {
+    const lines: string[] = ["=== DIMENSION SHEET SUMMARY ===\n"]
+
+    const envelope = ds.envelope as Record<string, unknown> | undefined
+    if (envelope) {
+        lines.push("ENVELOPE CONSTRAINTS:")
+        for (const [k, v] of Object.entries(envelope)) {
+            lines.push(`  ${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+        }
+        lines.push("")
+    }
+
+    const moduleDims = ds.module_dimensions as Record<string, unknown> | undefined
+    if (moduleDims) {
+        const entries = Object.entries(moduleDims)
+        lines.push(`MODULE DIMENSIONS (${entries.length} modules):`)
+        for (const [modId, dims] of entries.slice(0, 15)) {
+            const d = dims as Record<string, unknown>
+            const name = d.name ?? modId
+            const volume = d.volume ?? d.totalVolume
+            const mass = d.mass ?? d.totalMass ?? d.weight
+            lines.push(`  ${name}: ${volume ? `vol=${volume}` : ""}${mass ? ` mass=${mass}` : ""}`)
+            const dimFields = ["length", "width", "height", "diameter"]
+            const dimParts = dimFields.filter(f => d[f] != null).map(f => `${f}=${d[f]}`).join(", ")
+            if (dimParts) lines.push(`    ${dimParts}`)
+        }
+        lines.push("")
+    }
+
+    const target = ds.target as Record<string, unknown> | undefined
+    if (target) {
+        lines.push("TARGET CONSTRAINTS:")
+        for (const [k, v] of Object.entries(target)) {
+            lines.push(`  ${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`)
+        }
+        lines.push("")
+    }
+
+    const feasibility = ds.feasibility ?? ds.status ?? ds.solver_status
+    if (feasibility) lines.push(`FEASIBILITY: ${String(feasibility)}\n`)
+
+    return lines.join("\n").slice(0, 4000)
+}
+
+function summariseLayout(layout: Record<string, unknown>): string {
+    const lines: string[] = ["=== LAYOUT SUMMARY ===\n"]
+
+    const status = layout.status ?? layout.solver_status ?? layout.feasibility
+    if (status) lines.push(`STATUS: ${String(status)}`)
+
+    const containerType = layout.containerType ?? layout.container ?? layout.formFactor
+    if (containerType) lines.push(`CONTAINER: ${String(containerType)}`)
+
+    const totalArea = layout.totalArea ?? layout.usedArea ?? layout.footprint
+    const availableArea = layout.availableArea ?? layout.maxArea
+    if (totalArea) lines.push(`USED AREA: ${totalArea}${availableArea ? ` / ${availableArea} available` : ""}`)
+
+    const utilisation = layout.utilisation ?? layout.packingEfficiency ?? layout.fillRatio
+    if (utilisation) lines.push(`UTILISATION: ${utilisation}`)
+
+    const placements = layout.placements ?? layout.modules ?? layout.positions
+    if (Array.isArray(placements)) {
+        lines.push(`\nMODULE PLACEMENTS (${(placements as unknown[]).length}):`)
+        for (const p of (placements as Array<Record<string, unknown>>).slice(0, 15)) {
+            const name = p.name ?? p.moduleId ?? p.id ?? "?"
+            const pos = p.position ?? p.origin ?? p.coordinates
+            const rot = p.rotation ?? p.angle
+            lines.push(`  ${name}: pos=${pos ? JSON.stringify(pos) : "?"} rot=${rot ?? 0}`)
+        }
+    } else if (placements && typeof placements === "object") {
+        const entries = Object.entries(placements as Record<string, unknown>)
+        lines.push(`\nMODULE PLACEMENTS (${entries.length}):`)
+        for (const [id, p] of entries.slice(0, 15)) {
+            const pm = p as Record<string, unknown>
+            const pos = pm.position ?? pm.origin
+            lines.push(`  ${id}: pos=${pos ? JSON.stringify(pos) : "?"}`)
+        }
+    }
+
+    const warnings = layout.warnings ?? layout.issues ?? layout.conflicts
+    if (Array.isArray(warnings) && (warnings as unknown[]).length > 0) {
+        lines.push(`\nWARNINGS (${(warnings as unknown[]).length}):`)
+        for (const w of (warnings as string[]).slice(0, 10)) {
+            lines.push(`  - ${String(w).slice(0, 150)}`)
+        }
+    }
+
+    return lines.join("\n").slice(0, 4000)
+}
+
 // ── Data loading ──────────────────────────────────────────────────────────
 
 async function loadStageData(
@@ -592,7 +682,7 @@ async function loadStageData(
                 .maybeSingle()
             const ds = data?.dimension_sheet as Record<string, unknown> | null
             if (!ds) return "No dimension sheet found."
-            return JSON.stringify(ds, null, 2).slice(0, 12000)
+            return summariseDimensionSheet(ds)
         }
         case "layout": {
             const { data } = await admin
@@ -602,7 +692,7 @@ async function loadStageData(
                 .maybeSingle()
             const layout = data?.layout_data as Record<string, unknown> | null
             if (!layout) return "No layout data found."
-            return JSON.stringify(layout, null, 2).slice(0, 12000)
+            return summariseLayout(layout)
         }
         case "parts": {
             const { data } = await admin
@@ -1157,7 +1247,7 @@ ${stageData}`
                         )
 
                         // Re-score with the corrected data
-                        const correctedData = JSON.stringify(fixResult.correctedOutput, null, 2).slice(0, 12000)
+                        const correctedData = await loadStageData(projectId, rubric)
                         const reScoreResult = await runJudgePanel(
                             stage,
                             correctedData,
