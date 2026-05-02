@@ -808,7 +808,7 @@ function applyChaseHardGates(
   }
 
   // Count competitors (look for competitor table rows or named companies)
-  const competitorSection = outputText.match(/competitor[s]?.*?(?=\n#{1,3}\s|\n={3,}|$)/is);
+  const competitorSection = outputText.match(/competitor[s]?[\s\S]*?(?=\n#{1,3}\s|\n={3,}|$)/i);
   const competitorRows = competitorSection
     ? (competitorSection[0].match(/\|.*\|.*\|.*\|/g) || []).length - 1 // minus header
     : 0;
