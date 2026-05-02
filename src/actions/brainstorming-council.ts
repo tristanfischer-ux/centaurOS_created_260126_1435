@@ -21,16 +21,16 @@
  *
  * Model mapping (OpenRouter, diverse multi-lineage per Artificial Analysis
  *   Intelligence Index May 2026 — see COUNCIL_MODEL_MAP below for full table):
- *   Cal   (chief-of-staff)  → xiaomi/mimo-v2.5-pro
+ *   Cal   (chief-of-staff)  → deepseek/deepseek-v4-flash
  *   Sage  (strategist)      → google/gemini-3.1-pro-preview
  *   Fiona (fundraising)     → anthropic/claude-opus-4.7
  *   Finn  (finance-lead)    → moonshotai/kimi-k2.6
- *   Fang  (vp-manufacturing)→ xiaomi/mimo-v2.5-pro
+ *   Fang  (vp-manufacturing)→ deepseek/deepseek-v4-flash
  *   Max   (cto)             → deepseek/deepseek-v4-pro
  *   Priya (product-lead)    → qwen/qwen3.6-max-preview
- *   Mia   (growth-marketer) → xiaomi/mimo-v2.5-pro
- *   Sal   (sales-lead)      → xiaomi/mimo-v2.5-pro
- *   Jian  (vp-engineering)  → xiaomi/mimo-v2.5-pro
+ *   Mia   (growth-marketer) → deepseek/deepseek-v4-flash
+ *   Sal   (sales-lead)      → deepseek/deepseek-v4-flash
+ *   Jian  (vp-engineering)  → deepseek/deepseek-v4-flash
  *   Harper (hiring-team)    → moonshotai/kimi-k2.6
  *   Leo   (legal-counsel)   → z-ai/glm-5.1
  *
@@ -53,14 +53,18 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // A same-lineage council is an echo chamber. Every specialist slot pulls from
 // a DIFFERENT model family so blind spots from one training lineage are caught
 // by another. The table below spans six lineages:
-//   China Xiaomi → xiaomi/mimo-v2.5-pro   (IFBench 80%, non-hallucination 75%, long-context 74%)
+//   China DeepSeek → deepseek/deepseek-v4-flash (proven reliable on this OpenRouter account,
+//                                                  clean prose output, cheap at $0.14/$0.28/M)
 //   US Google  → google/gemini-3.1-pro-preview (HLE 45%, Intelligence 57 — best reasoner)
 //   US Anthropic → anthropic/claude-opus-4.7  (Fiona: +0.21 composite benchmark win)
 //   China Moonshot → moonshotai/kimi-k2.6     (Intelligence 54, different RLHF lineage)
-//   China Xiaomi   → xiaomi/mimo-v2.5-pro     (non-hallucination 75%, IFBench 80%)
 //   China DeepSeek → deepseek/deepseek-v4-pro (structured reasoning, Intelligence 52)
 //   China Alibaba  → qwen/qwen3.6-max-preview (IFBench 77%, Intelligence 52)
 //   China Zhipu    → z-ai/glm-5.1            (tool-use 98%, non-hallucination 74%)
+//
+// NOTE 2026-05-02: xiaomi/mimo-v2.5-pro was blocked on OpenRouter provider
+// allow-list, causing Cal and 4 other specialists to 404. Replaced with
+// deepseek/deepseek-v4-flash which is confirmed working on this account.
 //
 // IMPORTANT — prose vs reasoning models:
 //   deepseek/deepseek-v4-pro returns reasoning chain in `reasoning_content`, not
@@ -75,10 +79,10 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // slots are now on non-DeepSeek models.
 
 const COUNCIL_MODEL_MAP: Record<string, string> = {
-    // China Xiaomi — MiMo V2.5 Pro: IFBench 80%, non-hallucination 75%, long-context 74%.
-    // Best host/opener: honest grounding, follows format precisely without fabricating.
+    // China DeepSeek — V4-Flash: proven reliable on this OpenRouter account, clean prose output.
+    // Best host/opener: follows format precisely, cheap at $0.14/$0.28/M.
     // Also used for sales-lead and growth-marketer when Cal isn't in session.
-    "chief-of-staff":      "xiaomi/mimo-v2.5-pro",
+    "chief-of-staff":      "deepseek/deepseek-v4-flash",
 
     // US Google — Gemini 3.1 Pro: Intelligence 57, HLE 45% (#1 hardest problems).
     // Best strategic reasoner. Kept from prior mapping (no regression risk).
@@ -93,9 +97,9 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     // max_tokens>=4096 is already set in all callers (W51 fix).
     "finance-lead":        "moonshotai/kimi-k2.6",
 
-    // China Xiaomi — MiMo V2.5 Pro: Intelligence 54, non-hallucination 75%,
-    // IFBench 80%. Grounds manufacturing claims in reality rather than optimism.
-    "vp-manufacturing":    "xiaomi/mimo-v2.5-pro",
+    // China DeepSeek — V4-Flash: proven reliable on this OpenRouter account, clean prose output.
+    // Grounds manufacturing claims in reality rather than optimism.
+    "vp-manufacturing":    "deepseek/deepseek-v4-flash",
 
     // China DeepSeek — V4-Pro: Intelligence 52, structured reasoner. Upgrade from
     // V4-Flash for Max (cto) only — the engineering domain benefits from deeper
@@ -106,15 +110,14 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     // Different Alibaba lineage adds genuine diversity vs Moonshot/DeepSeek/Xiaomi.
     "product-lead":        "qwen/qwen3.6-max-preview",
 
-    // China Xiaomi — MiMo V2.5 Pro (same as Cal): used when Cal isn't in the session.
-    // Non-hallucination 75%, IFBench 80%, honest generalist.
-    "growth-marketer":     "xiaomi/mimo-v2.5-pro",
-    "sales-lead":          "xiaomi/mimo-v2.5-pro",
+    // China DeepSeek — V4-Flash: proven reliable on this OpenRouter account, clean prose output.
+    // Used when Cal isn't in the session. Cheap generalist prose.
+    "growth-marketer":     "deepseek/deepseek-v4-flash",
+    "sales-lead":          "deepseek/deepseek-v4-flash",
 
-    // China Xiaomi — MiMo V2.5 Pro (same as Fang): Intelligence 54, honest,
-    // good IFBench. Engineering and manufacturing share the same honest-grounding
-    // lineage.
-    "vp-engineering":      "xiaomi/mimo-v2.5-pro",
+    // China DeepSeek — V4-Flash: proven reliable on this OpenRouter account, clean prose output.
+    // Engineering and manufacturing share the same DeepSeek lineage for prose.
+    "vp-engineering":      "deepseek/deepseek-v4-flash",
 
     // China Moonshot — Kimi K2.6 (same as Finn): Intelligence 54, different lineage.
     "hiring-team":         "moonshotai/kimi-k2.6",
@@ -131,17 +134,17 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
 
 // Model label shown in the response card
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
-    "chief-of-staff":      "MiMo V2.5 Pro",
+    "chief-of-staff":      "DeepSeek V4-Flash",
     "fundraising-advisor": "Claude Opus 4.7",
     "strategist":          "Gemini 3.1 Pro",
     "finance-lead":        "Kimi K2.6",
     "cto":                 "DeepSeek V4-Pro",
-    "sales-lead":          "MiMo V2.5 Pro",
-    "vp-manufacturing":    "MiMo V2.5 Pro",
+    "sales-lead":          "DeepSeek V4-Flash",
+    "vp-manufacturing":    "DeepSeek V4-Flash",
     "vp-supply-chain":     "Gemini 3.1 Pro",
     "product-lead":        "Qwen 3.6 Max",
-    "growth-marketer":     "MiMo V2.5 Pro",
-    "vp-engineering":      "MiMo V2.5 Pro",
+    "growth-marketer":     "DeepSeek V4-Flash",
+    "vp-engineering":      "DeepSeek V4-Flash",
     "hiring-team":         "Kimi K2.6",
     "legal-counsel":       "GLM-5.1",
 }
