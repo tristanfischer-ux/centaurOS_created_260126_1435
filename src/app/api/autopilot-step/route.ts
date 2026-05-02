@@ -160,12 +160,16 @@ export async function POST(request: Request): Promise<NextResponse> {
             console.error(
                 `[autopilot-step:score_and_gate] scoring FAILED for project=${projectId} stage=${rawStage}: ${scoringErr instanceof Error ? scoringErr.message : scoringErr} — setting idle for retry`,
             )
-            await admin
+            const { error: updateErr } = await admin
                 .from("cad_lab_projects")
                 .update({
                     autopilot_state: { ...state, status: "idle" },
                 } as unknown as never)
                 .eq("id", projectId)
+            if (updateErr) {
+                console.error(`[autopilot-step] update failed:`, updateErr.message);
+                return NextResponse.json({ error: "Failed to update state to idle" }, { status: 500 });
+            }
             return NextResponse.json({ ok: true, action: "scoring_error_retry", stage: rawStage, error: scoringErr instanceof Error ? scoringErr.message : String(scoringErr) }, { status: 200 })
         }
 
@@ -198,7 +202,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                         `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} ` +
                             `exhausted ${MAX_SCORING_ATTEMPTS} scoring attempts — terminal_fail`,
                     )
-                    await admin
+                    const { error: updateErr } = await admin
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
@@ -208,6 +212,10 @@ export async function POST(request: Request): Promise<NextResponse> {
                             },
                         } as unknown as never)
                         .eq("id", projectId)
+                    if (updateErr) {
+                        console.error(`[autopilot-step] update failed:`, updateErr.message);
+                        return NextResponse.json({ error: "Failed to update state to terminal_fail" }, { status: 500 });
+                    }
                     return NextResponse.json({ ok: true, action: "terminal_fail", stage: rawStage }, { status: 200 })
                 }
 
@@ -251,7 +259,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                     waiting_max: "modules",
                     waiting_finn: "ai_cost_estimates",
                     matching_suppliers: "supplier_shortlist",
-                    proofreading: "proofreader_report",
+                    proofreading: "proofread_findings",
                 }
                 const dataColumn = SCORE_FAIL_CLEAR_COLUMN[rawStage]
                 if (dataColumn) {
@@ -264,6 +272,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                             `[autopilot-step:score_and_gate] failed to clear ${dataColumn} for project=${projectId} stage=${rawStage}:`,
                             clearErr.message,
                         )
+                        return NextResponse.json({ ok: false, error: "Failed to clear stage data" }, { status: 500 })
                     } else {
                         console.info(
                             `[autopilot-step:score_and_gate] cleared ${dataColumn} for project=${projectId} stage=${rawStage} (attempt ${attemptCount + 1}) — specialist will regenerate from scratch`,
@@ -284,7 +293,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                     .maybeSingle()
 
                 if (doneRow) {
-                    await admin
+                    const { error: runUpdateErr } = await admin
                         .from("pipeline_runs")
                         .update({
                             status: "failed",
@@ -293,12 +302,15 @@ export async function POST(request: Request): Promise<NextResponse> {
                             finished_at: new Date().toISOString(),
                         } as never)
                         .eq("id", doneRow.id)
+                    if (runUpdateErr) {
+                        console.warn(`[autopilot-step] failed to update pipeline_runs status (non-critical):`, runUpdateErr.message)
+                    }
                 }
 
                 // Re-fetch again after council may have written diagnosis
                 const postCouncilState = await refetchState()
                 const prevAttempts = typeof postCouncilState.attempts === "number" ? postCouncilState.attempts : 0
-                await admin
+                const { error: updateErr } = await admin
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
@@ -308,6 +320,10 @@ export async function POST(request: Request): Promise<NextResponse> {
                         },
                     } as unknown as never)
                     .eq("id", projectId)
+                if (updateErr) {
+                    console.error(`[autopilot-step] update failed:`, updateErr.message);
+                    return NextResponse.json({ error: "Failed to update state to idle" }, { status: 500 });
+                }
 
                 console.info(
                     `[autopilot-step:score_and_gate] reset project=${projectId} stage=${rawStage} to idle for re-fire (attempt ${attemptCount + 1}/${MAX_SCORING_ATTEMPTS})`,
@@ -324,7 +340,7 @@ export async function POST(request: Request): Promise<NextResponse> {
                 )
                 return NextResponse.json({ ok: true, action: "stale_score_discarded", stage: rawStage }, { status: 200 })
             }
-            await admin
+            const { error: updateErr } = await admin
                 .from("cad_lab_projects")
                 .update({
                     autopilot_state: {
@@ -333,6 +349,10 @@ export async function POST(request: Request): Promise<NextResponse> {
                     },
                 } as unknown as never)
                 .eq("id", projectId)
+            if (updateErr) {
+                console.error(`[autopilot-step] update failed:`, updateErr.message);
+                return NextResponse.json({ error: "Failed to update state to awaiting_gate" }, { status: 500 });
+            }
 
             console.info(
                 `[autopilot-step:score_and_gate] project=${projectId} stage=${rawStage} scored PASS — status set to awaiting_gate`,
@@ -351,12 +371,16 @@ export async function POST(request: Request): Promise<NextResponse> {
             )
             return NextResponse.json({ ok: true, action: "stale_score_discarded", stage: rawStage }, { status: 200 })
         }
-        await admin
+        const { error: updateErr } = await admin
             .from("cad_lab_projects")
             .update({
                 autopilot_state: { ...noRubricState, status: "awaiting_gate" },
             } as unknown as never)
             .eq("id", projectId)
+        if (updateErr) {
+            console.error(`[autopilot-step] update failed:`, updateErr.message);
+            return NextResponse.json({ error: "Failed to update state to awaiting_gate" }, { status: 500 });
+        }
         return NextResponse.json({ ok: true, action: "awaiting_gate_no_rubric", stage: rawStage }, { status: 200 })
     }
 
@@ -418,6 +442,11 @@ export async function POST(request: Request): Promise<NextResponse> {
         .select("id")
         .maybeSingle()
 
+    if (insertErr?.code === '23505') {
+        console.warn(`[autopilot-step] deduplicated concurrent fire for project=${projectId} stage=${stage}`);
+        return NextResponse.json({ ok: true, ran: false, reason: "already_running" }, { status: 200 });
+    }
+
     if (insertErr || !trackingInsert) {
         // Best-effort: log and continue. Better to attempt the work than
         // silently abandon. The cron's stale-running detector will clean up.
@@ -430,15 +459,18 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // ── 2. Run the specialist ───────────────────────────────────────
     // ── Heartbeat: keep the tracking row alive during long-running steps ──
-    // Fires every 60 s so the cron's 3-minute heartbeat threshold doesn't
+    // Fires every 30 s so the cron's 3-minute heartbeat threshold doesn't
     // mark this row STALE_ABANDONED mid-execution (e.g. Fang fanout taking
     // 12-24 min). Cleared in the finally block regardless of outcome.
+    // NOTE: If Vercel SIGKILLs the Lambda (e.g. maxDuration exceeded), 
+    // the finally block won't run and clearInterval won't be called.
+    // The cron's stale detector checks (heartbeat_at vs started_at) to mitigate this.
     const heartbeatInterval = trackingId
         ? setInterval(() => {
               updatePipelineHeartbeat(trackingId).catch((e) =>
                   console.warn("[autopilot-step] heartbeat update failed:", e),
               )
-          }, 60_000)
+          }, 30_000)
         : null
 
     let outcome: { ok: true } | { ok: false; error: string }
@@ -455,7 +487,7 @@ export async function POST(request: Request): Promise<NextResponse> {
 
     // ── 3. Stamp tracking row to terminal status ────────────────────
     if (trackingId) {
-        await admin
+        const { error: updateErr } = await admin
             .from("pipeline_runs")
             .update({
                 status: outcome.ok ? "done" : "failed",
@@ -464,6 +496,9 @@ export async function POST(request: Request): Promise<NextResponse> {
                 finished_at: new Date().toISOString(),
             } as never)
             .eq("id", trackingId)
+        if (updateErr) {
+            console.error(`[autopilot-step] update failed to set pipeline_runs terminal status:`, updateErr.message);
+        }
     }
 
     if (outcome.ok) {
@@ -624,7 +659,7 @@ async function runStep(
                     `The revised decomposition differs substantially from the original brief. ` +
                     `Review the Modules page to confirm the new architecture matches your intent.`
 
-                await admin
+                const { error: updateErr } = await admin
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
@@ -633,6 +668,9 @@ async function runStep(
                         },
                     } as never)
                     .eq("id", projectId)
+                if (updateErr) {
+                    console.warn(`[autopilot-step] failed to update topology_drift_note (non-critical):`, updateErr.message);
+                }
             } else {
                 console.log(
                     `[autopilot-step] waitForMaxRedecomposition: no substantial drift for project=${projectId} ` +
@@ -897,7 +935,35 @@ async function runStep(
                     "[autopilot-step] proofreader failed (non-blocking):",
                     result.error,
                 )
+                return { ok: true }
             }
+
+            if (result.blockerCount && result.blockerCount > 0) {
+                const admin = createAdminClient()
+                const { data: project } = await admin
+                    .from("cad_lab_projects")
+                    .select("autopilot_state")
+                    .eq("id", projectId)
+                    .maybeSingle()
+
+                if (project && project.autopilot_state) {
+                    const newState = {
+                        ...(project.autopilot_state as Record<string, unknown>),
+                        stage: "proofreader_blocked",
+                        status: "blocked",
+                    }
+                    await admin
+                        .from("cad_lab_projects")
+                        .update({ autopilot_state: newState } as never)
+                        .eq("id", projectId)
+                }
+
+                console.warn(
+                    `[autopilot-step] proofreader found ${result.blockerCount} blocker(s) for project=${projectId}. Halting PDF generation.`
+                )
+                return { ok: false, error: `Proofreader blocked with ${result.blockerCount} issue(s)` }
+            }
+
             return { ok: true }
         }
 
@@ -1173,13 +1239,10 @@ async function runStep(
                         storage_path: storagePath,
                     } as never)
                 if (insertErr) {
-                    // Soft fail — the PDF IS in storage; the row is the
-                    // index for the Downloads tab to find it. Log + return ok
-                    // so the autopilot stamps done; the row can be backfilled.
-                    console.warn(
-                        "[autopilot-step] report_downloads insert failed:",
-                        insertErr.message,
-                    )
+                    return {
+                        ok: false,
+                        error: `PDF generated but report_downloads insert failed: ${insertErr.message}`
+                    }
                 }
 
                 // Dual-save: also write to ~/Downloads/forge-demos/ for local

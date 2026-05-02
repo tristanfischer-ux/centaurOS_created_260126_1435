@@ -390,8 +390,40 @@ export async function createCadLabProject(
 ): Promise<{ projectId: string } | { error: string }> {
   return withAuth(async ({ supabase, foundryId, user }) => {
     // VALIDATION: Subject is required
-    if (!subject.trim()) {
+    const trimmedSubject = subject.trim()
+    if (!trimmedSubject) {
       return { error: "Subject is required" }
+    }
+
+    // VALIDATION: Vague brief detection
+    if (trimmedSubject.length < 100) {
+      return { error: "Brief is too short. Please provide at least 100 characters detailing your product's purpose, environment, and key constraints." }
+    }
+
+    const engineeringKeywords = [
+      "mass", "weight", "size", "dimension", "power", "watt", "cost", "price", 
+      "budget", "capacity", "kwh", "kg", "mm", "cm"
+    ]
+    const matches = new Set<string>()
+    const lowerSubject = trimmedSubject.toLowerCase()
+    
+    // We use word boundaries for short keywords to prevent false positives (e.g. 'kg' in 'background')
+    for (const kw of engineeringKeywords) {
+      if (kw.length <= 3 || kw === "watt") {
+        if (new RegExp(`\\b${kw}\\b`, "i").test(trimmedSubject)) {
+          matches.add(kw)
+        }
+      } else {
+        if (lowerSubject.includes(kw)) {
+          matches.add(kw)
+        }
+      }
+    }
+
+    if (matches.size < 2) {
+      return { 
+        error: "Brief lacks engineering constraints. Please include at least two key dimensions (e.g., mass, power, dimensions, target cost, or capacity) so the specialists have enough constraints to work with." 
+      }
     }
 
     // INTENT: The workspace H1 + breadcrumb read `name`, so a hard

@@ -79,6 +79,17 @@ import {
     shouldScoreStage,
 } from "@/lib/forge-v2/stage-scoring"
 
+const TERMINAL_STAGES = [
+    "done",
+    "failed",
+    "solver_error",
+    "preflight_blocked",
+    "gate_1_blocked",
+    "manual_review",
+    "terminal_fail",
+    "proofreader_blocked"
+]
+
 export const dynamic = "force-dynamic"
 export const maxDuration = 300
 
@@ -137,6 +148,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
         .eq("status", "running")
         .lt("started_at", staleThreshold)
         .is("heartbeat_at" as never, null)
+        .or(`finished_at.is.null,finished_at.lt.${staleThreshold}`)
         .limit(20)
     const { data: staleWithHeartbeat } = await admin
         .from("pipeline_runs")
@@ -144,6 +156,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
         .eq("status", "running")
         .not("heartbeat_at" as never, "is", null)
         .lt("heartbeat_at" as never, staleThreshold)
+        .or(`finished_at.is.null,finished_at.lt.${staleThreshold}`)
         .limit(20)
     const allStale = [...(staleNoHeartbeat ?? []), ...(staleWithHeartbeat ?? [])]
     if (allStale.length > 0) {
@@ -191,7 +204,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
         .from("cad_lab_projects")
         .select("id, autopilot_state")
         .not("autopilot_state", "is", null)
-        .not("autopilot_state->>stage", "in", '("done","failed","solver_error","preflight_blocked","gate_1_blocked")')
+        .not("autopilot_state->>stage", "in", `(${TERMINAL_STAGES.map(s => `"${s}"`).join(",")})`)
         .not("autopilot_state->>started_at", "is", null)
         .order("updated_at", { ascending: false })
         .limit(MAX_PROJECTS_PER_TICK * 2)
@@ -210,7 +223,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
             // 'solver_error' added 2026-04-29: NULL dimension_sheet hard-block.
             // 'preflight_blocked' added 2026-04-29: physics violation pre-pipeline.
             // 'gate_1_blocked' added 2026-04-29: numeric mismatch at brief-lock.
-            if (state.stage === "done" || state.stage === "failed" || state.stage === "solver_error" || state.stage === "preflight_blocked" || state.stage === "gate_1_blocked") return false
+            if (TERMINAL_STAGES.includes(state.stage)) return false
             return true
         })
         .slice(0, MAX_PROJECTS_PER_TICK)
@@ -235,15 +248,17 @@ async function tickOnce(request: Request): Promise<TickResult> {
         // will be skipped with the secret-missing reason.
     }
 
+    const firePromises: Promise<void>[] = []
+
     for (const project of active) {
         const state = project.autopilot_state as AutopilotState
         const stage = state.stage as AutopilotStage
 
-        // TERMINAL stages: 'done', 'solver_error', 'preflight_blocked', 'gate_1_blocked'
+        // TERMINAL stages
         // are all terminal. 'failed' is excluded upstream by the DB query; the others
         // are excluded by the in-memory filter above. Belt-and-suspenders guard here
         // prevents accidental advance if a project somehow slips through.
-        if (stage === "done" || stage === "solver_error" || stage === "preflight_blocked" || stage === "gate_1_blocked") {
+        if (TERMINAL_STAGES.includes(stage)) {
             details.push({
                 projectId: project.id,
                 stage,
@@ -254,7 +269,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
             continue
         }
 
-        const autopilotStatus = (state as Record<string, unknown>).status as string | undefined
+        const autopilotStatus = (state as unknown as Record<string, unknown>).status as string | undefined
         if (autopilotStatus === "manual_review") {
             details.push({
                 projectId: project.id,
@@ -320,6 +335,8 @@ async function tickOnce(request: Request): Promise<TickResult> {
         }
 
         // ── Fire stages ────────────────────────────────────────────
+        firePromises.push((async () => {
+        try {
         // Most-recent autopilot tracking row for this (project, stage).
         const { data: trackingRow } = await admin
             .from("pipeline_runs")
@@ -356,12 +373,10 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .eq("id", project.id)
                     .maybeSingle()
                 if (freshProject?.autopilot_state) {
-                    const freshState = freshProject.autopilot_state as AutopilotState
                     await adminClient
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
-                                ...freshState,
                                 status: "idle",
                                 failed_stages: [],
                                 current_stage_attempts: 0,
@@ -378,12 +393,12 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 })
             }
             advanced++
-            continue
+            return
         }
 
         // ── terminal_fail / stage_failed: reset with circuit breaker ────
         if (autopilotStatus === "terminal_fail" || autopilotStatus === "stage_failed") {
-            const totalResets = ((state as Record<string, unknown>).total_resets as number) ?? 0
+            const totalResets = ((state as unknown as Record<string, unknown>).total_resets as number) ?? 0
             if (totalResets >= 3) {
                 console.error(
                     `[autopilot-tick] project=${project.id} stage=${stage} hit circuit breaker (${totalResets} total resets) — moving to manual_review`,
@@ -392,7 +407,6 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
-                            ...(state as Record<string, unknown>),
                             status: "manual_review",
                         },
                     } as never)
@@ -405,81 +419,75 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     reason: `${autopilotStatus} → manual_review (${totalResets} resets, circuit breaker tripped)`,
                 })
                 skipped++
-                continue
+                return
             }
             console.warn(
                 `[autopilot-tick] ${autopilotStatus} detected for project=${project.id} stage=${stage} — resetting to idle for retry (reset ${totalResets + 1}/3)`,
             )
-            const { error: resetErr } = await createAdminClient()
-                .from("cad_lab_projects")
-                .update({
-                    autopilot_state: {
-                        ...(state as Record<string, unknown>),
-                        status: "idle",
-                        current_stage_attempts: 0,
-                        failed_stages: [],
-                        total_resets: totalResets + 1,
-                    },
-                } as never)
-                .eq("id", project.id)
-            if (resetErr) {
-                console.error(`[autopilot-tick] Failed to reset ${autopilotStatus} for project=${project.id}:`, resetErr.message)
-            } else {
-                console.info(`[autopilot-tick] project=${project.id} reset from ${autopilotStatus} to idle at stage=${stage} — will retry`)
-            }
+            try {
+                const adminClient = createAdminClient()
+                const { error: resetErr } = await adminClient
+                    .from("cad_lab_projects")
+                    .update({
+                        autopilot_state: {
+                            status: "idle",
+                            current_stage_attempts: 0,
+                            failed_stages: [],
+                            total_resets: totalResets + 1,
+                        },
+                    } as never)
+                    .eq("id", project.id)
+                if (resetErr) throw resetErr
 
-            // ── Clear stale data so the specialist regenerates from scratch ──
-            // Only for stage_failed (not terminal_fail / circuit breaker).
-            // Deterministic stages (sizing, layout) and derived stages (bom,
-            // pdf) are excluded — their data should NOT be cleared.
-            // running_fang_reviews: engineering reviews live inside
-            // modules[].engineeringReview — clearing modules would destroy the
-            // Max decomposition, so Fang is excluded here.
-            if (autopilotStatus === "stage_failed") {
-                const STAGE_DATA_COLUMN: Partial<Record<string, string>> = {
-                    waiting_chase: "research",
-                    waiting_max: "modules",
-                    waiting_finn: "ai_cost_estimates",
-                    matching_suppliers: "supplier_shortlist",
-                    proofreading: "proofreader_report",
-                }
-                const dataColumn = STAGE_DATA_COLUMN[stage]
-                if (dataColumn) {
-                    const { error: clearErr } = await createAdminClient()
-                        .from("cad_lab_projects")
-                        .update({ [dataColumn]: null } as never)
-                        .eq("id", project.id)
-                    if (clearErr) {
-                        console.error(
-                            `[autopilot-tick] Failed to clear ${dataColumn} for project=${project.id} stage=${stage}:`,
-                            clearErr.message,
-                        )
-                    } else {
+                console.info(`[autopilot-tick] project=${project.id} reset from ${autopilotStatus} to idle at stage=${stage} — will retry`)
+
+                // ── Clear stale data so the specialist regenerates from scratch ──
+                if (autopilotStatus === "stage_failed") {
+                    const STAGE_DATA_COLUMN: Partial<Record<string, string>> = {
+                        waiting_chase: "research",
+                        waiting_max: "modules",
+                        waiting_finn: "ai_cost_estimates",
+                        matching_suppliers: "supplier_shortlist",
+                        proofreading: "proofreader_report",
+                    }
+                    const dataColumn = STAGE_DATA_COLUMN[stage]
+                    if (dataColumn) {
+                        const { error: clearErr } = await adminClient
+                            .from("cad_lab_projects")
+                            .update({ [dataColumn]: null } as never)
+                            .eq("id", project.id)
+                        if (clearErr) throw clearErr
                         console.info(
                             `[autopilot-tick] Cleared ${dataColumn} for project=${project.id} stage=${stage} — specialist will regenerate`,
                         )
                     }
                 }
-            }
 
-            // Delete zombie pipeline_runs (running status > 5 min) so retry guard doesn't block
-            await createAdminClient()
-                .from("pipeline_runs")
-                .delete()
-                .eq("project_id", project.id)
-                .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
-                .eq("stage", stage)
-                .in("status", ["running", "failed", "error"])
-            details.push({
-                projectId: project.id,
-                stage,
-                action: "terminal_fail" as TickAction,
-                ok: true,
-                reason: `${autopilotStatus} → reset to idle for retry`,
-            })
-            skipped++
-            continue
+                // Delete zombie pipeline_runs (running status > 5 min) so retry guard doesn't block
+                const { error: delErr } = await adminClient
+                    .from("pipeline_runs")
+                    .delete()
+                    .eq("project_id", project.id)
+                    .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+                    .eq("stage", stage)
+                    .in("status", ["running", "failed", "error"])
+                if (delErr) throw delErr
+
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "terminal_fail" as TickAction,
+                    ok: true,
+                    reason: `${autopilotStatus} → reset to idle for retry`,
+                })
+                skipped++
+                return
+            } catch (err) {
+                console.error(`[autopilot-tick] Failed to reset ${autopilotStatus} for project=${project.id}:`, err)
+                return
+            }
         }
+
 
         if (trackingRow?.status === "done") {
             // ── Quality Gate hook (flag-gated, default off) ──────────────
@@ -579,7 +587,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                             })
                             skipped++
                         }
-                        continue
+                        return
                     }
 
                     if (gateResult.verdict === "FAIL" && gateResult.attempts_remaining === 0) {
@@ -613,7 +621,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                             reason: "FORGE_RENDER_STAGE_SECRET missing — cannot dispatch score_and_gate",
                         })
                         failed++
-                        continue
+                        return
                     }
 
                     try {
@@ -654,7 +662,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         reason: `score_and_gate dispatched to autopilot-step — waiting for awaiting_gate status`,
                     })
                     skipped++
-                    continue
+                    return
                 }
 
                 // alreadyScored=true: belt-and-suspenders if awaiting_gate wasn't set.
@@ -671,7 +679,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     details.push({ projectId: project.id, stage, action: "advance" as TickAction, ok: true, reason: `per-project advance (belt-and-suspenders): ${stage} → ${config.nextStage}` })
                 }
                 advanced++
-                continue
+                return
             }
             // ── end Stage Scoring dispatch ───────────────────────────────
 
@@ -693,7 +701,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 })
             }
             advanced++
-            continue
+            return
         }
 
         if (trackingRow?.status === "running") {
@@ -728,7 +736,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         : `running for ${Math.round(age / 1000)}s (no heartbeat)`,
                 })
                 skipped++
-                continue
+                return
             }
             // Stale — orphaned by a SIGKILLed Lambda. Mark and re-fire.
             await admin
@@ -809,17 +817,16 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
-                            ...(state as unknown as Record<string, unknown>),
                             status: "idle",
                             failed_stages: [],
                             current_stage_attempts: 1,
                         },
-                    } as unknown as never)
+                    } as never)
                     .eq("id", project.id)
                 // Fall through to fire logic below — do NOT continue/skip.
             }
             if (attempts >= config.maxAttempts) {
-                const totalResets = ((state as Record<string, unknown>).total_resets as number) ?? 0
+                const totalResets = ((state as unknown as Record<string, unknown>).total_resets as number) ?? 0
                 if (totalResets >= 3) {
                     console.error(
                         `[autopilot-tick] project=${project.id} stage=${stage} hit circuit breaker (${totalResets} total resets after ${attempts} attempts) — moving to manual_review`,
@@ -828,7 +835,6 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
-                                ...(state as unknown as Record<string, unknown>),
                                 status: "manual_review",
                             },
                         } as never)
@@ -841,39 +847,48 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         reason: `${attempts} >= ${config.maxAttempts}, circuit breaker (${totalResets} resets) — manual_review`,
                     })
                     skipped++
-                    continue
+                    return
                 }
                 console.warn(
                     `[autopilot-tick] project=${project.id} exhausted ${attempts}/${config.maxAttempts} attempts at stage=${stage} — resetting (reset ${totalResets + 1}/3)`,
                 )
-                await createAdminClient()
-                    .from("cad_lab_projects")
-                    .update({
-                        autopilot_state: {
-                            ...(state as unknown as Record<string, unknown>),
-                            status: "idle",
-                            current_stage_attempts: 0,
-                            total_resets: totalResets + 1,
-                        },
-                    } as never)
-                    .eq("id", project.id)
-                // Delete stale pipeline_runs so retry guard doesn't block
-                await createAdminClient()
-                    .from("pipeline_runs")
-                    .delete()
-                    .eq("project_id", project.id)
-                    .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
-                    .eq("stage", stage)
-                    .in("status", ["failed", "error"])
-                details.push({
-                    projectId: project.id,
-                    stage,
-                    action: "terminal_fail" as TickAction,
-                    ok: true,
-                    reason: `${attempts} >= ${config.maxAttempts} — reset to idle for retry`,
-                })
-                skipped++
-                continue
+                try {
+                    const adminClient = createAdminClient()
+                    const { error: resetErr } = await adminClient
+                        .from("cad_lab_projects")
+                        .update({
+                            autopilot_state: {
+                                status: "idle",
+                                current_stage_attempts: 0,
+                                total_resets: totalResets + 1,
+                            },
+                        } as never)
+                        .eq("id", project.id)
+                    if (resetErr) throw resetErr
+
+                    // Delete stale pipeline_runs so retry guard doesn't block
+                    const { error: delErr } = await adminClient
+                        .from("pipeline_runs")
+                        .delete()
+                        .eq("project_id", project.id)
+                        .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
+                        .eq("stage", stage)
+                        .in("status", ["failed", "error"])
+                    if (delErr) throw delErr
+
+                    details.push({
+                        projectId: project.id,
+                        stage,
+                        action: "terminal_fail" as TickAction,
+                        ok: true,
+                        reason: `${attempts} >= ${config.maxAttempts} — reset to idle for retry`,
+                    })
+                    skipped++
+                    return
+                } catch (err) {
+                    console.error(`[autopilot-tick] Failed to reset retry budget for project=${project.id}:`, err)
+                    return
+                }
             }
             // Else: fall through to fire (retry).
         }
@@ -888,7 +903,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 reason: "FORGE_RENDER_STAGE_SECRET missing",
             })
             failed++
-            continue
+            return
         }
 
         const fireAction: TickAction =
@@ -934,7 +949,13 @@ async function tickOnce(request: Request): Promise<TickResult> {
             ok: true,
         })
         fired++
+        } catch (err) {
+            console.error(`[autopilot-tick] Unhandled error in fire stage for project ${project.id}:`, err)
+        }
+        })())
     }
+
+    await Promise.allSettled(firePromises)
 
     return { advanced, fired, skipped, failed, details }
 }

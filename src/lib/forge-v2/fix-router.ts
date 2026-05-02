@@ -87,7 +87,7 @@ export const DATA_QUERY_TO_COLUMN: Record<string, { table: string; column: strin
     ai_cost_estimates: { table: "cad_lab_projects", column: "ai_cost_estimates", idColumn: "id" },
     supplier_matches: { table: "cad_lab_projects", column: "supplier_shortlist", idColumn: "id" },
     fang_reviews: { table: "cad_lab_projects", column: "fang_reviews", idColumn: "id" },
-    proofreader_report: { table: "cad_lab_projects", column: "proofreader_report", idColumn: "id" },
+    proofread_findings: { table: "cad_lab_projects", column: "proofread_findings", idColumn: "id" },
 }
 
 // ── Classification ──────────────────────────────────────────────────────────

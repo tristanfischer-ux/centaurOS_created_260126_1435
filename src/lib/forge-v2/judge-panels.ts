@@ -53,7 +53,7 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
     // High-risk (3 judges)
     waiting_chase: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
+        { model: "z-ai/glm-5.1", role: "honest generalist", lineage: "zhipu" },
         { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_max: [
@@ -64,11 +64,11 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
     waiting_bom: [
         { model: "z-ai/glm-5.1", role: "schema enforcer", lineage: "zhipu" },
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "xiaomi/mimo-v2.5-pro", role: "cross-reference", lineage: "xiaomi" },
+        { model: "moonshotai/kimi-k2.6", role: "cross-reference", lineage: "moonshot" },
     ],
     waiting_finn: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
-        { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
+        { model: "z-ai/glm-5.1", role: "honest anchor", lineage: "zhipu" },
         { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_fang: [
@@ -84,19 +84,19 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
     // Medium-risk (2 judges)
     waiting_suppliers: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
-        { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
+        { model: "z-ai/glm-5.1", role: "honest anchor", lineage: "zhipu" },
     ],
     matching_suppliers: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
-        { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
+        { model: "z-ai/glm-5.1", role: "honest anchor", lineage: "zhipu" },
     ],
     waiting_proofreader: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
+        { model: "z-ai/glm-5.1", role: "honest generalist", lineage: "zhipu" },
     ],
     proofreading: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
+        { model: "z-ai/glm-5.1", role: "honest generalist", lineage: "zhipu" },
     ],
     // Low-risk (2 judges — multimodal vision)
     waiting_pdf: [

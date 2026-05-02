@@ -320,7 +320,7 @@ async function runChaseResearchInternal(
         )
 
         let descriptionToUse = gateChaseRemediationCtx
-            ? buildRemediationPromptBlock(6, gateChaseRemediationCtx) + "\n\nProduct concept: " + description
+            ? buildRemediationPromptBlock(1, gateChaseRemediationCtx) + "\n\nProduct concept: " + description
             : description
 
         if (councilFeedback) {
@@ -642,12 +642,45 @@ If the brief specifies a container form factor, ALL downstream sizing MUST fit w
                 )
             }
 
+            // FIX 2: Validate research source URLs before persisting
+            let qualityFlag: string | undefined;
+            const sourcesList = Array.isArray(researchResult.sources) ? researchResult.sources : [];
+            if (sourcesList.length > 0) {
+                const checks = sourcesList.map(async (src) => {
+                    if (!src.uri || !src.uri.startsWith("http")) return false;
+                    try {
+                        const res = await fetch(src.uri, {
+                            method: "HEAD",
+                            signal: AbortSignal.timeout(5000)
+                        });
+                        return res.ok || res.status < 500;
+                    } catch {
+                        return false;
+                    }
+                });
+
+                const results = await Promise.all(checks);
+                const invalidCount = results.filter(v => !v).length;
+                if (invalidCount / sourcesList.length > 0.3) {
+                    qualityFlag = `[QUALITY WARNING] >30% of research source URLs (${invalidCount}/${sourcesList.length}) failed validation or timed out.`;
+                    console.warn(`[run-chase-research] ${qualityFlag}`);
+                }
+            }
+
+            let finalAssumptionNotes = researchResult.assumptionNotes || priorAssumptionNotes || "";
+            if (qualityFlag) {
+                finalAssumptionNotes = finalAssumptionNotes 
+                    ? finalAssumptionNotes + "\n\n" + qualityFlag
+                    : qualityFlag;
+            }
+
             // 7. Persist. saveCadLabResearch expects a CadLabResearchResult —
             //    we reuse the one we got back with our merged designBrief
             //    substituted in.
             const researchToSave: CadLabResearchResult = {
                 ...researchResult,
                 designBrief: mergedDesignBrief,
+                assumptionNotes: finalAssumptionNotes,
             }
             const saveResult = await saveCadLabResearch(projectId, researchToSave, trusted)
             if ("error" in saveResult) {

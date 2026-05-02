@@ -56,6 +56,8 @@
 
 import type { CadLabDesignBrief } from "@/lib/cad-lab-types"
 import type { DimensionSheet } from "@/lib/sizing/types"
+import { createAdminClient } from "@/lib/supabase/admin"
+import type { DeterministicGate, GateContext, DeterministicCheckResult } from "./types"
 
 // ─── Public types ──────────────────────────────────────────────────────
 
@@ -643,3 +645,33 @@ export const _extractMassFromBrief = extractMassFromBrief
 export const _extractThroughputFromBrief = extractThroughputFromBrief
 /** @internal — exported for unit tests only */
 export const _extractEnvelopeKindFromBrief = extractEnvelopeKindFromBrief
+
+// ─── Gate implementation ────────────────────────────────────────────────
+
+export const gate1: DeterministicGate<Gate1Input> = {
+    kind: "deterministic",
+    gateId: 1,
+    name: "Gate 1: Brief Scope Alignment",
+    loadInput: async (ctx: GateContext) => {
+        const admin = createAdminClient()
+        const { data } = await admin
+            .from("cad_lab_projects")
+            .select("research, dimension_sheet")
+            .eq("id", ctx.projectId)
+            .maybeSingle()
+        
+        const research = data?.research as { report?: unknown; designBrief?: CadLabDesignBrief } | null
+        const dimensionSheet = data?.dimension_sheet as DimensionSheet | null
+        
+        return buildGate1Input(research, dimensionSheet)
+    },
+    check: (input: Gate1Input): DeterministicCheckResult => {
+        const verdict = gate1Check(input)
+        return {
+            check_name: "Numeric target divergence",
+            passed: verdict.passed,
+            actual: verdict.blockers.length > 0 ? `${verdict.blockers.length} blockers found` : "No blockers",
+            expected: "0 blockers (divergence < 3.0x)"
+        }
+    }
+}

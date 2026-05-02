@@ -120,6 +120,11 @@ export interface ScoreBreakdown {
    * higher tiers ("verified", "premium") reserved for when enrichment adds them.
    */
   verificationTrust: number
+  /**
+   * URL shape bonus/penalty (-10 to +5 pts) — added on top to boost supplier
+   * product pages and penalise blog/news pages.
+   */
+  urlShape: number
   total: number
 }
 
@@ -344,24 +349,44 @@ const NON_SUPPLIER_TLD_PATTERNS = [
 ] as const
 
 /**
- * Returns true if the URL points at a non-manufacturer surface — blog,
- * article, news, university research, government page, or major content
- * platform. False if the URL looks like a supplier homepage or product
- * page.
+ * Returns true if the URL points at a non-manufacturer surface — academic 
+ * research, government page, or major content platform based on domain/TLD.
+ * False if the URL looks like a supplier homepage or product page.
  *
- * Conservative: returns false (allow) for unknown shapes so we never drop
- * a legitimate supplier whose URL we can't classify.
+ * Path-based analysis (e.g. /blog) is now handled as a scoring penalty rather
+ * than a hard block, so strong matches with weak paths can still surface.
  */
-function isNonSupplierUrl(url: string | null | undefined): boolean {
+function isNonSupplierDomain(url: string | null | undefined): boolean {
   if (!url) return false
   const lower = url.toLowerCase()
   for (const tld of NON_SUPPLIER_TLD_PATTERNS) {
     if (lower.includes(tld)) return true
   }
-  for (const path of NON_SUPPLIER_URL_PATH_PATTERNS) {
-    if (lower.includes(path)) return true
-  }
   return false
+}
+
+/**
+ * Scores a URL based on its path.
+ * +5 points for strong product/capability signals.
+ * -10 points for blog/news/press signals.
+ */
+function scoreUrlShape(url: string | null | undefined): number {
+  if (!url) return 0
+  const lower = url.toLowerCase()
+  let score = 0
+  
+  if (lower.includes("/products") || lower.includes("/capabilities") || lower.includes("/manufacturing") || lower.includes("/services")) {
+    score += 5
+  }
+  
+  for (const path of NON_SUPPLIER_URL_PATH_PATTERNS) {
+    if (lower.includes(path)) {
+      score -= 10
+      break // only penalise once
+    }
+  }
+  
+  return score
 }
 
 /**
@@ -911,7 +936,7 @@ export async function matchCadLabModuleSuppliers(
       const { data: mlSemantic } = await supabase.rpc("match_marketplace_listings", {
         query_embedding: JSON.stringify(embedding),
         match_threshold: 0.25,
-        match_count: 50,
+        match_count: 2000,
       })
 
       if (mlSemantic) {
@@ -1128,7 +1153,7 @@ export async function matchCadLabModuleSuppliers(
     "@/lib/supplier-verification"
   )
   const listings = (rawListings ?? []).filter((l) => {
-    if (isNonSupplierUrl(l.website_url)) return false
+    if (isNonSupplierDomain(l.website_url)) return false
     if (typeof l.title === "string" && nameCheck(l.title).bad) return false
     // Fix 2: drop listings that provably cannot meet the declared tolerance
     if (capabilityHardRejectIds.has(l.id)) return false
@@ -1286,6 +1311,9 @@ export async function matchCadLabModuleSuppliers(
         listing.data_quality_score,
       )
 
+      // Bonus 4: URL Shape (additive, -10 to +5 pts)
+      const urlShapePts = scoreUrlShape(listing.website_url)
+
       // Relevance gate. Now includes industry + cert alignment — an aerospace
       // shop with AS9100 but weak semantic overlap still surfaces.
       // SEMANTIC-ONLY FLOOR: a high semantic score alone (without process /
@@ -1320,13 +1348,14 @@ export async function matchCadLabModuleSuppliers(
         sustainability: sustainabilityPts,
         capacityFit: capacityFitPts,
         verificationTrust: verificationTrustPts,
+        urlShape: urlShapePts,
         total: 0,
       }
       breakdown.total = Math.round(
         (breakdown.semantic + breakdown.process + breakdown.material + breakdown.quality +
          breakdown.keyword + breakdown.capability + breakdown.industry +
          breakdown.certifications + breakdown.specialties + breakdown.region +
-         breakdown.sustainability + breakdown.capacityFit + breakdown.verificationTrust) * 10,
+         breakdown.sustainability + breakdown.capacityFit + breakdown.verificationTrust + breakdown.urlShape) * 10,
       ) / 10
 
       if (breakdown.total >= MIN_SCORE_THRESHOLD) {

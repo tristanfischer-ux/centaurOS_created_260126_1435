@@ -192,7 +192,7 @@ async function runDeterministicGate(
             `[gate-runner] gate.check() threw: gateId=${gate.gateId} project=${ctx.projectId}`,
             err,
         )
-        throw err // re-throw so the outer catch in runGate handles WARN return + lock release
+        throw err // re-throw so the outer catch in runGate handles FAIL return + lock release
     }
 
     return {
@@ -407,11 +407,11 @@ export async function runGate(
             msg,
         )
         await releaseLock(projectId, lockKey)
-        // Evaluation error → treat as WARN, don't block the pipeline
+        // Evaluation error → treat as FAIL, CRASH is a harder failure than WARN
         return {
-            verdict: "WARN",
-            attempts_remaining: MAX_GATE_ATTEMPTS - failedSoFar,
-            fail_count: failedSoFar,
+            verdict: "FAIL",
+            attempts_remaining: Math.max(0, MAX_GATE_ATTEMPTS - (failedSoFar + 1)),
+            fail_count: failedSoFar + 1,
         }
     }
 

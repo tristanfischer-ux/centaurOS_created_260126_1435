@@ -334,6 +334,7 @@ async function callNanoBananaImage(
   prompt: string,
   aspectRatio?: string,
   model: string = NANO_BANANA_MODEL,
+  timeoutMs: number = 90_000,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   // GOTCHA: Vercel env vars can have trailing whitespace/newlines — always trim
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
@@ -357,15 +358,11 @@ async function callNanoBananaImage(
 
   let response: Response
   try {
-    // RELIABILITY: 90s timeout. Nano Banana 2 has a long tail at 2-4 min
-    // on pathological prompts; without a cap a single hung call starves
-    // the sequential batch loop in handleGenerateModuleImages and eventually
-    // hits Vercel's 300s cap. Per forgeos-rules.md R4.
     response = await fetchWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(body),
-    }, 90_000)
+    }, timeoutMs)
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : "Network error"
     console.error("[XRayImageGen] Fetch failed:", { model, error: msg })
@@ -423,6 +420,7 @@ async function callNanoBananaImageWithReference(
   prompt: string,
   referenceImages: ReferenceImage[],
   aspectRatio?: string,
+  timeoutMs: number = 90_000,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
   if (!apiKey) {
@@ -452,13 +450,11 @@ async function callNanoBananaImageWithReference(
 
   let response: Response
   try {
-    // RELIABILITY: 90s timeout to match callNanoBananaImage. Multimodal
-    // prompts with reference images have the same pathological tail risk.
     response = await fetchWithTimeout(url, {
       method: "POST",
       headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
       body: JSON.stringify(body),
-    }, 90_000)
+    }, timeoutMs)
   } catch (fetchError) {
     const msg = fetchError instanceof Error ? fetchError.message : "Network error"
     console.error("[XRayImageGen] Fetch failed (multimodal):", { model: NANO_BANANA_MODEL, error: msg })
@@ -524,6 +520,7 @@ async function callOpenAIImage(
   prompt: string,
   size: "1024x1024" | "1024x1536" | "1536x1024",
   model: string = OPENAI_PRIMARY_MODEL,
+  timeoutMs: number = 60_000,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
@@ -531,14 +528,7 @@ async function callOpenAIImage(
   }
 
   const OpenAI = (await import("openai")).default
-  // RELIABILITY (2026-04-25 retune): 60s timeout. gpt-image-2 default-quality
-  // typical render is ~50s — 180s was meant as headroom for pathological
-  // prompts but in practice it just let one slow module burn the whole
-  // stage budget on Vercel (300s ceiling), starving the rest of the chain.
-  // At 60s: pathological prompts fail fast and the fallback chain takes
-  // over; the chain advances to the next module on schedule. No retries
-  // here — retries happen at the chain level (next stage) instead.
-  const client = new OpenAI({ apiKey, timeout: 60_000, maxRetries: 0 })
+  const client = new OpenAI({ apiKey, timeout: timeoutMs, maxRetries: 0 })
 
   // DECISION: Tristan explicitly chose gpt-image-2 DEFAULT quality over
   // "high"/thinking mode after the 4-way shootout — high mode produced
@@ -587,6 +577,41 @@ async function callImageWithFallback(
     referenceMimeType?: string
     moduleCropBase64?: string
   } = {},
+): Promise<{ mimeType: string; data: string; modelUsed: string } | null> {
+  let attempt = 0
+  const maxRetries = 2
+  let lastErr: unknown
+
+  while (attempt <= maxRetries) {
+    const timeoutMs = attempt === 0 ? 60_000 : 120_000
+
+    try {
+      const res = await _callImageWithFallback(prompt, imageConfig, timeoutMs)
+      return res
+    } catch (err) {
+      lastErr = err
+      if (attempt >= maxRetries) break
+
+      const delay = attempt === 0 ? 2000 : 4000
+      console.warn(`[XRayImageGen] Image generation failed (attempt ${attempt + 1}), retrying in ${delay}ms...`, err instanceof Error ? err.message : String(err))
+      await new Promise(r => setTimeout(r, delay))
+      attempt++
+    }
+  }
+
+  console.error(`[XRayImageGen] Image generation failed after ${attempt} attempts:`, lastErr instanceof Error ? lastErr.message : String(lastErr))
+  return null
+}
+
+async function _callImageWithFallback(
+  prompt: string,
+  imageConfig: {
+    aspectRatio?: string
+    referenceBase64?: string
+    referenceMimeType?: string
+    moduleCropBase64?: string
+  },
+  timeoutMs: number
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   // Enforce no-text guardrail on ALL prompts regardless of source
   const safePrompt = enforceNoText(prompt)
@@ -610,6 +635,7 @@ async function callImageWithFallback(
         openaiSize,
         OPENAI_PRIMARY_MODEL,
         referenceMimeType,
+        timeoutMs,
       )
       console.log("[XRayImageGen] gpt-image-2 edit succeeded (reference-aware)")
       return result
@@ -622,7 +648,7 @@ async function callImageWithFallback(
   // ── Step 2: OpenAI gpt-image-2 generate (primary text-to-image) ───
   if (hasOpenAIKey) {
     try {
-      return await callOpenAIImage(safePrompt, openaiSize, OPENAI_PRIMARY_MODEL)
+      return await callOpenAIImage(safePrompt, openaiSize, OPENAI_PRIMARY_MODEL, timeoutMs)
     } catch (primaryErr) {
       const msg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr)
       console.warn("[XRayImageGen] gpt-image-2 generate failed, falling to Gemini:", { error: msg.slice(0, 200) })
@@ -640,7 +666,7 @@ async function callImageWithFallback(
       refs.push({ mimeType: "image/png", base64: imageConfig.moduleCropBase64 })
     }
     try {
-      return await callNanoBananaImageWithReference(safePrompt, refs, imageConfig.aspectRatio)
+      return await callNanoBananaImageWithReference(safePrompt, refs, imageConfig.aspectRatio, timeoutMs)
     } catch (multimodalErr) {
       const msg = multimodalErr instanceof Error ? multimodalErr.message : String(multimodalErr)
       console.warn("[XRayImageGen] Nano Banana 2 multimodal failed, trying text-only:", { error: msg.slice(0, 200) })
@@ -649,7 +675,7 @@ async function callImageWithFallback(
 
   // ── Step 4: Nano Banana 2 text-only ───────────────────────────────
   try {
-    return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio)
+    return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio, NANO_BANANA_MODEL, timeoutMs)
   } catch (nb2Err) {
     const msg = nb2Err instanceof Error ? nb2Err.message : String(nb2Err)
     console.warn("[XRayImageGen] Nano Banana 2 text-only failed, trying stable:", { error: msg.slice(0, 200) })
@@ -657,7 +683,7 @@ async function callImageWithFallback(
 
   // ── Step 5: Nano Banana stable (gemini-2.5-flash-image) ──────────
   try {
-    return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio, NANO_BANANA_STABLE_MODEL)
+    return await callNanoBananaImage(safePrompt, imageConfig.aspectRatio, NANO_BANANA_STABLE_MODEL, timeoutMs)
   } catch (nbStableErr) {
     const msg = nbStableErr instanceof Error ? nbStableErr.message : String(nbStableErr)
     if (!hasOpenAIKey) {
@@ -668,7 +694,7 @@ async function callImageWithFallback(
   }
 
   // ── Step 6: OpenAI gpt-image-1 (deep fallback) ────────────────────
-  return await callOpenAIImage(safePrompt, openaiSize, OPENAI_FALLBACK_MODEL)
+  return await callOpenAIImage(safePrompt, openaiSize, OPENAI_FALLBACK_MODEL, timeoutMs)
 }
 
 /**
@@ -682,6 +708,7 @@ async function callOpenAIEdit(
   size: "1024x1024" | "1024x1536" | "1536x1024",
   model: string = OPENAI_PRIMARY_MODEL,
   referenceMimeType: string = "image/png",
+  timeoutMs: number = 180_000,
 ): Promise<{ mimeType: string; data: string; modelUsed: string }> {
   const apiKey = process.env.OPENAI_API_KEY?.trim()
   if (!apiKey) {
@@ -691,8 +718,7 @@ async function callOpenAIEdit(
   const openaiModule = await import("openai")
   const OpenAI = openaiModule.default
   const { toFile } = openaiModule
-  // Same 180s + no-retries rationale as callOpenAIImage.
-  const client = new OpenAI({ apiKey, timeout: 180_000, maxRetries: 0 })
+  const client = new OpenAI({ apiKey, timeout: timeoutMs, maxRetries: 0 })
 
   // INTENT: filename extension + type header must match the actual bytes.
   // The hero re-encoder ships JPEG; an earlier hardcoded "reference.png"
@@ -1440,6 +1466,8 @@ export async function generateModuleImage(
     moduleCropBase64,
   })
 
+  if (!imageData) return { url: "", modelUsed: "failed" }
+
   // Layer 3 REMOVED (2026-04-25 reliability retune): the consistency-score
   // retry loop added 30-50s per module and a second full fallback chain.
   // The reference-aware prompt (multimodal — referenceBase64 fed through
@@ -1493,7 +1521,7 @@ export async function generateModuleImageWithReference(
   // FLOW: tryOpenAIEdit → [fail] → text-only ghost prompt (existing path)
   const editResult = await tryOpenAIEdit(module, referenceBase64, visualStyle)
 
-  let imageData: { mimeType: string; data: string; modelUsed: string }
+  let imageData: { mimeType: string; data: string; modelUsed: string } | null
   if (editResult) {
     imageData = { ...editResult, modelUsed: OPENAI_PRIMARY_MODEL }
   } else {
@@ -1501,6 +1529,8 @@ export async function generateModuleImageWithReference(
     const prompt = buildModulePrompt(module, undefined, visualStyle)
     imageData = await callImageWithFallback(prompt, { aspectRatio: "3:2" })
   }
+
+  if (!imageData) return { url: "", modelUsed: "failed" }
 
   // INTENT: overlayModuleLabels() was removed here because Sharp's SVG composite
   // falls back to missing-glyph tofu boxes on Vercel's Linux container — the
@@ -1727,6 +1757,8 @@ Style: Modern technical product render on a clean white background. Show the com
     referenceBase64: userRefBase64,
   })
 
+  if (!imageData) return ""
+
   // Mode-specific filename so the three hero variants (default, interior,
   // exterior) don't overwrite each other in storage.
   const filename =
@@ -1766,6 +1798,8 @@ export async function generateSystemImage(
   const imageData = await callImageWithFallback(prompt, {
     aspectRatio: "16:9",
   })
+
+  if (!imageData) return ""
 
   // Post-process: add bottom legend bar with module names
   const labeledData = await overlaySystemLegend(

@@ -31,9 +31,10 @@ import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
 
 // ── Phase 2 gate imports (uncomment as each sub-agent lands) ───────────────
 //
-// import { gate1 } from "./gate-1"  // ← Gate 1 (hybrid LLM vote) still in flight
+import { gate1 } from "./gate-1"
 import { gate2 } from "./gate-2"
 import { gate3 } from "./gate-3"
+import { gate4 } from "./gate-4"
 import { gate5 } from "./gate-5"
 import { gate6 } from "./gate-6"
 
@@ -58,7 +59,7 @@ export const STAGE_GATE_MAP: Partial<Record<AutopilotStage, GateRunner>> = {
 
     // Gate 1 — brief scope alignment (LLM vote). Runs after locking_brief.
     // Wired in once Gate 1 sub-agent lands. v2.0.
-    // locking_brief: gate1,
+    locking_brief: gate1,
 
     // Gate 2 — module key-parts completeness (deterministic).
     // NOTE: Remediation injects `_gate2_remediation` context on the project
@@ -83,5 +84,5 @@ export const STAGE_GATE_MAP: Partial<Record<AutopilotStage, GateRunner>> = {
 
     // Gate 4 — cost realism (hybrid — Oracle library primary + LLM secondary).
     // Deferred to v2.1 per spec.
-    // waiting_finn: gate4,
+    waiting_finn: gate4,
 }

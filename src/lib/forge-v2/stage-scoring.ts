@@ -40,6 +40,7 @@ export const STAGE_ORDER: AutopilotStage[] = [
     'waiting_chase' as AutopilotStage,
     'locking_brief' as AutopilotStage,
     'waiting_max' as AutopilotStage,
+    'waiting_max_redecomposition' as AutopilotStage,
     'waiting_sizing' as AutopilotStage,
     'waiting_layout' as AutopilotStage,
     'waiting_bom' as AutopilotStage,
@@ -121,7 +122,7 @@ export interface StageScoreHistory {
     latest_scored_at: string
 }
 
-const MAX_SCORING_ATTEMPTS = 15
+const MAX_SCORING_ATTEMPTS = 5 // Reduced from 15 to prevent runaway scoring costs. 5 attempts is sufficient for fix→re-score cycles.
 
 // ── Validation mode map ────────────────────────────────────────────────────
 // Deterministic stages produce identical output for identical input and must
@@ -130,15 +131,15 @@ const MAX_SCORING_ATTEMPTS = 15
 // Confirmed by 6-model unanimous council 2026-04-30.
 export const STAGE_VALIDATION_MODE: Record<string, 'generative' | 'deterministic'> = {
     waiting_chase: 'generative',
-    waiting_brief_lock: 'generative',
+    locking_brief: 'generative',
     waiting_max: 'generative',
     waiting_sizing: 'deterministic',
     waiting_layout: 'deterministic',
     waiting_bom: 'generative',
     waiting_finn: 'generative',
-    waiting_suppliers: 'generative',
-    waiting_fang: 'generative',
-    waiting_proofreader: 'generative',
+    matching_suppliers: 'generative',
+    running_fang_reviews: 'generative',
+    proofreading: 'generative',
 }
 
 // ── Per-stage rubric definitions ──────────────────────────────────────────
@@ -234,7 +235,7 @@ const RUBRICS: Partial<Record<AutopilotStage, StageRubric>> = {
             { name: "unit_verification", description: "Are all units correct and consistently used?", weight: 1 },
             { name: "readability", description: "Is the text clear, well-structured, and free of obvious errors?", weight: 1 },
         ],
-        dataQuery: "proofreader_report",
+        dataQuery: "proofread_findings",
     },
 }
 
@@ -771,13 +772,13 @@ async function loadStageData(
             if (!Object.keys(reviews).length) return "No engineering reviews found in modules."
             return summariseFangReviews(reviews)
         }
-        case "proofreader_report": {
+        case "proofread_findings": {
             const { data } = await admin
                 .from("cad_lab_projects")
-                .select("proofreader_report")
+                .select("proofread_findings")
                 .eq("id", projectId)
                 .maybeSingle()
-            const report = data?.proofreader_report as Record<string, unknown> | null
+            const report = data?.proofread_findings as Record<string, unknown> | null
             return summariseProofreader(report)
         }
         default:
@@ -1339,19 +1340,22 @@ export async function storeStageScore(
         .eq("id", projectId)
         .maybeSingle()
 
-    const current = project?.autopilot_state as Record<string, unknown> | null
-    if (!current) return
+    const existingState = project?.autopilot_state as Record<string, unknown> | null
+    if (!existingState) return
 
-    const existingScores = (current.stage_scores ?? {}) as Record<string, StageScoreHistory>
-    const existing = existingScores[stage]
+    const currentScores = (existingState.stage_scores || {}) as Record<string, StageScoreHistory>
+    const existing = currentScores[stage]
 
+    let newHistory: StageScoreHistory;
     if (existing && existing.iterations) {
-        existing.iterations.push(result)
-        existing.composite = result.composite
-        existing.passed = result.passed
-        existing.latest_scored_at = result.scored_at
+        newHistory = {
+            iterations: [...existing.iterations, result],
+            composite: result.composite,
+            passed: result.passed,
+            latest_scored_at: result.scored_at
+        }
     } else {
-        existingScores[stage] = {
+        newHistory = {
             iterations: [result],
             composite: result.composite,
             passed: result.passed,
@@ -1359,12 +1363,14 @@ export async function storeStageScore(
         }
     }
 
+    const newScores = { ...currentScores, [stage]: newHistory };
+
     await admin
         .from("cad_lab_projects")
         .update({
             autopilot_state: {
-                ...current,
-                stage_scores: existingScores,
+                ...existingState,
+                stage_scores: newScores,
             },
         } as unknown as never)
         .eq("id", projectId)
