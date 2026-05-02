@@ -42,10 +42,10 @@ import { sanitizeErrorMessage } from '@/lib/security/sanitize'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) return null
   if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey })
+    openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
   }
   return openaiClient
 }
@@ -319,7 +319,7 @@ export async function parseTranscriptToStrategy(text: string): Promise<{ plan?: 
     let parsedPlan: z.infer<typeof StrategicPlanSchema>
     try {
       const completion = await openai.chat.completions.parse({
-        model: 'gpt-5.5',
+        model: 'openai/gpt-5.4',
         messages: [
           {
             role: 'system',

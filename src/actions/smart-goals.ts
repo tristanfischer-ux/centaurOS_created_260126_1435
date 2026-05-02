@@ -21,17 +21,17 @@ let openaiClient: OpenAI | null = null
 
 /** Whether AI features are available (API key is set). */
 function isAIEnabled(): boolean {
-  return Boolean(process.env.OPENAI_API_KEY?.trim())
+  return Boolean(process.env.OPENROUTER_API_KEY?.trim())
 }
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     return null
   }
 
   if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey })
+    openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
   }
 
   return openaiClient
@@ -202,7 +202,7 @@ Guidelines:
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5.5',
+      model: 'openai/gpt-5.4',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: sanitizedIdea },
@@ -281,7 +281,7 @@ export async function scoreSmartGoal(
 
   try {
     const response = await openai.chat.completions.create({
-      model: 'gpt-5.5',
+      model: 'openai/gpt-5.4',
       messages: [
         {
           role: 'system',

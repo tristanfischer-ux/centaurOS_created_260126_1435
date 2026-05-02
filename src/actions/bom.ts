@@ -34,7 +34,6 @@
  *   single-lambda pathway is retained for local tests and back-compat.
  */
 
-import { after } from "next/server"
 
 import { createAdminClient } from "@/lib/supabase/admin"
 import { withAuth } from "@/lib/server-action-utils"
@@ -2460,17 +2459,18 @@ export async function runBomSkeletonStage(projectId: string): Promise<void> {
   // If skeleton already done (e.g. a crashed-and-retried skeleton stage),
   // just jump to batch scheduling.
   if (state.skeleton_parts && state.pending_batch_ids.length > 0) {
-    after(async () => {
-      try {
-        const { runBomBatchStage } = await import("./bom")
-        await runBomBatchStage(projectId)
-      } catch (err) {
-        console.error(
-          "[bom-distributed:skeleton] batch re-schedule threw:",
-          err instanceof Error ? err.message : err,
-        )
-      }
-    })
+    // INLINE-AWAIT: replaced after() — Vercel silently drops after() when the
+    // handler returns in <1s (gotcha: forgeos_vercel_after_silent_drop). These
+    // stages are already running inside a long-lived autopilot-step container
+    // with its own maxDuration budget, so direct await is safe and reliable.
+    try {
+      await runBomBatchStage(projectId)
+    } catch (err) {
+      console.error(
+        "[bom-distributed:skeleton] batch re-schedule threw:",
+        err instanceof Error ? err.message : err,
+      )
+    }
     return
   }
 
@@ -2548,20 +2548,16 @@ export async function runBomSkeletonStage(projectId: string): Promise<void> {
   }
   await persistBomGenerationState(projectId, nextState)
 
-  // Schedule the first batch. after() keeps the container alive past this
-  // function's return; the dynamic import avoids module-init cycles
-  // (see forge-v2-render-all-modules.ts for the same pattern).
-  after(async () => {
-    try {
-      const { runBomBatchStage } = await import("./bom")
-      await runBomBatchStage(projectId)
-    } catch (err) {
-      console.error(
-        "[bom-distributed:skeleton] first batch schedule threw:",
-        err instanceof Error ? err.message : err,
-      )
-    }
-  })
+  // INLINE-AWAIT: replaced after() — see above for rationale. Direct await
+  // fires the first batch stage synchronously within the same container.
+  try {
+    await runBomBatchStage(projectId)
+  } catch (err) {
+    console.error(
+      "[bom-distributed:skeleton] first batch schedule threw:",
+      err instanceof Error ? err.message : err,
+    )
+  }
 }
 
 // ─── Stage 2: batch (many batches per invocation) ──────────────────
@@ -2620,17 +2616,15 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
 
   // No more batches — transition to merge.
   if (state.pending_batch_ids.length === 0) {
-    after(async () => {
-      try {
-        const { runBomMergeStage } = await import("./bom")
-        await runBomMergeStage(projectId)
-      } catch (err) {
-        console.error(
-          "[bom-distributed:batch] merge schedule threw:",
-          err instanceof Error ? err.message : err,
-        )
-      }
-    })
+    // INLINE-AWAIT: replaced after() — see runBomSkeletonStage for rationale.
+    try {
+      await runBomMergeStage(projectId)
+    } catch (err) {
+      console.error(
+        "[bom-distributed:batch] merge schedule threw:",
+        err instanceof Error ? err.message : err,
+      )
+    }
     return
   }
 
@@ -2754,23 +2748,20 @@ export async function runBomBatchStage(projectId: string): Promise<void> {
   }
   await persistBomGenerationState(projectId, nextState)
 
-  // Schedule the next step. More batches → next batch stage. Empty queue → merge.
-  after(async () => {
-    try {
-      if (nextState.pending_batch_ids.length > 0) {
-        const { runBomBatchStage: selfRef } = await import("./bom")
-        await selfRef(projectId)
-      } else {
-        const { runBomMergeStage } = await import("./bom")
-        await runBomMergeStage(projectId)
-      }
-    } catch (err) {
-      console.error(
-        "[bom-distributed:batch] next-stage schedule threw:",
-        err instanceof Error ? err.message : err,
-      )
+  // INLINE-AWAIT: replaced after() — see runBomSkeletonStage for rationale.
+  // More batches → recurse into next batch stage. Empty queue → merge.
+  try {
+    if (nextState.pending_batch_ids.length > 0) {
+      await runBomBatchStage(projectId)
+    } else {
+      await runBomMergeStage(projectId)
     }
-  })
+  } catch (err) {
+    console.error(
+      "[bom-distributed:batch] next-stage schedule threw:",
+      err instanceof Error ? err.message : err,
+    )
+  }
 }
 
 // ─── Stage 3: merge ────────────────────────────────────────────────

@@ -16,13 +16,13 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -114,7 +114,7 @@ Business Functions to Assess:
 ${JSON.stringify(functionsList, null, 2)}`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4.1-mini",
+                model: "openai/gpt-4.1-mini",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userPrompt }
@@ -221,7 +221,7 @@ export async function assessSingleFunction(
 Return JSON only: { "status": "...", "priority": "critical|high|medium|low", "reasoning": "..." }`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4.1-mini",
+                model: "openai/gpt-4.1-mini",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: `Business: ${foundryContext}\n\nFunction: ${functionName} (${functionCategory})` }

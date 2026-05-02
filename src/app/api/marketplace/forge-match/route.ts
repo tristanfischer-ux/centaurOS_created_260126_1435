@@ -36,13 +36,13 @@ interface ErrorResponse {
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -59,8 +59,8 @@ export async function POST(
         const user = { id: guard.userId }
 
         // SECURITY: Fail closed when OpenAI key is not configured.
-        if (!process.env.OPENAI_API_KEY?.trim()) {
-            console.error('[ForgeMatchAPI] OPENAI_API_KEY is not configured')
+        if (!process.env.OPENROUTER_API_KEY?.trim()) {
+            console.error('[ForgeMatchAPI] OPENROUTER_API_KEY is not configured')
             return NextResponse.json(
                 { error: 'Forge matching service is not configured' },
                 { status: 503 }
@@ -199,7 +199,7 @@ ${JSON.stringify(aiTools, null, 2)}
 Please suggest the top 3 AI tools that would form the best partnership with this human.`
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-4.1-mini',
+            model: 'openai/gpt-4.1-mini',
             messages: [
                 { role: 'system', content: systemPrompt },
                 { role: 'user', content: userPrompt }
@@ -208,7 +208,7 @@ Please suggest the top 3 AI tools that would form the best partnership with this
         })
 
         guard.trackUsage({
-            model: 'gpt-4.1-mini',
+            model: 'openai/gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
         }).catch(() => {})

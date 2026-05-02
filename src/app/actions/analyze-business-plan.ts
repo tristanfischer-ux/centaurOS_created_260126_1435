@@ -6,13 +6,13 @@ import { withAIGate } from '@/lib/ai/with-ai-gate'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -74,7 +74,7 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
         }
 
         const completion = await openai.chat.completions.create({
-            model: 'gpt-5.5',
+            model: 'openai/gpt-5.4',
             messages: [
                 {
                     role: 'system',
@@ -113,7 +113,7 @@ export async function analyzeBusinessPlan(formData: FormData): Promise<AnalysisR
         })
 
         await trackUsage({
-            model: 'gpt-5.5',
+            model: 'openai/gpt-5.4',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
         })

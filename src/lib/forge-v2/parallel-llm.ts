@@ -23,6 +23,7 @@
 
 import { callOpenAI, callGemini, callTogether } from "@/lib/cad-lab/api-helpers"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
+import { normaliseOpenRouterResponse } from "@/lib/ai/openrouter"
 
 // ── Types ─────────────────────────────────────────────────────────────
 
@@ -98,10 +99,7 @@ function makeDeepSeekModel(): ModelConfig {
                 throw new Error(`DeepSeek API error (${response.status}): ${errText.slice(0, 300)}`)
             }
             const data = await response.json()
-            // DeepSeek reasoning models put text in reasoning_content, not content
-            const content = data.choices?.[0]?.message?.content ?? ""
-            const reasoning = data.choices?.[0]?.message?.reasoning_content ?? ""
-            return content || reasoning
+            return normaliseOpenRouterResponse(data)
         },
     }
 }
@@ -456,9 +454,7 @@ function buildChaseFullLineup(): ModelConfig[] {
                     throw new Error(`Kimi K2.6 error (${response.status}): ${errText.slice(0, 300)}`)
                 }
                 const data = await response.json()
-                const content = data.choices?.[0]?.message?.content ?? ""
-                const reasoning = data.choices?.[0]?.message?.reasoning_content ?? ""
-                return content || reasoning
+                return normaliseOpenRouterResponse(data)
             },
         },
         // 5. China Alibaba MoE — Qwen 3 235B, strong JSON + logic
@@ -559,9 +555,7 @@ function buildChaseFullLineup(): ModelConfig[] {
                     throw new Error(`Qwen3.6-Plus error (${response.status}): ${errText.slice(0, 300)}`)
                 }
                 const data = await response.json()
-                const content = data.choices?.[0]?.message?.content ?? ""
-                const reasoning = data.choices?.[0]?.message?.reasoning_content ?? ""
-                return content || reasoning
+                return normaliseOpenRouterResponse(data)
             },
         },
         // 9. China DeepSeek Flash — faster DeepSeek tier, different temperature regime
@@ -594,9 +588,7 @@ function buildChaseFullLineup(): ModelConfig[] {
                     throw new Error(`DeepSeek V4-Flash error (${response.status}): ${errText.slice(0, 300)}`)
                 }
                 const data = await response.json()
-                const content = data.choices?.[0]?.message?.content ?? ""
-                const reasoning = data.choices?.[0]?.message?.reasoning_content ?? ""
-                return content || reasoning
+                return normaliseOpenRouterResponse(data)
             },
         },
         // 10. US Google Flash — faster Gemini tier, different reasoning path

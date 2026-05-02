@@ -15,13 +15,13 @@ import { checkRateLimit } from '@/lib/security/rate-limit'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -117,7 +117,7 @@ ${previousContext}
 Please provide a helpful, practical answer for a startup founder.`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4.1-mini",
+                model: "openai/gpt-4.1-mini",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: userPrompt }
@@ -221,7 +221,7 @@ Return ONLY a raw JSON object with this structure:
 }`
 
             const completion = await openai.chat.completions.create({
-                model: "gpt-4.1-mini",
+                model: "openai/gpt-4.1-mini",
                 messages: [
                     { role: "system", content: systemPrompt },
                     { role: "user", content: `Question: ${input.question_title}\n\nDetails: ${input.question_body}` }
@@ -283,7 +283,7 @@ export async function suggestQuestionCategory(
 
         try {
             const completion = await openai.chat.completions.create({
-                model: "gpt-4.1-mini",
+                model: "openai/gpt-4.1-mini",
                 messages: [
                     {
                         role: "system",

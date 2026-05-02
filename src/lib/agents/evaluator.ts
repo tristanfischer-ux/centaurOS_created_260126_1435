@@ -38,7 +38,7 @@ export async function evaluateOutput(
   userPrompt: string,
   assistantOutput: string
 ): Promise<EvaluationResult> {
-  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  const openaiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!openaiKey) {
     return {
       relevance: 0,
@@ -50,7 +50,7 @@ export async function evaluateOutput(
   }
 
   const { default: OpenAI } = await import('openai')
-  const client = new OpenAI({ apiKey: openaiKey })
+  const client = new OpenAI({ apiKey: openaiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   const systemPrompt = `You are an output quality evaluator. Score the assistant's response against the user's prompt.
 Return ONLY a JSON object with these exact keys (numbers 0-1, two decimals):
@@ -65,7 +65,7 @@ No other text. Example: {"relevance":0.9,"completeness":0.8,"actionability":0.85
 
   try {
     const res = await client.chat.completions.create({
-      model: 'gpt-5.5',
+      model: 'openai/gpt-5.4',
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userMessage },
@@ -153,7 +153,7 @@ const ENGINEERING_WEIGHTS = {
   toleranceStackUp: 0.15,
 }
 
-const ENGINEERING_EVAL_MODEL = 'gpt-5.5'
+const ENGINEERING_EVAL_MODEL = 'openai/gpt-5.4'
 
 /**
  * Scores an engineering recommendation (research report, module decomposition,
@@ -170,7 +170,7 @@ export async function evaluateEngineeringOutput(
   assistantOutput: string,
   context?: string
 ): Promise<EngineeringEvaluationResult> {
-  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  const openaiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!openaiKey) {
     return {
       dimensionalConsistency: 0,
@@ -184,7 +184,7 @@ export async function evaluateEngineeringOutput(
   }
 
   const { default: OpenAI } = await import('openai')
-  const client = new OpenAI({ apiKey: openaiKey })
+  const client = new OpenAI({ apiKey: openaiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   const systemPrompt = `You are an engineering quality evaluator. Score the assistant's engineering recommendation against the user's request and any source context.
 

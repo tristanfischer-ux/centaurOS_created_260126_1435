@@ -51,13 +51,13 @@ const CompareRequestSchema = z.object({
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -83,8 +83,8 @@ export interface CompareResponse {
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         // SECURITY: Validate API key is present
-        if (!process.env.OPENAI_API_KEY?.trim()) {
-            console.error('[TeamCompareAPI] OPENAI_API_KEY is not configured');
+        if (!process.env.OPENROUTER_API_KEY?.trim()) {
+            console.error('[TeamCompareAPI] OPENROUTER_API_KEY is not configured');
             return NextResponse.json(
                 { error: "AI comparison service is not configured" },
                 { status: 503 }
@@ -236,7 +236,7 @@ Analyze their availability and recommend the best person for task delegation.`;
 
         // Call OpenAI
         const completion = await openai.chat.completions.create({
-            model: "gpt-4.1-mini",
+            model: "openai/gpt-4.1-mini",
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt }
@@ -246,7 +246,7 @@ Analyze their availability and recommend the best person for task delegation.`;
 
         // AUDIT: Track AI usage
         await guard.trackUsage({
-            model: 'gpt-4.1-mini',
+            model: 'openai/gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens || 1000,
             completionTokens: completion.usage?.completion_tokens || 500,
         });

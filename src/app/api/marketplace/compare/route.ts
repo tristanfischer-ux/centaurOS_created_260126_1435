@@ -28,13 +28,13 @@ const CompareRequestSchema = z.object({
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -71,7 +71,7 @@ export interface CompareResponse {
 export async function POST(req: NextRequest) {
     try {
         // Validate API key is present
-        if (!process.env.OPENAI_API_KEY?.trim()) {
+        if (!process.env.OPENROUTER_API_KEY?.trim()) {
             console.error('OPENAI_API_KEY is not configured');
             return NextResponse.json(
                 { error: "AI comparison service is not configured" },
@@ -180,7 +180,7 @@ Analyze these options and provide your recommendation.`;
 
         // Call OpenAI
         const completion = await openai.chat.completions.create({
-            model: "gpt-4.1-mini",
+            model: "openai/gpt-4.1-mini",
             messages: [
                 { role: "system", content: systemPrompt },
                 { role: "user", content: userPrompt }
@@ -189,7 +189,7 @@ Analyze these options and provide your recommendation.`;
         });
 
         guard.trackUsage({
-            model: 'gpt-4.1-mini',
+            model: 'openai/gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
         }).catch(() => {})

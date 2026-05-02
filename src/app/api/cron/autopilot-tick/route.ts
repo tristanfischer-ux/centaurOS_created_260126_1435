@@ -432,14 +432,16 @@ async function tickOnce(request: Request): Promise<TickResult> {
             // Only for stage_failed (not terminal_fail / circuit breaker).
             // Deterministic stages (sizing, layout) and derived stages (bom,
             // pdf) are excluded — their data should NOT be cleared.
-            // fang writes to a separate table (cad_lab_reviews) — skip here.
-            // supplier_match re-queries live — no column to clear.
+            // running_fang_reviews: engineering reviews live inside
+            // modules[].engineeringReview — clearing modules would destroy the
+            // Max decomposition, so Fang is excluded here.
             if (autopilotStatus === "stage_failed") {
                 const STAGE_DATA_COLUMN: Partial<Record<string, string>> = {
-                    chase: "ai_research",
-                    max: "ai_modules",
-                    finn: "ai_cost_estimates",
-                    proofread: "ai_proofread_report",
+                    waiting_chase: "research",
+                    waiting_max: "modules",
+                    waiting_finn: "ai_cost_estimates",
+                    matching_suppliers: "supplier_shortlist",
+                    proofreading: "proofreader_report",
                 }
                 const dataColumn = STAGE_DATA_COLUMN[stage]
                 if (dataColumn) {

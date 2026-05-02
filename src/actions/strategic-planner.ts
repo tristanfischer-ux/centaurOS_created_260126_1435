@@ -34,13 +34,13 @@ import type { Json } from '@/types/database.types'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     return null
   }
 
   if (!openaiClient) {
-    openaiClient = new OpenAI({ apiKey })
+    openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
   }
 
   return openaiClient
@@ -362,7 +362,7 @@ Respond with ONLY valid JSON matching this schema (no markdown, no code fences):
 
     try {
       const response = await openai.chat.completions.create({
-        model: 'gpt-5.5',
+        model: 'openai/gpt-5.4',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `My strategic goal: ${goal}\n\nTarget deadline: ${deadline}` },

@@ -14,9 +14,9 @@ import {
 let openaiClient: OpenAI | null = null;
 
 function getOpenAIClient(): OpenAI | null {
-  const apiKey = process.env.OPENAI_API_KEY?.trim();
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim();
   if (!apiKey) return null;
-  if (!openaiClient) openaiClient = new OpenAI({ apiKey });
+  if (!openaiClient) openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
   return openaiClient;
 }
 
@@ -119,7 +119,7 @@ Set confidence:
 - "low": Ambiguous query that could match multiple interpretations`;
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-4.1-mini",
+    model: "openai/gpt-4.1-mini",
     messages: [
       { role: "system", content: systemContent },
       { role: "user", content: query },
@@ -129,7 +129,7 @@ Set confidence:
   });
 
   await guard.trackUsage({
-    model: "gpt-4.1-mini",
+    model: "openai/gpt-4.1-mini",
     promptTokens: completion.usage?.prompt_tokens || 800,
     completionTokens: completion.usage?.completion_tokens || 300,
   });
@@ -144,7 +144,7 @@ Set confidence:
       responseSnapshot,
       promptTokens: completion.usage?.prompt_tokens ?? null,
       completionTokens: completion.usage?.completion_tokens ?? null,
-      metadata: { model: "gpt-4.1-mini" },
+      metadata: { model: "openai/gpt-4.1-mini" },
     });
     await finishRollout(rolloutId, "finished");
   }
@@ -228,11 +228,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         foundryId: profile.foundry_id,
         userId: user.id,
         agentId: "ai_search",
-        metadata: { model: "gpt-4.1-mini" },
+        metadata: { model: "openai/gpt-4.1-mini" },
       });
     }
 
-    if (!process.env.OPENAI_API_KEY?.trim()) {
+    if (!process.env.OPENROUTER_API_KEY?.trim()) {
       return NextResponse.json(
         { success: false, error: "AI search service is not configured" },
         { status: 503 }

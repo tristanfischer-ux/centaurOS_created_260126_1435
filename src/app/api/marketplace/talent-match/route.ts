@@ -20,13 +20,13 @@ import { aiGuard } from "@/lib/ai/guard"
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -58,8 +58,8 @@ interface MatchResult {
 export async function POST(req: NextRequest): Promise<NextResponse> {
     try {
         // SECURITY: Fail closed when OpenAI key is not configured.
-        if (!process.env.OPENAI_API_KEY?.trim()) {
-            console.error('[TalentMatchAPI] OPENAI_API_KEY is not configured')
+        if (!process.env.OPENROUTER_API_KEY?.trim()) {
+            console.error('[TalentMatchAPI] OPENROUTER_API_KEY is not configured')
             return NextResponse.json(
                 { success: false, error: 'Talent matching service is not configured' },
                 { status: 503 }
@@ -126,7 +126,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
         // Call OpenAI for matching and scoring
         const completion = await openai.chat.completions.create({
-            model: "gpt-4.1-mini",
+            model: "openai/gpt-4.1-mini",
             messages: [
                 {
                     role: "system",
@@ -177,7 +177,7 @@ ${JSON.stringify(listingSummaries, null, 1)}`
 
         // AUDIT: Track AI usage
         await guard.trackUsage({
-            model: 'gpt-4.1-mini',
+            model: 'openai/gpt-4.1-mini',
             promptTokens: completion.usage?.prompt_tokens || 1200,
             completionTokens: completion.usage?.completion_tokens || 500,
         })
