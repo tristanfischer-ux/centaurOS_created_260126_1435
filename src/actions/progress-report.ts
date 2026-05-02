@@ -11,13 +11,11 @@
  * @security All actions require authentication and enforce foundry isolation
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { logInsights } from '@/lib/intelligence/insight-logger'
+import { callGemini } from '@/lib/cad-lab/api-helpers'
 import type { InsightEntry } from '@/lib/intelligence/insight-logger'
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY?.trim() || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -285,16 +283,7 @@ export async function generateWeeklyDigest(): Promise<{ data?: WeeklyDigest; err
     const nextWeekPriorities: string[] = []
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-flash-lite-preview',
-        generationConfig: {
-          temperature: 0.6,
-          maxOutputTokens: 1000,
-          responseMimeType: 'application/json',
-        },
-      })
-
-      const systemPrompt = `You are a sharp, insightful chief of staff writing a weekly progress briefing for a startup founder. You know every task, every person, every objective by name. Write like a trusted advisor — direct, specific, and actionable.
+const systemPrompt = `You are a sharp, insightful chief of staff writing a weekly progress briefing for a startup founder. You know every task, every person, every objective by name. Write like a trusted advisor — direct, specific, and actionable.
 
 Rules:
 - Reference specific tasks and people BY NAME. Never say "several tasks were completed" — say WHO did WHAT.

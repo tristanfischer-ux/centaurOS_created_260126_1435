@@ -809,7 +809,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
-                            ...(state as Record<string, unknown>),
+                            ...(state as unknown as Record<string, unknown>),
                             status: "idle",
                             failed_stages: [],
                             current_stage_attempts: 1,
@@ -828,7 +828,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
-                                ...(state as Record<string, unknown>),
+                                ...(state as unknown as Record<string, unknown>),
                                 status: "manual_review",
                             },
                         } as never)

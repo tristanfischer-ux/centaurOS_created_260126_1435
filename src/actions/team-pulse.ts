@@ -10,12 +10,10 @@
  * @security All actions require authentication and enforce foundry isolation
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY?.trim() || '')
+import { callGemini } from '@/lib/cad-lab/api-helpers'
 
 // ─── Types ────────────────────────────────────────────────────────
 

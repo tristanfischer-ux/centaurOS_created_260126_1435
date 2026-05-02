@@ -12,14 +12,12 @@
  */
 
 import { revalidatePath } from 'next/cache'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { withAuth } from '@/lib/server-action-utils'
 import { withAIGate } from '@/lib/ai/with-ai-gate'
 import { checkRateLimit } from '@/lib/security/rate-limit'
 import { buildAIContext } from '@/lib/ai-context/builder'
+import { callGemini } from '@/lib/cad-lab/api-helpers'
 import type { Json } from '@/types/database.types'
-
-const genAI = new GoogleGenerativeAI(process.env.GOOGLE_AI_API_KEY?.trim() || '')
 
 // ─── Types ────────────────────────────────────────────────────────
 
@@ -160,20 +158,13 @@ Rules:
 - Be opinionated about timeline — give a realistic estimate`
 
     try {
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-flash-lite-preview',
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 3000,
-          responseMimeType: 'application/json',
-        },
-      })
-
-      const result = await model.generateContent(
-        `${systemPrompt}\n\nUser goal: ${sentence}`
+      const { text: content } = await callGemini(
+        systemPrompt,
+        `User goal: ${sentence}`,
+        'google/gemini-flash-1.5-8b',
+        3000,
+        60_000,
       )
-
-      const content = result.response.text()
       if (!content) {
         return { error: 'AI returned empty response. Please try again.' }
       }
