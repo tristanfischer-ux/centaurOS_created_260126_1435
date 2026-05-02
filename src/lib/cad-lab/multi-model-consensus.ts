@@ -8,8 +8,7 @@
  * @related src/actions/cad-lab.ts (prefillDiagnostics)
  */
 
-import { withRetry } from '@/lib/retry'
-import { fetchWithTimeout } from '@/lib/fetch-with-timeout'
+import { callOpenRouter } from '@/lib/ai/openrouter'
 
 export interface ConsensusResult {
   /** Agreed value when 2+ models match; null when no majority */
@@ -37,59 +36,28 @@ function normalizeMaterial(raw: string): string {
   return raw.trim().slice(0, 80) || "Other"
 }
 
-// INTENT: Retry on transient API errors (rate limit, server errors, network issues)
-const apiShouldRetry = (error: Error) => {
-  const msg = error.message.toLowerCase()
-  return msg.includes('429') || msg.includes('502') || msg.includes('503') ||
-    msg.includes('network') || msg.includes('timeout') || msg.includes('529')
-}
-
 async function callOpenAIConsensus(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
-  const OpenAI = (await import("openai")).default
-  const openai = new OpenAI({ apiKey })
-  // R4: AbortSignal.timeout() silently fails in server actions. Use AbortController + setTimeout.
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 30_000)
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-5.5",
-      max_completion_tokens: 256,
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-    }, { signal: controller.signal })
-    return (completion.choices?.[0]?.message?.content ?? "").trim()
-  } finally {
-    clearTimeout(timer)
-  }
+  const result = await callOpenRouter({
+    model: "openai/gpt-5.4",
+    system: systemPrompt,
+    prompt: userPrompt,
+    maxTokens: 256,
+    timeoutMs: 30_000,
+  })
+  if (!result.ok) throw new Error(result.error ?? "OpenRouter GPT-5.4 call failed")
+  return (result.text ?? "").trim()
 }
 
-async function callGemini(systemPrompt: string, userPrompt: string): Promise<string> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim() ?? process.env.GEMINI_API_KEY?.trim()
-  if (!apiKey) throw new Error("Gemini API key not configured")
-  const fullPrompt = `${systemPrompt}\n\n${userPrompt}`
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-lite-preview:generateContent?key=${apiKey}`
-  return withRetry(async () => {
-    const response = await fetchWithTimeout(
-      url,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-          generationConfig: { maxOutputTokens: 256 },
-        }),
-      },
-      30_000,
-    )
-    if (!response.ok) throw new Error(`Gemini error: ${response.status}`)
-    const data = await response.json()
-    const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-    return text.trim()
-  }, { maxRetries: 2, baseDelay: 2000, shouldRetry: apiShouldRetry })
+async function callGeminiConsensus(systemPrompt: string, userPrompt: string): Promise<string> {
+  const result = await callOpenRouter({
+    model: "google/gemini-3.1-flash-lite-preview",
+    system: systemPrompt,
+    prompt: userPrompt,
+    maxTokens: 256,
+    timeoutMs: 30_000,
+  })
+  if (!result.ok) throw new Error(result.error ?? "OpenRouter Gemini call failed")
+  return (result.text ?? "").trim()
 }
 
 /**
@@ -111,8 +79,8 @@ export async function runMaterialConsensus(
     { name: "OpenAI", fn: () => callOpenAIConsensus(systemPrompt, userPrompt) },
     { name: "GPT-5.3", fn: () => callOpenAIConsensus(systemPrompt, userPrompt) },
   ]
-  if (process.env.GOOGLE_AI_API_KEY?.trim() || process.env.GEMINI_API_KEY?.trim()) {
-    runners.push({ name: "Gemini", fn: () => callGemini(systemPrompt, userPrompt) })
+  if (process.env.OPENROUTER_API_KEY?.trim()) {
+    runners.push({ name: "Gemini", fn: () => callGeminiConsensus(systemPrompt, userPrompt) })
   }
 
   await Promise.all(

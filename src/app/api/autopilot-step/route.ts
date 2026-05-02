@@ -413,6 +413,7 @@ export async function POST(request: Request): Promise<NextResponse> {
             status: "running",
             trigger: "auto.autopilot",
             started_at: startedAt,
+            heartbeat_at: startedAt,
         } as never)
         .select("id")
         .maybeSingle()
