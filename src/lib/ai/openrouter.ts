@@ -291,3 +291,32 @@ export const CHEAP_STRUCTURED_MODEL = "deepseek/deepseek-v4-flash" as const
 export const MID_STRUCTURED_MODEL = "deepseek/deepseek-v4-pro" as const
 /** Cheap option with strong English prose — good for description synthesis. */
 export const CHEAP_PROSE_MODEL = "google/gemini-2.5-flash" as const
+
+/**
+ * Normalise a raw OpenRouter (OpenAI-compatible) response JSON to a plain
+ * string, handling the `reasoning_content` / `content` split emitted by
+ * DeepSeek V4 and other reasoning models.
+ *
+ * Resolution order (mirrors the logic inside `callOpenRouter`):
+ *   1. `choices[0].message.content`        — the visible answer field
+ *   2. `choices[0].message.reasoning_content` — fallback for reasoning models
+ *      that put their entire output in this field and return an empty `content`
+ *   3. `choices[0].message.reasoning`      — Kimi K2.6 alias
+ *
+ * Use this when making raw `fetch` calls to OpenRouter outside of
+ * `callOpenRouter` so that the reasoning-content normalisation is centralised.
+ *
+ * @param data - Parsed JSON response body from OpenRouter.
+ * @returns The extracted text, or an empty string if no text is found.
+ */
+export function normaliseOpenRouterResponse(data: unknown): string {
+    const choice = (data as RawResponse)?.choices?.[0]
+    if (!choice) return ""
+    const content = stringFromMaybeArray(choice.message?.content)
+    const reasoning = stringFromMaybeArray(
+        choice.message?.reasoning_content ?? choice.message?.reasoning,
+    )
+    if (content && content.trim().length > 0) return content
+    if (reasoning && reasoning.trim().length > 0) return reasoning
+    return ""
+}

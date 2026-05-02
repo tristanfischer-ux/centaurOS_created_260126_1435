@@ -14,6 +14,7 @@ import type { Sector } from "@/types/foundry"
 import { createClient } from "@/lib/supabase/server"
 import { fetchWithTimeout } from "@/lib/fetch-with-timeout"
 import { withRetry } from "@/lib/retry"
+import { normaliseOpenRouterResponse } from "@/lib/ai/openrouter"
 
 // ─── Sector Lookup ───────────────────────────────────────────────────
 
@@ -319,10 +320,8 @@ export async function callGemini(
 
   const data = await response.json()
   // GOTCHA: DeepSeek and some reasoning models put output in reasoning_content, not content.
-  // Check both fields so we don't silently return empty text.
-  const content: string = data.choices?.[0]?.message?.content ?? ""
-  const reasoningContent: string = data.choices?.[0]?.message?.reasoning_content ?? ""
-  const text: string = content || reasoningContent
+  // normaliseOpenRouterResponse handles both fields centrally.
+  const text: string = normaliseOpenRouterResponse(data)
 
   return {
     text,
@@ -434,10 +433,8 @@ export async function callOpenAI(
 
   const data = await response.json()
   // GOTCHA: DeepSeek and some reasoning models put output in reasoning_content, not content.
-  // Check both fields so we don't silently return empty text.
-  const content: string = data.choices?.[0]?.message?.content ?? ""
-  const reasoningContent: string = data.choices?.[0]?.message?.reasoning_content ?? ""
-  const text: string = content || reasoningContent
+  // normaliseOpenRouterResponse handles both fields centrally.
+  const text: string = normaliseOpenRouterResponse(data)
 
   return {
     text,
@@ -541,12 +538,8 @@ export async function callDeepSeek(
 
   const data = await response.json()
   // DeepSeek reasoning models put output in `reasoning_content` field —
-  // use `content` (the visible reply) for synthesis. Fall back to
-  // reasoning_content only if content is empty.
-  const text: string =
-    data.choices?.[0]?.message?.content ||
-    data.choices?.[0]?.message?.reasoning_content ||
-    ""
+  // normaliseOpenRouterResponse handles both fields centrally.
+  const text: string = normaliseOpenRouterResponse(data)
 
   return {
     text,
