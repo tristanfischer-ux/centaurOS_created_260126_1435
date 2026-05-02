@@ -259,10 +259,10 @@ async function generateDesignChanges(
   failingModules: Array<{ module: ModuleSpec; failedCriteria: string[] }>,
   config: ConvergenceConfig,
 ): Promise<ProposedChange[]> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) return []
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   const moduleDescriptions = failingModules.map(({ module, failedCriteria }) => {
     const analysis = module.cadModel?.analysis
@@ -279,7 +279,7 @@ ${analysis?.dfm ? `DFM: ${analysis.dfm.printable ? "Printable" : "NOT printable"
   }).join("\n---\n")
 
   const completion = await openai.chat.completions.create({
-    model: "gpt-5.5",
+    model: "openai/gpt-5.4",
     messages: [
       { role: "system", content: DESIGN_CHANGE_SYSTEM_PROMPT },
       {

@@ -87,7 +87,7 @@ export interface RetrieveForEngineeringOptions {
  * @returns Array of 1536 floats, or null if API is unavailable
  */
 export async function embedText(text: string): Promise<number[] | null> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) return null
 
   const trimmed = text.trim().slice(0, 8000)
@@ -95,7 +95,7 @@ export async function embedText(text: string): Promise<number[] | null> {
 
   try {
     const { default: OpenAI } = await import('openai')
-    const client = new OpenAI({ apiKey })
+    const client = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     const res = await client.embeddings.create({
       model: EMBEDDING_MODEL,
       input: trimmed,

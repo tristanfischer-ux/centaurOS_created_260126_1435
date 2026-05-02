@@ -47,9 +47,9 @@ export async function generateAndStoreStandards(
   productDescription: string,
   existingStandardCodes: string[],
 ): Promise<DesignStandard[]> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
-    console.warn("[standards-auto-learn] OPENAI_API_KEY not configured, skipping")
+    console.warn("[standards-auto-learn] OPENROUTER_API_KEY not configured, skipping")
     return []
   }
 

@@ -2623,14 +2623,14 @@ Be thorough and precise. Include specific numbers, model names, and manufacturer
 
       // 3. Send raw data + internal DB context to OpenAI for synthesis
       console.info("[Forge] Concept research: Synthesizing report with GPT-5.5...")
-      const openaiKey = process.env.OPENAI_API_KEY?.trim()
-      if (!openaiKey) throw new Error("OPENAI_API_KEY not configured")
+      const openaiKey = process.env.OPENROUTER_API_KEY?.trim()
+      if (!openaiKey) throw new Error("OPENROUTER_API_KEY not configured")
 
       const xrayModel = "gpt-5.5"
       const claudeData = await withRetry(async () => {
         let resp: Response
         try {
-          resp = await fetch("https://api.openai.com/v1/chat/completions", {
+          resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",

@@ -707,7 +707,7 @@ export async function searchBuyPartProducts(
     return partNames.map((name) => ({ partName: name, products: [] }))
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     console.error("[BUY-SEARCH] OPENAI_API_KEY not set")
     return partNames.map((name) => ({ partName: name, products: [] }))

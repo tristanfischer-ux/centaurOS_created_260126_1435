@@ -154,11 +154,11 @@ export async function reviewImageCoherence(
             }
         }
 
-        const apiKey = process.env.OPENAI_API_KEY?.trim()
+        const apiKey = process.env.OPENROUTER_API_KEY?.trim()
         if (!apiKey) {
             return {
                 ok: false,
-                error: "OPENAI_API_KEY not configured.",
+                error: "OPENROUTER_API_KEY not configured.",
                 errorCode: "NO_API_KEY",
             }
         }
@@ -249,7 +249,7 @@ Rank outliers by severity desc (major first). Be conservative — only flag imag
 
         let rawJson: string
         try {
-            const response = await fetch("https://api.openai.com/v1/chat/completions", {
+            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

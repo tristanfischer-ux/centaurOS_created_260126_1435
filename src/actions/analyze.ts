@@ -231,7 +231,7 @@ export async function analyzeBusinessPlan(
   formData: FormData
 ): Promise<{ analysis?: BusinessPlanAnalysis; error?: string }> {
   return withAIGate('analyze', async ({ user, foundryId }) => {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) return { error: 'AI analysis service is not configured' }
 
     // SECURITY: Rate limit AI calls to prevent cost abuse

@@ -304,19 +304,19 @@ async function analyzeSource(
     companyContext: string,
 ): Promise<IntelligenceReport | null> {
     try {
-        const apiKey = process.env.OPENAI_API_KEY?.trim()
+        const apiKey = process.env.OPENROUTER_API_KEY?.trim()
         if (!apiKey) {
-            console.error('[IntelligenceSweep] OPENAI_API_KEY not configured')
+            console.error('[IntelligenceSweep] OPENROUTER_API_KEY not configured')
             return null
         }
 
         const OpenAI = await getOpenAIClient()
-        const client = new OpenAI({ apiKey })
+        const client = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
         const prompt = `${companyContext}\n\n---\n\n${source.analysisPrompt}`
 
         const response = await client.chat.completions.create({
-            model: 'gpt-5.5',
+            model: 'openai/gpt-5.4',
             messages: [
                 {
                     role: 'system',

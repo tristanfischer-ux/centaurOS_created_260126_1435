@@ -787,8 +787,8 @@ ${cadContext}${foundryContext}
 Provide your structured market assessment as JSON.`
 
     // ── Call Claude Sonnet ──────────────────────────────────────────
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) return { error: 'OPENAI_API_KEY not configured' }
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) return { error: 'OPENROUTER_API_KEY not configured' }
 
     const callStartedAt = Date.now()
     try {
@@ -799,7 +799,7 @@ Provide your structured market assessment as JSON.`
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'gpt-4.1-mini',
+        model: 'openai/gpt-4.1-mini',
         promptTokens: result.tokensIn,
         completionTokens: result.tokensOut,
       })
@@ -810,7 +810,7 @@ Provide your structured market assessment as JSON.`
         foundryId,
         specialistId: 'priya',
         section: 'products',
-        model: 'gpt-4.1-mini',
+        model: 'openai/gpt-4.1-mini',
         inputTokens: result.tokensIn,
         outputTokens: result.tokensOut,
         durationMs: Date.now() - callStartedAt,
@@ -1007,7 +1007,7 @@ export async function scoreFundability(
     const HAIKU_MODEL = 'gpt-4.1-mini'
 
     try {
-      const apiKey = process.env.OPENAI_API_KEY?.trim()
+      const apiKey = process.env.OPENROUTER_API_KEY?.trim()
       if (apiKey) {
         const scoresContext = JSON.stringify({
           market_size_score,
@@ -1043,7 +1043,7 @@ export async function scoreFundability(
 
           // FLOW: Track AI usage for billing
           await trackUsage({
-            model: 'gpt-4.1-mini',
+            model: 'openai/gpt-4.1-mini',
             promptTokens: result.tokensIn,
             completionTokens: result.tokensOut,
           })
@@ -1531,7 +1531,7 @@ Produce the design brief JSON.`
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'gpt-4.1-mini',
+        model: 'openai/gpt-4.1-mini',
         promptTokens: result.tokensIn,
         completionTokens: result.tokensOut,
       })
@@ -1707,7 +1707,7 @@ Generate the design brief JSON that will guide engineering changes to achieve th
 
       // INTENT: Track usage for billing
       await trackUsage({
-        model: 'gpt-4.1-mini',
+        model: 'openai/gpt-4.1-mini',
         promptTokens: result.tokensIn,
         completionTokens: result.tokensOut,
       })
@@ -1995,7 +1995,7 @@ Rules:
 
       // FLOW: Track AI usage for billing
       await trackUsage({
-        model: 'gpt-4.1-mini',
+        model: 'openai/gpt-4.1-mini',
         promptTokens: result.tokensIn,
         completionTokens: result.tokensOut,
       })
@@ -2084,8 +2084,8 @@ export async function generateDesignBriefFromSynthesis(
       .eq('foundry_id', foundryId)
       .order('iteration_number', { ascending: true })
 
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) return { error: 'OPENAI_API_KEY not configured' }
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) return { error: 'OPENROUTER_API_KEY not configured' }
 
     try {
       const systemPrompt = `You are Max, the CTO of Fractional Forge. You translate business improvements into engineering design briefs for hardware products.
@@ -2149,7 +2149,7 @@ Return ONLY a valid JSON object (no markdown fences):
       if (!text) return { error: 'Empty AI response' }
 
       await trackUsage({
-        model: 'gpt-4.1-mini',
+        model: 'openai/gpt-4.1-mini',
         promptTokens: result.tokensIn,
         completionTokens: result.tokensOut,
       })
@@ -2299,8 +2299,8 @@ export async function reviewBriefFeasibility(
 
     if (fetchError || !brief) return { error: 'Brief not found' }
 
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) return { error: 'OPENAI_API_KEY not configured' }
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) return { error: 'OPENROUTER_API_KEY not configured' }
 
     try {
       const systemPrompt = `You are Max, CTO of Fractional Forge. You're a pragmatic engineer who's built hardware products from prototype to mass production. You review design briefs for technical feasibility.
@@ -2331,7 +2331,7 @@ Return ONLY a valid JSON object (no markdown):
       if (!('text' in result)) return { error: 'Unexpected AI response' }
 
       const text = result.text
-      await trackUsage({ model: 'gpt-4.1-mini', promptTokens: result.tokensIn, completionTokens: result.tokensOut })
+      await trackUsage({ model: 'openai/gpt-4.1-mini', promptTokens: result.tokensIn, completionTokens: result.tokensOut })
 
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim()
       try {

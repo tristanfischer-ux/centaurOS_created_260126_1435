@@ -81,12 +81,12 @@ export async function runReflector(
 ): Promise<string> {
   if (!observations.trim()) return ''
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('[AgentMemory/Reflector] Missing OPENAI_API_KEY')
   }
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   const systemPrompt =
     REFLECTOR_SYSTEM_PROMPT + COMPRESSION_GUIDANCE[compressionLevel]

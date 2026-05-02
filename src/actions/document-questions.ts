@@ -98,8 +98,8 @@ Rules:
     ].join('')
 
     const { callOpenAI } = await import('@/lib/cad-lab/api-helpers')
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) return { success: false, error: 'OPENAI_API_KEY not configured' }
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) return { success: false, error: 'OPENROUTER_API_KEY not configured' }
 
     const result = await callOpenAI(systemPrompt, userMessage, 'gpt-4.1-mini', 1024, 120_000)
 

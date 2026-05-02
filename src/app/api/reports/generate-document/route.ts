@@ -155,7 +155,7 @@ export async function POST(request: Request): Promise<Response> {
         // Step 3: Call GPT-5.5 with streaming
         emit({ type: "progress", message: "Generating document…", percent: 30 })
 
-        const openaiApiKey = process.env.OPENAI_API_KEY?.trim()
+        const openaiApiKey = process.env.OPENROUTER_API_KEY?.trim()
         if (!openaiApiKey) {
           emit({ type: "error", message: "AI service not configured" })
           return
@@ -165,14 +165,14 @@ export async function POST(request: Request): Promise<Response> {
         let tokensIn = 0
         let tokensOut = 0
 
-        const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        const openaiResponse = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             "Authorization": `Bearer ${openaiApiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-5.5",
+            model: "openai/gpt-5.4",
             max_completion_tokens: 8192,
             stream: true,
             stream_options: { include_usage: true },
@@ -227,7 +227,7 @@ export async function POST(request: Request): Promise<Response> {
         const tokensUsed = tokensIn + tokensOut
 
         guard.trackUsage({
-          model: 'gpt-5.5',
+          model: 'openai/gpt-5.4',
           promptTokens: tokensIn,
           completionTokens: tokensOut,
         }).catch(() => {})

@@ -35,12 +35,12 @@ export async function GET(request: NextRequest) {
   const timeout = 10_000
 
   // 1. OpenAI
-  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  const openaiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (openaiKey) {
     const start = Date.now()
     const openaiModel = "gpt-4.1-nano"
     try {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      const res = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${openaiKey}` },
         body: JSON.stringify({ model: openaiModel, max_tokens: 5, messages: [{ role: "user", content: "1" }] }),

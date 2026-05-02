@@ -53,12 +53,12 @@ export async function runAIWorker(taskId: string, assigneeId: string) {
         }
 
         // 3. Generate Content
-        const apiKey = process.env.OPENAI_API_KEY?.trim()
+        const apiKey = process.env.OPENROUTER_API_KEY?.trim()
         if (!apiKey) {
             throw new Error('Missing OPENAI_API_KEY environment variable')
         }
         
-        const openai = new OpenAI({ apiKey })
+        const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
         // SECURITY: Sanitize user-provided content to prevent prompt injection
         const sanitizedTaskTitle = escapeHtml(task.title || '')
@@ -133,7 +133,7 @@ Your goal: Execute this task directly. Provide a concrete output, draft, or solu
 Do not say "I will do this". DO IT.`
 
         const completion = await openai.chat.completions.create({
-            model: "gpt-5.5",
+            model: "openai/gpt-5.4",
             max_completion_tokens: 4096,
             messages: [
                 { role: "system", content: systemPrompt },
@@ -151,7 +151,7 @@ Do not say "I will do this". DO IT.`
             foundryId: task.foundry_id,
             userId: assigneeId,
             feature: 'ghost_agent',
-            model: 'gpt-5.5',
+            model: 'openai/gpt-5.4',
             promptTokens: completion.usage?.prompt_tokens,
             completionTokens: completion.usage?.completion_tokens,
             metadata: { taskId },

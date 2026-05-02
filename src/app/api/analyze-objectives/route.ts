@@ -83,7 +83,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient text provided' }, { status: 400 })
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
   }
@@ -91,7 +91,7 @@ export async function POST(request: NextRequest) {
   try {
     const truncatedText = text.slice(0, 100000)
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

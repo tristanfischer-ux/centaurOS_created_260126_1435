@@ -57,8 +57,8 @@ export async function generateInfeasibilityAlternatives(
   if (!isValidUUID(req.projectId)) return { alternatives: [], error: "Invalid project ID" }
 
   return withAIGate('cad_lab_review', async () => {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) return { alternatives: [], error: "OPENAI_API_KEY not configured" }
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) return { alternatives: [], error: "OPENROUTER_API_KEY not configured" }
 
     const supabase = await createClient()
     const [project, priorRejections] = await Promise.all([
@@ -135,8 +135,8 @@ export async function generateCostReductionAlternatives(
   if (!(req.targetUnitCostGbp > 0)) return { alternatives: [], error: "Target unit cost must be > 0" }
 
   return withAIGate('cad_lab_review', async () => {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) return { alternatives: [], error: "OPENAI_API_KEY not configured" }
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) return { alternatives: [], error: "OPENROUTER_API_KEY not configured" }
 
     const supabase = await createClient()
     const [project, priorRejections] = await Promise.all([
@@ -210,8 +210,8 @@ export async function generateManualAlternatives(
   }
 
   return withAIGate('cad_lab_review', async () => {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) return { alternatives: [], error: "OPENAI_API_KEY not configured" }
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) return { alternatives: [], error: "OPENROUTER_API_KEY not configured" }
 
     const supabase = await createClient()
     const [project, priorRejections] = await Promise.all([

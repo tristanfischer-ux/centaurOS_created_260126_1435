@@ -270,7 +270,7 @@ export async function extractThesisFromBusinessPlan(args: {
   text: string
 }): Promise<{ error: string } | { success: true; extracted: ExtractedThesis }> {
   return withAuth(async ({ user, foundryId }) => {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) return { error: 'ai_not_configured' }
 
     const raw = (args.text ?? '').trim()

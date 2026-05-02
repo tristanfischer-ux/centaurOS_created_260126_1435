@@ -43,9 +43,9 @@ export async function scoreRenderVision(
   referenceImageBase64?: string,
   renderMediaType: "image/svg+xml" | "image/png" | "image/jpeg" = "image/svg+xml",
 ): Promise<VisionScoreResult | null> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
-    console.warn("[VISION-SCORER] OPENAI_API_KEY not configured, skipping")
+    console.warn("[VISION-SCORER] OPENROUTER_API_KEY not configured, skipping")
     return null
   }
 
@@ -110,7 +110,7 @@ Do not include any text outside the JSON.`
 
     const data = await withRetry(async () => {
       const response = await fetchWithTimeout(
-        "https://api.openai.com/v1/chat/completions",
+        "https://openrouter.ai/api/v1/chat/completions",
         {
           method: "POST",
           headers: {
@@ -118,7 +118,7 @@ Do not include any text outside the JSON.`
             "Authorization": `Bearer ${apiKey}`,
           },
           body: JSON.stringify({
-            model: "gpt-5.5",
+            model: "openai/gpt-5.4",
             max_completion_tokens: 1024,
             messages: [
               { role: "system", content: systemPrompt },

@@ -75,7 +75,7 @@ Available slide types (use a variety for visual interest):
 export async function generateStrategicBriefing(
   request: GenerateBriefingRequest,
 ): Promise<GenerateBriefingResponse> {
-  if (!process.env.OPENAI_API_KEY?.trim()) {
+  if (!process.env.OPENROUTER_API_KEY?.trim()) {
     console.warn('[SlideGenerator] OPENAI_API_KEY not set — using fallback')
     return {
       success: true,
@@ -88,11 +88,11 @@ export async function generateStrategicBriefing(
     console.info('[SlideGenerator] Prompt length:', (systemPrompt.length + userPrompt.length), 'chars')
     const genStart = Date.now()
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY?.trim()}`,
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY?.trim()}`,
       },
       body: JSON.stringify({
         model: MODEL_ID,

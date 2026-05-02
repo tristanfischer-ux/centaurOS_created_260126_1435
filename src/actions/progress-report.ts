@@ -322,8 +322,13 @@ ${objectiveNarratives || '  No active objectives'}
 
 Overall health trend: ${overallHealthTrend}`
 
-      const result = await model.generateContent(`${systemPrompt}\n\n${userPrompt}`)
-      const content = result.response.text()
+      const { text: content } = await callGemini(
+        systemPrompt,
+        userPrompt,
+        'google/gemini-flash-1.5-8b',
+        1000,
+        60_000,
+      )
       if (content) {
         const parsed = JSON.parse(content)
         summary = parsed.summary || ''

@@ -86,7 +86,7 @@ Examples:
  * @returns Thermal configuration for the worker
  */
 async function inferThermalConfig(module: ModuleSpec): Promise<ThermalConfig> {
-  const openai = new OpenAI()
+  const openai = new OpenAI({ apiKey: process.env.OPENROUTER_API_KEY?.trim() ?? "", baseURL: "https://openrouter.ai/api/v1" })
 
   const moduleContext = [
     `Module name: ${module.name}`,
@@ -100,7 +100,7 @@ async function inferThermalConfig(module: ModuleSpec): Promise<ThermalConfig> {
     .join("\n")
 
   const response = await openai.chat.completions.create({
-    model: "gpt-5.5",
+    model: "openai/gpt-5.4",
     temperature: 0.3,
     response_format: { type: "json_object" },
     messages: [

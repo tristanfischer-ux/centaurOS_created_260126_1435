@@ -91,13 +91,13 @@ async function callHaiku(
   }
 
   // Fallback: OpenAI gpt-4.1-mini
-  const openaiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!openaiKey) throw new Error("No AI API key configured (DEEPSEEK_API_KEY or OPENAI_API_KEY)")
+  const openaiKey = process.env.OPENROUTER_API_KEY?.trim()
+  if (!openaiKey) throw new Error("No AI API key configured (DEEPSEEK_API_KEY or OPENROUTER_API_KEY)")
 
   const openaiModel = "gpt-4.1-mini"
   let response: Response
   try {
-    response = await fetch("https://api.openai.com/v1/chat/completions", {
+    response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

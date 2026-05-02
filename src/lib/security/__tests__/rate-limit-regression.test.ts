@@ -339,9 +339,9 @@ describe('server action OpenAI hardening regressions', () => {
       expect(source).not.toMatch(/apiKey:\s*process\.env\.OPENAI_API_KEY\s*\|\|/)
     }
 
-    // analyze.ts uses OpenAI (GPT-5.5) — verify it fails closed too
+    // analyze.ts uses OpenRouter (or OpenAI fallback) — verify it fails closed too
     const analyzeSource = await readFile(path.join(process.cwd(), 'src/actions/analyze.ts'), 'utf-8')
-    expect(analyzeSource).toContain('OPENAI_API_KEY')
+    expect(analyzeSource.includes('OPENAI_API_KEY') || analyzeSource.includes('OPENROUTER_API_KEY')).toBe(true)
     expect(analyzeSource).toContain('AI analysis service is not configured')
     expect(analyzeSource).not.toContain('dummy-key-for-build')
     expect(analyzeSource).not.toContain('sk-placeholder')

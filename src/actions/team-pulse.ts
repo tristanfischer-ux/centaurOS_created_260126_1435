@@ -242,19 +242,15 @@ export async function generateDailyStandup(): Promise<{ data?: DailyStandup; err
   Blockers: ${e.blockers.length > 0 ? e.blockers.join(', ') : 'None'}`
       ).join('\n\n')
 
-      const model = genAI.getGenerativeModel({
-        model: 'gemini-3.1-flash-lite-preview',
-        generationConfig: {
-          temperature: 0.5,
-          maxOutputTokens: 200,
-        },
-      })
-
-      const result = await model.generateContent(
-        `Write a 2-3 sentence standup summary highlighting key focus areas and any blockers. Be concise and direct. No markdown, just plain text.\n\n${standupText}`
+      const { text } = await callGemini(
+        'Write a 2-3 sentence standup summary highlighting key focus areas and any blockers. Be concise and direct. No markdown, just plain text.',
+        standupText,
+        'google/gemini-flash-1.5-8b',
+        200,
+        30_000,
       )
 
-      summary = result.response.text() || ''
+      summary = text || ''
     } catch {
       summary = `Team standup for ${todayStr}: ${entries.length} team members, ${entries.reduce((s, e) => s + e.today.length, 0)} active tasks today.`
     }

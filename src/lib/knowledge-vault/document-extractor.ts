@@ -303,16 +303,16 @@ function splitIntoWindows(text: string): string[] {
 async function callDocumentExtractionLLM(
   windowText: string
 ): Promise<ExtractedNote[]> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     console.warn('[KnowledgeVault/DocExtractor] OPENAI_API_KEY not set, skipping extraction')
     return []
   }
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini',
+    model: 'openai/gpt-4.1-mini',
     temperature: 0.2,
     max_tokens: 4000,
     messages: [

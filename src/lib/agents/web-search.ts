@@ -157,13 +157,13 @@ export async function runPreSearch(
   specialistDomain: string,
   _maxSearches: number = PRE_SEARCH_MAX_USES,
 ): Promise<WebSearchResult> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     return { summary: '', sources: [], searchCount: 0, estimatedCostUsd: 0 }
   }
 
   try {
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

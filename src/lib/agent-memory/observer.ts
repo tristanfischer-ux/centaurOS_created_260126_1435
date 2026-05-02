@@ -107,12 +107,12 @@ export async function runObserver(
 ): Promise<string> {
   if (messages.length === 0) return ''
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('[AgentMemory/Observer] Missing OPENAI_API_KEY')
   }
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
   const formattedMessages = formatMessagesForObserver(messages)
 
   let userPrompt = '## MESSAGES TO OBSERVE\n\n' + formattedMessages

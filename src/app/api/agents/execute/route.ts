@@ -129,7 +129,7 @@ import { isRetryableError } from "@/lib/agents/error-classification"
 function resolveApiKeyForProvider(pid: AIProviderId): string | null {
     // ELIMINATED 2026-04-30: anthropic removed — ForgeOS no longer uses Anthropic.
     const envMap: Partial<Record<AIProviderId, string>> = {
-        openai: process.env.OPENAI_API_KEY?.trim() ?? "",
+        openai: process.env.OPENROUTER_API_KEY?.trim() ?? "",
         google: process.env.GOOGLE_AI_API_KEY?.trim() ?? "",
         qwen: process.env.DASHSCOPE_API_KEY?.trim() ?? "",
         "qwen-local": "ollama",
@@ -1663,7 +1663,7 @@ async function handleToolAwareStreaming(params: ToolAwareStreamingParams): Promi
                         while (loopCount <= MAX_TOOL_LOOPS) {
                             let response
                             try {
-                                const fetchResp = await fetch("https://api.openai.com/v1/chat/completions", {
+                                const fetchResp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                                     method: "POST",
                                     headers: {
                                         "Content-Type": "application/json",

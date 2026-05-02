@@ -534,15 +534,15 @@ async function callClaude(
     userPrompt: string,
     context: { foundryId?: string; userId?: string } = {},
 ): Promise<{ text: string }> {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
-    if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
     const { foundryId, userId } = context
     const outreachComposeModel = "gpt-4.1-mini"
 
     return withRetry(async () => {
         let response: Response
         try {
-            response = await fetch("https://api.openai.com/v1/chat/completions", {
+            response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",

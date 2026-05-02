@@ -11,13 +11,13 @@ import { ParsedObjective } from './types'
 let openaiClient: OpenAI | null = null
 
 function getOpenAIClient(): OpenAI | null {
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
         return null
     }
 
     if (!openaiClient) {
-        openaiClient = new OpenAI({ apiKey })
+        openaiClient = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
     }
 
     return openaiClient
@@ -78,7 +78,7 @@ export async function parseTextToObjective(text: string): Promise<ParsedObjectiv
     const currentDate = new Date().toISOString().split('T')[0]
 
     const completion = await openai.chat.completions.parse({
-        model: 'gpt-5.5',
+        model: 'openai/gpt-5.4',
         messages: [
             {
                 role: 'system',
@@ -142,7 +142,7 @@ export async function refineObjective(
     }
 
     const completion = await openai.chat.completions.parse({
-        model: 'gpt-5.5',
+        model: 'openai/gpt-5.4',
         messages: [
             {
                 role: 'system',
@@ -181,7 +181,7 @@ export async function generateHelpResponse(text: string): Promise<string> {
     }
 
     const completion = await openai.chat.completions.create({
-        model: 'gpt-5.5',
+        model: 'openai/gpt-5.4',
         messages: [
             {
                 role: 'system',

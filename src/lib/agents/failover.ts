@@ -92,14 +92,14 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "openai", modelId: "gpt-5.5" },
+        { providerId: "openai", modelId: "gpt-5.4" },
     ],
     minimax: [
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "together", modelId: "Qwen/Qwen3.5-397B-A17B" },
         { providerId: "qwen", modelId: "qwen3.5-plus" },
-        { providerId: "openai", modelId: "gpt-5.5" },
+        { providerId: "openai", modelId: "gpt-5.4" },
     ],
     "qwen-local": [
         { providerId: "qwen-local", modelId: "qwen3:30b-a3b" },
@@ -108,7 +108,7 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "deepseek", modelId: "deepseek-v4-flash" },
         { providerId: "google", modelId: "gemini-2.5-flash" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
-        { providerId: "openai", modelId: "gpt-5.5" },
+        { providerId: "openai", modelId: "gpt-5.4" },
     ],
     // 2026-05-02: Direct Google API quota exhausted — route through Together (DeepSeek V4-Pro)
     // instead of direct google provider. Gemini 3.1 Pro via Google API is unavailable.
@@ -118,7 +118,7 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
     openai: [
-        { providerId: "openai", modelId: "gpt-5.5" },
+        { providerId: "openai", modelId: "gpt-5.4" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "google", modelId: "gemini-2.5-flash" },
     ],
@@ -131,7 +131,7 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
     // Sal (sales-lead) — gpt-4.1-mini primary, no Anthropic fallback
     "gpt-mini": [
         { providerId: "openai", modelId: "gpt-4.1-mini" },
-        { providerId: "openai", modelId: "gpt-5.5" },
+        { providerId: "openai", modelId: "gpt-5.4" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
     ],
     // Fang (vp-manufacturing) — Qwen 3 235B, no Anthropic fallback
@@ -295,7 +295,7 @@ function hasApiKeyForProvider(providerId: AIProviderId): boolean {
             // ELIMINATED 2026-04-30 — Anthropic removed from ForgeOS.
             return false
         case "openai":
-            return !!process.env.OPENAI_API_KEY?.trim()
+            return !!process.env.OPENROUTER_API_KEY?.trim()
         case "deepseek":
             return !!process.env.DEEPSEEK_API_KEY?.trim()
         case "google":

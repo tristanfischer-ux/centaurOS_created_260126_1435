@@ -116,7 +116,7 @@ export async function generateExecutiveNarrative(
   context: NarrativeContext,
   options: NarrativeOptions,
 ): Promise<NarrativeResult> {
-  if (!process.env.OPENAI_API_KEY?.trim()) {
+  if (!process.env.OPENROUTER_API_KEY?.trim()) {
     console.warn('[ReportNarrative] OPENAI_API_KEY not set — using template fallback')
     return buildFallbackNarrative(context, options)
   }
@@ -125,11 +125,11 @@ export async function generateExecutiveNarrative(
     const systemPrompt = buildExecutiveSystemPrompt(options)
     const userPrompt = buildExecutiveUserPrompt(context)
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY?.trim()}`,
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY?.trim()}`,
       },
       body: JSON.stringify({
         model: MODEL_ID,
@@ -175,7 +175,7 @@ export async function generateSectionNarrative(
   sectionData: Record<string, unknown>,
   options: NarrativeOptions,
 ): Promise<string> {
-  if (!process.env.OPENAI_API_KEY?.trim()) {
+  if (!process.env.OPENROUTER_API_KEY?.trim()) {
     return buildSectionFallback(sectionType)
   }
 
@@ -192,11 +192,11 @@ export async function generateSectionNarrative(
 
     const userPrompt = `Section data:\n${JSON.stringify(sectionData, null, 2)}`
 
-    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${process.env.OPENAI_API_KEY?.trim()}`,
+        "Authorization": `Bearer ${process.env.OPENROUTER_API_KEY?.trim()}`,
       },
       body: JSON.stringify({
         model: MODEL_ID,

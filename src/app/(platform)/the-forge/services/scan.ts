@@ -91,9 +91,9 @@ Return a JSON object matching the provided schema exactly. Every module's IO sho
  * @throws Error if AI call fails or response doesn't match schema
  */
 async function callScanAI(idea: string, researchReport?: string): Promise<AIScanOutput> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
-    throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
+    throw new Error("[XRayScan] OPENROUTER_API_KEY is not configured")
   }
 
   console.info("[XRayScan] Starting AI scan with GPT-5.5 for idea:", {
@@ -114,7 +114,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
 
   const parsed = await withRetry<AIScanOutput>(async () => {
     const resp = await fetchWithTimeout(
-      "https://api.openai.com/v1/chat/completions",
+      "https://openrouter.ai/api/v1/chat/completions",
       {
         method: "POST",
         headers: {
@@ -122,7 +122,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
           "Authorization": `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-5.5",
+          model: "openai/gpt-5.4",
           max_completion_tokens: 32768,
           messages: [
             { role: "system", content: systemPrompt },
@@ -171,7 +171,7 @@ async function callScanAI(idea: string, researchReport?: string): Promise<AIScan
   console.info("[XRayScan] AI scan complete:", {
     moduleCount: parsed.modules.length,
     gatingModule: parsed.modules.find((m: { isGatingModule?: boolean; name: string }) => m.isGatingModule)?.name,
-    model: "gpt-5.5",
+    model: "openai/gpt-5.4",
   })
 
   return parsed
@@ -245,12 +245,12 @@ export async function deriveProcessClassAI(
   modulePurpose: string,
   answeredQuestions: Array<{ question: string; answer: string }>,
 ): Promise<{ derivedProcessClass: string; derivedRisks: string[] }> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
-    throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
+    throw new Error("[XRayScan] OPENROUTER_API_KEY is not configured")
   }
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   const { ProcessClassDerivationSchema } = await import("./xray-schema")
 
@@ -259,7 +259,7 @@ export async function deriveProcessClassAI(
     .join("\n\n")
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-5.5",
+    model: "openai/gpt-5.4",
     messages: [
       {
         role: "system",
@@ -344,12 +344,12 @@ export async function refineScanAI(
     return mockScanIdea(updatedIdea)
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
-    throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
+    throw new Error("[XRayScan] OPENROUTER_API_KEY is not configured")
   }
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   // Build a summary of the current spec for the AI
   const currentSpecSummary = buildSpecSummary(currentSpec)
@@ -367,7 +367,7 @@ export async function refineScanAI(
   }
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-5.5",
+    model: "openai/gpt-5.4",
     messages: [
       { role: "system", content: REFINE_SCAN_SYSTEM_PROMPT },
       { role: "user", content: userContent },
@@ -489,12 +489,12 @@ export async function refineModuleAI(
     return editedModule
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
-    throw new Error("[XRayScan] OPENAI_API_KEY is not configured")
+    throw new Error("[XRayScan] OPENROUTER_API_KEY is not configured")
   }
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   // Build context about the system and the module being refined
   const systemContext = [
@@ -556,7 +556,7 @@ export async function refineModuleAI(
   })
 
   const completion = await openai.chat.completions.parse({
-    model: "gpt-5.5",
+    model: "openai/gpt-5.4",
     messages: [
       { role: "system", content: REFINE_MODULE_SYSTEM_PROMPT },
       {

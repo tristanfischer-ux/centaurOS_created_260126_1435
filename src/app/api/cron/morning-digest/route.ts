@@ -91,7 +91,7 @@ async function generateCalMessage(
   taskCount: number,
   taskTitles: string[]
 ): Promise<string> {
-  const apiKey = process.env.OPENAI_API_KEY
+  const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
     return getStaticCalMessage(taskCount)
   }
@@ -101,14 +101,14 @@ async function generateCalMessage(
       ? `Their tasks for today: ${taskTitles.slice(0, 5).join(', ')}${taskTitles.length > 5 ? ` and ${taskTitles.length - 5} more` : ''}.`
       : 'They have a clear day with no tasks due.'
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        model: 'openai/gpt-4.1-mini',
         max_tokens: 150,
         messages: [{
           role: 'user',

@@ -85,9 +85,9 @@ export async function POST(request: Request) {
     const { systemPrompt, userPrompt } = buildOutreachPrompt({ campaign, contact, knowledgeBase })
 
     // 6. Stream from OpenAI
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) {
-        return NextResponse.json({ error: "OPENAI_API_KEY not configured" }, { status: 500 })
+        return NextResponse.json({ error: "OPENROUTER_API_KEY not configured" }, { status: 500 })
     }
 
     const encoder = new TextEncoder()
@@ -104,7 +104,7 @@ export async function POST(request: Request) {
 
             let response: Response
             try {
-                response = await fetch("https://api.openai.com/v1/chat/completions", {
+                response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json",
@@ -262,7 +262,7 @@ export async function POST(request: Request) {
                     return
                 }
 
-                guard.trackUsage({ model: 'gpt-5.5' }).catch(() => {})
+                guard.trackUsage({ model: 'openai/gpt-5.4' }).catch(() => {})
 
                 controller.enqueue(encoder.encode(
                     `data: ${JSON.stringify({ done: true, emailCount })}\n\n`

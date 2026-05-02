@@ -160,17 +160,17 @@ async function callOpus(
   maxTokens: number = 6144,
 ): Promise<string> {
   // ── Stage 1: Try OpenAI GPT-5.5 ──
-  const openaiKey = process.env.OPENAI_API_KEY?.trim()
+  const openaiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (openaiKey) {
     try {
-      const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      const resp = await fetch("https://openrouter.ai/api/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "Authorization": `Bearer ${openaiKey}`,
         },
         body: JSON.stringify({
-          model: "gpt-5.5",
+          model: "openai/gpt-5.4",
           max_completion_tokens: maxTokens,
           messages: [
             { role: "system", content: systemPrompt },

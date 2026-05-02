@@ -244,19 +244,19 @@ async function evaluateWithLLM(
   noteContent: string,
   candidates: KnowledgeNoteSummary[]
 ): Promise<LLMConnection[]> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const apiKey = process.env.OPENROUTER_API_KEY?.trim()
   if (!apiKey) {
     return []
   }
 
-  const openai = new OpenAI({ apiKey })
+  const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' })
 
   const candidateList = candidates
     .map((c, i) => `[${i}] "${c.title}" (${c.note_type}): ${c.description}`)
     .join('\n')
 
   const response = await openai.chat.completions.create({
-    model: 'gpt-4.1-mini',
+    model: 'openai/gpt-4.1-mini',
     temperature: 0,
     max_tokens: 1000,
     messages: [

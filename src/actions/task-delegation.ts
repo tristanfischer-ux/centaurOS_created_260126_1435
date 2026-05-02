@@ -249,7 +249,7 @@ Do NOT:
 - Sound like a generic assistant — sound like ${specialist.name}${voiceReminder}`
 
     // ── 5. Generate deliverable via AI ────────────────────────────
-    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) return { error: 'AI service not configured' }
 
     const controller = new AbortController()
@@ -264,7 +264,7 @@ Do NOT:
     try {
       let response: Response
       try {
-        response = await fetch("https://api.openai.com/v1/chat/completions", {
+        response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

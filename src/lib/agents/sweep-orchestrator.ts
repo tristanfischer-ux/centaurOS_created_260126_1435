@@ -141,20 +141,20 @@ const EXECUTION_MAX_TOKENS = 8192
  * interactive mode. This ensures output quality matches what was measured.
  */
 const EXECUTION_MODEL_MAP: Record<string, { model: string; provider: 'openai-compat'; baseURL: string; apiKeyEnv: string }> = {
-  'claude': { model: 'gpt-5.5', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
+  'claude': { model: 'openai/gpt-5.4', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
   'sonnet': { model: 'deepseek-chat', provider: 'openai-compat', baseURL: 'https://api.deepseek.com/v1', apiKeyEnv: 'DEEPSEEK_API_KEY' },
   'deepseek': { model: 'deepseek-chat', provider: 'openai-compat', baseURL: 'https://api.deepseek.com/v1', apiKeyEnv: 'DEEPSEEK_API_KEY' },
-  'google': { model: 'gemini-3.1-pro-preview', provider: 'openai-compat', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKeyEnv: 'GOOGLE_AI_API_KEY' },
-  'openai': { model: 'gpt-5.5', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
+  'google': { model: 'google/gemini-3.1-pro-preview', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
+  'openai': { model: 'openai/gpt-5.4', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
   'minimax': { model: 'MiniMax-M2.7', provider: 'openai-compat', baseURL: 'https://api.minimax.io/v1', apiKeyEnv: 'MINIMAX_API_KEY' },
-  'haiku': { model: 'gemini-2.5-flash', provider: 'openai-compat', baseURL: 'https://generativelanguage.googleapis.com/v1beta/openai', apiKeyEnv: 'GOOGLE_AI_API_KEY' },
-  'gpt-mini': { model: 'gpt-4.1-mini', provider: 'openai-compat', baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' },
+  'haiku': { model: 'google/gemini-2.5-flash', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
+  'gpt-mini': { model: 'openai/gpt-4.1-mini', provider: 'openai-compat', baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' },
   'qwen-235b': { model: 'qwen3-235b-a22b', provider: 'openai-compat', baseURL: 'https://dashscope.aliyuncs.com/compatible-mode/v1', apiKeyEnv: 'DASHSCOPE_API_KEY' },
   'deepseek-v4-pro': { model: 'deepseek-ai/DeepSeek-V4-Pro', provider: 'openai-compat', baseURL: 'https://api.together.xyz/v1', apiKeyEnv: 'TOGETHER_API_KEY' },
 }
 
 /** Fallback execution model when specialist's model is unavailable */
-const EXECUTION_FALLBACK_MODEL = { model: 'gpt-4.1-mini', provider: 'openai-compat' as const, baseURL: 'https://api.openai.com/v1', apiKeyEnv: 'OPENAI_API_KEY' }
+const EXECUTION_FALLBACK_MODEL = { model: 'openai/gpt-4.1-mini', provider: 'openai-compat' as const, baseURL: 'https://openrouter.ai/api/v1', apiKeyEnv: 'OPENROUTER_API_KEY' }
 
 // ─── Sweep Data Tool Mapping ────────────────────────────────────────
 
@@ -804,7 +804,7 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
         }
 
         const effectiveModelConfig = apiKey ? modelConfig : EXECUTION_FALLBACK_MODEL
-        const effectiveApiKey = apiKey || process.env.OPENAI_API_KEY
+        const effectiveApiKey = apiKey || process.env.OPENROUTER_API_KEY
 
         if (!effectiveApiKey) {
           console.warn('[SweepOrchestrator] No API key available for execution sweep — skipping')
@@ -834,15 +834,15 @@ export async function executeSingleSweep(config: SweepConfig): Promise<SweepResu
           } catch (modelErr) {
             console.warn(`[SweepOrchestrator] ${effectiveModelConfig.model} failed for ${config.specialistId}, falling back to gpt-4.1-mini:`, modelErr instanceof Error ? modelErr.message : modelErr)
 
-            const fallbackKey = process.env.OPENAI_API_KEY
+            const fallbackKey = process.env.OPENROUTER_API_KEY
             if (fallbackKey) {
               const OpenAILib = await getOpenAIClient()
               const fallbackClient = new OpenAILib({
                 apiKey: fallbackKey,
-                baseURL: 'https://api.openai.com/v1',
+                baseURL: 'https://openrouter.ai/api/v1',
               })
               const fallbackCompletion = await fallbackClient.chat.completions.create({
-                model: 'gpt-4.1-mini',
+                model: 'openai/gpt-4.1-mini',
                 max_tokens: EXECUTION_MAX_TOKENS,
                 temperature: 0.4,
                 messages: [
