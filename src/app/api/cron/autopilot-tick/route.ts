@@ -377,6 +377,8 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
+                                ...freshProject.autopilot_state as Record<string, unknown>,
+                                stage: config.nextStage,
                                 status: "idle",
                                 failed_stages: [],
                                 current_stage_attempts: 0,
@@ -407,9 +409,10 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
+                            ...(state as unknown as Record<string, unknown>),
                             status: "manual_review",
                         },
-                    } as never)
+                    } as unknown as never)
                     .eq("id", project.id)
                 details.push({
                     projectId: project.id,
@@ -430,12 +433,13 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
+                            ...(state as unknown as Record<string, unknown>),
                             status: "idle",
                             current_stage_attempts: 0,
                             failed_stages: [],
                             total_resets: totalResets + 1,
                         },
-                    } as never)
+                    } as unknown as never)
                     .eq("id", project.id)
                 if (resetErr) throw resetErr
 
@@ -817,11 +821,12 @@ async function tickOnce(request: Request): Promise<TickResult> {
                     .from("cad_lab_projects")
                     .update({
                         autopilot_state: {
+                            ...(state as unknown as Record<string, unknown>),
                             status: "idle",
                             failed_stages: [],
                             current_stage_attempts: 1,
                         },
-                    } as never)
+                    } as unknown as never)
                     .eq("id", project.id)
                 // Fall through to fire logic below — do NOT continue/skip.
             }
@@ -835,9 +840,10 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
+                                ...(state as unknown as Record<string, unknown>),
                                 status: "manual_review",
                             },
-                        } as never)
+                        } as unknown as never)
                         .eq("id", project.id)
                     details.push({
                         projectId: project.id,
@@ -858,6 +864,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
                         .from("cad_lab_projects")
                         .update({
                             autopilot_state: {
+                                ...(state as unknown as Record<string, unknown>),
                                 status: "idle",
                                 current_stage_attempts: 0,
                                 total_resets: totalResets + 1,
