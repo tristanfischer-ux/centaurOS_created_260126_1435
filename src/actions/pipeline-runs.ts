@@ -142,6 +142,15 @@ export async function startPipelineRun(
   return { runId: data.id }
 }
 
+export async function updatePipelineHeartbeat(runId: string): Promise<void> {
+  const db = createAdminClient()
+  await db
+    .from("pipeline_runs")
+    .update({ heartbeat_at: new Date().toISOString() } as never)
+    .eq("id", runId)
+    .eq("status", "running")
+}
+
 export async function completePipelineRun(
   runId: string,
   patch: Partial<Row>
@@ -176,6 +185,22 @@ export async function failPipelineRun(
     })
     .eq("id", runId)
   if (error) throw new Error(`failPipelineRun failed: ${error.message}`)
+}
+
+/**
+ * Bump the last_heartbeat timestamp on a running pipeline_runs row.
+ * Call every 60 seconds from within a specialist execution to signal
+ * liveness. The cron stale-detection threshold is 3 minutes — if no
+ * heartbeat lands within that window the row is treated as STALE_ABANDONED
+ * and re-fired. Fire-and-forget safe (errors are swallowed at call sites
+ * so a failed heartbeat never aborts the specialist's main work).
+ */
+export async function updatePipelineHeartbeat(runId: string): Promise<void> {
+  const supabase = createAdminClient()
+  await supabase
+    .from("pipeline_runs")
+    .update({ last_heartbeat: new Date().toISOString() })
+    .eq("id", runId)
 }
 
 export async function loadLatestRunForStage(
