@@ -13,7 +13,8 @@
  * @audit Project mutations are tracked via updated_at timestamps.
  */
 
-import { after } from "next/server"
+// after() removed 2026-05-02 — silently drops on Vercel for short handlers.
+// Chase now fires inline via dynamic import + 3s race window.
 
 import { withAuth } from "@/lib/server-action-utils"
 import type { TrustedContext } from "@/lib/server-action-utils"
@@ -487,31 +488,41 @@ export async function createCadLabProject(
     // here would create a circular "use server" module-init cycle.
     //
     // GOTCHA (P0.2): use the Background variant because this runs in an
-    // after() post-response context where cookies are unavailable — the
-    // withAuth-wrapped variant would return "Unauthorized" and every first
-    // Chase auto-fire would fail silently. foundryId + user.id are still
-    // in closure from the outer withAuth, so we plumb them explicitly.
+    // FIX (2026-05-02): after() silently drops on Vercel when the parent
+    // handler returns in <1s — the container tears down before the after()
+    // queue processes. Replaced with inline fire-and-forget that keeps the
+    // container alive through the critical window (import resolution + call start).
+    // See: forgeos_vercel_after_silent_drop.md
     const capturedFoundryId = foundryId
     const capturedUserId = user.id
     const capturedProjectId = data.id
-    after(async () => {
-      try {
-        const { runChaseResearchBackground } = await import(
-          "@/actions/specialists/run-chase-research"
-        )
-        await runChaseResearchBackground(
-          capturedProjectId,
-          capturedFoundryId,
-          capturedUserId,
-          "auto.project-create",
-        )
-      } catch (err) {
+
+    const chaseInit = (async () => {
+      const { runChaseResearchBackground } = await import(
+        "@/actions/specialists/run-chase-research"
+      )
+      // Fire without awaiting full research — the dynamic import + initial
+      // call keeps the container alive long enough for Vercel to hand off.
+      runChaseResearchBackground(
+        capturedProjectId,
+        capturedFoundryId,
+        capturedUserId,
+        "auto.project-create",
+      ).catch((err) => {
         console.error("[createCadLabProject] Chase auto-trigger failed:", {
           projectId: capturedProjectId,
           error: err instanceof Error ? err.message : String(err),
         })
-      }
-    })
+      })
+    })()
+
+    // Wait up to 3s for the import to resolve and call to start.
+    // This is the critical fix: by awaiting here, we keep the container
+    // alive through the window where after() would silently drop.
+    await Promise.race([
+      chaseInit,
+      new Promise<void>((resolve) => setTimeout(() => resolve(), 3000)),
+    ])
 
     return { projectId: data.id }
   })
