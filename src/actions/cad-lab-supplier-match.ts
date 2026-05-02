@@ -55,6 +55,7 @@ import { createClient } from "@/lib/supabase/server"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { embedText } from "@/lib/search/semantic-search"
 import type { TrustedContext } from "@/lib/server-action-utils"
+import { filterSupplierUrls } from "@/lib/utils/supplier-url-filter"
 
 // ─── Types ──────────────────────────────────────────────────────────
 
@@ -377,9 +378,7 @@ function isNonSupplierUrl(url: string | null | undefined): boolean {
  * @param urls - Raw website URL strings (may include null/undefined — both are excluded)
  * @returns Only the URLs that look like genuine supplier homepages or product pages
  */
-export function filterSupplierUrls(urls: string[]): string[] {
-  return urls.filter((url) => !isNonSupplierUrl(url))
-}
+// filterSupplierUrls moved to @/lib/utils/supplier-url-filter
 
 // ─── Region Match ────────────────────────────────────────────────────
 //

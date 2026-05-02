@@ -17,7 +17,7 @@ import { createHash } from "crypto"
 import { embedText } from "@/lib/search/semantic-search"
 
 import type { ModuleSpec } from "./xray-schema"
-import { filterSupplierUrls } from "@/actions/cad-lab-supplier-match"
+import { filterSupplierUrls } from "@/lib/utils/supplier-url-filter"
 
 // ─── Cache ──────────────────────────────────────────────────────────
 
