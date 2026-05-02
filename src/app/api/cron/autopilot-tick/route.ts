@@ -59,7 +59,6 @@ import {
     recordFailure,
     markDone,
     lockBriefSynchronously,
-    getProjectFoundryId,
     type AutopilotStage,
     type AutopilotState,
 } from "@/actions/forge-v2-autopilot"
@@ -77,13 +76,7 @@ import { runGate, markUncertainty } from "@/lib/forge-v2/stage-gates/runner"
 import { STAGE_GATE_MAP } from "@/lib/forge-v2/stage-gates/registry"
 import { triggerRemediation } from "@/lib/forge-v2/stage-gates/remediation"
 import {
-    checkFoundryCohortGate,
-    advanceCohort,
     shouldScoreStage,
-    MAX_SCORING_ATTEMPTS,
-    FORGE_GUILD_COHORT_IDS,
-    getCohortLeadingStage,
-    getStageIndex,
 } from "@/lib/forge-v2/stage-scoring"
 
 export const dynamic = "force-dynamic"
@@ -296,7 +289,7 @@ async function tickOnce(request: Request): Promise<TickResult> {
         // Most-recent autopilot tracking row for this (project, stage).
         const { data: trackingRow } = await admin
             .from("pipeline_runs")
-            .select("id, status, started_at, error_code, error_message")
+            .select("id, status, started_at, last_heartbeat, error_code, error_message")
             .eq("project_id", project.id)
             .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
             .eq("stage", stage)
@@ -304,121 +297,54 @@ async function tickOnce(request: Request): Promise<TickResult> {
             .limit(1)
             .maybeSingle()
 
-        // ── awaiting_gate: scoring done in autopilot-step, cron runs cohort check ──
+        // ── awaiting_gate: scoring done in autopilot-step, advance this project immediately ──
         // Set by autopilot-step score_and_gate action when a project scores ≥8/10.
-        // Cohort check is fast (DB queries only, no LLM calls) — safe in the cron.
+        // Per-project advancement (2026-05-02): each project advances as soon as it
+        // passes its own quality gate — no waiting for other cohort projects.
+        // The cohort concept remains for reporting/UI but does NOT block individual advancement.
         if (autopilotStatus === "awaiting_gate" && shouldScoreStage(stage as AutopilotStage)) {
-            const foundryId = await getProjectFoundryId(project.id)
-            if (foundryId) {
-                // ── Catch-up logic: if this project is BEHIND the cohort, advance individually ──
-                // When a project was reset (e.g. stage_failed → re-run), it may be at an
-                // earlier stage than the rest of the cohort. The cohort already passed this
-                // stage, so the behind project should advance individually to catch up.
-                // The cohort gate only holds projects at the LEADING stage.
-                const isCohortProject = FORGE_GUILD_COHORT_IDS.includes(project.id)
-                if (isCohortProject) {
-                    const leadingStage = await getCohortLeadingStage()
-                    if (leadingStage && getStageIndex(stage as AutopilotStage) < getStageIndex(leadingStage)) {
-                        // This project is behind — advance individually to catch up
-                        console.info(
-                            `[autopilot-tick] CATCH-UP: project=${project.id} at ${stage} is behind leading stage ${leadingStage} — advancing individually`,
-                        )
-                        if (config.nextStage === "done") {
-                            await markDone(project.id, stage)
-                            details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
-                        } else {
-                            await advance(project.id, stage, config.nextStage)
-                            // Set status to idle so the cron runs the stage work.
-                            // advance() preserves the existing status (awaiting_gate),
-                            // but the project hasn't done work for the next stage yet.
-                            const adminClient = createAdminClient()
-                            const { data: freshProject } = await adminClient
-                                .from("cad_lab_projects")
-                                .select("autopilot_state")
-                                .eq("id", project.id)
-                                .maybeSingle()
-                            if (freshProject?.autopilot_state) {
-                                const freshState = freshProject.autopilot_state as AutopilotState
-                                await adminClient
-                                    .from("cad_lab_projects")
-                                    .update({
-                                        autopilot_state: {
-                                            ...freshState,
-                                            status: "idle",
-                                            failed_stages: [],
-                                            current_stage_attempts: 0,
-                                        },
-                                    } as unknown as never)
-                                    .eq("id", project.id)
-                            }
-                            details.push({
-                                projectId: project.id,
-                                stage,
-                                action: "advance" as TickAction,
-                                ok: true,
-                                reason: `catch-up advance: ${stage} → ${config.nextStage} (leading: ${leadingStage})`,
-                            })
-                        }
-                        advanced++
-                        continue
-                    }
+            // ── Per-project advance: this project passed, advance it now ──
+            console.info(
+                `[autopilot-tick] per-project advance: project=${project.id} stage=${stage} passed quality gate — advancing independently`,
+            )
+            if (config.nextStage === "done") {
+                await markDone(project.id, stage)
+                details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
+            } else {
+                await advance(project.id, stage, config.nextStage)
+                // Set status to idle so the cron runs the stage work on the next tick.
+                // advance() preserves the existing status (awaiting_gate),
+                // but the project hasn't done work for the next stage yet.
+                const adminClient = createAdminClient()
+                const { data: freshProject } = await adminClient
+                    .from("cad_lab_projects")
+                    .select("autopilot_state")
+                    .eq("id", project.id)
+                    .maybeSingle()
+                if (freshProject?.autopilot_state) {
+                    const freshState = freshProject.autopilot_state as AutopilotState
+                    await adminClient
+                        .from("cad_lab_projects")
+                        .update({
+                            autopilot_state: {
+                                ...freshState,
+                                status: "idle",
+                                failed_stages: [],
+                                current_stage_attempts: 0,
+                            },
+                        } as unknown as never)
+                        .eq("id", project.id)
                 }
-
-                const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
-
-                if (cohort.shouldResetAll) {
-                    // Gate check failed — log and skip, do NOT reset the whole cohort.
-                    // The gate will re-check on the next cron tick.
-                    console.warn(
-                        `[autopilot-tick] cohort gate failed at stage=${stage} (awaiting_gate) — skipping, will re-check next tick`,
-                    )
-                    details.push({
-                        projectId: project.id,
-                        stage,
-                        action: "skip_running" as TickAction,
-                        ok: false,
-                        reason: `cohort gate: a project exhausted ${MAX_SCORING_ATTEMPTS} attempts — leaving projects at current stage`,
-                    })
-                    skipped++
-                    continue
-                }
-
-                if (!cohort.allPassed) {
-                    const failing = cohort.results
-                        .filter((r) => !r.passed)
-                        .map((r) => `${r.projectName}(${r.composite})`)
-                        .join(", ")
-                    console.info(
-                        `[autopilot-tick] cohort gate HOLD project=${project.id} stage=${stage} — not all projects passed: ${failing}`,
-                    )
-                    details.push({
-                        projectId: project.id,
-                        stage,
-                        action: "skip_running" as TickAction,
-                        ok: false,
-                        reason: `cohort gate: waiting for all projects to score ≥8/10 — failing: ${failing}`,
-                    })
-                    skipped++
-                    continue
-                }
-
-                // ALL passed — advance the entire cohort atomically
-                if (config.nextStage === "done") {
-                    await markDone(project.id, stage)
-                    details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
-                } else {
-                    const cohortResult = await advanceCohort(foundryId, stage as AutopilotStage, config.nextStage as AutopilotStage)
-                    details.push({
-                        projectId: project.id,
-                        stage,
-                        action: "advance" as TickAction,
-                        ok: cohortResult.ok,
-                        reason: `cohort advance: ${cohortResult.advancedCount} projects ${stage} → ${config.nextStage}`,
-                    })
-                }
-                advanced++
-                continue
+                details.push({
+                    projectId: project.id,
+                    stage,
+                    action: "advance" as TickAction,
+                    ok: true,
+                    reason: `per-project advance: ${stage} → ${config.nextStage}`,
+                })
             }
+            advanced++
+            continue
         }
 
         // ── terminal_fail / stage_failed: reset with circuit breaker ────
@@ -696,30 +622,20 @@ async function tickOnce(request: Request): Promise<TickResult> {
                 }
 
                 // alreadyScored=true: belt-and-suspenders if awaiting_gate wasn't set.
-                const foundryId = await getProjectFoundryId(project.id)
-                if (foundryId) {
-                    const cohort = await checkFoundryCohortGate(foundryId, stage as AutopilotStage)
-                    if (cohort.shouldResetAll) {
-                        console.warn(`[autopilot-tick] cohort gate failed at stage=${stage} (belt-and-suspenders) — skipping, will re-check next tick`)
-                        details.push({ projectId: project.id, stage, action: "skip_running" as TickAction, ok: false, reason: `cohort gate: a project failed — leaving projects at current stage` })
-                        skipped++
-                        continue
-                    }
-                    if (!cohort.allPassed) {
-                        details.push({ projectId: project.id, stage, action: "skip_running" as TickAction, ok: false, reason: `cohort gate: waiting for all projects` })
-                        skipped++
-                        continue
-                    }
-                    if (config.nextStage === "done") {
-                        await markDone(project.id, stage)
-                        details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
-                    } else {
-                        const cohortResult = await advanceCohort(foundryId, stage as AutopilotStage, config.nextStage as AutopilotStage)
-                        details.push({ projectId: project.id, stage, action: "advance" as TickAction, ok: cohortResult.ok, reason: `cohort advance: ${cohortResult.advancedCount} projects ${stage} → ${config.nextStage}` })
-                    }
-                    advanced++
-                    continue
+                // Per-project advancement (2026-05-02): advance this project immediately
+                // without waiting for other cohort projects.
+                console.info(
+                    `[autopilot-tick] belt-and-suspenders per-project advance: project=${project.id} stage=${stage}`,
+                )
+                if (config.nextStage === "done") {
+                    await markDone(project.id, stage)
+                    details.push({ projectId: project.id, stage, action: "advance_done", ok: true })
+                } else {
+                    await advance(project.id, stage, config.nextStage)
+                    details.push({ projectId: project.id, stage, action: "advance" as TickAction, ok: true, reason: `per-project advance (belt-and-suspenders): ${stage} → ${config.nextStage}` })
                 }
+                advanced++
+                continue
             }
             // ── end Stage Scoring dispatch ───────────────────────────────
 
