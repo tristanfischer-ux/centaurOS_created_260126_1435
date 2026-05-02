@@ -11,10 +11,12 @@ global.fetch = mockFetch
 beforeEach(() => {
   mockFetch.mockReset()
   process.env.OPENAI_API_KEY = "test-key"
+  process.env.OPENROUTER_API_KEY = "test-openrouter-key"
 })
 
 afterEach(() => {
   delete process.env.OPENAI_API_KEY
+  delete process.env.OPENROUTER_API_KEY
 })
 
 describe("scoreRenderVision", () => {
@@ -78,6 +80,7 @@ describe("scoreRenderVision", () => {
 
   it("returns null when API key is missing", async () => {
     delete process.env.OPENAI_API_KEY
+    delete process.env.OPENROUTER_API_KEY
     const result = await scoreRenderVision("dGVzdA==", "test", "test")
     expect(result).toBeNull()
     expect(mockFetch).not.toHaveBeenCalled()
