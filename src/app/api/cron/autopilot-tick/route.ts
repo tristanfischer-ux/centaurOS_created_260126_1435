@@ -467,14 +467,47 @@ async function tickOnce(request: Request): Promise<TickResult> {
             } else {
                 console.info(`[autopilot-tick] project=${project.id} reset from ${autopilotStatus} to idle at stage=${stage} — will retry`)
             }
-            // Delete stale pipeline_runs so retry guard doesn't block
+
+            // ── Clear stale data so the specialist regenerates from scratch ──
+            // Only for stage_failed (not terminal_fail / circuit breaker).
+            // Deterministic stages (sizing, layout) and derived stages (bom,
+            // pdf) are excluded — their data should NOT be cleared.
+            // fang writes to a separate table (cad_lab_reviews) — skip here.
+            // supplier_match re-queries live — no column to clear.
+            if (autopilotStatus === "stage_failed") {
+                const STAGE_DATA_COLUMN: Partial<Record<string, string>> = {
+                    chase: "ai_research",
+                    max: "ai_modules",
+                    finn: "ai_cost_estimates",
+                    proofread: "ai_proofread_report",
+                }
+                const dataColumn = STAGE_DATA_COLUMN[stage]
+                if (dataColumn) {
+                    const { error: clearErr } = await createAdminClient()
+                        .from("cad_lab_projects")
+                        .update({ [dataColumn]: null } as never)
+                        .eq("id", project.id)
+                    if (clearErr) {
+                        console.error(
+                            `[autopilot-tick] Failed to clear ${dataColumn} for project=${project.id} stage=${stage}:`,
+                            clearErr.message,
+                        )
+                    } else {
+                        console.info(
+                            `[autopilot-tick] Cleared ${dataColumn} for project=${project.id} stage=${stage} — specialist will regenerate`,
+                        )
+                    }
+                }
+            }
+
+            // Delete zombie pipeline_runs (running status > 5 min) so retry guard doesn't block
             await createAdminClient()
                 .from("pipeline_runs")
                 .delete()
                 .eq("project_id", project.id)
                 .eq("specialist_id", AUTOPILOT_TRACKING_SPECIALIST)
                 .eq("stage", stage)
-                .in("status", ["failed", "error"])
+                .in("status", ["running", "failed", "error"])
             details.push({
                 projectId: project.id,
                 stage,

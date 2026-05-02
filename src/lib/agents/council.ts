@@ -55,8 +55,8 @@ export type CouncilTier = "quick" | "full" | "deep" | "strategy"
 export const MODEL_TIER_LATENCY_WEIGHT: Record<string, number> = {
     haiku:            1,
     "gpt-mini":       1,
-    // Grok 4.3: 203 tok/s — fastest frontier model (xAI, May 2026 benchmarks).
-    // Weight 1 matches haiku; it genuinely returns first in practice.
+    // MiMo V2.5 Pro slot replaced Grok 4.3 (2026-05-02). Weight kept at 1
+    // to preserve dispatch ordering; actual latency profile to be re-measured.
     grok:             1,
     sonnet:           2,
     deepseek:         3,

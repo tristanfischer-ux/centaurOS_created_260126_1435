@@ -14,7 +14,7 @@ import type { OpenRouterCallResult } from "@/lib/ai/openrouter"
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
-export type JudgeLineage = "xiaomi" | "xai" | "zhipu" | "google" | "moonshot" | "deepseek"
+export type JudgeLineage = "xiaomi" | "zhipu" | "google" | "moonshot" | "deepseek"
 
 export interface JudgeConfig {
     model: string
@@ -53,50 +53,50 @@ const JUDGE_PANELS: Record<string, JudgeConfig[]> = {
     // High-risk (3 judges)
     waiting_chase: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "x-ai/grok-4.3", role: "honest adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
         { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_max: [
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
         { model: "z-ai/glm-5.1", role: "schema enforcer", lineage: "zhipu" },
         { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_bom: [
         { model: "z-ai/glm-5.1", role: "schema enforcer", lineage: "zhipu" },
-        { model: "x-ai/grok-4.3", role: "honest anchor", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
         { model: "xiaomi/mimo-v2.5-pro", role: "cross-reference", lineage: "xiaomi" },
     ],
     waiting_finn: [
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
         { model: "deepseek/deepseek-v4-pro", role: "depth seat", lineage: "deepseek" },
     ],
     waiting_fang: [
         { model: "deepseek/deepseek-v4-pro", role: "depth", lineage: "deepseek" },
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
         { model: "moonshotai/kimi-k2.6", role: "multimodal", lineage: "moonshot" },
     ],
     running_fang_reviews: [
         { model: "deepseek/deepseek-v4-pro", role: "depth", lineage: "deepseek" },
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
         { model: "moonshotai/kimi-k2.6", role: "multimodal", lineage: "moonshot" },
     ],
     // Medium-risk (2 judges)
     waiting_suppliers: [
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
     ],
     matching_suppliers: [
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
     ],
     waiting_proofreader: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
     ],
     proofreading: [
         { model: "xiaomi/mimo-v2.5-pro", role: "honest anchor", lineage: "xiaomi" },
-        { model: "x-ai/grok-4.3", role: "adversary", lineage: "xai" },
+        { model: "xiaomi/mimo-v2.5-pro", role: "honest generalist", lineage: "xiaomi" },
     ],
     // Low-risk (2 judges — multimodal vision)
     waiting_pdf: [

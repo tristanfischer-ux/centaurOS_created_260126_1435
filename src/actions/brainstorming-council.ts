@@ -21,15 +21,15 @@
  *
  * Model mapping (OpenRouter, diverse multi-lineage per Artificial Analysis
  *   Intelligence Index May 2026 — see COUNCIL_MODEL_MAP below for full table):
- *   Cal   (chief-of-staff)  → x-ai/grok-4.3
+ *   Cal   (chief-of-staff)  → xiaomi/mimo-v2.5-pro
  *   Sage  (strategist)      → google/gemini-3.1-pro-preview
  *   Fiona (fundraising)     → anthropic/claude-opus-4.7
  *   Finn  (finance-lead)    → moonshotai/kimi-k2.6
  *   Fang  (vp-manufacturing)→ xiaomi/mimo-v2.5-pro
  *   Max   (cto)             → deepseek/deepseek-v4-pro
  *   Priya (product-lead)    → qwen/qwen3.6-max-preview
- *   Mia   (growth-marketer) → x-ai/grok-4.3
- *   Sal   (sales-lead)      → x-ai/grok-4.3
+ *   Mia   (growth-marketer) → xiaomi/mimo-v2.5-pro
+ *   Sal   (sales-lead)      → xiaomi/mimo-v2.5-pro
  *   Jian  (vp-engineering)  → xiaomi/mimo-v2.5-pro
  *   Harper (hiring-team)    → moonshotai/kimi-k2.6
  *   Leo   (legal-counsel)   → z-ai/glm-5.1
@@ -53,7 +53,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // A same-lineage council is an echo chamber. Every specialist slot pulls from
 // a DIFFERENT model family so blind spots from one training lineage are caught
 // by another. The table below spans six lineages:
-//   US xAI     → x-ai/grok-4.3           (IFBench 81%, non-hallucination 75%, 203 tok/s)
+//   China Xiaomi → xiaomi/mimo-v2.5-pro   (IFBench 80%, non-hallucination 75%, long-context 74%)
 //   US Google  → google/gemini-3.1-pro-preview (HLE 45%, Intelligence 57 — best reasoner)
 //   US Anthropic → anthropic/claude-opus-4.7  (Fiona: +0.21 composite benchmark win)
 //   China Moonshot → moonshotai/kimi-k2.6     (Intelligence 54, different RLHF lineage)
@@ -75,10 +75,10 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // slots are now on non-DeepSeek models.
 
 const COUNCIL_MODEL_MAP: Record<string, string> = {
-    // US xAI — Grok 4.3: fastest (203 tok/s), IFBench #1 (81%), honest (75%).
-    // Best host/opener: sets up sessions fast, follows format precisely.
+    // China Xiaomi — MiMo V2.5 Pro: IFBench 80%, non-hallucination 75%, long-context 74%.
+    // Best host/opener: honest grounding, follows format precisely without fabricating.
     // Also used for sales-lead and growth-marketer when Cal isn't in session.
-    "chief-of-staff":      "x-ai/grok-4.3",
+    "chief-of-staff":      "xiaomi/mimo-v2.5-pro",
 
     // US Google — Gemini 3.1 Pro: Intelligence 57, HLE 45% (#1 hardest problems).
     // Best strategic reasoner. Kept from prior mapping (no regression risk).
@@ -106,10 +106,10 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     // Different Alibaba lineage adds genuine diversity vs Moonshot/DeepSeek/Xiaomi.
     "product-lead":        "qwen/qwen3.6-max-preview",
 
-    // US xAI — Grok 4.3 (same as Cal): used when Cal isn't in the session.
-    // Intelligence 53, non-hallucination 75%, fast.
-    "growth-marketer":     "x-ai/grok-4.3",
-    "sales-lead":          "x-ai/grok-4.3",
+    // China Xiaomi — MiMo V2.5 Pro (same as Cal): used when Cal isn't in the session.
+    // Non-hallucination 75%, IFBench 80%, honest generalist.
+    "growth-marketer":     "xiaomi/mimo-v2.5-pro",
+    "sales-lead":          "xiaomi/mimo-v2.5-pro",
 
     // China Xiaomi — MiMo V2.5 Pro (same as Fang): Intelligence 54, honest,
     // good IFBench. Engineering and manufacturing share the same honest-grounding
@@ -131,16 +131,16 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
 
 // Model label shown in the response card
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
-    "chief-of-staff":      "Grok 4.3",
+    "chief-of-staff":      "MiMo V2.5 Pro",
     "fundraising-advisor": "Claude Opus 4.7",
     "strategist":          "Gemini 3.1 Pro",
     "finance-lead":        "Kimi K2.6",
     "cto":                 "DeepSeek V4-Pro",
-    "sales-lead":          "Grok 4.3",
+    "sales-lead":          "MiMo V2.5 Pro",
     "vp-manufacturing":    "MiMo V2.5 Pro",
     "vp-supply-chain":     "Gemini 3.1 Pro",
     "product-lead":        "Qwen 3.6 Max",
-    "growth-marketer":     "Grok 4.3",
+    "growth-marketer":     "MiMo V2.5 Pro",
     "vp-engineering":      "MiMo V2.5 Pro",
     "hiring-team":         "Kimi K2.6",
     "legal-counsel":       "GLM-5.1",

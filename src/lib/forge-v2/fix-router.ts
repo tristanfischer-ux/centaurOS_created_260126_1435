@@ -8,9 +8,9 @@
  * Routing table (from STAGE-JUDGE-PANELS-BRIEF.md):
  *   complex_multifile  → Gemini 3.1 Pro  (Coding 56, IFBench 77%)
  *   standard_single    → Gemini 3.1 Pro  (proxy for Sonnet — no OpenRouter tool access)
- *   spec_precise       → Grok 4.3        (IFBench 81%, follows spec exactly)
+ *   spec_precise       → MiMo V2.5 Pro   (IFBench 80%, non-hallucination 75%, follows spec without fabricating)
  *   bulk_mechanical    → DeepSeek V4-Flash ($0.07/M, fine for template changes)
- *   high_stakes        → GPT-5.5         (Coding 59, cross-checked by Grok 4.3)
+ *   high_stakes        → GPT-5.5         (Coding 59, cross-checked by MiMo V2.5 Pro)
  */
 
 import { callOpenRouter } from "@/lib/ai/openrouter"
@@ -63,7 +63,7 @@ const FIX_ROUTING: Record<FixComplexity, FixRouteConfig> = {
         maxTokens: 16000,
     },
     spec_precise: {
-        model: "x-ai/grok-4.3",
+        model: "xiaomi/mimo-v2.5-pro",
         maxTokens: 16000,
     },
     bulk_mechanical: {
@@ -73,7 +73,7 @@ const FIX_ROUTING: Record<FixComplexity, FixRouteConfig> = {
     high_stakes: {
         model: "openai/gpt-5.5",
         maxTokens: 16000,
-        crossCheck: "x-ai/grok-4.3",
+        crossCheck: "xiaomi/mimo-v2.5-pro",
     },
 }
 

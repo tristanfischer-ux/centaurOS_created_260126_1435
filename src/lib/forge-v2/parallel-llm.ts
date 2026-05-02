@@ -463,11 +463,11 @@ function buildChaseFullLineup(): ModelConfig[] {
         },
         // 5. China Alibaba MoE — Qwen 3 235B, strong JSON + logic
         makeQwenModel(),
-        // 6. US xAI — adversarial lineage, willing to challenge consensus
+        // 6. China Xiaomi — honest generalist, non-hallucination 75%
         {
-            id: "x-ai/grok-4.3",
-            displayName: "Grok 4.3",
-            lineage: "xAI (US)",
+            id: "xiaomi/mimo-v2.5-pro",
+            displayName: "MiMo V2.5 Pro",
+            lineage: "Xiaomi (China)",
             call: async (system, user) => {
                 const apiKey = process.env.OPENROUTER_API_KEY?.trim()
                 if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
@@ -477,7 +477,7 @@ function buildChaseFullLineup(): ModelConfig[] {
                         method: "POST",
                         headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
                         body: JSON.stringify({
-                            model: "x-ai/grok-4.3",
+                            model: "xiaomi/mimo-v2.5-pro",
                             max_tokens: 16000,
                             temperature: 0.2,
                             messages: [
@@ -490,7 +490,7 @@ function buildChaseFullLineup(): ModelConfig[] {
                 )
                 if (!response.ok) {
                     const errText = await response.text()
-                    throw new Error(`Grok-3 error (${response.status}): ${errText.slice(0, 300)}`)
+                    throw new Error(`MiMo-V2.5-Pro error (${response.status}): ${errText.slice(0, 300)}`)
                 }
                 const data = await response.json()
                 return data.choices?.[0]?.message?.content ?? ""

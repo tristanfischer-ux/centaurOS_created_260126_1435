@@ -241,24 +241,72 @@ export async function callGemini(
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
-  if (!apiKey) throw new Error("GOOGLE_AI_API_KEY not configured")
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim()
 
-  // SECURITY: API key in header, not URL — prevents leaking in fetch error messages and server logs
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`
+  // DECISION: Route through OpenRouter when key is available — eliminates direct Google API
+  // dependency and uses a single key. Falls back to direct Google API if OpenRouter key not set,
+  // so existing deployments without the new env var don't break.
+  if (!openRouterKey) {
+    // Fallback: direct Google API
+    const apiKey = process.env.GOOGLE_AI_API_KEY?.trim()
+    if (!apiKey) throw new Error("Neither OPENROUTER_API_KEY nor GOOGLE_AI_API_KEY configured")
+
+    // SECURITY: API key in header, not URL — prevents leaking in fetch error messages and server logs
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`
+
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          system_instruction: { parts: [{ text: systemPrompt }] },
+          contents: [{ parts: [{ text: userPrompt }] }],
+          generationConfig: {
+            maxOutputTokens: maxTokens,
+            temperature: 0.2,
+          },
+        }),
+      },
+      timeoutMs,
+    )
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`Gemini API error (${response.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await response.json()
+    const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+    const usage = data.usageMetadata ?? {}
+
+    return {
+      text,
+      tokensIn: usage.promptTokenCount ?? 0,
+      tokensOut: usage.candidatesTokenCount ?? 0,
+    }
+  }
+
+  // Route through OpenRouter using OpenAI-compatible chat format.
+  // Map bare model IDs to OpenRouter's google/ namespace (e.g. gemini-3.1-pro-preview → google/gemini-3.1-pro-preview).
+  const orModelId = modelId.startsWith("google/") ? modelId : `google/${modelId}`
 
   const response = await fetchWithTimeout(
-    url,
+    "https://openrouter.ai/api/v1/chat/completions",
     {
       method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${openRouterKey}`,
+      },
       body: JSON.stringify({
-        system_instruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ parts: [{ text: userPrompt }] }],
-        generationConfig: {
-          maxOutputTokens: maxTokens,
-          temperature: 0.2,
-        },
+        model: orModelId,
+        max_tokens: maxTokens,
+        temperature: 0.2,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
       }),
     },
     timeoutMs,
@@ -266,17 +314,20 @@ export async function callGemini(
 
   if (!response.ok) {
     const errText = await response.text()
-    throw new Error(`Gemini API error (${response.status}): ${errText.slice(0, 300)}`)
+    throw new Error(`Gemini (OpenRouter) API error (${response.status}): ${errText.slice(0, 300)}`)
   }
 
   const data = await response.json()
-  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-  const usage = data.usageMetadata ?? {}
+  // GOTCHA: DeepSeek and some reasoning models put output in reasoning_content, not content.
+  // Check both fields so we don't silently return empty text.
+  const content: string = data.choices?.[0]?.message?.content ?? ""
+  const reasoningContent: string = data.choices?.[0]?.message?.reasoning_content ?? ""
+  const text: string = content || reasoningContent
 
   return {
     text,
-    tokensIn: usage.promptTokenCount ?? 0,
-    tokensOut: usage.candidatesTokenCount ?? 0,
+    tokensIn: data.usage?.prompt_tokens ?? 0,
+    tokensOut: data.usage?.completion_tokens ?? 0,
   }
 }
 
@@ -287,29 +338,85 @@ export async function callOpenAI(
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) throw new Error("OPENAI_API_KEY not configured")
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim()
 
-  // GPT-5+/o3/o4 reasoning models REJECT `max_tokens` — they require `max_completion_tokens`.
-  // gpt-4.1*, gpt-4o*, and older models still accept `max_tokens`.
+  // DECISION: Route through OpenRouter when key is available — eliminates direct OpenAI API
+  // dependency and uses a single key. Falls back to direct OpenAI API if OpenRouter key not set,
+  // so existing deployments without the new env var don't break.
+  if (!openRouterKey) {
+    // Fallback: direct OpenAI API
+    const apiKey = process.env.OPENAI_API_KEY?.trim()
+    if (!apiKey) throw new Error("Neither OPENROUTER_API_KEY nor OPENAI_API_KEY configured")
+
+    // GPT-5+/o3/o4 reasoning models REJECT `max_tokens` — they require `max_completion_tokens`.
+    // gpt-4.1*, gpt-4o*, and older models still accept `max_tokens`.
+    const isReasoningModel =
+      modelId.startsWith("gpt-5") || modelId.startsWith("o3") || modelId.startsWith("o4") || modelId.startsWith("o1")
+    const tokenParam = isReasoningModel
+      ? { max_completion_tokens: maxTokens }
+      : { max_tokens: maxTokens }
+
+    const response = await fetchWithTimeout(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: modelId,
+          ...tokenParam,
+          // Reasoning models (gpt-5+, o1, o3, o4) reject any explicit temperature override.
+          ...(isReasoningModel ? {} : { temperature: 0.2 }),
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+        }),
+      },
+      timeoutMs,
+    )
+
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`OpenAI API error (${response.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await response.json()
+    const text: string = data.choices?.[0]?.message?.content ?? ""
+
+    return {
+      text,
+      tokensIn: data.usage?.prompt_tokens ?? 0,
+      tokensOut: data.usage?.completion_tokens ?? 0,
+    }
+  }
+
+  // Route through OpenRouter using OpenAI-compatible chat format.
+  // Map bare model IDs to OpenRouter's openai/ namespace (e.g. gpt-4.1-mini → openai/gpt-4.1-mini).
+  const orModelId = modelId.startsWith("openai/") ? modelId : `openai/${modelId}`
+
+  // GPT-5+/o1/o3/o4 reasoning models REJECT `max_tokens` — they require `max_completion_tokens`.
   const isReasoningModel =
-    modelId.startsWith("gpt-5") || modelId.startsWith("o3") || modelId.startsWith("o4")
+    modelId.includes("o1") || modelId.includes("o3") || modelId.includes("o4") ||
+    modelId.startsWith("gpt-5") || modelId.startsWith("openai/gpt-5")
   const tokenParam = isReasoningModel
     ? { max_completion_tokens: maxTokens }
     : { max_tokens: maxTokens }
 
   const response = await fetchWithTimeout(
-    "https://api.openai.com/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${openRouterKey}`,
       },
       body: JSON.stringify({
-        model: modelId,
+        model: orModelId,
         ...tokenParam,
-        // Reasoning models (gpt-5+, o3, o4) reject any explicit temperature override.
+        // Reasoning models (gpt-5+, o1, o3, o4) reject any explicit temperature override.
         ...(isReasoningModel ? {} : { temperature: 0.2 }),
         messages: [
           { role: "system", content: systemPrompt },
@@ -322,11 +429,15 @@ export async function callOpenAI(
 
   if (!response.ok) {
     const errText = await response.text()
-    throw new Error(`OpenAI API error (${response.status}): ${errText.slice(0, 300)}`)
+    throw new Error(`OpenAI (OpenRouter) API error (${response.status}): ${errText.slice(0, 300)}`)
   }
 
   const data = await response.json()
-  const text: string = data.choices?.[0]?.message?.content ?? ""
+  // GOTCHA: DeepSeek and some reasoning models put output in reasoning_content, not content.
+  // Check both fields so we don't silently return empty text.
+  const content: string = data.choices?.[0]?.message?.content ?? ""
+  const reasoningContent: string = data.choices?.[0]?.message?.reasoning_content ?? ""
+  const text: string = content || reasoningContent
 
   return {
     text,
