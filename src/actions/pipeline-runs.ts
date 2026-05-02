@@ -22,13 +22,15 @@ export async function startPipelineRun(
   input: Omit<Insert, "status" | "started_at">
 ): Promise<{ runId: string }> {
   const db = createAdminClient()
+  const now = new Date().toISOString()
   const { data, error } = await db
     .from("pipeline_runs")
     .insert({
       ...input,
       status: "running",
-      started_at: new Date().toISOString(),
-    })
+      started_at: now,
+      heartbeat_at: now,
+    } as never)
     .select("id")
     .single()
   if (error || !data) {
@@ -50,10 +52,17 @@ export async function startPipelineRun(
       // run 13: Finn cost.estimate for project 3e6c39b1 died with no
       // logs at the 300s timeout, row stayed 'running', cron's repeated
       // dispatches kept reusing the dead runId and never recovered.
+      //
+      // GOTCHA: heartbeat_at supersedes started_at for staleness — a
+      // long-running specialist (Chase: 9-12 min) that is actively calling
+      // updatePipelineHeartbeat() should never be marked stale. We use
+      // the most-recent of heartbeat_at and started_at so rows without a
+      // heartbeat fall back to the original age-based logic while live rows
+      // are never falsely recovered.
       const STALE_RUNNING_MS = 5 * 60 * 1000
       const { data: inFlight } = await db
         .from("pipeline_runs")
-        .select("id, started_at")
+        .select("id, started_at, heartbeat_at")
         .eq("project_id", input.project_id)
         .eq("specialist_id", input.specialist_id)
         .eq("stage", input.stage)
@@ -62,12 +71,13 @@ export async function startPipelineRun(
         .limit(1)
         .maybeSingle()
       if (inFlight) {
-        const latestTimestamp = (inFlight as Record<string, unknown>).heartbeat_at as string | null
-          ?? inFlight.started_at
-        const startedMs = latestTimestamp
-          ? new Date(latestTimestamp).getTime()
-          : Date.now()
-        const ageMs = Date.now() - startedMs
+        // Use heartbeat_at when present (row has received at least one beat);
+        // fall back to started_at for older rows that pre-date the column.
+        const latestIso =
+          (inFlight as { heartbeat_at?: string | null }).heartbeat_at ??
+          inFlight.started_at
+        const livenessMs = latestIso ? new Date(latestIso).getTime() : Date.now()
+        const ageMs = Date.now() - livenessMs
         if (ageMs > STALE_RUNNING_MS) {
           // Zombie: container died mid-flight. Fail it out so the partial
           // unique index releases the (project, specialist, stage) triple,
@@ -75,7 +85,7 @@ export async function startPipelineRun(
           // through to the original behaviour (shouldn't happen since we
           // just freed the slot).
           console.warn(
-            `[startPipelineRun] stale-running row ${inFlight.id} (${Math.round(ageMs / 1000)}s old) ` +
+            `[startPipelineRun] stale-running row ${inFlight.id} (${Math.round(ageMs / 1000)}s since last heartbeat/start) ` +
               `for ${input.specialist_id}:${input.stage} on project ${input.project_id} — marking failed and retrying insert`,
           )
           await db
@@ -83,17 +93,19 @@ export async function startPipelineRun(
             .update({
               status: "failed",
               error_code: "STALE_ABANDONED",
-              error_message: `Run sat at 'running' for ${Math.round(ageMs / 1000)}s with no completion — container presumed killed. Auto-recovered by startPipelineRun.`,
+              error_message: `Run sat at 'running' for ${Math.round(ageMs / 1000)}s with no heartbeat — container presumed killed. Auto-recovered by startPipelineRun.`,
               finished_at: new Date().toISOString(),
             })
             .eq("id", inFlight.id)
+          const retryNow = new Date().toISOString()
           const retry = await db
             .from("pipeline_runs")
             .insert({
               ...input,
               status: "running",
-              started_at: new Date().toISOString(),
-            })
+              started_at: retryNow,
+              heartbeat_at: retryNow,
+            } as never)
             .select("id")
             .single()
           if (retry.data) {
@@ -181,18 +193,25 @@ export async function failPipelineRun(
 }
 
 /**
- * Bump the last_heartbeat timestamp on a running pipeline_runs row.
- * Call every 60 seconds from within a specialist execution to signal
- * liveness. The cron stale-detection threshold is 3 minutes — if no
- * heartbeat lands within that window the row is treated as STALE_ABANDONED
- * and re-fired. Fire-and-forget safe (errors are swallowed at call sites
- * so a failed heartbeat never aborts the specialist's main work).
+ * Refresh the heartbeat_at timestamp on a running pipeline_runs row.
+ *
+ * @description Call this every ~60 seconds inside a long-running specialist
+ * execution to signal liveness. The stale-detection threshold in
+ * startPipelineRun is 5 minutes — any row whose heartbeat_at (or started_at
+ * for older rows without a heartbeat) is older than that will be marked
+ * STALE_ABANDONED and replaced by a fresh run on the next 23505 retry.
+ *
+ * Safe to fire-and-forget. A failed heartbeat update is non-fatal; the row
+ * will look slightly older than reality but the specialist should NOT abort
+ * on a heartbeat error.
+ *
+ * @param runId - The pipeline_runs.id from startPipelineRun
  */
 export async function updatePipelineHeartbeat(runId: string): Promise<void> {
-  const supabase = createAdminClient()
-  await supabase
+  const db = createAdminClient()
+  await db
     .from("pipeline_runs")
-    .update({ last_heartbeat: new Date().toISOString() })
+    .update({ heartbeat_at: new Date().toISOString() } as never)
     .eq("id", runId)
 }
 

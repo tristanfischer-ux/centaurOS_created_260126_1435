@@ -232,24 +232,41 @@ export async function POST(request: Request): Promise<NextResponse> {
                     )
                 }
 
-                // When scoring fails on the same data twice, clear the stage
-                // output so the specialist regenerates from scratch instead of
-                // the cron just re-scoring identical output in a loop.
-                if (attemptCount >= 2) {
-                    const STAGE_DATA_COLUMN: Partial<Record<string, string>> = {
-                        chase: "ai_research",
-                        max: "ai_modules",
-                        finn: "ai_cost_estimates",
-                        proofread: "ai_proofread_report",
-                    }
-                    const dataColumn = STAGE_DATA_COLUMN[rawStage]
-                    if (dataColumn) {
-                        await admin
-                            .from("cad_lab_projects")
-                            .update({ [dataColumn]: null } as never)
-                            .eq("id", projectId)
+                // Clear the stage output on every score failure so the specialist
+                // regenerates from scratch. Without clearing, the cron re-fires
+                // the specialist but the specialist finds existing data and exits
+                // early — producing identical output that scores identically.
+                //
+                // Column map: full autopilot stage name → cad_lab_projects column.
+                // Excluded stages:
+                //   waiting_sizing, waiting_layout — deterministic solvers; clearing
+                //     would not help since the solver re-runs the same parameters.
+                //   waiting_bom — parts data lives in a separate normalised structure;
+                //     the BOM specialist regenerates when re-fired regardless.
+                //   running_fang_reviews — engineering reviews are embedded inside
+                //     modules[].engineeringReview; clearing the whole modules column
+                //     would destroy the Max decomposition. Fang re-fires cleanly.
+                const SCORE_FAIL_CLEAR_COLUMN: Partial<Record<string, string>> = {
+                    waiting_chase: "research",
+                    waiting_max: "modules",
+                    waiting_finn: "ai_cost_estimates",
+                    matching_suppliers: "supplier_shortlist",
+                    proofreading: "proofreader_report",
+                }
+                const dataColumn = SCORE_FAIL_CLEAR_COLUMN[rawStage]
+                if (dataColumn) {
+                    const { error: clearErr } = await admin
+                        .from("cad_lab_projects")
+                        .update({ [dataColumn]: null } as never)
+                        .eq("id", projectId)
+                    if (clearErr) {
+                        console.error(
+                            `[autopilot-step:score_and_gate] failed to clear ${dataColumn} for project=${projectId} stage=${rawStage}:`,
+                            clearErr.message,
+                        )
+                    } else {
                         console.info(
-                            `[autopilot-step:score_and_gate] cleared ${dataColumn} for project=${projectId} stage=${rawStage} after ${attemptCount} failed scores — specialist will regenerate`,
+                            `[autopilot-step:score_and_gate] cleared ${dataColumn} for project=${projectId} stage=${rawStage} (attempt ${attemptCount + 1}) — specialist will regenerate from scratch`,
                         )
                     }
                 }

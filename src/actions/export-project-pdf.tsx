@@ -7115,6 +7115,25 @@ async function exportProjectPdfInternal(
         }
 
         try {
+            // Pre-render layout validation — checks the data structure for
+            // common bugs that produce blank or truncated sections without
+            // crashing the renderer (empty BOM, hollow modules, missing
+            // suppliers, etc.). Non-blocking: warnings are logged but the
+            // render proceeds regardless. See src/lib/forge-v2/pdf-validator.ts.
+            {
+                const { validatePdfLayout } = await import(
+                    "@/lib/forge-v2/pdf-validator"
+                )
+                const layoutCheck = validatePdfLayout(pdfInput)
+                if (!layoutCheck.valid) {
+                    console.warn(
+                        `[export-project-pdf] layout validator found ${layoutCheck.issues.length} issue(s) — ` +
+                            `PDF will render but may have blank or sparse sections:`,
+                        layoutCheck.issues,
+                    )
+                }
+            }
+
             // Diagnostic walk over pdfInput just before render: any non-
             // finite number anywhere in the tree is a smoking gun for a
             // Yoga / pdfkit "unsupported number" crash. Logs the path
