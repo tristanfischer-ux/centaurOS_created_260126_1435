@@ -145,6 +145,7 @@ export async function callClaude(
 export async function callGeminiWithSearch(
   prompt: string,
   modelId: string = "gemini-3.1-flash-lite-preview",
+  maxRetries: number = 3,
 ): Promise<{
   text: string
   sources: Array<{ uri: string; title: string }>
@@ -157,50 +158,65 @@ export async function callGeminiWithSearch(
   // SECURITY: API key in header, not URL — prevents leaking in fetch error messages and server logs
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`
 
-  const response = await fetchWithTimeout(
-    url,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }],
-        tools: [{ google_search: {} }],
-        generationConfig: {
-          maxOutputTokens: 8192,
-          temperature: 0.2,
-        },
-      }),
-    },
-    60_000,
-  )
+  let lastError: Error | null = null
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    if (attempt > 0) {
+      // Exponential backoff: 2s, 4s, 8s
+      const delay = Math.pow(2, attempt) * 1000
+      console.info(`[callGeminiWithSearch] Retry attempt ${attempt}/${maxRetries} after ${delay}ms`)
+      await new Promise((resolve) => setTimeout(resolve, delay))
+    }
 
-  if (!response.ok) {
+    const response = await fetchWithTimeout(
+      url,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          tools: [{ google_search: {} }],
+          generationConfig: {
+            maxOutputTokens: 8192,
+            temperature: 0.2,
+          },
+        }),
+      },
+      60_000,
+    )
+
+    if (response.ok) {
+      const data = await response.json()
+      const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
+      const usage = data.usageMetadata ?? {}
+
+      // Extract grounding sources from metadata
+      const groundingMeta = data.candidates?.[0]?.groundingMetadata
+      const chunks: Array<{ web?: { uri?: string; title?: string } }> =
+        groundingMeta?.groundingChunks ?? []
+      const sources = chunks
+        .filter((c): c is { web: { uri: string; title: string } } => {
+          if (!c.web?.uri || !c.web?.title) return false
+          try { return /^https?:$/.test(new URL(c.web.uri).protocol) } catch { return false }
+        })
+        .map((c) => ({ uri: c.web.uri, title: c.web.title }))
+
+      return { text, sources, tokensIn: usage.promptTokenCount ?? 0, tokensOut: usage.candidatesTokenCount ?? 0 }
+    }
+
+    // Retry on 503 (service unavailable) and 429 (rate limit)
+    const status = response.status
     const errText = await response.text()
-    throw new Error(`Gemini Search API error (${response.status}): ${errText.slice(0, 300)}`)
+    lastError = new Error(`Gemini Search API error (${status}): ${errText.slice(0, 300)}`)
+
+    if (status !== 503 && status !== 429) {
+      throw lastError // Non-retryable error
+    }
+    console.warn(`[callGeminiWithSearch] ${status} on attempt ${attempt + 1}: ${errText.slice(0, 100)}`)
   }
 
-  const data = await response.json()
-  const text: string = data.candidates?.[0]?.content?.parts?.[0]?.text ?? ""
-  const usage = data.usageMetadata ?? {}
-
-  // Extract grounding sources from metadata
-  const groundingMeta = data.candidates?.[0]?.groundingMetadata
-  const chunks: Array<{ web?: { uri?: string; title?: string } }> =
-    groundingMeta?.groundingChunks ?? []
-  const sources = chunks
-    .filter((c): c is { web: { uri: string; title: string } } => {
-      if (!c.web?.uri || !c.web?.title) return false
-      // SECURITY: Reject non-HTTP(S) URLs from search results (prevents javascript: injection)
-      try { return /^https?:$/.test(new URL(c.web.uri).protocol) } catch { return false }
-    })
-    .map((c) => ({ uri: c.web.uri, title: c.web.title }))
-
-  return {
-    text,
-    sources,
-    tokensIn: usage.promptTokenCount ?? 0,
-    tokensOut: usage.candidatesTokenCount ?? 0,
-  }
+  // All retries exhausted — return empty result gracefully (downstream handles missing search data)
+  console.error(`[callGeminiWithSearch] All ${maxRetries} retries exhausted: ${lastError?.message}`)
+  return { text: "", sources: [], tokensIn: 0, tokensOut: 0 }
 }
 
 // ─── Gemini API Call (plain text, no search grounding) ───────────────

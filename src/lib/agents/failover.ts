@@ -110,8 +110,10 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
         { providerId: "openai", modelId: "gpt-5.5" },
     ],
+    // 2026-05-02: Direct Google API quota exhausted — route through Together (DeepSeek V4-Pro)
+    // instead of direct google provider. Gemini 3.1 Pro via Google API is unavailable.
     google: [
-        { providerId: "google", modelId: "gemini-3.1-pro-preview" },
+        { providerId: "together", modelId: "deepseek-ai/DeepSeek-V4-Pro" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
@@ -120,9 +122,9 @@ export const FALLBACK_CHAINS: Record<ModelTier, ProviderTarget[]> = {
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "google", modelId: "gemini-2.5-flash" },
     ],
-    // 2026-04-29: Mia — swap from Haiku to Gemini 2.5 Flash (no Anthropic)
+    // 2026-05-02: Direct Google API quota exhausted — DeepSeek V4-Flash via DeepSeek direct
     haiku: [
-        { providerId: "google", modelId: "gemini-2.5-flash" },
+        { providerId: "deepseek", modelId: "deepseek-v4-flash" },
         { providerId: "deepseek", modelId: "deepseek-chat" },
         { providerId: "minimax", modelId: "MiniMax-M2.7" },
     ],
