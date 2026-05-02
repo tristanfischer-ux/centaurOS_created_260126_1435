@@ -277,7 +277,7 @@ describe('OpenAI key hardening regressions', () => {
 
     for (const routePath of routes) {
       const source = await readFile(path.join(process.cwd(), routePath), 'utf-8')
-      expect(source).toMatch(/if \(!process\.env\.OPENAI_API_KEY(\?\.trim\(\))?(\)|\))/)
+      expect(source).toMatch(/if \(!process\.env\.(OPENAI_API_KEY|OPENROUTER_API_KEY)(\?\.trim\(\))?(\)|\))/)
       expect(source).toContain('{ status: 503 }')
     }
   })
