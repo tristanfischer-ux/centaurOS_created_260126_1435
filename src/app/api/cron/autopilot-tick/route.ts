@@ -127,6 +127,40 @@ export async function GET(request: Request): Promise<NextResponse> {
 
 async function tickOnce(request: Request): Promise<TickResult> {
     const admin = createAdminClient()
+    // Sweep stale pipeline_runs — any 'running' row with no heartbeat
+    // activity for 10+ minutes is presumed dead (container killed).
+    const STALE_HEARTBEAT_MINUTES = 10
+    const staleThreshold = new Date(Date.now() - STALE_HEARTBEAT_MINUTES * 60 * 1000).toISOString()
+    const { data: staleNoHeartbeat } = await admin
+        .from("pipeline_runs")
+        .select("id")
+        .eq("status", "running")
+        .lt("started_at", staleThreshold)
+        .is("heartbeat_at" as never, null)
+        .limit(20)
+    const { data: staleWithHeartbeat } = await admin
+        .from("pipeline_runs")
+        .select("id")
+        .eq("status", "running")
+        .not("heartbeat_at" as never, "is", null)
+        .lt("heartbeat_at" as never, staleThreshold)
+        .limit(20)
+    const allStale = [...(staleNoHeartbeat ?? []), ...(staleWithHeartbeat ?? [])]
+    if (allStale.length > 0) {
+        await admin
+            .from("pipeline_runs")
+            .update({
+                status: "failed",
+                error_code: "STALE_ABANDONED",
+                error_message: `No heartbeat for ${STALE_HEARTBEAT_MINUTES}+ minutes — container presumed killed. Auto-recovered by cron sweep.`,
+                finished_at: new Date().toISOString(),
+            } as never)
+            .in("id", allStale.map((r) => r.id))
+        console.warn(
+            `[autopilot-tick] swept ${allStale.length} stale pipeline_runs to failed`,
+        )
+    }
+
     const details: TickDetail[] = []
     let advanced = 0
     let fired = 0
