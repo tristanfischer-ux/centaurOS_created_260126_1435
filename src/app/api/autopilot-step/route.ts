@@ -231,6 +231,28 @@ export async function POST(request: Request): Promise<NextResponse> {
                     )
                 }
 
+                // When scoring fails on the same data twice, clear the stage
+                // output so the specialist regenerates from scratch instead of
+                // the cron just re-scoring identical output in a loop.
+                if (attemptCount >= 2) {
+                    const STAGE_DATA_COLUMN: Partial<Record<string, string>> = {
+                        chase: "ai_research",
+                        max: "ai_modules",
+                        finn: "ai_cost_estimates",
+                        proofread: "ai_proofread_report",
+                    }
+                    const dataColumn = STAGE_DATA_COLUMN[rawStage]
+                    if (dataColumn) {
+                        await admin
+                            .from("cad_lab_projects")
+                            .update({ [dataColumn]: null } as never)
+                            .eq("id", projectId)
+                        console.info(
+                            `[autopilot-step:score_and_gate] cleared ${dataColumn} for project=${projectId} stage=${rawStage} after ${attemptCount} failed scores — specialist will regenerate`,
+                        )
+                    }
+                }
+
                 // Supersede the done tracking row so next tick re-fires this stage
                 const { data: doneRow } = await admin
                     .from("pipeline_runs")
