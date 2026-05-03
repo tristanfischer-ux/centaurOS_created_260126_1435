@@ -360,12 +360,18 @@ export default function CadLabResearchPage(): React.ReactNode {
   // after setDesignBrief/setSubject would use stale values. The effect fires after React
   // commits the state updates, so handleResearch sees the correct enriched values.
   const interviewResearchFiredRef = useRef(false)
+  const skippedSubjectRef = useRef<string | null>(null)
   useEffect(() => {
     if (interviewPhase === "complete" && !interviewResearchFiredRef.current && !isResearching && !hasResearch) {
       interviewResearchFiredRef.current = true
+      // If subject was captured during onSkip, temporarily update subject state
+      // so handleResearch's DOM read fallback also works
+      if (skippedSubjectRef.current && !subject) {
+        setSubject(skippedSubjectRef.current)
+      }
       handleResearch()
     }
-  }, [interviewPhase, isResearching, hasResearch, handleResearch])
+  }, [interviewPhase, isResearching, hasResearch, handleResearch, subject, setSubject])
 
   // Reset guards when interview resets to idle (e.g. handleReset)
   useEffect(() => {
@@ -487,8 +493,9 @@ export default function CadLabResearchPage(): React.ReactNode {
                 // React commits the state updates with the correct values.
               }}
               onSkip={() => {
+                const skippedSubject = subject
                 setInterviewPhase("complete")
-                // Same stale-closure issue — let the effect handle it.
+                skippedSubjectRef.current = skippedSubject
               }}
             />
           </motion.div>
