@@ -50,11 +50,11 @@ async function callOpenAIConsensus(systemPrompt: string, userPrompt: string): Pr
 
 async function callGeminiConsensus(systemPrompt: string, userPrompt: string): Promise<string> {
   const result = await callOpenRouter({
-    model: "google/gemini-3.1-flash-lite-preview",
+    model: "google/gemini-3.1-pro-preview",
     system: systemPrompt,
     prompt: userPrompt,
-    maxTokens: 256,
-    timeoutMs: 30_000,
+    maxTokens: 4096,
+    timeoutMs: 60_000,
   })
   if (!result.ok) throw new Error(result.error ?? "OpenRouter Gemini call failed")
   return (result.text ?? "").trim()

@@ -145,7 +145,7 @@ export async function callAI(
  */
 export async function callGeminiWithSearch(
   prompt: string,
-  modelId: string = "gemini-3.1-flash-lite-preview",
+  modelId: string = "gemini-3.1-pro-preview",
   maxRetries: number = 3,
 ): Promise<{
   text: string
