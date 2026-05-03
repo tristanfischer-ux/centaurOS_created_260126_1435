@@ -60,16 +60,22 @@ async function getSpecialistRound1Response(
 
 async function getSpecialistRound2Response(
     question: string,
-    specialist: { id: string; name: string; title: string; tagline: string },
-    calFraming: string,
-    specialistResponses: Array<{ name: string; response: string }>,
+    specialist: { id: string; name: string; title: string },
+    ownRound1Response: string,
+    peersRound1: Array<{ name: string; response: string }>,
 ) {
     const res = await fetch("/api/agents/council-call", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action: "specialist-r2", question, specialist, calFraming, specialistResponses }),
+        body: JSON.stringify({
+            action: "specialist-r2",
+            question,
+            specialist,
+            calFraming: ownRound1Response,
+            specialistResponses: peersRound1,
+        }),
     })
-    return res.json() as Promise<{ ok: true; response: SpecialistResponse } | { ok: false; error: string }>
+    return res.json() as Promise<{ ok: true; id: string; round2Response: string } | { ok: false; error: string }>
 }
 
 async function getCalClosingResponse(
@@ -629,31 +635,23 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             // Writing now means navigation-away-then-back can recover the session
             // from DB even while Cal and specialists are still in flight.
             // Fire-and-forget the threadId — we need it for progressive entry writes.
+            // Fire-and-forget thread creation — don't await because server
+            // actions trigger RSC revalidation which blocks state updates.
             let liveThreadId: string | null = null
-            try {
-                const startResult = await startMeetingThread({
-                    topic: trimmedQ,
-                    councilTier: tierSnapshot,
-                    specialistIds: snapshotIds,
-                })
+            const threadPromise = startMeetingThread({
+                topic: trimmedQ,
+                councilTier: tierSnapshot,
+                specialistIds: snapshotIds,
+            }).then(startResult => {
                 if (startResult.threadId) {
                     liveThreadId = startResult.threadId
-                    // Pin the threadId in URL so a back-nav can recover.
-                    // GOTCHA: router.replace() inside startTransition is
-                    // unreliable — Next.js App Router batches the navigation
-                    // update and may revert the URL on the next render when
-                    // searchParams (from the server) re-asserts. Use
-                    // window.history.replaceState directly: this is an
-                    // imperative, synchronous DOM update that Next.js does
-                    // not overwrite on re-render, matching how the Next.js
-                    // docs recommend pinning non-navigation URL state.
                     const params = new URLSearchParams(window.location.search)
                     params.set("session", liveThreadId)
                     window.history.replaceState(null, "", `${pathname}?${params}`)
                 }
-            } catch {
-                // Non-fatal — proceed without persistence; session still runs in memory
-            }
+            }).catch(() => {
+                // Non-fatal — proceed without persistence
+            })
 
             // ── Step 1: Cal frames the question first ────────────────────────
             // Specialists are queued (councilPhase: "cal-framing") while Cal runs.
@@ -680,6 +678,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 hostOpening: calFramingResult.framing,
             }))
 
+            // threadPromise resolves in background — liveThreadId may or may not
+            // be set yet. Persistence calls are best-effort.
             if (liveThreadId) {
                 addProgressiveMeetingEntry(liveThreadId, {
                     specialistId: "chief-of-staff",

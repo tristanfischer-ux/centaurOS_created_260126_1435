@@ -32,6 +32,75 @@ import { isValidUUID } from '@/lib/security/sanitize'
 
 const COVER_BUCKET = 'brainstorm-assets'
 
+/**
+ * Try generating a cover image via OpenAI gpt-image-2.
+ * Returns the PNG buffer on success, null on failure.
+ */
+async function tryGptImage2(topic: string, specialistNames: string[]): Promise<Buffer | null> {
+    const apiKey = process.env.OPENAI_API_KEY
+    if (!apiKey) {
+        console.warn('[BrainstormCover] No OPENAI_API_KEY — skipping gpt-image-2')
+        return null
+    }
+
+    const namesList = specialistNames.slice(0, 4).join(', ')
+    const prompt = [
+        'Create a professional, visually striking infographic-style illustration',
+        'for a business brainstorming council session.',
+        `The topic being discussed is: "${topic.slice(0, 200)}".`,
+        `The council members are: ${namesList}.`,
+        'Show diverse professionals in discussion in a modern, bright meeting room.',
+        'Style: modern corporate illustration, light cream background, warm accent colours,',
+        'clean typography, professional but approachable. NO dark themes or dark backgrounds.',
+        'Include the ForgeOS brand subtly. Do NOT include any text overlays or headlines.',
+    ].join(' ')
+
+    try {
+        const resp = await fetch('https://api.openai.com/v1/images/generations', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                model: 'gpt-image-1',
+                prompt,
+                n: 1,
+                size: '1536x1024',
+                quality: 'low',
+            }),
+            signal: AbortSignal.timeout(60_000),
+        })
+
+        if (!resp.ok) {
+            const errBody = await resp.text().catch(() => '')
+            console.error('[BrainstormCover] gpt-image-2 API error:', {
+                status: resp.status,
+                body: errBody.slice(0, 300),
+            })
+            return null
+        }
+
+        const json = await resp.json()
+        const b64 = json?.data?.[0]?.b64_json
+        if (b64) {
+            return Buffer.from(b64, 'base64')
+        }
+        const url = json?.data?.[0]?.url
+        if (url) {
+            const imgResp = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+            if (imgResp.ok) {
+                return Buffer.from(await imgResp.arrayBuffer())
+            }
+        }
+        console.error('[BrainstormCover] gpt-image-2 returned no image data')
+        return null
+    } catch (err) {
+        console.error('[BrainstormCover] gpt-image-2 fetch failed:', err instanceof Error ? err.message : err)
+        return null
+    }
+}
+
 type CoverStatus = 'pending' | 'generating' | 'ready' | 'failed'
 
 /**
@@ -153,27 +222,67 @@ export async function generateSessionInfographic(
     const startedAt = Date.now()
 
     try {
-        // Call the route handler server-to-server. The route handler:
-        //  - Renders the infographic JSX via next/og
-        //  - Uploads the PNG to brainstorm-assets/<threadId>/cover.png
-        //  - Updates cover_image_url + cover_status='ready' in the DB
-        //
-        // We need to call this as an authenticated request so the route's
-        // own auth check passes. We do this by making an internal fetch
-        // with the user's cookie header forwarded.
-        //
-        // IMPORTANT: this only works in a Node.js runtime context (not edge).
-        // The 'use server' action runs on Node.js, so this is fine.
+        // Fetch thread data for the gpt-image-2 prompt
+        const { data: threadData } = await admin
+            .from('meeting_threads')
+            .select('topic')
+            .eq('id', threadId)
+            .single()
 
-        // Determine the base URL — use VERCEL_URL in production/preview,
-        // localhost in development.
+        const { data: rawEntries } = await admin
+            .from('meeting_entries')
+            .select('specialist_name, role')
+            .eq('thread_id', threadId)
+            .eq('role', 'specialist')
+            .limit(10)
+
+        const specialistNames = [...new Set(
+            (rawEntries ?? [])
+                .map((e: { specialist_name: string | null }) => e.specialist_name)
+                .filter(Boolean) as string[]
+        )]
+
+        const topic = threadData?.topic ?? 'Business strategy discussion'
+
+        // ── Primary path: gpt-image-2 (real illustration) ──
+        const gptImage = await tryGptImage2(topic, specialistNames)
+
+        if (gptImage) {
+            const storagePath = `${threadId}/cover.png`
+            const { error: uploadErr } = await admin.storage
+                .from(COVER_BUCKET)
+                .upload(storagePath, gptImage, {
+                    contentType: 'image/png',
+                    upsert: true,
+                    cacheControl: '86400',
+                })
+
+            if (!uploadErr) {
+                await admin.from('meeting_threads').update({
+                    cover_status: 'ready',
+                    cover_image_url: storagePath,
+                }).eq('id', threadId)
+
+                try { revalidatePath('/agents') } catch { /* no-op in after() */ }
+                await logUsage(threadId, foundryId, authorUserId, true)
+
+                console.info('[BrainstormCover] Cover generated:', {
+                    threadId, renderer: 'gpt-image-2', ms: Date.now() - startedAt,
+                })
+                return { ok: true, error: null }
+            }
+
+            console.error('[BrainstormCover] gpt-image-2 storage upload failed:', uploadErr.message)
+        }
+
+        // ── Fallback path: next/og text-card infographic ──
+        console.info('[BrainstormCover] Falling back to next/og renderer')
+
         const baseUrl = process.env.VERCEL_URL
             ? `https://${process.env.VERCEL_URL}`
             : process.env.NEXT_PUBLIC_SITE_URL
             ?? 'http://localhost:3000'
 
-        // Forward the caller's cookies so the route handler's auth check passes.
-        // In Next.js server actions the 'next/headers' cookies() helper is available.
         const { cookies } = await import('next/headers')
         const cookieStore = await cookies()
         const cookieHeader = cookieStore
@@ -185,42 +294,25 @@ export async function generateSessionInfographic(
 
         const resp = await fetch(coverUrl, {
             method: 'GET',
-            headers: {
-                Cookie: cookieHeader,
-                Accept: 'image/png',
-            },
-            // 30-second timeout — next/og rendering is fast
+            headers: { Cookie: cookieHeader, Accept: 'image/png' },
             signal: AbortSignal.timeout(30_000),
         })
 
         if (!resp.ok) {
             const errBody = await resp.text().catch(() => '')
-            console.error('[BrainstormCover] Route handler returned non-ok:', {
-                threadId,
-                status: resp.status,
-                body: errBody.slice(0, 300),
+            console.error('[BrainstormCover] next/og route returned non-ok:', {
+                threadId, status: resp.status, body: errBody.slice(0, 300),
             })
             await setCoverStatus(threadId, 'failed')
             await logUsage(threadId, foundryId, authorUserId, false)
             return { ok: false, error: `Route handler ${resp.status}: ${errBody.slice(0, 100)}` }
         }
 
-        // The route handler already set cover_status='ready' and cover_image_url.
-        // We just need to log and revalidate.
-
-        try {
-            revalidatePath('/agents')
-        } catch {
-            // revalidatePath only works inside a Next.js render context;
-            // when called from a Vercel after() block it may no-op silently.
-        }
-
+        try { revalidatePath('/agents') } catch { /* no-op in after() */ }
         await logUsage(threadId, foundryId, authorUserId, true)
 
         console.info('[BrainstormCover] Cover generated:', {
-            threadId,
-            renderer: 'next/og',
-            ms: Date.now() - startedAt,
+            threadId, renderer: 'next/og-fallback', ms: Date.now() - startedAt,
         })
 
         return { ok: true, error: null }
