@@ -67,14 +67,14 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     activeProjectId, isSaving, lastSaved, saveError,
     showProjects, setShowProjects, refreshProjects,
     // Projects
-    projects, isLoadingProjects,
+    projects = [], isLoadingProjects,
     handleLoadProject, handleDeleteProject, handleReset,
     // Progress
     progressLines = [], isResearching, isDecomposing, isBatchRunning, generatingModuleIds = new Set(), isGeneratingUnified,
     // Milestone
     milestone, setMilestone,
     // Post-research idle detection
-    hasResearch, modules,
+    hasResearch, modules = [],
   } = useCadLab()
 
   // Load project only when explicitly requested via ?project=<id>.
