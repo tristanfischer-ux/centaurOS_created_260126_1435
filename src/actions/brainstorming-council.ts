@@ -455,19 +455,30 @@ export async function getCalFraming(
     specialistNames: string[],
 ): Promise<{ ok: true; framing: string } | { ok: false; error: string }> {
     if (!question?.trim()) return { ok: false, error: "Question is required" }
-    const result = await callOpenRouter({
-        model: COUNCIL_MODEL_MAP["chief-of-staff"],
-        system: "You are Cal, Chief of Staff and council host at Fractional Forge. You frame questions and introduce specialists. British English. 3–4 sentences max.",
-        prompt: getCalOpeningPrompt(question, specialistNames),
-        maxTokens: 1200,
-        temperature: 0.7,
-        timeoutMs: 60_000,
-    })
-    if (!result.ok) {
+    const model = COUNCIL_MODEL_MAP["chief-of-staff"]
+    console.info("[getCalFraming] START model=%s question=%s", model, question.slice(0, 60))
+    const t0 = Date.now()
+    try {
+        const result = await callOpenRouter({
+            model,
+            system: "You are Cal, Chief of Staff and council host at Fractional Forge. You frame questions and introduce specialists. British English. 3–4 sentences max.",
+            prompt: getCalOpeningPrompt(question, specialistNames),
+            maxTokens: 1200,
+            temperature: 0.7,
+            timeoutMs: 30_000,
+        })
+        console.info("[getCalFraming] DONE ok=%s elapsed=%dms", result.ok, Date.now() - t0)
+        if (!result.ok) {
+            console.warn("[getCalFraming] OpenRouter error: %s", (result as { error: string }).error)
+            const fallback = `I've put your question to ${specialistNames.length} specialists — ${specialistNames.slice(0, -1).join(", ")}${specialistNames.length > 1 ? " and " : ""}${specialistNames[specialistNames.length - 1]}. They each look at it through their own lens. Read their take, then I'll close with what to do next.`
+            return { ok: true, framing: fallback }
+        }
+        return { ok: true, framing: result.text.trim() }
+    } catch (err) {
+        console.error("[getCalFraming] EXCEPTION elapsed=%dms error=%s", Date.now() - t0, err instanceof Error ? err.message : String(err))
         const fallback = `I've put your question to ${specialistNames.length} specialists — ${specialistNames.slice(0, -1).join(", ")}${specialistNames.length > 1 ? " and " : ""}${specialistNames[specialistNames.length - 1]}. They each look at it through their own lens. Read their take, then I'll close with what to do next.`
         return { ok: true, framing: fallback }
     }
-    return { ok: true, framing: result.text.trim() }
 }
 
 /**
