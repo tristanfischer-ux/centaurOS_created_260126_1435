@@ -45,14 +45,15 @@ async function tryGptImage2(topic: string, specialistNames: string[]): Promise<B
 
     const namesList = specialistNames.slice(0, 4).join(', ')
     const prompt = [
-        'Create a professional, visually striking infographic-style illustration',
+        'Create a professional, visually striking illustration',
         'for a business brainstorming council session.',
         `The topic being discussed is: "${topic.slice(0, 200)}".`,
         `The council members are: ${namesList}.`,
         'Show diverse professionals in discussion in a modern, bright meeting room.',
         'Style: modern corporate illustration, light cream background, warm accent colours,',
-        'clean typography, professional but approachable. NO dark themes or dark backgrounds.',
-        'Include the ForgeOS brand subtly. Do NOT include any text overlays or headlines.',
+        'professional but approachable.',
+        'Do NOT include any text, words, letters, numbers, or typography in the image whatsoever.',
+        'No dark themes or dark backgrounds.',
     ].join(' ')
 
     try {
@@ -67,7 +68,7 @@ async function tryGptImage2(topic: string, specialistNames: string[]): Promise<B
                 prompt,
                 n: 1,
                 size: '1536x1024',
-                quality: 'low',
+                quality: 'medium',
             }),
             signal: AbortSignal.timeout(60_000),
         })

@@ -33,6 +33,8 @@ import {
     Link2,
     Check,
     FileDown,
+    AudioLines,
+    ImageIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -44,8 +46,10 @@ import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { COUNCIL_POSITION_LABELS } from "@/lib/agents/council"
 import { getSpecialistById } from "@/lib/agents/specialists-config"
-import { appendMeetingEntries, branchMeetingThread } from "@/actions/meeting-threads"
+import { appendMeetingEntries, branchMeetingThread, refreshSessionAssetUrls } from "@/actions/meeting-threads"
 import { generateMeetingThreadPdf } from "@/actions/meeting-thread-pdf"
+import { generateSessionInfographic } from "@/actions/brainstorm-cover"
+import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import type { MeetingThreadDetail, MeetingEntryRow } from "@/actions/meeting-threads"
 import type { SubscriptionTier } from "@/lib/billing/plans"
 import { getPrimaryTargetForTier } from "@/lib/agents/failover"
@@ -501,7 +505,11 @@ export function MeetingThreadView({
     // F3 legacy playlist controls (used only when audioUrl is absent)
     const [activeClipIdx, setActiveClipIdx] = useState(0)
     const audioRef = useRef<HTMLAudioElement | null>(null)
-    const hasLegacyClips = !audioUrl && Array.isArray(audioClips) && audioClips.length > 0
+    const [coverGenState, setCoverGenState] = useState<"idle" | "running" | "done" | "error">("idle")
+    const [audioGenState, setAudioGenState] = useState<"idle" | "running" | "done" | "error">("idle")
+    const [liveCoverUrl, setLiveCoverUrl] = useState<string | null>(coverImageUrl ?? null)
+    const [liveAudioUrl, setLiveAudioUrl] = useState<string | null>(audioUrl ?? null)
+    const hasLegacyClips = !liveAudioUrl && Array.isArray(audioClips) && audioClips.length > 0
     const activeClip = hasLegacyClips ? audioClips![activeClipIdx] ?? null : null
 
     const handleClipEnded = useCallback(() => {
@@ -578,8 +586,6 @@ export function MeetingThreadView({
                 const a = document.createElement("a")
                 a.href = result.signedUrl
                 a.download = `brainstorm-${thread.id.slice(0, 8)}.pdf`
-                a.target = "_blank"
-                a.rel = "noopener noreferrer"
                 document.body.appendChild(a)
                 a.click()
                 a.remove()
@@ -617,16 +623,13 @@ export function MeetingThreadView({
                 </Link>
             </div>
 
-            {/* F2: Generated cover image — pinned at the top, used as the
-                shareable thumbnail when the founder posts the session
-                elsewhere. Falls back gracefully when generation is still
-                pending or failed. */}
-            {coverImageUrl && (
+            {/* F2: Generated cover image or generate button */}
+            {liveCoverUrl ? (
                 <Card className="overflow-hidden border">
                     <div className="relative w-full bg-muted/20 aspect-[16/9] max-h-[420px]">
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
-                            src={coverImageUrl}
+                            src={liveCoverUrl}
                             alt={`Generated cover for: ${thread.topic}`}
                             className="absolute inset-0 h-full w-full object-cover"
                         />
@@ -635,11 +638,49 @@ export function MeetingThreadView({
                         </span>
                     </div>
                 </Card>
-            )}
+            ) : isAuthor ? (
+                <Card className="border">
+                    <CardContent className="pt-5 pb-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted">
+                                <ImageIcon className="h-4 w-4 text-muted-foreground" />
+                            </span>
+                            <div>
+                                <p className="text-sm font-medium text-foreground">Cover image</p>
+                                <p className="text-[11px] text-muted-foreground">Generate an illustration for this session</p>
+                            </div>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant={coverGenState === "error" ? "destructive" : "default"}
+                            disabled={coverGenState === "running"}
+                            onClick={async () => {
+                                setCoverGenState("running")
+                                try {
+                                    const result = await generateSessionInfographic(thread.id)
+                                    if (result.ok) {
+                                        const urls = await refreshSessionAssetUrls(thread.id)
+                                        if (urls.coverUrl) setLiveCoverUrl(urls.coverUrl)
+                                        setCoverGenState("done")
+                                    } else {
+                                        setCoverGenState("error")
+                                    }
+                                } catch {
+                                    setCoverGenState("error")
+                                }
+                            }}
+                        >
+                            {coverGenState === "running" ? (
+                                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generating…</>
+                            ) : coverGenState === "error" ? "Retry" : "Generate cover"}
+                        </Button>
+                    </CardContent>
+                </Card>
+            ) : null}
 
             {/* F3: Audio player — single combined file for new sessions (2026-04-28+);
-                legacy per-clip playlist for old sessions. */}
-            {audioUrl ? (
+                legacy per-clip playlist for old sessions; generate button if absent. */}
+            {liveAudioUrl ? (
                 <Card className="border">
                     <CardContent className="pt-5 space-y-3">
                         <div className="flex items-center gap-2">
@@ -650,7 +691,7 @@ export function MeetingThreadView({
                         </div>
                         {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
                         <audio
-                            src={audioUrl}
+                            src={liveAudioUrl}
                             controls
                             preload="metadata"
                             className="w-full"
@@ -715,6 +756,44 @@ export function MeetingThreadView({
                         <p className="text-[10px] text-muted-foreground">
                             Each specialist is voiced distinctly. Tap a name to skip to their take.
                         </p>
+                    </CardContent>
+                </Card>
+            ) : isAuthor ? (
+                <Card className="border">
+                    <CardContent className="pt-5 pb-5 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-3">
+                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-electric-blue/10 text-electric-blue">
+                                <AudioLines className="h-4 w-4" />
+                            </span>
+                            <div>
+                                <p className="text-sm font-medium text-foreground">Audio transcript</p>
+                                <p className="text-[11px] text-muted-foreground">Generate an audio version of this discussion</p>
+                            </div>
+                        </div>
+                        <Button
+                            size="sm"
+                            variant={audioGenState === "error" ? "destructive" : "default"}
+                            disabled={audioGenState === "running"}
+                            onClick={async () => {
+                                setAudioGenState("running")
+                                try {
+                                    const result = await generateSessionAudio(thread.id)
+                                    if (result.ok) {
+                                        const urls = await refreshSessionAssetUrls(thread.id)
+                                        if (urls.audioUrl) setLiveAudioUrl(urls.audioUrl)
+                                        setAudioGenState("done")
+                                    } else {
+                                        setAudioGenState("error")
+                                    }
+                                } catch {
+                                    setAudioGenState("error")
+                                }
+                            }}
+                        >
+                            {audioGenState === "running" ? (
+                                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generating…</>
+                            ) : audioGenState === "error" ? "Retry" : "Create audio transcript"}
+                        </Button>
                     </CardContent>
                 </Card>
             ) : null}

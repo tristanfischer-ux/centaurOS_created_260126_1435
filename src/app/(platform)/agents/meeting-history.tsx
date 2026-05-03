@@ -232,8 +232,6 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                 const a = document.createElement("a")
                 a.href = result.signedUrl
                 a.download = `brainstorm-${meeting.id.slice(0, 8)}.pdf`
-                a.target = "_blank"
-                a.rel = "noopener noreferrer"
                 document.body.appendChild(a)
                 a.click()
                 a.remove()
