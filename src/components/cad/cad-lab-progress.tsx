@@ -645,7 +645,7 @@ interface CadLabProgressProps {
  * domain-specific engineering facts matched to the user's subject.
  * Tier 3 annotates individual progress lines with context.
  */
-export function CadLabProgress({ lines, isActive, operationType, subject = "" }: CadLabProgressProps) {
+export function CadLabProgress({ lines = [], isActive, operationType, subject = "" }: CadLabProgressProps) {
   const [factIndex, setFactIndex] = useState(0)
   const [explainerIndex, setExplainerIndex] = useState(0)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)

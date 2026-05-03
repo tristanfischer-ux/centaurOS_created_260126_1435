@@ -1,0 +1,10 @@
+Fix a JavaScript runtime error in the ForgeOS Cad Lab page that prevents module decomposition from working.
+
+## Error
+`TypeError: Cannot read properties of undefined (reading 'length')` in the compiled Next.js bundle. This happens when the user clicks "Generate Modules" on the Cad Lab Design page.
+
+## Fix Strategy
+1. The error points to `modules.length === 0` in the `handleDecompose` useEffect trigger at `src/app/(platform)/the-forge/cad-lab/page.tsx:389`.
+2. Although `useState<CadLabModule[]>([])` in `cad-lab-context.tsx` initializes `modules` as an array, during hydration, Hot Module Replacement (HMR), or asynchronous fallback returns within the context provider, it may briefly be evaluated as `undefined`.
+3. I added `= []` as a default parameter for `modules` where it is destructured from `useCadLab()` in `page.tsx` and all sibling pages inside `the-forge/cad-lab/`.
+4. I also defaulted other potentially-undefined arrays, sets, and refs (e.g. `progressLines`, `freshResearchRef`, `referenceImages`) in `page.tsx` to ensure zero crashes on initialization.
