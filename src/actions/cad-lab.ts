@@ -329,24 +329,19 @@ export async function runCadLabResearch(
     // Alibaba/Moonshot/Zhipu, Mistral) in parallel to dump what each
     // LLM already knows from training data about this product.
     //
-    // The dossier covers ALL pipeline stages: specs, competitors,
-    // regulations, market sizing, suppliers, costs, materials, and
-    // application knowledge. Each downstream stage reads the sections
-    // relevant to it via extractStageContext().
+    // IMPORTANT: Training data is NOT prepended to the Gemini search prompt.
+    // Gemini silently drops its Google Search tool when the prompt exceeds
+    // ~2000 chars, resulting in zero grounding sources. Instead, the training
+    // data is injected into the SYNTHESIS step where Claude/OpenAI combines
+    // it with the Gemini search results into the final report.
     //
-    // Purpose:
-    // 1. Gives Gemini a knowledge baseline so it focuses web search on GAPS
-    // 2. Provides a fallback if web search returns zero sources
-    // 3. Grounds Finn, BOM, Sizing with known costs/specs even pre-search
-    // 4. Evidence to judges that LLMs have domain knowledge (boosts scoring)
-    let trainingDataDossier = ""
+    // The dossier is also stored on the project for downstream stages
+    // (Max, Sizing, BOM, Finn) to read via extractStageContext().
     let fullTrainingDossier = ""
     try {
       const trainingDump = await runTrainingDataDump(description, formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes))
       if (trainingDump.dossier.length > 0 && trainingDump.modelsResponded > 0) {
         fullTrainingDossier = trainingDump.dossier
-        // Chase-relevant sections for the Gemini prompt
-        trainingDataDossier = extractStageContext(fullTrainingDossier, "waiting_chase") || fullTrainingDossier.slice(0, 8000)
         console.info(`[THE-FORGE] Stage 0 complete: ${trainingDump.modelsResponded}/10 models, ${trainingDump.dossier.length} chars, ${trainingDump.elapsedMs}ms`)
       }
     } catch (stage0Err) {
@@ -354,11 +349,13 @@ export async function runCadLabResearch(
     }
 
     // 1. Run Gemini + Google Search and Thingiverse in parallel
+    // NOTE: Gemini prompt is intentionally SHORT — no training data prepended.
+    // Long prompts cause Gemini to silently drop the Google Search tool.
     const intakeContext = formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes)
 
     const [webResult, cadResult] = await Promise.allSettled([
       callGeminiWithSearch(
-        `${trainingDataDossier ? "=== KNOWLEDGE FROM 10 LLM TRAINING DATA (supplement, do not duplicate) ===\n" + trainingDataDossier + "\n\nUse the above training data as a knowledge baseline. Focus your web search on FILLING GAPS and VERIFYING claims — do not waste tokens re-discovering standard specifications that are already known. Where training data and web search conflict, prefer the web search (more current).\n\n" : ""}Find the real-world specifications for: ${description}
+        `Find the real-world specifications for: ${description}
 
 I need precise engineering dimensions for 3D CAD modelling. Search for:
 
@@ -410,6 +407,12 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
         .map((m) => `- ${m.name}: ${m.url}\n  ${m.description}`)
         .join("\n")
       rawDataSections.push(`=== THINGIVERSE CAD MODELS ===\n${modelList}`)
+    }
+
+    // Stage 0 training data — injected into SYNTHESIS (not Gemini search)
+    // This supplements web search results with what 10 LLMs know from training data.
+    if (fullTrainingDossier.length > 0) {
+      rawDataSections.push(`=== KNOWLEDGE FROM 10 LLM TRAINING DATA (Stage 0) ===\n${fullTrainingDossier.slice(0, 12000)}\n[Stage 0 training data truncated — full dossier stored on project]`)
     }
 
     const rawContext = rawDataSections.join("\n\n")

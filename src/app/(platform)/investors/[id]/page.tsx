@@ -44,7 +44,6 @@ import { ViewCapOverlay } from '../components/ViewCapOverlay'
 import { CollapsibleSection } from './components/CollapsibleSection'
 import { PersonalisedInsight } from './components/PersonalisedInsight'
 import { FactStrip } from './components/FactStrip'
-import { RecentNewsBlock } from './components/RecentNewsBlock'
 import { DeepDossierContent } from './components/DeepDossierContent'
 import { SourceEvidence } from './components/SourceEvidence'
 import {
@@ -264,20 +263,19 @@ export default async function InvestorDetailPage({ params }: PageProps) {
   // Apex-outreach enrichment: fetch deep profile (recent news, dossier) in
   // parallel with the rest of the page data. Graceful no-op when bridge is
   // unavailable (env vars missing) or the investor has no forge_capital_id.
-  async function fetchApexDeepProfile(): Promise<{ recentNews: string[]; deepProfile: Record<string, unknown> | null; deepProfileUpdatedAt: string | undefined }> {
+  async function fetchApexDeepProfile(): Promise<{ deepProfile: Record<string, unknown> | null; deepProfileUpdatedAt: string | undefined }> {
     const forgeCapId = attrs.forge_capital_id
-    if (!forgeCapId) return { recentNews: [], deepProfile: null, deepProfileUpdatedAt: undefined }
+    if (!forgeCapId) return { deepProfile: null, deepProfileUpdatedAt: undefined }
     const apex = createApexClient()
-    if (!apex) return { recentNews: [], deepProfile: null, deepProfileUpdatedAt: undefined }
+    if (!apex) return { deepProfile: null, deepProfileUpdatedAt: undefined }
     const { data } = await apex
       .from('investor_deep_profiles')
       .select('profile_json, updated_at')
       .eq('investor_id', forgeCapId)
       .maybeSingle()
-    if (!data?.profile_json) return { recentNews: [], deepProfile: null, deepProfileUpdatedAt: undefined }
+    if (!data?.profile_json) return { deepProfile: null, deepProfileUpdatedAt: undefined }
     const pj = data.profile_json as Record<string, unknown>
-    const news = Array.isArray(pj.recent_news) ? (pj.recent_news as string[]) : []
-    return { recentNews: news, deepProfile: pj, deepProfileUpdatedAt: data.updated_at ?? undefined }
+    return { deepProfile: pj, deepProfileUpdatedAt: data.updated_at ?? undefined }
   }
 
   const [contactResult, userSectorResult, coInvestorResult, apexResult] = await Promise.allSettled([
@@ -301,9 +299,9 @@ export default async function InvestorDetailPage({ params }: PageProps) {
     : {}
   const userSector = userSectorResult.status === 'fulfilled' ? userSectorResult.value : null
   const coInvestors = coInvestorResult.status === 'fulfilled' ? coInvestorResult.value.coInvestors : []
-  const { recentNews, deepProfile: apexDeepProfile, deepProfileUpdatedAt } = apexResult.status === 'fulfilled'
+  const { deepProfile: apexDeepProfile, deepProfileUpdatedAt } = apexResult.status === 'fulfilled'
     ? apexResult.value
-    : { recentNews: [] as string[], deepProfile: null, deepProfileUpdatedAt: undefined }
+    : { deepProfile: null, deepProfileUpdatedAt: undefined }
   const shortlistStage: ShortlistStage | null = shortlistResult.status === 'fulfilled'
     ? (shortlistResult.value[id] ?? null)
     : null
@@ -514,17 +512,6 @@ export default async function InvestorDetailPage({ params }: PageProps) {
             />
 
             {/* §1 — Recent News (from apex-outreach deep profile) */}
-            {recentNews.length > 0 && (
-              <CollapsibleSection
-                number={1}
-                title="Recent News"
-                subtitle={`${recentNews.length} item${recentNews.length === 1 ? '' : 's'}`}
-                previewLines={3}
-              >
-                <RecentNewsBlock newsLines={recentNews} />
-              </CollapsibleSection>
-            )}
-
             {/* §2 Investment Thesis */}
             {attrs.investment_thesis && (
               <CollapsibleSection number={2} title="Investment Thesis" defaultOpen previewLines={4}>
