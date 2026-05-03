@@ -20,6 +20,7 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
+import React from "react"
 import { toast } from "sonner"
 import {
   Loader2,
@@ -71,6 +72,19 @@ import { useStageBriefing } from "@/hooks/use-stage-briefing"
 import { STAGE_SPECIALISTS, getNextStageSpecialist } from "@/lib/cad-lab/stage-specialist-map"
 
 // ─── Page Component ──────────────────────────────────────────────────
+
+// Simple error boundary to catch framer-motion .length crashes without breaking the page
+class RenderErrorBoundary extends React.Component<{children: React.ReactNode}, {hasError: boolean}> {
+  state = { hasError: false }
+  static getDerivedStateFromError() { return { hasError: true } }
+  componentDidCatch(error: Error) {
+    console.error("[CAD-LAB-ERROR-BOUNDARY]", error.message, error.stack?.slice(0, 500))
+  }
+  render() {
+    if (this.state.hasError) return null
+    return this.props.children
+  }
+}
 
 export default function CadLabResearchPage(): React.ReactNode {
   const router = useRouter()
@@ -440,6 +454,7 @@ export default function CadLabResearchPage(): React.ReactNode {
   }, [activeTab, modules.length])
 
   return (
+    <RenderErrorBoundary>
     <div className="space-y-6">
       {/* ── Reverse link to the product this design was promoted to, if any ── */}
       {activeProjectId && (
@@ -1388,5 +1403,6 @@ export default function CadLabResearchPage(): React.ReactNode {
 
       <DesignReportDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} stage="concept" />
     </div>
+    </RenderErrorBoundary>
   )
 }
