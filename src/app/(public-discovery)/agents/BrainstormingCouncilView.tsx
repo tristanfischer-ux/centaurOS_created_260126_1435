@@ -302,8 +302,8 @@ type SessionPhase = "idle" | "pending" | "done" | "error"
  * W77: Fine-grained orchestration phase inside "pending" and at the
  * transition to "done". Drives which sections show loading vs content.
  *
- * - "r1-running"    — Cal + Round 1 specialists fire in parallel; cards arrive
- *                     one-by-one as individual promises resolve
+ * - "r1-running"    — Cal finished; Round 1 specialists fire in parallel; cards
+ *                     arrive one-by-one as individual promises resolve
  * - "r2-running"    — R1 shown; Round 2 specialists are in flight
  * - "cal-closing"   — R2 (or R1 for quick tier) shown; Cal closing is in flight
  * - "done"          — everything populated
@@ -566,11 +566,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         setQuestion("")
         setShowPicker(false)
 
-        // Cal + specialists fire in parallel — go straight to r1-running.
+        // Cal frames first — start in cal-framing so specialists show as queued.
         setSession({
             ...EMPTY_SESSION,
             phase: "pending",
-            councilPhase: "r1-running",
+            councilPhase: "cal-framing",
             submittedQuestion: trimmedQ,
             submittedTier: tierSnapshot,
             submittedSpecialistIds: snapshotIds,
