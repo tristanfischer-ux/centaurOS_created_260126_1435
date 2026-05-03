@@ -104,6 +104,41 @@ function makeDeepSeekModel(): ModelConfig {
     }
 }
 
+function makeGrokModel(): ModelConfig {
+    return {
+        id: "grok-4.3",
+        displayName: "Grok 4.3",
+        lineage: "xAI (US)",
+        call: async (system, user) => {
+            const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+            if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+            const response = await fetchWithTimeout(
+                "https://openrouter.ai/api/v1/chat/completions",
+                {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                    body: JSON.stringify({
+                        model: "x-ai/grok-4",
+                        max_tokens: 16384,
+                        temperature: 0.2,
+                        messages: [
+                            { role: "system", content: system },
+                            { role: "user", content: user },
+                        ],
+                    }),
+                },
+                180_000,
+            )
+            if (!response.ok) {
+                const errText = await response.text()
+                throw new Error(`xAI/OpenRouter error (${response.status}): ${errText.slice(0, 300)}`)
+            }
+            const data = await response.json()
+            return normaliseOpenRouterResponse(data)
+        },
+    }
+}
+
 function makeQwenModel(): ModelConfig {
     return {
         id: "qwen3-235b-a22b",
@@ -127,13 +162,13 @@ export const STAGE_MODEL_TRIADS: Record<string, ModelConfig[]> = {
     // Chase (research synthesis) — factual diversity catches hallucinated sources
     waiting_chase: [
         makeOpenAIModel("gpt-5.5", "GPT-5.5"),
-        makeDeepSeekModel(),
+        makeGrokModel(),
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
     ],
     // Max (concept synthesis) — creative diversity matters most
     waiting_max: [
         makeOpenAIModel("gpt-5.5", "GPT-5.5"),
-        makeDeepSeekModel(),
+        makeGrokModel(),
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
     ],
     // Sizing (engineering calculations) — cross-validation of numbers
@@ -145,25 +180,25 @@ export const STAGE_MODEL_TRIADS: Record<string, ModelConfig[]> = {
     // Bill of materials (component selection) — different knowledge bases
     waiting_bom: [
         makeOpenAIModel("gpt-5.5", "GPT-5.5"),
-        makeDeepSeekModel(),
+        makeGrokModel(),
         makeQwenModel(),
     ],
     // Finn (cost estimation) — financial figures need verification
     waiting_finn: [
         makeOpenAIModel("gpt-5.5", "GPT-5.5"),
-        makeDeepSeekModel(),
+        makeGrokModel(),
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
     ],
     // Fang (engineering review) — adversarial review benefits from diversity
     running_fang_reviews: [
         makeQwenModel(),
-        makeDeepSeekModel(),
+        makeGrokModel(),
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
     ],
     // Proofreading (synthesis + fact-check) — same triad as Chase/Max/Finn
     proofreading: [
         makeOpenAIModel("gpt-5.5", "GPT-5.5"),
-        makeDeepSeekModel(),
+        makeGrokModel(),
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
     ],
 }
@@ -187,18 +222,36 @@ async function runScout(
 ): Promise<string | null> {
     try {
         const start = Date.now()
-        const { text } = await callOpenAI(
-            systemPrompt,
-            userPrompt,
-            "gpt-4.1-mini", // Fast, cheap, good enough for first-pass
-            8192,
-            30_000, // 30s timeout — scout must be fast
+        const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
+        if (!apiKey) {
+            console.warn(`[parallel-llm] DEEPSEEK_API_KEY not set — scout skipped for ${stage}`)
+            return null
+        }
+        const response = await fetchWithTimeout(
+            "https://api.deepseek.com/v1/chat/completions",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                body: JSON.stringify({
+                    model: "deepseek-chat",
+                    max_tokens: 8192,
+                    temperature: 0.2,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt },
+                    ],
+                }),
+            },
+            30_000,
         )
+        if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`)
+        const data = await response.json()
+        const text = data.choices?.[0]?.message?.content || ""
         const elapsed = Date.now() - start
-        console.info(`[parallel-llm] Scout completed for stage ${stage} in ${elapsed}ms (${text.length} chars)`)
+        console.info(`[parallel-llm] Scout (V4-Flash) for stage ${stage}: ${elapsed}ms, ${text.length} chars`)
         return text
     } catch (err) {
-        console.warn(`[parallel-llm] Scout failed for stage ${stage}: ${err instanceof Error ? err.message : String(err)} — proceeding without scout`)
+        console.warn(`[parallel-llm] Scout failed for ${stage}: ${err instanceof Error ? err.message : String(err)} — proceeding without`)
         return null
     }
 }
@@ -467,8 +520,8 @@ function buildChaseFullLineup(): ModelConfig[] {
     return [
         // 1. US OpenAI — strongest general-purpose frontier
         makeOpenAIModel("gpt-5.5", "GPT-5.5"),
-        // 2. China DeepSeek — deep reasoning, different RLHF priors
-        makeDeepSeekModel(),
+        // 2. US xAI — Grok 4.3, fast reasoning, 175 tok/s, different lineage
+        makeGrokModel(),
         // 3. US Google — best long-document research synthesis
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
         // 4. China Moonshot — different open-weight lineage, multimodal
