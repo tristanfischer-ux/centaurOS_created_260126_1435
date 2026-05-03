@@ -598,6 +598,35 @@ The benchmark_grounding output MUST appear as a clearly labelled section in the 
                 console.warn("[run-finn-cost] DB grounding failed (non-fatal):", groundingErr instanceof Error ? groundingErr.message : groundingErr)
             }
 
+            // 4b. Pre-Finn validation: ensure all parts have been expanded.
+            //     If BOM generated parts but the batches failed or skipped some,
+            //     they will have cost_provenance='todo'. Finn should not run
+            //     on skeleton-only parts because cost estimates will be wildly
+            //     inaccurate or placeholder.
+            try {
+                const { data: todoParts, error: todoErr } = await admin
+                    .from("parts")
+                    .select("id, part_number")
+                    .eq("cad_lab_project_id", projectId)
+                    .eq("cost_provenance", "todo")
+
+                if (todoErr) {
+                    console.warn("[run-finn-cost] Failed to check cost_provenance:", todoErr.message)
+                } else if (todoParts && todoParts.length > 0) {
+                    const partIds = todoParts.slice(0, 5).map(p => p.part_number || p.id).join(", ")
+                    const msg = `Cost estimation skipped — BOM expansion incomplete. Found ${todoParts.length} part(s) with missing specs/costs (e.g. ${partIds}). Re-run BOM generation first.`
+                    await failPipelineRun(runId, "NO_BOM", msg)
+                    return {
+                        ok: false,
+                        runId,
+                        error: msg,
+                        errorCode: "NO_BOM",
+                    }
+                }
+            } catch (err) {
+                console.warn("[run-finn-cost] error checking todo parts:", err)
+            }
+
             // 5. Call the inner estimator. It handles DeepSeek call, JSON
             //    parse, classification overrides, and validation. Returns
             //    `{ success: true, estimates }` or `{ success: false, error }`.
@@ -775,6 +804,7 @@ The benchmark_grounding output MUST appear as a clearly labelled section in the 
                                 >,
                             })
                             .eq("id", projectId)
+                            .eq("foundry_id", foundryId)
                         if (correctErr) {
                             console.warn(
                                 `[run-finn-cost] BOM-anchor persist failed (non-blocking): ${correctErr.message}`,
@@ -836,6 +866,7 @@ The benchmark_grounding output MUST appear as a clearly labelled section in the 
                         } as unknown as Record<string, unknown>,
                     })
                     .eq("id", projectId)
+                    .eq("foundry_id", foundryId)
             } catch (nreErr) {
                 console.warn(
                     "[run-finn-cost] NRE estimation failed (non-blocking):",

@@ -327,28 +327,14 @@ async function runChaseResearchInternal(
             descriptionToUse = councilFeedback + "\n\n" + descriptionToUse
         }
 
-        // 2c. Inject standard form-factor constraints when the brief
-        //     mentions container-based or battery-storage products.
-        const lowerDesc = descriptionToUse.toLowerCase()
-        if (
-            lowerDesc.includes("container") ||
-            lowerDesc.includes("bess") ||
-            lowerDesc.includes("battery energy storage") ||
-            lowerDesc.includes("shipping container") ||
-            lowerDesc.includes("containerised") ||
-            lowerDesc.includes("containerized")
-        ) {
-            descriptionToUse += `\n\nIMPORTANT PHYSICAL CONSTRAINT — Standard shipping container internal dimensions:
-- 20ft container: 5.9m x 2.35m x 2.39m (33.2 m3, ~500 kWh practical battery capacity)
-- 40ft container: 12.03m x 2.35m x 2.39m (67.7 m3, ~1000 kWh practical battery capacity)
-- 40ft High-Cube: 12.03m x 2.35m x 2.69m (76.3 m3, ~1200 kWh practical battery capacity)
-If the brief specifies a container form factor, ALL downstream sizing MUST fit within these physical constraints. Flag any capacity target that cannot physically fit in the specified container size. A single 20ft container CANNOT hold more than ~500 kWh of lithium-ion battery storage; a 40ft container tops out at ~1000-1200 kWh. Multi-container configurations must be explicitly stated.`
+        // The downstream runCadLabResearch caps descriptions at 5000 characters.
+        // We added remediation context and council feedback.
+        // If we exceed 5000, we truncate cleanly.
+        if (descriptionToUse.length > 5000) {
+            descriptionToUse = descriptionToUse.slice(0, 4997) + "..."
         }
 
-        // 3. Pre-flight tier budget check. Mirrors Max's pattern exactly —
-        //    inner runCadLabResearch calls enforceCadLabLimit too; this
-        //    outer one lets us return a clean BUDGET_CAPPED errorCode
-        //    before we've opened a pipeline_runs row.
+        // 3. AI Budget check (cost_gbp_pence not tracked for Chase yet)
         let budgetOk = true
         let budgetMessage: string | null = null
         try {
@@ -445,6 +431,7 @@ If the brief specifies a container form factor, ALL downstream sizing MUST fit w
                     priorDesignBrief,
                     priorAssumptionNotes,
                     documentContext: referenceDossierContext,
+                    projectId: projectId,
                     onRetry: (firstErr) => {
                         retried = true
                         firstErrorMessage = firstErr
@@ -896,16 +883,19 @@ async function runResearchWithOneRetry(
          * read inside `runCadLabResearch` that would otherwise fail.
          */
         trusted?: { userId: string; foundryId: string }
+        projectId?: string
     },
 ): Promise<CadLabResearchResult> {
     const researchArg: {
         designBrief?: CadLabDesignBrief
         assumptionNotes?: string
         documentContext?: string
+        existingProjectId?: string
     } = {}
     if (opts.priorDesignBrief) researchArg.designBrief = opts.priorDesignBrief
     if (opts.priorAssumptionNotes) researchArg.assumptionNotes = opts.priorAssumptionNotes
     if (opts.documentContext) researchArg.documentContext = opts.documentContext
+    if (opts.projectId) researchArg.existingProjectId = opts.projectId
 
     const first = await runCadLabResearch(description, researchArg, opts.trusted)
     if (first.success) return first

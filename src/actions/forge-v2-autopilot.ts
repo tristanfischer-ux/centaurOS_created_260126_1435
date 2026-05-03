@@ -647,6 +647,7 @@ export async function recordFailure(
         stage: stageSlug,
         failed_stages: failed,
         error,
+        finished_at: new Date().toISOString(),
     }
     await admin
         .from("cad_lab_projects")

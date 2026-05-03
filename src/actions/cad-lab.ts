@@ -339,58 +339,35 @@ export async function runCadLabResearch(
     // (Max, Sizing, BOM, Finn) to read via extractStageContext().
     let fullTrainingDossier = ""
     try {
-      const trainingDump = await runTrainingDataDump(description, formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes))
-      if (trainingDump.dossier.length > 0 && trainingDump.modelsResponded > 0) {
-        fullTrainingDossier = trainingDump.dossier
-        console.info(`[THE-FORGE] Stage 0 complete: ${trainingDump.modelsResponded}/10 models, ${trainingDump.dossier.length} chars, ${trainingDump.elapsedMs}ms`)
+      // Temporary check if we already have it from a previous run to speed up testing
+      const existingProject = await createAdminClient().from('cad_lab_projects').select('additional_context').eq('id', options?.existingProjectId || '').single();
+      if (existingProject.data?.additional_context && existingProject.data.additional_context.length > 50000) {
+        fullTrainingDossier = existingProject.data.additional_context;
+        console.info(`[THE-FORGE] Stage 0 skipped: Found ${fullTrainingDossier.length} chars of existing training data on project.`);
+      } else {
+        const trainingDump = await runTrainingDataDump(description, formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes))
+        if (trainingDump.dossier.length > 0 && trainingDump.modelsResponded > 0) {
+          fullTrainingDossier = trainingDump.dossier
+          console.info(`[THE-FORGE] Stage 0 complete: ${trainingDump.modelsResponded}/10 models, ${trainingDump.dossier.length} chars, ${trainingDump.elapsedMs}ms`)
+        }
       }
     } catch (stage0Err) {
       console.warn("[THE-FORGE] Stage 0 training data dump failed (non-fatal, continuing):", stage0Err instanceof Error ? stage0Err.message : stage0Err)
     }
 
-    // 1. Run Gemini + Google Search and Thingiverse in parallel
-    // NOTE: Gemini prompt is intentionally SHORT — no training data prepended.
-    // Long prompts cause Gemini to silently drop the Google Search tool.
+    // 1. Skip Gemini web search per user request — using Stage 0 Training Data Dump instead
+    // NOTE: We will come back to the web search later, once we have improved other aspects of the process
     const intakeContext = formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes)
 
-    const [webResult, cadResult] = await Promise.allSettled([
-      callGeminiWithSearch(
-        `Find the real-world specifications for: ${description}
-
-I need precise engineering dimensions for 3D CAD modelling. Search for:
-
-1. OVERALL DIMENSIONS — length, width, height in mm (folded and unfolded if applicable)
-2. WEIGHT — total weight and breakdown if available
-3. MOTOR/ACTUATOR SPECS — diameter, height, mounting hole pattern (if it has motors)
-4. KEY COMPONENT DIMENSIONS — battery, camera, electronics, frame, arms
-5. CRITICAL CONSTRAINTS — motor-to-motor diagonal, wheelbase, prop clearance
-6. MATERIAL — primary materials and wall thicknesses
-7. STANDARD PARTS — propeller size, bolt sizes, mounting standards
-
-You MUST also include the following structured output sections:
-
-**Sources**: Require a "Sources" section listing at least 10 sources, each with title, organization, source type, URL, jurisdiction, and publication date. Require diversity: ≥2 manufacturer datasheets, ≥2 regulatory/standards docs, ≥2 market reports, ≥2 competitor pages.
-**Regulatory Matrix**: Require a "Regulatory Compliance" table with columns: requirement, jurisdiction, applies_to, mandatory_or_guidance, evidence, design_implication, status. Pre-seed categories: G99 grid code, DNO connection, UKCA/CE, EMC/LVD, UN38.3/ADR transport, NFCC guidance, BS/IEC 62933. Minimum 8 items, ≥5 UK-specific.
-**Market Sizing**: Require "Market Sizing" section with TAM, SAM, SOM in GBP, methodology (top-down and bottom-up), assumptions, calculation steps, and customer segments. Require at least one UK government/grid source and one market report.
-**Competitor Analysis**: Require a "Competitor Analysis" table with columns: company, product_name, energy_MWh, power_MW, chemistry, certifications, cost_or_price_signal, lead_time, source_url. Minimum 5 named competitors.
-**Inline Citations**: Every numeric claim, compliance reference, or cost figure must include [Source: <source_id>] inline.
-**Assumptions vs Facts**: Require claims to be labeled as "Fact (cited)" or "Inference (reasoned)" or "Assumption (unverified)".
-
-Format your response as a structured specification sheet with exact numbers in millimetres. If a dimension is approximate, say so. If you find conflicting specs from different sources, list both.
-
-Do NOT guess dimensions. Only include measurements you found from real sources.${intakeContext}`,
-      ),
+    const [cadResult] = await Promise.allSettled([
       searchCadModels(description),
     ])
 
-    const webSpecs = webResult.status === "fulfilled" ? webResult.value.text : ""
-    const webSources = webResult.status === "fulfilled" ? webResult.value.sources : []
+    const webSpecs = "Web search skipped. Relying entirely on Stage 0 training data dump."
+    const webSources = []
     const cadModels = cadResult.status === "fulfilled" ? cadResult.value : []
 
-    // Log Gemini/Thingiverse failures so they aren't silent
-    if (webResult.status === "rejected") {
-      console.error("[THE-FORGE] Step 1: Gemini web search failed:", webResult.reason)
-    }
+    // Log Thingiverse failures so they aren't silent
     if (cadResult.status === "rejected") {
       console.error("[THE-FORGE] Step 1: Thingiverse CAD search failed:", cadResult.reason)
     }

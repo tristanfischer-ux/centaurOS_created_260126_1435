@@ -830,6 +830,13 @@ async function runFangSizingInternal(
                 : `envelope: ${sheet.envelope.label} (library default)`,
         ]
 
+        if (!sheet.feasible) {
+            // INTENT: Prevent INFEASIBLE dimension estimates from emitting downstream.
+            // Downstream stages (layout, BOM, Finn) see empty dimensions and gracefully abort/wait,
+            // while diagnostics (conflicts, sweep) remain intact for the founder/gates.
+            sheet.module_dimensions = {}
+        }
+
         // Persist dimension_sheet AND any auto-adjustments applied during
         // the loop above. The adjustments live in research._brief_auto_adjustments
         // — read by the cover banner so the founder sees what was relaxed.

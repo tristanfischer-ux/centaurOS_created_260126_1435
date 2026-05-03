@@ -233,7 +233,20 @@ export async function rasteriseSpatialPlanToDataUri(
     if (!svg) return null
 
     const sharp = (await import("sharp")).default
-    const pngBuffer = await sharp(Buffer.from(svg))
+    const image = sharp(Buffer.from(svg))
+    
+    const stats = await image.stats()
+    if (stats.channels[0] && stats.channels[1] && stats.channels[2]) {
+        const meanR = stats.channels[0].mean
+        const meanG = stats.channels[1].mean
+        const meanB = stats.channels[2].mean
+        if (meanR < 10 && meanG < 10 && meanB < 10) {
+            console.warn("[rasterise-spatial-plan] SVG rasterisation produced a black rectangle. Falling back to table.")
+            return null
+        }
+    }
+
+    const pngBuffer = await image
         .png({ compressionLevel: 8 })
         .toBuffer()
     const base64 = pngBuffer.toString("base64")

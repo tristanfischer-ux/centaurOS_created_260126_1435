@@ -63,7 +63,7 @@ import type { DeterministicGate, GateContext, DeterministicCheckResult } from ".
 
 /** One axis where a numeric mismatch was found. */
 export interface Gate1MismatchAxis {
-    axis: "capacity" | "throughput" | "mass" | "envelope_kind" | "power"
+    axis: "capacity" | "throughput" | "mass" | "envelope_kind" | "power" | "semantic"
     /** What the founder wrote in their brief (raw string + normalised SI value). */
     founder_value: { raw: string; normalised: number; unit: string } | null
     /** What Chase produced in the structured output. */
@@ -102,6 +102,10 @@ export interface Gate1Input {
      *  plus any intake fields the founder typed before Chase ran. Pass every
      *  available brief field joined into one string. */
     founder_raw_brief: string
+    /**
+     * Textual fields from Chase's generated design brief.
+     */
+    chase_design_brief_text?: string
     /**
      * Chase's structured extraction. The fields mirror what the sizing engine
      * persists on `dimension_sheet.target` (kWh → `capacity_kwh`, kW → `power_kw`)
@@ -142,6 +146,24 @@ const KG_PER_TONNE = 1_000
 const KG_PER_LB = 0.45359237
 
 // ─── Extraction helpers ────────────────────────────────────────────────
+
+const STOP_WORDS = new Set([
+    "the", "and", "a", "to", "of", "in", "for", "is", "on", "that", "by", "this", "with", "i", "you", "it", "not", "or", "be", "are", "from", "at", "as", "your", "all", "have", "new", "more", "an", "was", "we", "will", "home", "can", "us", "about", "if", "page", "my", "has", "search", "free", "but", "our", "one", "other", "do", "no", "information", "time", "they", "site", "he", "up", "may", "what", "which", "their", "news", "out", "use", "any", "there", "see", "only", "so", "his", "when", "contact", "here", "business", "who", "web", "also", "now", "help", "get", "pm", "view", "online", "c", "e", "first", "am", "been", "would", "how", "were", "me", "s", "services", "some", "these", "click", "its", "like", "service", "x", "than", "find", "price", "date", "back", "top", "people", "had", "list", "name", "just", "over", "state", "year", "day", "into", "email", "two", "health", "n", "world", "products", "music", "buy", "data", "make", "them", "should", "product", "system", "post", "her", "city", "t", "add", "policy", "number", "such", "please", "available", "copyright", "support", "message", "after", "best", "software", "then", "jan", "good", "video", "well", "d", "where", "info", "rights", "public", "books", "high", "school", "through", "m", "each", "links", "she", "review", "years", "order", "very", "privacy", "book", "items", "company", "read", "group", "sex", "need", "many", "user", "said", "de", "does", "set", "under", "general", "research", "university", "january", "mail", "full", "map", "reviews", "program", "life",
+    "want", "build", "create", "design", "develop", "target", "cost", "below", "above", "installed", "using", "based", "platform", "solution", "scale", "type", "form", "factor", "unit", "require", "needs", "required", "include", "including", "within", "without", "while", "whom", "whose", "why", "yet", "yours", "yourself", "yourselves", "system", "systems", "project", "projects", "need", "needs", "want", "wants", "like", "would", "could", "should", "must", "can", "may", "might", "shall", "will", "the", "a", "an", "and", "or", "but", "if", "because", "as", "until", "while", "of", "at", "by", "for", "with", "about", "against", "between", "into", "through", "during", "before", "after", "above", "below", "to", "from", "up", "down", "in", "out", "on", "off", "over", "under", "again", "further", "then", "once", "here", "there", "when", "where", "why", "how", "all", "any", "both", "each", "few", "more", "most", "other", "some", "such", "no", "nor", "not", "only", "own", "same", "so", "than", "too", "very"
+])
+
+export function extractTechnicalTerms(text: string): string[] {
+    if (!text) return []
+    // Match words containing letters, numbers, hyphens. Require at least one letter.
+    const matches = text.toLowerCase().match(/\b[a-z0-9-]*[a-z][a-z0-9-]*\b/g) || []
+    const terms = new Set<string>()
+    for (const match of matches) {
+        if (match.length > 3 && !STOP_WORDS.has(match)) {
+            terms.add(match)
+        }
+    }
+    return Array.from(terms)
+}
 
 /** Run a pattern globally and return all captured numeric groups. */
 function extractAll(pattern: RegExp, text: string, multiplier = 1): Array<{ raw: string; value: number }> {
@@ -563,6 +585,41 @@ export function gate1Check(input: Gate1Input): Gate1Verdict {
         })
     }
 
+    // ── 6. Semantic Divergence ──────────────────────────────────────────
+    if (input.chase_design_brief_text !== undefined) {
+        const founderTerms = extractTechnicalTerms(briefText)
+        const chaseTerms = extractTechnicalTerms(input.chase_design_brief_text)
+        const chaseTermsSet = new Set(chaseTerms)
+
+        const missingCriticalTerms = founderTerms.filter(t => {
+            // If the term is explicitly in Chase's terms, it's not missing
+            if (chaseTermsSet.has(t)) return false;
+            
+            // If it's hyphenated, check if all parts are present
+            if (t.includes("-")) {
+                const parts = t.split("-");
+                if (parts.length > 1 && parts.every(p => chaseTermsSet.has(p))) return false;
+            }
+            
+            // Check if any Chase term contains this term as a substring, or vice versa (for plurals/variants)
+            for (const ct of chaseTermsSet) {
+                if (ct.includes(t) || t.includes(ct)) return false;
+            }
+            
+            return true;
+        })
+        
+        if (missingCriticalTerms.length > 0) {
+            blockers.push({
+                axis: "semantic",
+                founder_value: { raw: missingCriticalTerms.join(", "), normalised: 0, unit: "terms" },
+                chase_value: null,
+                factor_off: Infinity,
+                explanation: `Semantic divergence: Founder's brief included critical terms (${missingCriticalTerms.join(", ")}) that are missing from Chase's design brief. This indicates Chase may have misunderstood the core technology or use case.`,
+            })
+        }
+    }
+
     const passed = blockers.length === 0
     const needs_founder_confirmation =
         warnings.some((w) => w.explanation.toLowerCase().includes("confirm"))
@@ -584,13 +641,11 @@ export function gate1Check(input: Gate1Input): Gate1Verdict {
 export function buildGate1Input(
     research: { report?: unknown; designBrief?: CadLabDesignBrief } | null,
     dimensionSheet: DimensionSheet | null,
+    founderRawBriefText: string = "",
 ): Gate1Input {
     // Build the raw brief text haystack — same strategy as run-fang-sizing.ts.
     const db = research?.designBrief ?? null
-    const haystack = [
-        typeof research?.report === "string"
-            ? research.report
-            : (research?.report as { content?: string } | null)?.content ?? "",
+    const chaseDesignBriefText = [
         db?.useCase ?? "",
         db?.mission ?? "",
         db?.complianceNotes ?? "",
@@ -599,6 +654,17 @@ export function buildGate1Input(
     ]
         .filter((s) => typeof s === "string" && s.length > 0)
         .join(" \n ")
+
+    const fallbackHaystack = [
+        typeof research?.report === "string"
+            ? research.report
+            : (research?.report as { content?: string } | null)?.content ?? "",
+        chaseDesignBriefText,
+    ]
+        .filter((s) => typeof s === "string" && s.length > 0)
+        .join(" \n ")
+
+    const actualFounderBrief = founderRawBriefText.trim() ? founderRawBriefText.trim() : fallbackHaystack
 
     // Chase's structured interpretation lives in dimension_sheet.target.
     // The sizing engine persists capacity as `kWh` and power as `kW`.
@@ -619,7 +685,8 @@ export function buildGate1Input(
                 : null
 
     return {
-        founder_raw_brief: haystack,
+        founder_raw_brief: actualFounderBrief,
+        chase_design_brief_text: chaseDesignBriefText,
         chase_design_brief: {
             capacity_kwh: capacityKwh,
             power_kw: powerKw,
@@ -656,14 +723,17 @@ export const gate1: DeterministicGate<Gate1Input> = {
         const admin = createAdminClient()
         const { data } = await admin
             .from("cad_lab_projects")
-            .select("research, dimension_sheet")
+            .select("research, dimension_sheet, founder_raw_brief, subject")
             .eq("id", ctx.projectId)
             .maybeSingle()
         
         const research = data?.research as { report?: unknown; designBrief?: CadLabDesignBrief } | null
         const dimensionSheet = data?.dimension_sheet as DimensionSheet | null
+        const founderText = (typeof data?.founder_raw_brief === "string" && data?.founder_raw_brief.trim())
+            ? data.founder_raw_brief.trim()
+            : (typeof data?.subject === "string" ? data.subject.trim() : "")
         
-        return buildGate1Input(research, dimensionSheet)
+        return buildGate1Input(research, dimensionSheet, founderText)
     },
     check: (input: Gate1Input): DeterministicCheckResult => {
         const verdict = gate1Check(input)

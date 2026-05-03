@@ -333,15 +333,20 @@ function PdfFooter({ label }: { label: string }): React.ReactElement {
  * number". Coercing at the boundary gives downstream code a real number
  * to work with OR a clean null guarded by the existing `?? 0` patterns.
  */
-function toFiniteOrNull(x: unknown): number | null {
-    if (typeof x === "number") {
-        return Number.isFinite(x) ? x : null
-    }
-    if (typeof x === "string" && x.length > 0) {
-        const n = Number(x)
-        return Number.isFinite(n) ? n : null
-    }
-    return null
+function safeNumeric(val: unknown): number | null {
+    if (val === null || val === undefined) return null;
+    const n = typeof val === 'string' ? parseFloat(val) : val;
+    return typeof n === 'number' && Number.isFinite(n) ? n : null;
+}
+
+function safeDivide(a: number | null, b: number | null): number | null {
+    if (a == null || b == null || b === 0) return null
+    return a / b
+}
+
+function safeAdd(a: number | null, b: number | null): number | null {
+    if (a == null || b == null) return null
+    return a + b
 }
 
 function fmtGbp(n: number | null | undefined): string {
@@ -367,6 +372,9 @@ function walkForBadNumbers(
         }
         return out
     }
+    if (typeof obj === "string" && obj.length > 0 && obj.length < 30 && !isNaN(Number(obj))) {
+        out.push({ path, value: obj })
+    }
     if (Array.isArray(obj)) {
         for (let i = 0; i < obj.length; i++) {
             out.push(...walkForBadNumbers(obj[i], `${path}[${i}]`))
@@ -382,6 +390,48 @@ function walkForBadNumbers(
         }
     }
     return out
+}
+
+function coercePdfInputNumbers(data: PdfInput) {
+    if (data.cost) {
+        data.cost.unitTotalGbp = safeNumeric(data.cost.unitTotalGbp) as number | null
+        data.cost.ceilingGbp = safeNumeric(data.cost.ceilingGbp) as number | null
+        if ('headroomGbp' in data.cost) {
+            (data.cost as any).headroomGbp = safeNumeric((data.cost as any).headroomGbp) as number | null
+        }
+    }
+    for (const mod of data.modules) {
+        mod.massKg = safeNumeric(mod.massKg) as number | null
+        mod.budgetMassKg = safeNumeric(mod.budgetMassKg) as number | null
+        if (mod.cost) {
+            mod.cost.totalPerUnit = safeNumeric(mod.cost.totalPerUnit) as number | null
+            if (mod.cost.labourCost !== undefined) mod.cost.labourCost = safeNumeric(mod.cost.labourCost) as number | null
+            if (mod.cost.materialCostPerUnit !== undefined) mod.cost.materialCostPerUnit = safeNumeric(mod.cost.materialCostPerUnit) as number | undefined
+            if (mod.cost.processingCostPerUnit !== undefined) mod.cost.processingCostPerUnit = safeNumeric(mod.cost.processingCostPerUnit) as number | undefined
+            if (mod.cost.toolingCost !== undefined) mod.cost.toolingCost = safeNumeric(mod.cost.toolingCost) as number | undefined
+            if (mod.cost.estimatedMassKg !== undefined) mod.cost.estimatedMassKg = safeNumeric(mod.cost.estimatedMassKg) as number | undefined
+            
+            if (Array.isArray(mod.cost.parts)) {
+                for (const p of mod.cost.parts) {
+                    if (p.cost !== undefined) p.cost = safeNumeric(p.cost) as number
+                }
+            }
+            
+            const anyCost = mod.cost as any
+            if (Array.isArray(anyCost.costBreakdown)) {
+                for (const row of anyCost.costBreakdown) {
+                    if (!row || typeof row !== 'object') continue
+                    for (const k of Object.keys(row)) {
+                        if (typeof row[k] === 'string' && !isNaN(Number(row[k])) && row[k].length > 0) {
+                            row[k] = safeNumeric(row[k])
+                        } else if (typeof row[k] === 'number') {
+                            row[k] = safeNumeric(row[k])
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 function fmtKg(n: number | null | undefined): string {
@@ -4260,6 +4310,42 @@ function SizingOptimisationSection({
         <View>
             <Text style={styles.h2}>{sectionNumber}. Sizing optimisation</Text>
             <Text style={styles.muted}>{captionText}</Text>
+            
+            {!sheet.feasible && (
+                <View
+                    style={{
+                        marginTop: 8,
+                        marginBottom: 10,
+                        padding: 10,
+                        backgroundColor: "#fee2e2",
+                        borderLeftWidth: 4,
+                        borderLeftColor: "#b91c1c",
+                        borderRadius: 3,
+                    }}
+                    wrap={false}
+                >
+                    <Text style={{ fontSize: 10, fontWeight: "bold", color: "#7f1d1d", marginBottom: 4 }}>
+                        INFEASIBLE DESIGN — The briefed target exceeds the selected envelope.
+                    </Text>
+                    <Text style={{ fontSize: 9, color: "#7f1d1d", marginBottom: 6 }}>
+                        The solver could not fit the original target into the envelope. The configuration below is incomplete or over-capacity. Treat downstream dimensions, spatial plans, and costs as tentative until the brief is revised.
+                    </Text>
+                    {sheet.closest_feasible_alternate && (
+                        <View style={{ marginTop: 2, padding: 6, backgroundColor: "#fef2f2", borderRadius: 2 }}>
+                            <Text style={{ fontSize: 9, fontWeight: "bold", color: "#991b1b", marginBottom: 2 }}>
+                                Closest feasible alternate the solver found:
+                            </Text>
+                            <Text style={{ fontSize: 9, color: "#991b1b", marginBottom: 2 }}>
+                                {Object.entries(sheet.closest_feasible_alternate.target).map(([k, v]) => `${k}: ${v}`).join(" · ")}
+                            </Text>
+                            <Text style={{ fontSize: 8.5, color: "#991b1b", fontStyle: "italic" }}>
+                                {sheet.closest_feasible_alternate.delta_from_primary} · envelope: {sheet.closest_feasible_alternate.envelope.label}
+                            </Text>
+                        </View>
+                    )}
+                </View>
+            )}
+
             <View style={{ marginBottom: 10 }}>
                 <Text style={{ fontSize: 10, color: "#555", marginBottom: 2 }}>Envelope</Text>
                 <Text style={{ fontSize: 10, marginBottom: 6 }}>{envelopeLine}</Text>
@@ -4268,37 +4354,7 @@ function SizingOptimisationSection({
                     {Object.entries(sheet.target).map(([k, v]) => `${k}: ${v}`).join(" · ")}{" "}
                     <Text style={{ color: feasibleColor, fontWeight: "bold" }}>[{feasibleLabel}]</Text>
                 </Text>
-                {/* Loop 8 L5-P4 sizing universalisation: when primary is
-                 * infeasible, show the closest feasible alternate the
-                 * solver could find. Founder gets ORIGINAL (INFEASIBLE)
-                 * + CLOSEST FEASIBLE side-by-side so the trade-off is
-                 * visible instead of buried in recommendations. */}
-                {!sheet.feasible && sheet.closest_feasible_alternate && (
-                    <View
-                        style={{
-                            marginTop: 6,
-                            marginBottom: 8,
-                            padding: 8,
-                            borderRadius: 4,
-                            backgroundColor: "#f0fdf4",
-                            borderLeftWidth: 3,
-                            borderLeftColor: "#15803d",
-                        }}
-                    >
-                        <Text style={{ fontSize: 10, fontWeight: "bold", color: "#14532d", marginBottom: 2 }}>
-                            Closest feasible alternate the solver found
-                        </Text>
-                        <Text style={{ fontSize: 11, marginBottom: 2 }}>
-                            {Object.entries(sheet.closest_feasible_alternate.target)
-                                .map(([k, v]) => `${k}: ${v}`)
-                                .join(" · ")}{" "}
-                            <Text style={{ color: "#0a6a1a", fontWeight: "bold" }}>[FEASIBLE]</Text>
-                        </Text>
-                        <Text style={{ fontSize: 9, color: "#166534", fontStyle: "italic" }}>
-                            {sheet.closest_feasible_alternate.delta_from_primary} · envelope: {sheet.closest_feasible_alternate.envelope.label}
-                        </Text>
-                    </View>
-                )}
+                {/* Loop 8 L5-P4 sizing universalisation */}
                 {!sheet.feasible && !sheet.closest_feasible_alternate && (
                     <View
                         style={{
@@ -5646,20 +5702,17 @@ async function exportProjectPdfInternal(
             if (!canonicalSpecs || canonicalRevision === 0) return null
             const m = canonicalSpecs.modules?.[moduleId]
             if (!m) return null
-            const v = m.specs?.[specKey]?.value
-            return typeof v === "number" && Number.isFinite(v) ? v : null
+            return safeNumeric(m.specs?.[specKey]?.value)
         }
         function canonicalPartCost(partId: string): number | null {
             if (!canonicalSpecs || canonicalRevision === 0) return null
             const p = canonicalSpecs.parts?.[partId]
-            const v = p?.unitCostGbp?.value
-            return typeof v === "number" && Number.isFinite(v) ? v : null
+            return safeNumeric(p?.unitCostGbp?.value)
         }
         function canonicalPartMass(partId: string): number | null {
             if (!canonicalSpecs || canonicalRevision === 0) return null
             const p = canonicalSpecs.parts?.[partId]
-            const v = p?.massKg?.value
-            return typeof v === "number" && Number.isFinite(v) ? v : null
+            return safeNumeric(p?.massKg?.value)
         }
 
         const costEstimates = (project.ai_cost_estimates as Record<
@@ -5786,10 +5839,10 @@ async function exportProjectPdfInternal(
                 massKg: (() => {
                     const fromCanonical = canonicalModuleSpec(m.id, "massKg")
                     if (fromCanonical !== null) return fromCanonical
-                    return typeof m.estimatedMassKg === "number" ? m.estimatedMassKg : null
+                    return safeNumeric(m.estimatedMassKg)
                 })(),
-                budgetMassKg: typeof m.budgetMassKg === "number" ? m.budgetMassKg : null,
-                leadWeeks: typeof m.leadWeeks === "number" ? m.leadWeeks : null,
+                budgetMassKg: safeNumeric(m.budgetMassKg),
+                leadWeeks: safeNumeric(m.leadWeeks),
                 leadTimeSource:
                     typeof m.leadTimeSource === "string" ? m.leadTimeSource : null,
                 mirrorOf: typeof m.mirrorOf === "string" ? m.mirrorOf : null,
@@ -5828,8 +5881,8 @@ async function exportProjectPdfInternal(
                         if (!r || typeof r !== "object") continue
                         const rr = r as Record<string, unknown>
                         if (typeof rr.hazard !== "string" || rr.hazard.length === 0) continue
-                        const sev = typeof rr.severity === "number" ? rr.severity : null
-                        const lik = typeof rr.likelihood === "number" ? rr.likelihood : null
+                        const sev = safeNumeric(rr.severity)
+                        const lik = safeNumeric(rr.likelihood)
                         if (sev === null || lik === null) continue
                         out.push({
                             id: typeof rr.id === "string" ? rr.id : `RM-${out.length + 1}`,
@@ -5847,14 +5900,14 @@ async function exportProjectPdfInternal(
                                 typeof rr.mitigation === "string" ? rr.mitigation : null,
                             owner: typeof rr.owner === "string" ? rr.owner : null,
                             residualSeverity:
-                                typeof rr.residualSeverity === "number"
-                                    ? Math.max(1, Math.min(5, Math.round(rr.residualSeverity)))
+                                safeNumeric(rr.residualSeverity) !== null
+                                    ? Math.max(1, Math.min(5, Math.round(safeNumeric(rr.residualSeverity) as number)))
                                     : null,
                             residualLikelihood:
-                                typeof rr.residualLikelihood === "number"
+                                safeNumeric(rr.residualLikelihood) !== null
                                     ? Math.max(
                                           1,
-                                          Math.min(5, Math.round(rr.residualLikelihood)),
+                                          Math.min(5, Math.round(safeNumeric(rr.residualLikelihood) as number)),
                                       )
                                     : null,
                         })
@@ -5897,11 +5950,11 @@ async function exportProjectPdfInternal(
                 materialSpec: typeof p.material_spec === "string" ? p.material_spec : null,
                 finish: typeof p.finish === "string" ? p.finish : null,
                 tolerance: typeof p.tolerance === "string" ? p.tolerance : null,
-                massKg: canonicalMass !== null ? canonicalMass : toFiniteOrNull(p.mass_kg),
+                massKg: canonicalMass !== null ? canonicalMass : safeNumeric(p.mass_kg),
                 estimatedUnitCostGbp:
                     canonicalCost !== null
                         ? canonicalCost
-                        : toFiniteOrNull(p.estimated_unit_cost_gbp),
+                        : safeNumeric(p.estimated_unit_cost_gbp),
                 isPurchased: Boolean(p.is_purchased),
                 description: typeof p.description === "string" ? p.description : null,
                 // A1 — cost_provenance column (migration 20260429300000).
@@ -5969,7 +6022,7 @@ async function exportProjectPdfInternal(
         try {
             const { snapshotCanonicalSpecs } = await import("@/lib/cad-lab/snapshot-canonical-specs")
             const finnTotal = Object.values(costEstimates).reduce(
-                (acc: number, est) => acc + (typeof est?.totalPerUnit === "number" ? est.totalPerUnit : 0),
+                (acc: number, est) => acc + (safeNumeric(est?.totalPerUnit) ?? 0),
                 0,
             )
             const snapshotResult = await snapshotCanonicalSpecs(
@@ -6048,16 +6101,13 @@ async function exportProjectPdfInternal(
         }
         const perModuleCost = modules.map((m) => {
             const partsTotal = partsCostByModule.get(m.name)
-            const finnTotal =
-                m.cost && typeof m.cost.totalPerUnit === "number"
-                    ? (m.cost.totalPerUnit as number)
-                    : null
+            const finnTotal = m.cost ? safeNumeric(m.cost.totalPerUnit) : null
             // Prefer parts-table roll-up; fall back to Finn estimate only if
             // the BOM has no rows for this module (which is itself a bug
             // worth flagging, but better than rendering null).
             return {
                 moduleName: m.name,
-                totalGbp: typeof partsTotal === "number" ? partsTotal : finnTotal,
+                totalGbp: partsTotal !== undefined ? partsTotal : finnTotal,
                 // finnTotalGbp kept separately so the cost-tree validation
                 // gate (below) can cross-check the two sources even when the
                 // parts-table roll-up wins the display race.
@@ -6092,7 +6142,7 @@ async function exportProjectPdfInternal(
                 ((m.cost as { parts?: Array<{ name: string; cost: number }> } | null)?.parts ?? []).map(
                     (p: { name: string; cost: number }) => ({
                         name: p.name,
-                        cost: typeof p.cost === "number" ? p.cost : 0,
+                        cost: safeNumeric(p.cost) ?? 0,
                         moduleName: m.name,
                     }),
                 ),
@@ -6305,16 +6355,8 @@ async function exportProjectPdfInternal(
                         const country = l.country as string | null
                         if (country) hqById.set(id, country)
                     }
-                    foundedYearById.set(
-                        id,
-                        typeof l.founded_year === "number" ? (l.founded_year as number) : null,
-                    )
-                    employeeCountById.set(
-                        id,
-                        typeof l.employee_count_exact === "number"
-                            ? (l.employee_count_exact as number)
-                            : null,
-                    )
+                    foundedYearById.set(id, safeNumeric(l.founded_year))
+                    employeeCountById.set(id, safeNumeric(l.employee_count_exact))
                     leadTimeById.set(id, (l.lead_time as string | null) ?? null)
                     minimumOrderById.set(id, (l.minimum_order as string | null) ?? null)
                     const certText = formatJsonArrayField(l.certifications as string | string[] | null | undefined, "")
@@ -6353,8 +6395,7 @@ async function exportProjectPdfInternal(
                 typeof r.project_synthesis === "string" && r.project_synthesis.length > 0
                     ? (r.project_synthesis as string)
                     : null,
-            matchScore:
-                typeof r.best_match_score === "number" ? r.best_match_score : null,
+            matchScore: safeNumeric(r.best_match_score),
             scoreBreakdown:
                 r.best_score_breakdown && typeof r.best_score_breakdown === "object"
                     ? (r.best_score_breakdown as Record<string, unknown>)
@@ -6455,7 +6496,7 @@ async function exportProjectPdfInternal(
                     .select("id", { count: "exact", head: true })
                     .in("category", ["Products", "Services"])
                     .ilike("industries", `%${detectedDomain}%`)
-                if (typeof domainCount === "number" && domainCount < SUPPLIER_COVERAGE_THRESHOLD) {
+                if (safeNumeric(domainCount) !== null && (safeNumeric(domainCount) as number) < SUPPLIER_COVERAGE_THRESHOLD) {
                     const domainLabel = detectedDomain.replace(/_/g, " ")
                     supplierDirectoryCoverageNote =
                         `Supplier shortlist drawn from a directory with limited coverage in ${domainLabel} (${domainCount} entries). Results may not reflect the full market.`
@@ -6499,7 +6540,7 @@ async function exportProjectPdfInternal(
             const action = `${r.specialist_id}.${r.stage}${status === "done" ? "" : ` · ${status}`}`
             const meta: string[] = []
             if (r.model_id) meta.push(String(r.model_id))
-            if (typeof r.cost_gbp_pence === "number") meta.push(`${r.cost_gbp_pence}p`)
+            if (safeNumeric(r.cost_gbp_pence) !== null) meta.push(`${safeNumeric(r.cost_gbp_pence)}p`)
             if (r.error_code) meta.push(String(r.error_code))
             if (r.error_message) meta.push(String(r.error_message).slice(0, 80))
             auditLog.push({
@@ -6594,14 +6635,8 @@ async function exportProjectPdfInternal(
                         : null,
                 whyNow:
                     typeof designBrief?.whyNow === "string" ? designBrief!.whyNow : null,
-                unitCostCeilingGbp:
-                    typeof designBrief?.constraints?.unitCostCeilingGbp === "number"
-                        ? designBrief!.constraints!.unitCostCeilingGbp
-                        : null,
-                maxMassKg:
-                    typeof designBrief?.constraints?.maxMassKg === "number"
-                        ? designBrief!.constraints!.maxMassKg
-                        : null,
+                unitCostCeilingGbp: safeNumeric(designBrief?.constraints?.unitCostCeilingGbp),
+                maxMassKg: safeNumeric(designBrief?.constraints?.maxMassKg),
                 targetProcess:
                     typeof designBrief?.targetProcess === "string"
                         ? designBrief!.targetProcess
@@ -6631,10 +6666,7 @@ async function exportProjectPdfInternal(
                 // L9-P1: unitTotalGbp now sourced from parts table (BOM
                 // master). Render null only when BOM is genuinely empty.
                 unitTotalGbp: parts.length > 0 ? unitTotalGbp : null,
-                ceilingGbp:
-                    typeof designBrief?.constraints?.unitCostCeilingGbp === "number"
-                        ? designBrief!.constraints!.unitCostCeilingGbp
-                        : null,
+            ceilingGbp: safeNumeric(designBrief?.constraints?.unitCostCeilingGbp),
                 // Fix 1 — Loop 25 P0: cost-mismatch assertion result.
                 // Non-null when the persisted verdict cost evidence differs
                 // from the canonical deduped BOM roll-up by more than 1%.
@@ -6712,7 +6744,7 @@ async function exportProjectPdfInternal(
                         0,
                     )
                     const declaredTotalMassKg = modules.reduce((acc, m) => {
-                        return acc + (typeof m.massKg === "number" ? m.massKg : 0)
+                        return acc + (safeNumeric(m.massKg) ?? 0)
                     }, 0)
                     const baseReconciliation = reconcileNumerics({
                         moduleCosts: moduleCostsForReconciliation,
@@ -6949,7 +6981,7 @@ async function exportProjectPdfInternal(
                             : new Date().toISOString(),
                     model: typeof raw.model === "string" ? raw.model : "unknown",
                     costPence:
-                        typeof raw.cost_pence === "number" ? raw.cost_pence : 0,
+                        safeNumeric(raw.cost_pence) !== null ? safeNumeric(raw.cost_pence) as number : 0,
                     findings: cleaned,
                 }
             })(),
@@ -7143,6 +7175,7 @@ async function exportProjectPdfInternal(
             // to pipeline_runs.error_message (Vercel CLI logs were
             // unreachable during the 2026-04-26 debug — surfacing through
             // Supabase is the reliable path).
+            coercePdfInputNumbers(pdfInput)
             const sus = walkForBadNumbers(pdfInput, "")
             if (sus.length > 0) {
                 console.error("[export-project-pdf] non-finite numbers detected:", JSON.stringify(sus.slice(0, 30)))

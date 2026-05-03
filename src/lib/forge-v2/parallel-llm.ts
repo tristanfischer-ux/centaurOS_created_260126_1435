@@ -553,13 +553,46 @@ Be decisive. Pick one winner. Only synthesise if the combination is clearly bett
  */
 function buildChaseFullLineup(): ModelConfig[] {
     return [
-        // 1. US OpenAI — strongest general-purpose frontier
-        makeOpenAIModel("gpt-5.5", "GPT-5.5"),
-        // 2. US xAI — Grok 4.3, fast reasoning, 175 tok/s, different lineage
-        makeGrokModel(),
-        // 3. US Google — best long-document research synthesis
+        // 1. US Google — Lead reasoner
         makeGeminiModel("gemini-3.1-pro-preview", "Gemini 3.1 Pro"),
-        // 4. China Moonshot — different open-weight lineage, multimodal
+        // 2. US OpenAI — Near-best coder (Stable)
+        makeOpenAIModel("gpt-5.4", "GPT-5.4"),
+        // 3. US xAI — Grok 4.3, fast reasoning, 175 tok/s, different lineage
+        makeGrokModel(),
+        // 4. China Zhipu — GLM-5.1, Schema enforcer
+        {
+            id: "z-ai/glm-5.1",
+            displayName: "GLM-5.1",
+            lineage: "Zhipu (China)",
+            call: async (system, user) => {
+                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+                const response = await fetchWithTimeout(
+                    "https://openrouter.ai/api/v1/chat/completions",
+                    {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                        body: JSON.stringify({
+                            model: "z-ai/glm-5.1",
+                            max_tokens: 16000,
+                            temperature: 0.2,
+                            messages: [
+                                { role: "system", content: system },
+                                { role: "user", content: user },
+                            ],
+                        }),
+                    },
+                    180_000,
+                )
+                if (!response.ok) {
+                    const errText = await response.text()
+                    throw new Error(`GLM-5.1 error (${response.status}): ${errText.slice(0, 300)}`)
+                }
+                const data = await response.json()
+                return data.choices?.[0]?.message?.content ?? ""
+            },
+        },
+        // 5. China Moonshot — Kimi K2.6, Scientific coder
         {
             id: "moonshotai/kimi-k2.6",
             displayName: "Kimi K2.6",
@@ -586,15 +619,13 @@ function buildChaseFullLineup(): ModelConfig[] {
                 )
                 if (!response.ok) {
                     const errText = await response.text()
-                    throw new Error(`Kimi K2.6 error (${response.status}): ${errText.slice(0, 300)}`)
+                    throw new Error(`Kimi-K2.6 error (${response.status}): ${errText.slice(0, 300)}`)
                 }
                 const data = await response.json()
                 return normaliseOpenRouterResponse(data)
             },
         },
-        // 5. China Alibaba MoE — Qwen 3 235B, strong JSON + logic
-        makeQwenModel(),
-        // 6. China Xiaomi — honest generalist, non-hallucination 75%
+        // 6. China Xiaomi — MiMo V2.5-Pro, Honest generalist
         {
             id: "xiaomi/mimo-v2.5-pro",
             displayName: "MiMo V2.5 Pro",
@@ -626,108 +657,7 @@ function buildChaseFullLineup(): ModelConfig[] {
                 const data = await response.json()
                 return data.choices?.[0]?.message?.content ?? ""
             },
-        },
-        // 7. EU Mistral — different non-US priors, catches US-default assumptions
-        {
-            id: "mistralai/mistral-large-2407",
-            displayName: "Mistral Large",
-            lineage: "Mistral (EU)",
-            call: async (system, user) => {
-                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
-                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
-                const response = await fetchWithTimeout(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                        body: JSON.stringify({
-                            model: "mistralai/mistral-large-2407",
-                            max_tokens: 16000,
-                            temperature: 0.2,
-                            messages: [
-                                { role: "system", content: system },
-                                { role: "user", content: user },
-                            ],
-                        }),
-                    },
-                    180_000,
-                )
-                if (!response.ok) {
-                    const errText = await response.text()
-                    throw new Error(`Mistral Large error (${response.status}): ${errText.slice(0, 300)}`)
-                }
-                const data = await response.json()
-                return data.choices?.[0]?.message?.content ?? ""
-            },
-        },
-        // 8. China Alibaba 1M-context — Qwen3.6-Plus, ideal for long research prompts
-        {
-            id: "qwen/qwen3.6-plus",
-            displayName: "Qwen3.6-Plus",
-            lineage: "Alibaba 1M-ctx (China)",
-            call: async (system, user) => {
-                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
-                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
-                const response = await fetchWithTimeout(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                        body: JSON.stringify({
-                            model: "qwen/qwen3.6-plus",
-                            max_tokens: 16000,
-                            temperature: 0.2,
-                            messages: [
-                                { role: "system", content: system },
-                                { role: "user", content: user },
-                            ],
-                        }),
-                    },
-                    180_000,
-                )
-                if (!response.ok) {
-                    const errText = await response.text()
-                    throw new Error(`Qwen3.6-Plus error (${response.status}): ${errText.slice(0, 300)}`)
-                }
-                const data = await response.json()
-                return normaliseOpenRouterResponse(data)
-            },
-        },
-        // 9. China DeepSeek Flash — faster DeepSeek tier, different temperature regime
-        {
-            id: "deepseek/deepseek-v4-flash",
-            displayName: "DeepSeek V4-Flash",
-            lineage: "DeepSeek Flash (China)",
-            call: async (system, user) => {
-                const apiKey = process.env.OPENROUTER_API_KEY?.trim()
-                if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
-                const response = await fetchWithTimeout(
-                    "https://openrouter.ai/api/v1/chat/completions",
-                    {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                        body: JSON.stringify({
-                            model: "deepseek/deepseek-v4-flash",
-                            max_tokens: 16000,
-                            temperature: 0.2,
-                            messages: [
-                                { role: "system", content: system },
-                                { role: "user", content: user },
-                            ],
-                        }),
-                    },
-                    180_000,
-                )
-                if (!response.ok) {
-                    const errText = await response.text()
-                    throw new Error(`DeepSeek V4-Flash error (${response.status}): ${errText.slice(0, 300)}`)
-                }
-                const data = await response.json()
-                return normaliseOpenRouterResponse(data)
-            },
-        },
-        // 10. US Google Flash — faster Gemini tier, different reasoning path
-        makeGeminiModel("gemini-2.5-flash", "Gemini 2.5 Flash"),
+        }
     ]
 }
 
@@ -924,11 +854,9 @@ Additional rules:
             const { text: synthesised } = await callJudge(synthSystem, synthUser, 8192)
 
             if (synthesised && synthesised.length > 500) {
-                console.info(
-                    `[parallel-llm] Chase synthesis: merged top-${top3Candidates.length} (${top3Candidates.map(c => c.model).join(", ")}) → ${synthesised.length} chars`,
-                )
                 finalOutput = synthesised
-                winnerModelLabel = `synthesised(top-${top3Candidates.length}: ${overallWinner.model}+)`
+                winnerModelLabel = `Synthesised (base: ${overallWinner.model} + ${top3Candidates.length - 1} others)`
+                console.info(`[parallel-llm] Chase synthesis successful: ${finalOutput.length} chars`)
             }
         } catch (synthErr) {
             // Non-fatal: synthesis failed, fall back to tournament winner
@@ -1245,33 +1173,41 @@ Be specific with numbers where your training data supports it. Write "UNKNOWN" r
         `[stage-0] Starting 10-LLM training data dump: ${STAGE_0_MODELS.map((m) => m.displayName).join(", ")}`,
     )
 
-    // Run ALL 10 models in parallel — 120s timeout each
-    const results = await Promise.allSettled(
+    const BATCH_TIMEOUT_MS = 90000;
+    const partialResults: Array<{ model: string; lineage: string; output: string }> = [];
+
+    const batchPromise = Promise.all(
         STAGE_0_MODELS.map(async (model) => {
-            const modelStart = Date.now()
+            const modelStart = Date.now();
             try {
-                const output = await model.call(systemPrompt, userPrompt)
-                const elapsed = Date.now() - modelStart
+                const output = await model.call(systemPrompt, userPrompt);
+                const elapsed = Date.now() - modelStart;
                 console.info(
                     `[stage-0] ${model.displayName} (${model.lineage}): ${output.length} chars in ${elapsed}ms`,
-                )
-                return { model: model.displayName, lineage: model.lineage, output }
+                );
+                if (output && output.length > 100) {
+                    partialResults.push({ model: model.displayName, lineage: model.lineage, output });
+                }
             } catch (err) {
-                const elapsed = Date.now() - modelStart
-                const errMsg = err instanceof Error ? err.message : String(err)
-                console.warn(`[stage-0] ${model.displayName} (${model.lineage}) FAILED after ${elapsed}ms: ${errMsg}`)
-                return { model: model.displayName, lineage: model.lineage, output: "" }
+                const elapsed = Date.now() - modelStart;
+                const errMsg = err instanceof Error ? err.message : String(err);
+                console.warn(`[stage-0] ${model.displayName} (${model.lineage}) FAILED after ${elapsed}ms: ${errMsg}`);
             }
-        }),
-    )
+        })
+    );
 
-    const modelOutputs = results.map((r) =>
-        r.status === "fulfilled"
-            ? r.value
-            : { model: "unknown", lineage: "unknown", output: "" },
-    )
+    const timeoutPromise = new Promise<void>((resolve) => {
+        setTimeout(() => {
+            console.warn(`[stage-0] BATCH TIMEOUT reached (${BATCH_TIMEOUT_MS}ms). Collecting partial results.`);
+            resolve();
+        }, BATCH_TIMEOUT_MS);
+    });
 
-    const successfulOutputs = modelOutputs.filter((o) => o.output.length > 100)
+    await Promise.race([batchPromise, timeoutPromise]);
+
+    const successfulOutputs = partialResults;
+
+    const seenHashes = new Set<string>();
 
     // Build the merged dossier — each model's output in its own section
     // so downstream stages can see which lineage contributed what
@@ -1285,9 +1221,30 @@ Be specific with numbers where your training data supports it. Write "UNKNOWN" r
     ]
 
     for (const output of successfulOutputs) {
+        const paragraphs = output.output.split(/\n\s*\n/);
+        const uniqueParagraphs: string[] = [];
+
+        for (const para of paragraphs) {
+            const trimmed = para.trim();
+            if (!trimmed) continue;
+            
+            if (trimmed.length < 100 || trimmed.startsWith("###") || trimmed.startsWith("---")) {
+                uniqueParagraphs.push(trimmed);
+                continue;
+            }
+
+            const hash = trimmed.slice(0, 100).toLowerCase();
+            if (!seenHashes.has(hash)) {
+                seenHashes.add(hash);
+                uniqueParagraphs.push(trimmed);
+            }
+        }
+
+        const deduplicatedOutput = uniqueParagraphs.join("\n\n");
+
         dossierParts.push(
             `--- ${output.model} (${output.lineage}) ---`,
-            output.output.slice(0, 6000),
+            deduplicatedOutput.slice(0, 6000),
             "",
         )
     }
@@ -1302,7 +1259,7 @@ Be specific with numbers where your training data supports it. Write "UNKNOWN" r
 
     return {
         dossier,
-        modelOutputs: modelOutputs.map((o) => ({
+        modelOutputs: successfulOutputs.map((o) => ({
             model: o.model,
             lineage: o.lineage,
             output: o.output.slice(0, 300),

@@ -21,6 +21,7 @@
  */
 
 import { createAdminClient } from "@/lib/supabase/admin"
+import { resolveGate6Verdict } from "./gate-6"
 import type {
     GateRunner,
     GateContext,
@@ -412,6 +413,13 @@ export async function runGate(
             verdict: "FAIL",
             attempts_remaining: Math.max(0, MAX_GATE_ATTEMPTS - (failedSoFar + 1)),
             fail_count: failedSoFar + 1,
+        }
+    }
+
+    if (gate.gateId === 6 && evalResult.verdict === "FAIL" && evalResult.deterministic_result) {
+        const reclassified = resolveGate6Verdict(evalResult.deterministic_result)
+        if (reclassified === "WARN") {
+            evalResult.verdict = "WARN"
         }
     }
 

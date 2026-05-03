@@ -360,24 +360,18 @@ async function runMaxDecompositionInternal(
         }
 
         // 3. Pre-flight tier budget check.
-        //    The inner skeletonDecompose / expandModuleDetail actions ALSO
-        //    call enforceCadLabLimit(user.id, …) which re-checks this. That
-        //    duplicate check is the source of truth for per-run enforcement;
-        //    this outer one exists so the orchestrator can return a clean
-        //    BUDGET_CAPPED errorCode before we've written a pipeline_runs
-        //    row that would otherwise be immediately marked 'failed'.
+        console.log("[DEBUG] Before checkAILimit...");
         let budgetOk = true
         let budgetMessage: string | null = null
         try {
             const gate = await checkAILimit(foundryId)
+            console.log("[DEBUG] After checkAILimit. allowed=", gate.allowed);
             if (!gate.allowed) {
                 budgetOk = false
                 budgetMessage =
                     gate.message ?? "AI usage limit reached for this billing period."
             }
         } catch (err) {
-            // Fail closed with a distinct errorCode so we don't silently let a
-            // bad lookup turn into uncharged spend.
             console.error(
                 "[run-max-decomposition] checkAILimit threw:",
                 err instanceof Error ? err.message : err,
@@ -393,6 +387,7 @@ async function runMaxDecompositionInternal(
         if (!budgetOk) {
             return {
                 ok: false,
+                runId: "pre-flight",
                 error: budgetMessage ?? "AI usage limit reached.",
                 errorCode: "BUDGET_CAPPED",
             }
@@ -401,6 +396,7 @@ async function runMaxDecompositionInternal(
         // 4. Start pipeline_run. Once this returns, every exit path MUST
         //    either complete or fail the run — otherwise it hangs in
         //    'running' forever and the UI chip lies.
+        console.log("[DEBUG] Before startPipelineRun...");
         let runId: string
         try {
             const started = await startPipelineRun({
@@ -435,11 +431,10 @@ async function runMaxDecompositionInternal(
             //
             // COST TRIAL (2026-04-25): we use parallel-and-compare instead
             // of a single hardcoded model to increase diversity.
-            const modelId = (project.model_id || "gpt-5.5") as Parameters<
+            const modelId = (project.model_id || "deepseek") as Parameters<
                 typeof skeletonDecompose
             >[2]
-            // Load DB grounding data for Max stage (design_standards). Non-fatal
-            // if it fails — skeleton proceeds without grounding context.
+            console.log("[DEBUG] Before loadGroundingData...");
             let maxGroundingSection = ""
             try {
                 maxGroundingSection = await loadGroundingData("waiting_max", projectId)
@@ -450,6 +445,7 @@ async function runMaxDecompositionInternal(
                 console.warn("[run-max-decomposition] DB grounding failed (non-fatal):", groundingErr instanceof Error ? groundingErr.message : groundingErr)
             }
 
+            console.log("[DEBUG] Before getCouncilFeedbackForStage...");
             // Council quality-gate feedback for re-runs
             const councilFeedback = await getCouncilFeedbackForStage(
                 projectId,
@@ -468,6 +464,7 @@ async function runMaxDecompositionInternal(
                 return compressReferenceDossier(project.reference_dossier) + briefBlock + groundingBlock + councilBlock
             })()
 
+            console.log("[DEBUG] Before skeletonDecompose...");
             const skeletonResult = await skeletonDecompose(
                 description,
                 reportToUse, // gate remediation context prepended when present (see step 2b)

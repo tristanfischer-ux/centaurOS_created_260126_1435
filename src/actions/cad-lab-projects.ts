@@ -554,7 +554,7 @@ export async function saveCadLabResearch(
       assumptionNotes: research.assumptionNotes,
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from("cad_lab_projects")
       .update({
         research: researchData as unknown as Json,
@@ -563,6 +563,9 @@ export async function saveCadLabResearch(
         modules: null,
       })
       .eq("id", projectId)
+      .select()
+
+    console.log("[saveCadLabResearch] DEBUG data:", JSON.stringify(data, null, 2))
 
     if (error) {
       console.error("[THE-FORGE-PROJECTS] Failed to save research:", error.message)

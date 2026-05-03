@@ -157,18 +157,22 @@ export async function callOpenRouter(
 
     let response: Response
     try {
-        response = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
-            method: "POST",
-            headers: {
-                Authorization: `Bearer ${apiKey}`,
-                "Content-Type": "application/json",
-                // Optional but recommended by OpenRouter for analytics.
-                "HTTP-Referer": "https://fractionalforge.app",
-                "X-Title": "ForgeOS",
+        const { fetchWithTimeout } = await import("@/lib/fetch-with-timeout")
+        response = await fetchWithTimeout(
+            `${OPENROUTER_BASE}/chat/completions`,
+            {
+                method: "POST",
+                headers: {
+                    Authorization: `Bearer ${apiKey}`,
+                    "Content-Type": "application/json",
+                    // Optional but recommended by OpenRouter for analytics.
+                    "HTTP-Referer": "https://fractionalforge.app",
+                    "X-Title": "ForgeOS",
+                },
+                body: JSON.stringify(body),
             },
-            body: JSON.stringify(body),
-            signal: AbortSignal.timeout(timeoutMs),
-        })
+            timeoutMs
+        )
     } catch (err) {
         const msg = err instanceof Error ? err.message : String(err)
         return {

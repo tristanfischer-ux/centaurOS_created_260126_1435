@@ -23,7 +23,7 @@ export const gate4: DeterministicGate<Gate4Input> = {
             modules: (data?.modules as Record<string, unknown> | null) ?? null
         }
     },
-    check: (input: Gate4Input): DeterministicCheckResult => {
+    check: (input: Gate4Input): DeterministicCheckResult & { remediationContext?: string; remediationTargetStage?: string } => {
         if (!input.modules || Object.keys(input.modules).length === 0) {
             return {
                 check_name: "Finn cost estimates",
@@ -38,7 +38,9 @@ export const gate4: DeterministicGate<Gate4Input> = {
                 check_name: "Finn cost estimates",
                 passed: false,
                 actual: "Missing ai_cost_estimates entirely",
-                expected: "Cost estimates exist for all modules"
+                expected: "Cost estimates exist for all modules",
+                remediationContext: "GATE REMEDIATION OVERRIDE: Cost realism gate failed. Missing ai_cost_estimates entirely. Re-run Finn cost estimation ensuring every module receives a non-zero totalPerUnit value.",
+                remediationTargetStage: "waiting_finn"
             }
         }
 
@@ -63,6 +65,17 @@ export const gate4: DeterministicGate<Gate4Input> = {
             if (missingModules.length > 0) parts.push(`${missingModules.length} missing`)
             if (zeroCostModules.length > 0) parts.push(`${zeroCostModules.length} zero cost`)
             actual = parts.join(", ")
+        }
+
+        if (!passed) {
+            return {
+                check_name: "Finn cost estimates",
+                passed,
+                actual,
+                expected: "Cost estimates exist for all modules and > 0",
+                remediationContext: `GATE REMEDIATION OVERRIDE: Cost realism gate failed. ${actual}. Re-run Finn cost estimation ensuring every module receives a non-zero totalPerUnit value.`,
+                remediationTargetStage: "waiting_finn"
+            }
         }
 
         return {

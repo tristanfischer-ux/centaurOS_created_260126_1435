@@ -555,6 +555,61 @@ const MAX_REDECOMPOSITION_ATTEMPTS = 3
 
 // ─── Per-step specialist invocation ─────────────────────────────────────
 
+async function waitForBomBatches(projectId: string): Promise<void> {
+    const admin = createAdminClient()
+    const startTime = Date.now()
+    
+    while (true) {
+        if (Date.now() - startTime > 300_000) {
+            throw new Error("BOM batches timed out after 300s")
+        }
+        
+        const { data: project } = await admin
+            .from("cad_lab_projects")
+            .select("bom_generation_state")
+            .eq("id", projectId)
+            .single()
+            
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const state = project?.bom_generation_state as any
+        if (!state) {
+            throw new Error("BOM generation state lost")
+        }
+        
+        if (state.error) {
+            throw new Error(`BOM generation failed: ${state.error}`)
+        }
+        
+        if (state.finished_at) {
+            break
+        }
+        
+        if (state.pending_batch_ids && state.pending_batch_ids.length > 0) {
+            const { runBomBatchStage } = await import("@/actions/bom")
+            await runBomBatchStage(projectId)
+        } else if (state.skeleton_parts && state.pending_batch_ids?.length === 0) {
+            const { runBomMergeStage } = await import("@/actions/bom")
+            await runBomMergeStage(projectId)
+            
+            // Check state one last time to catch merge errors
+            const { data: finalProject } = await admin
+                .from("cad_lab_projects")
+                .select("bom_generation_state")
+                .eq("id", projectId)
+                .single()
+            const finalState = finalProject?.bom_generation_state as any
+            if (finalState?.error) {
+                throw new Error(`BOM generation failed during merge: ${finalState.error}`)
+            }
+            break
+        } else {
+            // Unlikely to reach here if skeleton completed successfully, 
+            // but just in case, short sleep to prevent tight loop.
+            await new Promise((resolve) => setTimeout(resolve, 1000))
+        }
+    }
+}
+
 async function runStep(
     projectId: string,
     step: AutopilotStepName,
@@ -900,22 +955,20 @@ async function runStep(
             }
             // BOM is a 3-stage distributed pipeline: skeleton → batches →
             // merge. runBomGeneratorBackground only kicks off the generator;
-            // the skeleton stage was previously fired via after() inside
-            // run-bom-generator.ts. The new architecture owns the chain
-            // here so dual-trigger races can't happen. Skeleton stage uses
-            // its own internal after()-cascade to fire batch + merge; we
-            // await skeleton synchronously, batch + merge propagate via
-            // skeleton's own state machine and the cron picks up failures.
+            // the orchestrator here owns the chain synchronously to avoid 
+            // dual-trigger races and ensure the stage is only marked done 
+            // after all batches merged.
             const { runBomSkeletonStage } = await import("@/actions/bom")
             try {
                 await runBomSkeletonStage(projectId)
+                await waitForBomBatches(projectId)
             } catch (err) {
                 return {
                     ok: false,
                     error:
                         err instanceof Error
-                            ? `BOM skeleton stage failed: ${err.message}`
-                            : "BOM skeleton stage failed",
+                            ? `BOM stage failed: ${err.message}`
+                            : "BOM stage failed",
                 }
             }
             return { ok: true }
@@ -1225,14 +1278,25 @@ async function runStep(
             const admin = createAdminClient()
             const STORAGE_BUCKET = "report-downloads"
             try {
-                // Look up foundry slug for the storage prefix — matches the
-                // `forge-guild/<projectId>/...` pattern observed in prior
-                // production rows.
+                // Resolve foundry-owner profile_id for the report_downloads
+                // row (the table requires non-null profile_id; autopilot
+                // runs with no user session, so foundry-owner is the
+                // canonical author). Also look up foundry slug for the
+                // storage prefix.
                 const { data: foundryRow } = await admin
                     .from("foundries")
-                    .select("slug")
+                    .select("slug, owner_id")
                     .eq("id", foundryId)
                     .maybeSingle()
+
+                const profileId = foundryRow?.owner_id ?? null
+                if (!profileId) {
+                    return {
+                        ok: false,
+                        error: `PDF generation aborted: foundry ${foundryId} has no owner_id. report_downloads requires a non-null profile_id.`
+                    }
+                }
+
                 const foundrySlug =
                     typeof foundryRow?.slug === "string" && foundryRow.slug.length > 0
                         ? foundryRow.slug
@@ -1253,17 +1317,6 @@ async function runStep(
                     }
                 }
 
-                // Resolve foundry-owner profile_id for the report_downloads
-                // row (the table requires non-null profile_id; autopilot
-                // runs with no user session, so foundry-owner is the
-                // canonical author).
-                const { data: foundryOwner } = await admin
-                    .from("foundries")
-                    .select("owner_id")
-                    .eq("id", foundryId)
-                    .maybeSingle()
-                const profileId = foundryOwner?.owner_id ?? null
-
                 const { error: insertErr } = await admin
                     .from("report_downloads")
                     .insert({
@@ -1276,6 +1329,8 @@ async function runStep(
                         storage_path: storagePath,
                     } as never)
                 if (insertErr) {
+                    // Cleanup the uploaded file so we don't leak orphaned storage objects
+                    await admin.storage.from(STORAGE_BUCKET).remove([storagePath])
                     return {
                         ok: false,
                         error: `PDF generated but report_downloads insert failed: ${insertErr.message}`
