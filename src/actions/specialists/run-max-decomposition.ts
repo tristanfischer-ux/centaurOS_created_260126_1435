@@ -324,6 +324,41 @@ async function runMaxDecompositionInternal(
                 : buildRemediationPromptBlock(2, remediationCtx)) + report
             : report
 
+        // 2c. Design brief context — inject structured constraints from Chase.
+        //     Chase extracts capacity targets, cost ceilings, markets, compliance
+        //     notes, and competitor data into research.designBrief. Max only reads
+        //     research.report by default, so we prepend the structured brief here
+        //     so decomposition can use it for module sizing and constraints.
+        const designBrief = (research as { designBrief?: Record<string, unknown> } | null)?.designBrief
+        let briefContext = ""
+        if (designBrief && typeof designBrief === "object") {
+            const briefFields: string[] = []
+            if (typeof designBrief.useCase === "string" && designBrief.useCase) briefFields.push(`Use case: ${designBrief.useCase}`)
+            if (typeof designBrief.targetProcess === "string" && designBrief.targetProcess) briefFields.push(`Target process: ${designBrief.targetProcess}`)
+            if (typeof designBrief.targetMaterial === "string" && designBrief.targetMaterial) briefFields.push(`Target material: ${designBrief.targetMaterial}`)
+            if (typeof designBrief.toleranceTarget === "string" && designBrief.toleranceTarget) briefFields.push(`Tolerance target: ${designBrief.toleranceTarget}`)
+            if (typeof designBrief.quantityTarget === "string" && designBrief.quantityTarget) briefFields.push(`Quantity target: ${designBrief.quantityTarget}`)
+            if (typeof designBrief.complianceNotes === "string" && designBrief.complianceNotes) briefFields.push(`Compliance: ${designBrief.complianceNotes}`)
+            if (typeof designBrief.mission === "string" && designBrief.mission) briefFields.push(`Mission: ${designBrief.mission}`)
+            if (Array.isArray(designBrief.targetCustomers) && designBrief.targetCustomers.length > 0) briefFields.push(`Target customers: ${designBrief.targetCustomers.join(", ")}`)
+            if (designBrief.marketSizing && typeof designBrief.marketSizing === "object") {
+                const ms = designBrief.marketSizing as Record<string, unknown>
+                const parts: string[] = []
+                if (typeof ms.tam === "number") parts.push(`TAM: ${ms.tam}`)
+                if (typeof ms.sam === "number") parts.push(`SAM: ${ms.sam}`)
+                if (typeof ms.som === "number") parts.push(`SOM: ${ms.som}`)
+                if (typeof ms.currency === "string") parts.push(`Currency: ${ms.currency}`)
+                if (parts.length > 0) briefFields.push(`Market sizing: ${parts.join(", ")}`)
+            }
+            if (Array.isArray(designBrief.competitors) && designBrief.competitors.length > 0) {
+                briefFields.push(`Competitors: ${designBrief.competitors.map((c: Record<string, unknown>) => typeof c.name === "string" ? c.name : "unknown").join(", ")}`)
+            }
+            if (briefFields.length > 0) {
+                briefContext = `\n\n=== STRUCTURED DESIGN BRIEF (from Chase research) ===\n${briefFields.join("\n")}\nUse these constraints when decomposing into modules. Respect capacity targets, material selections, and cost ceilings.\n`
+                console.info(`[run-max-decomposition] Injected designBrief context: ${briefFields.length} fields`)
+            }
+        }
+
         // 3. Pre-flight tier budget check.
         //    The inner skeletonDecompose / expandModuleDetail actions ALSO
         //    call enforceCadLabLimit(user.id, …) which re-checks this. That
@@ -424,12 +459,13 @@ async function runMaxDecompositionInternal(
             const maxDossierContext = (() => {
                 const groundingBlock = maxGroundingSection ? `\n\n${maxGroundingSection}` : ""
                 const councilBlock = councilFeedback ? `\n\n${councilFeedback}` : ""
-                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return (groundingBlock + councilBlock) || undefined
+                const briefBlock = briefContext || ""
+                if (typeof project.reference_dossier !== "string" || project.reference_dossier.length === 0) return (briefBlock + groundingBlock + councilBlock) || undefined
                 const stageSection = extractStageSection(project.reference_dossier, "max")
                 const anchors = extractConstraintAnchors(project.reference_dossier)
-                if (stageSection && anchors) return `${stageSection}\n\n${anchors}${groundingBlock}${councilBlock}`
-                if (stageSection) return `${stageSection}${groundingBlock}${councilBlock}`
-                return compressReferenceDossier(project.reference_dossier) + groundingBlock + councilBlock
+                if (stageSection && anchors) return `${stageSection}\n\n${anchors}${briefBlock}${groundingBlock}${councilBlock}`
+                if (stageSection) return `${stageSection}${briefBlock}${groundingBlock}${councilBlock}`
+                return compressReferenceDossier(project.reference_dossier) + briefBlock + groundingBlock + councilBlock
             })()
 
             const skeletonResult = await skeletonDecompose(
