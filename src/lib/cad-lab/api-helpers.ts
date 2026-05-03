@@ -697,6 +697,9 @@ export async function searchCadModels(
     return []
   }
 
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 30_000)
+
   try {
     const searchTerm = description
       .replace(/quadcopter|drone|3d model|cad/gi, "")
@@ -708,15 +711,15 @@ export async function searchCadModels(
 
     const url = `https://api.thingiverse.com/search/${encodeURIComponent(searchTerm)}?type=things&per_page=5&sort=relevant`
 
-    const response = await fetchWithTimeout(
+    const response = await fetch(
       url,
       {
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: "application/json",
         },
-      },
-      10_000,
+        signal: controller.signal,
+      }
     )
 
     if (!response.ok) {
@@ -746,11 +749,17 @@ export async function searchCadModels(
         thumbnail: h.preview_image,
       }))
   } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      console.warn('[searchCadModels] timed out after 30s')
+      return []
+    }
     console.warn(
       "[THE-FORGE] Thingiverse search failed:",
       error instanceof Error ? error.message : "Unknown error",
     )
     return []
+  } finally {
+    clearTimeout(timeoutId)
   }
 }
 

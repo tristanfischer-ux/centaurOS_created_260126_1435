@@ -189,6 +189,8 @@ export interface CadLabDesignBriefSource {
   publisher?: string
   /** What this source establishes or why it was cited. */
   relevance: string
+  /** URL to the source */
+  uri?: string
 }
 
 /**

@@ -584,7 +584,14 @@ If the brief specifies a container form factor, ALL downstream sizing MUST fit w
                 // New fields — always prefer fresh extraction; no prior
                 // to preserve (founders don't edit these in the Brief UI).
                 sources:
-                    extraction.brief?.sources || priorDesignBrief?.sources,
+                    (researchResult.sources && researchResult.sources.length > 0)
+                        ? researchResult.sources.map((s) => ({
+                              title: s.title || "Web Source",
+                              type: "other" as const,
+                              relevance: "Web search result",
+                              uri: s.uri,
+                          }))
+                        : (extraction.brief?.sources || priorDesignBrief?.sources || []),
                 marketSizing:
                     extraction.brief?.marketSizing || priorDesignBrief?.marketSizing,
                 competitors:
