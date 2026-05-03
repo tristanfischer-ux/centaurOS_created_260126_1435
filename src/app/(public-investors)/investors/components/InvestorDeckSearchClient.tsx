@@ -192,6 +192,7 @@ export function InvestorDeckSearchClient({
   const [extractedProfile, setExtractedProfile] = useState<ExtractedProfile | null>(null)
   const [searchFailureMessage, setSearchFailureMessage] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const cancelRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   // W45b: URL persistence for back-nav restore
   const searchParams = useSearchParams()
@@ -234,6 +235,7 @@ export function InvestorDeckSearchClient({
       toast.error('Please describe your startup in a little more detail.')
       return
     }
+    cancelRef.current = false
     setLastQuery(trimmed)
     setHasSearched(true)
     setSearchFailureMessage(null)
@@ -253,6 +255,7 @@ export function InvestorDeckSearchClient({
           pageSize: 200,
           skipMatchEnrichment: true,
         })
+        if (cancelRef.current) return // Search was cancelled — discard results
         setFirms(result.firms)
         setTotal(result.total)
         setMatchOutputs(result.matchOutputs ?? {})
@@ -329,6 +332,12 @@ export function InvestorDeckSearchClient({
   const handleFindInvestors = () => {
     runSearch(query)
   }
+
+  const handleCancelSearch = useCallback(() => {
+    cancelRef.current = true
+    setIsPending(false)
+    toast.info('Search cancelled')
+  }, [])
 
   const handleReRun = () => {
     if (lastQuery) runSearch(lastQuery)
@@ -606,6 +615,7 @@ export function InvestorDeckSearchClient({
             textareaRef={textareaRef}
             onChipClick={handleChipClick}
             onFindInvestors={handleFindInvestors}
+            onCancelSearch={handleCancelSearch}
             onReRun={hasSearched ? handleReRun : undefined}
             hasSearched={hasSearched}
             isPending={isPending}
@@ -1004,6 +1014,7 @@ interface PastePanelProps {
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   onChipClick: (chip: string) => void
   onFindInvestors: () => void
+  onCancelSearch?: () => void
   onReRun?: () => void
   hasSearched: boolean
   isPending: boolean
@@ -1017,6 +1028,7 @@ function PastePanel({
   textareaRef,
   onChipClick,
   onFindInvestors,
+  onCancelSearch,
   onReRun,
   hasSearched,
   isPending,
@@ -1119,17 +1131,22 @@ function PastePanel({
             disabled={isExtracting}
           />
         </label>
-        <button
-          onClick={onFindInvestors}
-          disabled={isPending || query.trim().length < 10}
-          className="inline-flex items-center gap-2.5 bg-international-orange text-white font-bold px-6 py-3 rounded-lg text-sm cursor-pointer hover:bg-international-orange/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isPending ? (
-            <><Loader2 className="h-4 w-4 animate-spin" /> Searching…</>
-          ) : (
-            'Find Investors →'
-          )}
-        </button>
+        {isPending ? (
+          <button
+            onClick={onCancelSearch}
+            className="inline-flex items-center gap-2.5 bg-red-500 text-white font-bold px-6 py-3 rounded-lg text-sm cursor-pointer hover:bg-red-600 transition-colors"
+          >
+            <Loader2 className="h-4 w-4 animate-spin" /> Cancel search
+          </button>
+        ) : (
+          <button
+            onClick={onFindInvestors}
+            disabled={query.trim().length < 10}
+            className="inline-flex items-center gap-2.5 bg-international-orange text-white font-bold px-6 py-3 rounded-lg text-sm cursor-pointer hover:bg-international-orange/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            Find Investors →
+          </button>
+        )}
       </div>
     </div>
   )
