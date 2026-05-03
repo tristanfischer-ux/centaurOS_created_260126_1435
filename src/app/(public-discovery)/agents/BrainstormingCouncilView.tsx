@@ -2371,9 +2371,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                         audioReadyRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
                                     }, 200)
                                 } else {
+                                    console.error('[BrainstormAudio] Server returned error:', result.error)
                                     setAudioStatus("error")
                                 }
-                            } catch {
+                            } catch (err) {
+                                console.error('[BrainstormAudio] Client exception:', err)
                                 setAudioStatus("error")
                             }
                         }}

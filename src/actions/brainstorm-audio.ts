@@ -67,7 +67,7 @@ const VOICE_READER2 = 'Kore' // Clear, engaging British female
 // Chunking constants (matching HFN generate_audio.py).
 const TTS_MAX_CHARS = 4_500
 const TTS_MIN_LAST_CHUNK = 1_000
-const TTS_RATE_LIMIT_SLEEP_MS = 45_000
+const TTS_RATE_LIMIT_SLEEP_MS = 3_000
 
 // The voice-direction prompt prepended to each chunk.
 const VOICE_DIRECTION = `Read this brainstorm-council discussion aloud using British English accents — Received Pronunciation, like BBC Radio 4. Reader1 is a calm, authoritative narrator. Reader2 is a clear, engaging narrator. Both read at a natural, measured pace suitable for a serious analytical conversation. Each reader reads their assigned turns smoothly and professionally.`
@@ -313,7 +313,7 @@ async function generateTtsChunk(chunk: TtsChunk, maxRetries = 6): Promise<Buffer
                     console.warn(`[BrainstormAudio] ${model} daily quota exhausted, trying next model`)
                     break // Try the next model.
                 }
-                const waitMs = 15_000 + attempt * 10_000
+                const waitMs = 3_000 + attempt * 2_000
                 console.warn(`[BrainstormAudio] ${model} HTTP ${resp.status} attempt ${attempt + 1}/${maxRetries} — waiting ${waitMs}ms`)
                 await new Promise((r) => setTimeout(r, waitMs))
                 lastError = `HTTP ${resp.status}`
@@ -338,7 +338,7 @@ async function generateTtsChunk(chunk: TtsChunk, maxRetries = 6): Promise<Buffer
 
             const candidates = data.candidates ?? []
             if (candidates.length === 0) {
-                const waitMs = 15_000 + attempt * 10_000
+                const waitMs = 3_000 + attempt * 2_000
                 console.warn(`[BrainstormAudio] ${model} no candidates attempt ${attempt + 1} — waiting ${waitMs}ms`)
                 await new Promise((r) => setTimeout(r, waitMs))
                 lastError = 'No candidates'
@@ -348,7 +348,7 @@ async function generateTtsChunk(chunk: TtsChunk, maxRetries = 6): Promise<Buffer
             const inlineData = candidates[0]?.content?.parts?.[0]?.inlineData
             if (!inlineData?.data) {
                 const finishReason = candidates[0]?.finishReason ?? 'unknown'
-                const waitMs = 15_000 + attempt * 10_000
+                const waitMs = 3_000 + attempt * 2_000
                 console.warn(`[BrainstormAudio] ${model} no audio (finishReason=${finishReason}) attempt ${attempt + 1} — waiting ${waitMs}ms`)
                 await new Promise((r) => setTimeout(r, waitMs))
                 lastError = `No audio (finishReason=${finishReason})`
