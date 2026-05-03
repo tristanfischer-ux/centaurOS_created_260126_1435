@@ -27,7 +27,7 @@
 
 "use client"
 
-import { useState, useRef, useTransition, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import Link from "next/link"
 import { ChevronRight } from "lucide-react"
@@ -366,7 +366,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
     const [activeTier, setActiveTier] = useState<CouncilTier>("deep")
     const [question, setQuestion] = useState("")
     const [session, setSession] = useState<CouncilSession>(EMPTY_SESSION)
-    const [isPending, startTransition] = useTransition()
+    const [isSubmitting, setIsSubmitting] = useState(false)
     const inputRef = useRef<HTMLTextAreaElement>(null)
     const audioReadyRef = useRef<HTMLDivElement>(null)
     // W7: bump this counter after each successful session save to trigger
@@ -548,7 +548,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             inputRef.current?.focus()
             return
         }
-        if (isPending) return // already in flight
+        if (isSubmitting) return // already in flight
 
         // W2: capture the tier and specialists at the exact moment of
         // submission so they are locked for this session's lifecycle.
@@ -578,7 +578,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             submittedSpecialistIds: snapshotIds,
         })
 
-        startTransition(async () => {
+        setIsSubmitting(true)
+        ;(async () => {
             try {
             // ── Step 0: Create the thread row immediately (progressive persistence) ──
             // Writing now means navigation-away-then-back can recover the session
@@ -866,7 +867,6 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 console.error("[BrainstormingCouncilView] Failed to finalise session:", saveErr)
             }
             } catch (orchestrationErr) {
-                // Catch-all: startTransition silently swallows errors — surface them.
                 console.error("[BrainstormingCouncilView] Council orchestration error:", orchestrationErr)
                 setSession(prev => ({
                     ...prev,
@@ -876,9 +876,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         ? orchestrationErr.message
                         : "Something went wrong starting the council. Please try again.",
                 }))
+            } finally {
+                setIsSubmitting(false)
             }
-        })
-    }, [question, isPending, activeTier, selectedSpecialistIds, pathname, router])
+        })()
+    }, [question, isSubmitting, activeTier, selectedSpecialistIds, pathname, router])
 
     function handleReset() {
         setSession(EMPTY_SESSION)
@@ -1643,10 +1645,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         className="bc-convene"
                         type="submit"
                         onClick={handleConvene}
-                        disabled={isPending}
-                        style={isPending ? { opacity: 0.6, cursor: "wait" } : undefined}
+                        disabled={isSubmitting}
+                        style={isSubmitting ? { opacity: 0.6, cursor: "wait" } : undefined}
                     >
-                        {isPending ? "Convening…" : "Convene the council  →"}
+                        {isSubmitting ? "Convening…" : "Convene the council  →"}
                     </button>
                 </div>
             </form>
