@@ -114,6 +114,7 @@ export type AutopilotStage =
 export interface AutopilotState {
     started_at: string
     stage: AutopilotStage
+    status?: "running" | "idle" | "manual_review"
     completed_stages: string[]
     failed_stages: string[]
     error?: string
@@ -365,6 +366,7 @@ export async function startAutopilot(
             .from("cad_lab_projects")
             .update({
                 autopilot_state: initial,
+                status: "running",
             } as unknown as never)
             .eq("id", projectId)
             .eq("foundry_id", foundryId)
