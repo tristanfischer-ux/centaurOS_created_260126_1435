@@ -703,6 +703,22 @@ If the brief specifies a container form factor, ALL downstream sizing MUST fit w
                 }
             }
 
+            // 7b. Store the Stage 0 training data dossier on the project
+            //     so downstream stages (Max, Sizing, BOM, Finn) can read it
+            //     via extractStageContext() without parsing the research JSON.
+            if (researchResult.trainingDataDossier) {
+                try {
+                    const adminForDossier = createAdminClient()
+                    await adminForDossier
+                        .from("cad_lab_projects")
+                        .update({ additional_context: researchResult.trainingDataDossier })
+                        .eq("id", projectId)
+                    console.info(`[chase] Stored Stage 0 dossier (${researchResult.trainingDataDossier.length} chars) on project ${projectId}`)
+                } catch (dossierErr) {
+                    console.warn("[chase] Failed to store Stage 0 dossier on project (non-fatal):", dossierErr instanceof Error ? dossierErr.message : dossierErr)
+                }
+            }
+
             // 8. Done. Record token counts from the structured-brief
             //    extraction (the inner runCadLabResearch doesn't surface
             //    them). cost_gbp_pence stays null — see header.

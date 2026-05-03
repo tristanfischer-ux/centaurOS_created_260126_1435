@@ -61,6 +61,7 @@ import {
 } from "@/lib/cad-lab/domain-prompts"
 import type { DiagnosticEnrichment, FieldEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
+import { runTrainingDataDump, extractStageContext } from "@/lib/forge-v2/parallel-llm"
 import {
   getMashupPlanningSystemPrompt,
   getMashupPlanningUserPrompt,
@@ -323,12 +324,41 @@ export async function runCadLabResearch(
   try {
     console.info("[THE-FORGE] Step 1: Research — web search + CAD model search...")
 
+    // ── Stage 0: Training data knowledge dump (10 LLMs) ──────────────
+    // Run 10 models from 6 lineages (OpenAI, Google, xAI, DeepSeek,
+    // Alibaba/Moonshot/Zhipu, Mistral) in parallel to dump what each
+    // LLM already knows from training data about this product.
+    //
+    // The dossier covers ALL pipeline stages: specs, competitors,
+    // regulations, market sizing, suppliers, costs, materials, and
+    // application knowledge. Each downstream stage reads the sections
+    // relevant to it via extractStageContext().
+    //
+    // Purpose:
+    // 1. Gives Gemini a knowledge baseline so it focuses web search on GAPS
+    // 2. Provides a fallback if web search returns zero sources
+    // 3. Grounds Finn, BOM, Sizing with known costs/specs even pre-search
+    // 4. Evidence to judges that LLMs have domain knowledge (boosts scoring)
+    let trainingDataDossier = ""
+    let fullTrainingDossier = ""
+    try {
+      const trainingDump = await runTrainingDataDump(description, formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes))
+      if (trainingDump.dossier.length > 0 && trainingDump.modelsResponded > 0) {
+        fullTrainingDossier = trainingDump.dossier
+        // Chase-relevant sections for the Gemini prompt
+        trainingDataDossier = extractStageContext(fullTrainingDossier, "waiting_chase") || fullTrainingDossier.slice(0, 8000)
+        console.info(`[THE-FORGE] Stage 0 complete: ${trainingDump.modelsResponded}/10 models, ${trainingDump.dossier.length} chars, ${trainingDump.elapsedMs}ms`)
+      }
+    } catch (stage0Err) {
+      console.warn("[THE-FORGE] Stage 0 training data dump failed (non-fatal, continuing):", stage0Err instanceof Error ? stage0Err.message : stage0Err)
+    }
+
     // 1. Run Gemini + Google Search and Thingiverse in parallel
     const intakeContext = formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes)
 
     const [webResult, cadResult] = await Promise.allSettled([
       callGeminiWithSearch(
-        `Find the real-world specifications for: ${description}
+        `${trainingDataDossier ? "=== KNOWLEDGE FROM 10 LLM TRAINING DATA (supplement, do not duplicate) ===\n" + trainingDataDossier + "\n\nUse the above training data as a knowledge baseline. Focus your web search on FILLING GAPS and VERIFYING claims — do not waste tokens re-discovering standard specifications that are already known. Where training data and web search conflict, prefer the web search (more current).\n\n" : ""}Find the real-world specifications for: ${description}
 
 I need precise engineering dimensions for 3D CAD modelling. Search for:
 
@@ -637,6 +667,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
       industryDomain: detectedIndustryDomain,
       totalStandardsMatched,
       engineeringData: engineeringDataMeta,
+      trainingDataDossier: fullTrainingDossier || undefined,
     }
   } catch (error) {
     console.error("[THE-FORGE] Step 1 failed:", error instanceof Error ? error.message : error)

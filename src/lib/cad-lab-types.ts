@@ -815,6 +815,8 @@ export interface CadLabResearchResult {
     supplierTechniqueNames?: string[]
     totalDataPoints: number
   }
+  /** Stage 0: 10-LLM training data knowledge dump (for downstream stages) */
+  trainingDataDossier?: string
 }
 
 // ─── Mashup Types ─────────────────────────────────────────────────────

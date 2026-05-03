@@ -993,3 +993,388 @@ export async function callParallelAndCompare(
         tokensOut: 0,
     }
 }
+
+// ── Stage 0: Training Data Knowledge Dump (10 LLMs) ─────────────────
+
+/**
+ * Result of a Stage 0 training data dump.
+ */
+export interface TrainingDataDumpResult {
+    /** Merged dossier text combining all model outputs, organised by pipeline stage */
+    dossier: string
+    /** Per-model outputs for transparency and debugging */
+    modelOutputs: Array<{ model: string; lineage: string; output: string }>
+    /** Number of models that responded successfully */
+    modelsResponded: number
+    /** Total elapsed wall-clock time in ms */
+    elapsedMs: number
+}
+
+/**
+ * The 10 models used for Stage 0 training data extraction.
+ *
+ * Chosen for maximum lineage diversity — every model comes from a
+ * different organisation with different training data mixes:
+ *
+ * | # | Model | Lineage | Why |
+ * |---|---|---|---|
+ * | 1 | GPT-5.5 | US OpenAI | Best coder, broadest general training |
+ * | 2 | GPT-5.4 | US OpenAI | Different cutoff, different reasoning |
+ * | 3 | Gemini 3.1 Pro | US Google | #1 reasoner, strong on specs/regulatory |
+ * | 4 | Gemini 2.5 Flash | US Google | Fast, broad training, different tradeoffs |
+ * | 5 | Grok 4.3 | US xAI | Honest adversary, different data sources (X/Twitter) |
+ * | 6 | DeepSeek V4-Pro | China DeepSeek | Frontier reasoning, strong on engineering |
+ * | 7 | Qwen 3.6-plus | China Alibaba | 1M context, Chinese manufacturing knowledge |
+ * | 8 | Kimi K2.6 | China Moonshot | Best open-weight, multimodal |
+ * | 9 | GLM-5.1 | China Zhipu | Schema enforcer, strong on structured data |
+ * | 10 | Mistral Large | EU Mistral | European regulatory knowledge, different priors |
+ */
+const STAGE_0_MODELS: Array<{
+    id: string
+    displayName: string
+    lineage: string
+    call: (system: string, user: string) => Promise<string>
+}> = [
+    {
+        id: "openai/gpt-5.5",
+        displayName: "GPT-5.5",
+        lineage: "US OpenAI",
+        call: async (system, user) => callOpenRouterModel("openai/gpt-5.5", system, user, 16000),
+    },
+    {
+        id: "openai/gpt-5.4",
+        displayName: "GPT-5.4",
+        lineage: "US OpenAI (alt)",
+        call: async (system, user) => callOpenRouterModel("openai/gpt-5.4", system, user, 16000),
+    },
+    {
+        id: "google/gemini-3.1-pro-preview",
+        displayName: "Gemini 3.1 Pro",
+        lineage: "US Google",
+        call: async (system, user) => callOpenRouterModel("google/gemini-3.1-pro-preview", system, user, 16000),
+    },
+    {
+        id: "google/gemini-2.5-flash",
+        displayName: "Gemini 2.5 Flash",
+        lineage: "US Google (fast)",
+        call: async (system, user) => callOpenRouterModel("google/gemini-2.5-flash", system, user, 16000),
+    },
+    {
+        id: "x-ai/grok-4.3",
+        displayName: "Grok 4.3",
+        lineage: "US xAI",
+        call: async (system, user) => callOpenRouterModel("x-ai/grok-4.3", system, user, 16000),
+    },
+    {
+        id: "deepseek/deepseek-v4-pro",
+        displayName: "DeepSeek V4-Pro",
+        lineage: "China DeepSeek",
+        call: async (system, user) => callOpenRouterModel("deepseek/deepseek-v4-pro", system, user, 16000),
+    },
+    {
+        id: "qwen/qwen3.6-plus",
+        displayName: "Qwen 3.6-plus",
+        lineage: "China Alibaba",
+        call: async (system, user) => callOpenRouterModel("qwen/qwen3.6-plus", system, user, 16000),
+    },
+    {
+        id: "moonshotai/kimi-k2.6",
+        displayName: "Kimi K2.6",
+        lineage: "China Moonshot",
+        call: async (system, user) => callOpenRouterModel("moonshotai/kimi-k2.6", system, user, 16000),
+    },
+    {
+        id: "z-ai/glm-5.1",
+        displayName: "GLM-5.1",
+        lineage: "China Zhipu",
+        call: async (system, user) => callOpenRouterModel("z-ai/glm-5.1", system, user, 16000),
+    },
+    {
+        id: "mistralai/mistral-large-2407",
+        displayName: "Mistral Large",
+        lineage: "EU Mistral",
+        call: async (system, user) => callOpenRouterModel("mistralai/mistral-large-2407", system, user, 16000),
+    },
+]
+
+/**
+ * Call a single model via OpenRouter. Shared helper for Stage 0.
+ */
+async function callOpenRouterModel(
+    modelId: string,
+    systemPrompt: string,
+    userPrompt: string,
+    maxTokens: number = 16000,
+): Promise<string> {
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+
+    const response = await fetchWithTimeout(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+                model: modelId,
+                max_tokens: maxTokens,
+                temperature: 0.2,
+                messages: [
+                    { role: "system", content: systemPrompt },
+                    { role: "user", content: userPrompt },
+                ],
+            }),
+        },
+        120_000,
+    )
+
+    if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`OpenRouter ${modelId} error (${response.status}): ${errText.slice(0, 300)}`)
+    }
+
+    const data = await response.json()
+    return data.choices?.[0]?.message?.content ?? ""
+}
+
+/**
+ * Stage 0 — 10-LLM training data knowledge dump.
+ *
+ * Runs 10 models from 6 different lineages (OpenAI, Google, xAI, DeepSeek,
+ * Alibaba/Moonshot/Zhipu, Mistral) in parallel. Each model is asked to dump
+ * what it knows from training data, structured around ALL pipeline stages:
+ *
+ *   1. Engineering specs (feeds: sizing, BOM, CAD)
+ *   2. Competitor products (feeds: market analysis, brief)
+ *   3. Regulatory requirements (feeds: brief, proofreading)
+ *   4. Market sizing (feeds: Finn, Max)
+ *   5. Suppliers and manufacturers (feeds: BOM, supplier matching)
+ *   6. Cost benchmarks (feeds: Finn, BOM)
+ *   7. Materials and certifications (feeds: sizing, Fang reviews)
+ *   8. Application-specific knowledge (feeds: all stages)
+ *
+ * The merged dossier is stored on the project so every downstream stage
+ * can inject the relevant section as context. This means:
+ *   - Chase research is supplemented with training data knowledge
+ *   - Finn cost estimates reference known price points
+ *   - BOM knows which suppliers and materials are typical
+ *   - Sizing has ballpark dimensions even if web search fails
+ *
+ * This is the FIRST thing that runs in a pipeline — before anything else.
+ */
+export async function runTrainingDataDump(
+    productDescription: string,
+    designBriefContext: string = "",
+): Promise<TrainingDataDumpResult> {
+    const start = Date.now()
+
+    const systemPrompt = `You are a senior hardware product development expert with deep domain knowledge across engineering, manufacturing, supply chains, regulatory compliance, market dynamics, and cost estimation.
+
+Based ONLY on your training data (no web search, no external tools), provide a comprehensive knowledge dump about the product described below. This information will be used to GROUND the entire development pipeline — from initial research through to bill of materials and cost estimation.
+
+Structure your response in these sections (answer ALL sections, write "UNKNOWN" if you genuinely don't have data):
+
+### 1. ENGINEERING SPECIFICATIONS
+What are the typical/known specifications for this type of product?
+- Dimensions (length × width × height), weight, capacity
+- Power rating, voltage, current specifications
+- Key materials and construction methods
+- Performance parameters and operating ranges
+- If you know exact numbers, provide them. If you know ranges, provide ranges.
+
+### 2. COMPETITOR PRODUCTS
+What companies make similar products? For each:
+- Company name, product name, key differentiators
+- Approximate price tier or cost range
+- Notable features or specifications
+- Geographic markets they serve
+List at least 3 if you know any.
+
+### 3. REGULATORY REQUIREMENTS
+What certifications, standards, and regulations apply?
+- Safety standards (UL, IEC, BS, etc.)
+- Environmental regulations (RoHS, REACH, WEEE, etc.)
+- Transport/delivery regulations
+- Industry-specific certifications
+- Geographic jurisdiction (UK, EU, North America, Asia)
+
+### 4. MARKET DATA
+What do you know about this market?
+- Market size (TAM/SAM) if known
+- Growth rate and trends
+- Key customer segments
+- Geographic demand patterns
+- Industry reports or benchmarks
+
+### 5. SUPPLIERS AND MANUFACTURERS
+What companies supply components or manufacture this type of product?
+- Company names, locations, specialties
+- Manufacturing clusters or geographic concentrations
+- Known supply chain patterns
+
+### 6. COST BENCHMARKS
+What are typical cost structures for this product category?
+- Bill of materials breakdown percentages
+- Known component costs (if any)
+- Manufacturing cost ranges
+- Margin expectations
+
+### 7. MATERIALS AND CERTIFICATIONS
+What materials are typically used? What certifications do buyers require?
+- Primary and secondary materials
+- Surface finishes, coatings
+- Certification requirements by market
+
+### 8. APPLICATION-SPECIFIC KNOWLEDGE
+Any domain-specific knowledge about how this product is used, deployed, or maintained?
+- Installation requirements
+- Maintenance patterns
+- Integration with other systems
+- Common failure modes
+
+Be specific with numbers where your training data supports it. Write "UNKNOWN" rather than guessing. Label your confidence: [HIGH], [MEDIUM], or [LOW] for each factual claim.`
+
+    const userPrompt = [
+        `PRODUCT DESCRIPTION:\n${productDescription}`,
+        designBriefContext ? `\nADDITIONAL CONTEXT FROM FOUNDER:\n${designBriefContext}` : "",
+    ].filter(Boolean).join("\n")
+
+    console.info(
+        `[stage-0] Starting 10-LLM training data dump: ${STAGE_0_MODELS.map((m) => m.displayName).join(", ")}`,
+    )
+
+    // Run ALL 10 models in parallel — 120s timeout each
+    const results = await Promise.allSettled(
+        STAGE_0_MODELS.map(async (model) => {
+            const modelStart = Date.now()
+            try {
+                const output = await model.call(systemPrompt, userPrompt)
+                const elapsed = Date.now() - modelStart
+                console.info(
+                    `[stage-0] ${model.displayName} (${model.lineage}): ${output.length} chars in ${elapsed}ms`,
+                )
+                return { model: model.displayName, lineage: model.lineage, output }
+            } catch (err) {
+                const elapsed = Date.now() - modelStart
+                const errMsg = err instanceof Error ? err.message : String(err)
+                console.warn(`[stage-0] ${model.displayName} (${model.lineage}) FAILED after ${elapsed}ms: ${errMsg}`)
+                return { model: model.displayName, lineage: model.lineage, output: "" }
+            }
+        }),
+    )
+
+    const modelOutputs = results.map((r) =>
+        r.status === "fulfilled"
+            ? r.value
+            : { model: "unknown", lineage: "unknown", output: "" },
+    )
+
+    const successfulOutputs = modelOutputs.filter((o) => o.output.length > 100)
+
+    // Build the merged dossier — each model's output in its own section
+    // so downstream stages can see which lineage contributed what
+    const dossierParts: string[] = [
+        `=== STAGE 0: TRAINING DATA KNOWLEDGE DUMP ===`,
+        `Models consulted: ${STAGE_0_MODELS.length}`,
+        `Models responded: ${successfulOutputs.length}`,
+        `This dossier contains what ${successfulOutputs.length} LLMs know from their training data.`,
+        `Use this to ground each pipeline stage — it supplements (does not replace) web research.`,
+        "",
+    ]
+
+    for (const output of successfulOutputs) {
+        dossierParts.push(
+            `--- ${output.model} (${output.lineage}) ---`,
+            output.output.slice(0, 6000),
+            "",
+        )
+    }
+
+    const dossier = dossierParts.join("\n")
+    const elapsedMs = Date.now() - start
+
+    console.info(
+        `[stage-0] COMPLETE: ${successfulOutputs.length}/${STAGE_0_MODELS.length} models responded, ` +
+        `${dossier.length} chars total, ${elapsedMs}ms`,
+    )
+
+    return {
+        dossier,
+        modelOutputs: modelOutputs.map((o) => ({
+            model: o.model,
+            lineage: o.lineage,
+            output: o.output.slice(0, 300),
+        })),
+        modelsResponded: successfulOutputs.length,
+        elapsedMs,
+    }
+}
+
+/**
+ * Extract section-specific context from a Stage 0 dossier for a particular
+ * pipeline stage. Each stage only needs certain sections.
+ *
+ * @param fullDossier - The complete Stage 0 dossier
+ * @param targetStage - Which pipeline stage needs context
+ * @returns Relevant excerpt (or empty string if dossier is unavailable)
+ */
+export function extractStageContext(
+    fullDossier: string,
+    targetStage: string,
+): string {
+    if (!fullDossier) return ""
+
+    // Map stages to the sections they care about
+    const stageSectionMap: Record<string, string[]> = {
+        waiting_chase: ["1", "2", "3", "4", "8"],         // specs, competitors, regulatory, market, application
+        waiting_max: ["1", "4", "8"],                      // specs, market, application
+        waiting_sizing: ["1", "6", "7"],                   // specs, costs, materials
+        waiting_bom: ["1", "5", "6", "7"],                 // specs, suppliers, costs, materials
+        waiting_finn: ["4", "6"],                          // market, costs
+        matching_suppliers: ["2", "5"],                    // competitors, suppliers
+        running_fang_reviews: ["1", "3", "7"],             // specs, regulatory, materials
+        proofreading: ["3", "7", "8"],                     // regulatory, materials, application
+    }
+
+    const relevantSections = stageSectionMap[targetStage]
+    if (!relevantSections?.length) return fullDossier.slice(0, 4000) // Unknown stage — give them the start
+
+    // Extract sections by header number from each model's output
+    const lines = fullDossier.split("\n")
+    const relevantLines: string[] = []
+    let currentSection: string | null = null
+    let currentModel: string = ""
+
+    for (const line of lines) {
+        // Track which model we're in
+        if (line.startsWith("--- ") && line.endsWith(" ---")) {
+            currentModel = line
+            relevantLines.push("")
+            relevantLines.push(currentModel)
+            currentSection = null
+            continue
+        }
+
+        // Track section headers (### 1. ENGINEERING SPECIFICATIONS, etc.)
+        const sectionMatch = line.match(/^### (\d+)\./)
+        if (sectionMatch) {
+            currentSection = sectionMatch[1]
+            if (relevantSections.includes(currentSection)) {
+                relevantLines.push(line)
+            }
+            continue
+        }
+
+        // Include content lines if we're in a relevant section
+        if (currentSection && relevantSections.includes(currentSection)) {
+            relevantLines.push(line)
+        }
+    }
+
+    const result = relevantLines.join("\n").trim()
+    return result.length > 100
+        ? `=== TRAINING DATA CONTEXT (Stage 0, ${targetStage}) ===\n${result}`
+        : ""
+}

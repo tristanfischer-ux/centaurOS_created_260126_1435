@@ -16,15 +16,15 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Performance Monitoring
-  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.05 : 1.0,
+  // Disable tracing in dev — noisy SpanExporter kills server memory during LLM stages
+  tracesSampleRate: process.env.NODE_ENV === "production" ? 0.05 : 0,
 
   // Session Replay - capture 1% of sessions, 100% on error
   replaysSessionSampleRate: 0.01,
   replaysOnErrorSampleRate: 1.0,
 
-  // Enable debug in development
-  debug: process.env.NODE_ENV === "development",
+  // Never verbose logging
+  debug: false,
 
   // Environment tag
   environment: process.env.NODE_ENV,
