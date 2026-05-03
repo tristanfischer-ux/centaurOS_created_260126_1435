@@ -290,34 +290,6 @@ async function runScout(
         return null
     }
 }
-        const response = await fetchWithTimeout(
-            "https://api.deepseek.com/v1/chat/completions",
-            {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
-                body: JSON.stringify({
-                    model: "deepseek-chat",
-                    max_tokens: 8192,
-                    temperature: 0.2,
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: userPrompt },
-                    ],
-                }),
-            },
-            30_000,
-        )
-        if (!response.ok) throw new Error(`DeepSeek API error: ${response.status}`)
-        const data = await response.json()
-        const text = data.choices?.[0]?.message?.content || ""
-        const elapsed = Date.now() - start
-        console.info(`[parallel-llm] Scout (V4-Flash) for stage ${stage}: ${elapsed}ms, ${text.length} chars`)
-        return text
-    } catch (err) {
-        console.warn(`[parallel-llm] Scout failed for ${stage}: ${err instanceof Error ? err.message : String(err)} — proceeding without`)
-        return null
-    }
-}
 
 /** Format scout output as context for the triad models */
 function buildScoutContext(scoutOutput: string | null): string {
