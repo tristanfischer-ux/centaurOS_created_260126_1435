@@ -79,10 +79,10 @@ import { createAdminClient } from "@/lib/supabase/admin"
 // slots are now on non-DeepSeek models.
 
 const COUNCIL_MODEL_MAP: Record<string, string> = {
-    // China DeepSeek — V4-Flash: proven reliable on this OpenRouter account, clean prose output.
-    // Best host/opener: follows format precisely, cheap at $0.14/$0.28/M.
-    // Also used for sales-lead and growth-marketer when Cal isn't in session.
-    "chief-of-staff":      "deepseek/deepseek-v4-flash",
+    // US xAI — Grok 4.3: fastest frontier model, Intelligence 55, tool-use 98%.
+    // Best host/opener: very fast response time, follows format precisely.
+    // Swapped from V4-Flash 2026-05-03 per Tristan — V4-Flash was stalling.
+    "chief-of-staff":      "x-ai/grok-4.3",
 
     // US Google — Gemini 3.1 Pro: Intelligence 57, HLE 45% (#1 hardest problems).
     // Best strategic reasoner. Kept from prior mapping (no regression risk).
@@ -134,7 +134,7 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
 
 // Model label shown in the response card
 const COUNCIL_MODEL_LABEL: Record<string, string> = {
-    "chief-of-staff":      "DeepSeek V4-Flash",
+    "chief-of-staff":      "Grok 4.3",
     "fundraising-advisor": "Claude Opus 4.7",
     "strategist":          "Gemini 3.1 Pro",
     "finance-lead":        "Kimi K2.6",
