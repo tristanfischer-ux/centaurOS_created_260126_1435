@@ -70,7 +70,7 @@ function CadLabLayoutShell({ children }: { children: React.ReactNode }): React.R
     projects, isLoadingProjects,
     handleLoadProject, handleDeleteProject, handleReset,
     // Progress
-    progressLines, isResearching, isDecomposing, isBatchRunning, generatingModuleIds, isGeneratingUnified,
+    progressLines = [], isResearching, isDecomposing, isBatchRunning, generatingModuleIds = new Set(), isGeneratingUnified,
     // Milestone
     milestone, setMilestone,
     // Post-research idle detection
