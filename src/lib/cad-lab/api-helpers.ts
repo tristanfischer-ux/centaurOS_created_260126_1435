@@ -201,6 +201,20 @@ export async function callGeminiWithSearch(
         })
         .map((c) => ({ uri: c.web.uri, title: c.web.title }))
 
+      // If Gemini returned text but zero grounding sources, supplement with Brave Search
+      if (sources.length === 0 && text.trim().length > 0) {
+        console.info("[callGeminiWithSearch] Gemini returned 0 grounding sources — triggering Brave Search fallback")
+        const fallback = await braveSearchFallback(prompt)
+        if (fallback.sources.length > 0) {
+          return {
+            text: text + "\n" + fallback.text,
+            sources: fallback.sources,
+            tokensIn: usage.promptTokenCount ?? 0,
+            tokensOut: usage.candidatesTokenCount ?? 0,
+          }
+        }
+      }
+
       return { text, sources, tokensIn: usage.promptTokenCount ?? 0, tokensOut: usage.candidatesTokenCount ?? 0 }
     }
 
@@ -215,9 +229,112 @@ export async function callGeminiWithSearch(
     console.warn(`[callGeminiWithSearch] ${status} on attempt ${attempt + 1}: ${errText.slice(0, 100)}`)
   }
 
-  // All retries exhausted — return empty result gracefully (downstream handles missing search data)
+  // All retries exhausted — try Brave Search as last resort
   console.error(`[callGeminiWithSearch] All ${maxRetries} retries exhausted: ${lastError?.message}`)
+  console.info("[callGeminiWithSearch] Attempting Brave Search as last resort fallback")
+  const fallback = await braveSearchFallback(prompt)
+  if (fallback.sources.length > 0) {
+    return { text: fallback.text, sources: fallback.sources, tokensIn: 0, tokensOut: 0 }
+  }
   return { text: "", sources: [], tokensIn: 0, tokensOut: 0 }
+}
+
+// ─── Brave Search Fallback ─────────────────────────────────────────────
+
+const BRAVE_SEARCH_URL = "https://api.search.brave.com/res/v1/web/search"
+
+/**
+ * Runs Brave Search queries as a fallback when Gemini Search returns 0 sources.
+ * Returns a formatted text block of search results + synthetic source entries.
+ */
+async function braveSearchFallback(
+  productDescription: string,
+): Promise<{ text: string; sources: Array<{ uri: string; title: string }> }> {
+  const braveKey = process.env.BRAVE_SEARCH_API_KEY?.trim()
+  if (!braveKey) {
+    console.warn("[braveSearchFallback] BRAVE_SEARCH_API_KEY not configured — skipping fallback")
+    return { text: "", sources: [] }
+  }
+
+  // Extract the core product concept (first ~80 chars) for search queries
+  const coreQuery = productDescription
+    .replace(/^Find the real-world specifications for:\s*/i, "")
+    .split("\n")[0]
+    .slice(0, 80)
+    .trim()
+
+  const queries = [
+    `${coreQuery} specifications dimensions datasheet`,
+    `${coreQuery} market size regulatory compliance UK EU`,
+    `${coreQuery} competitors manufacturers suppliers`,
+  ]
+
+  const allResults: Array<{ uri: string; title: string; description: string }> = []
+
+  for (const query of queries) {
+    try {
+      const url = new URL(BRAVE_SEARCH_URL)
+      url.searchParams.set("q", query)
+      url.searchParams.set("count", "5")
+      url.searchParams.set("search_lang", "en")
+
+      const res = await fetchWithTimeout(
+        url.toString(),
+        {
+          headers: {
+            Accept: "application/json",
+            "X-Subscription-Token": braveKey,
+          },
+        },
+        15_000,
+      )
+
+      if (!res.ok) {
+        console.warn(`[braveSearchFallback] Brave ${res.status} for query: ${query.slice(0, 60)}`)
+        continue
+      }
+
+      const data = await res.json()
+      const results = (data.web?.results ?? []) as Array<{
+        title?: string
+        url?: string
+        description?: string
+      }>
+
+      for (const r of results) {
+        if (r.url) {
+          allResults.push({
+            uri: r.url,
+            title: r.title ?? "Untitled",
+            description: r.description ?? "",
+          })
+        }
+      }
+    } catch (err) {
+      console.warn(`[braveSearchFallback] query failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  if (allResults.length === 0) {
+    return { text: "", sources: [] }
+  }
+
+  // Deduplicate by URL
+  const seen = new Set<string>()
+  const unique = allResults.filter((r) => {
+    if (seen.has(r.uri)) return false
+    seen.add(r.uri)
+    return true
+  })
+
+  const textBlock = unique
+    .map((r, i) => `[${i + 1}] ${r.title}\n    URL: ${r.uri}\n    ${r.description}`)
+    .join("\n\n")
+
+  const sources = unique.map((r) => ({ uri: r.uri, title: r.title }))
+
+  console.info(`[braveSearchFallback] Returned ${unique.length} results for "${coreQuery.slice(0, 50)}"`)
+  return { text: `\n=== BRAVE SEARCH FALLBACK RESULTS ===\n${textBlock}`, sources }
 }
 
 // ─── Gemini API Call (plain text, no search grounding) ───────────────
