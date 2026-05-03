@@ -699,7 +699,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             }))
 
             const r1Promises = specialistsForTier.map(async (sp) => {
-                const r1Result = await getSpecialistRound1Response(trimmedQ, sp)
+                let r1Result: { ok: true; response: SpecialistResponse } | { ok: false; error: string }
+                try {
+                    r1Result = await getSpecialistRound1Response(trimmedQ, sp)
+                } catch (err) {
+                    console.error(`[BrainstormingCouncilView] R1 fetch failed for ${sp.name}:`, err)
+                    r1Result = { ok: false, error: err instanceof Error ? err.message : "Network error" }
+                }
                 const resp: SpecialistResponse = r1Result.ok
                     ? r1Result.response
                     : {
@@ -707,7 +713,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         name: sp.name,
                         title: sp.title,
                         modelLabel: "error",
-                        response: `${sp.name} was unable to respond. Try again in a moment.`,
+                        response: `${sp.name} was unable to respond to this question. The model returned an error — try again in a moment.`,
                     }
                 setSession(prev => ({
                     ...prev,
@@ -729,7 +735,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
             // Wait for all specialists to finish before proceeding to R2 / Cal closing
             const r1Responses = await Promise.all(r1Promises)
-            const successfulR1 = r1Responses.filter(r => !r.response.includes("was unable to respond"))
+            const successfulR1 = r1Responses.filter(r => r.modelLabel !== "error")
 
             // ── Step 3: Round 2 (non-quick tiers) ─────────────────────────
             let finalSpecialistResponses: SpecialistResponse[] = r1Responses
@@ -740,35 +746,39 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 setSession(prev => ({ ...prev, councilPhase: "r2-running" }))
 
                 const r2Promises = successfulR1.map(async (sp) => {
-                    const peers = successfulR1
-                        .filter(r => r.id !== sp.id)
-                        .map(r => ({ name: r.name, response: r.response }))
-                    const r2Result = await getSpecialistRound2Response(
-                        trimmedQ,
-                        { id: sp.id, name: sp.name, title: sp.title },
-                        sp.response,
-                        peers,
-                    )
-                    // W77: update this specialist's card with round2Response on resolve.
-                    if (r2Result.ok) {
-                        setSession(prev => ({
-                            ...prev,
-                            specialistResponses: prev.specialistResponses.map(r =>
-                                r.id === r2Result.id ? { ...r, round2Response: r2Result.round2Response } : r
-                            ),
-                        }))
-                        // Progressive persistence: write this specialist's R2 entry to DB
-                        if (liveThreadId) {
-                            addProgressiveMeetingEntry(liveThreadId, {
-                                specialistId: sp.id,
-                                specialistName: sp.name,
-                                councilPosition: "reactor",
-                                roundNumber: 2,
-                                content: r2Result.round2Response,
-                                role: "specialist",
-                            }).catch(err => console.error("[BrainstormingCouncilView] R2 entry save failed:", err))
+                    try {
+                        const peers = successfulR1
+                            .filter(r => r.id !== sp.id)
+                            .map(r => ({ name: r.name, response: r.response }))
+                        const r2Result = await getSpecialistRound2Response(
+                            trimmedQ,
+                            { id: sp.id, name: sp.name, title: sp.title },
+                            sp.response,
+                            peers,
+                        )
+                        // W77: update this specialist's card with round2Response on resolve.
+                        if (r2Result.ok) {
+                            setSession(prev => ({
+                                ...prev,
+                                specialistResponses: prev.specialistResponses.map(r =>
+                                    r.id === r2Result.id ? { ...r, round2Response: r2Result.round2Response } : r
+                                ),
+                            }))
+                            // Progressive persistence: write this specialist's R2 entry to DB
+                            if (liveThreadId) {
+                                addProgressiveMeetingEntry(liveThreadId, {
+                                    specialistId: sp.id,
+                                    specialistName: sp.name,
+                                    councilPosition: "reactor",
+                                    roundNumber: 2,
+                                    content: r2Result.round2Response,
+                                    role: "specialist",
+                                }).catch(err => console.error("[BrainstormingCouncilView] R2 entry save failed:", err))
+                            }
+                            return { id: sp.id, round2Response: r2Result.round2Response }
                         }
-                        return { id: sp.id, round2Response: r2Result.round2Response }
+                    } catch (err) {
+                        console.error(`[BrainstormingCouncilView] R2 fetch failed for ${sp.name}:`, err)
                     }
                     return null
                 })
@@ -792,15 +802,20 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 .filter(r => r.round2Response)
                 .map(r => ({ name: r.name, response: r.round2Response! }))
 
-            const calClosingResult = await getCalClosingResponse(
-                trimmedQ,
-                successfulR1.map(r => ({ name: r.name, response: r.response })),
-                r2ForCal,
-            )
-
-            const hostClosing = calClosingResult.ok
-                ? calClosingResult.closing
-                : "Cal was unable to complete the synthesis. The responses above reflect the council's individual perspectives."
+            let hostClosing: string
+            try {
+                const calClosingResult = await getCalClosingResponse(
+                    trimmedQ,
+                    successfulR1.map(r => ({ name: r.name, response: r.response })),
+                    r2ForCal,
+                )
+                hostClosing = calClosingResult.ok
+                    ? calClosingResult.closing
+                    : "Cal was unable to complete the synthesis. The specialist responses above reflect the council's individual perspectives."
+            } catch (err) {
+                console.error("[BrainstormingCouncilView] Cal closing failed:", err)
+                hostClosing = "Cal was unable to complete the synthesis. The specialist responses above reflect the council's individual perspectives."
+            }
 
             // Persist Cal's closing entry before marking done
             if (liveThreadId) {
@@ -2001,9 +2016,10 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             )
                         }
 
-                        // Arrived — show real card
+                        // Arrived — show real card (dimmed if the model errored)
+                        const isError = arrived.modelLabel === "error"
                         return (
-                            <div key={arrived.id} className="bc-specialist-card">
+                            <div key={arrived.id} className="bc-specialist-card" style={isError ? { opacity: 0.6, borderColor: "var(--bc-border-soft)" } : undefined}>
                                 <div className="bc-specialist-head">
                                     <div className={`bc-sp-avatar ${avatarClass}`}>{initials}</div>
                                     <div className="bc-sp-meta">
@@ -2016,9 +2032,11 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 <div className="bc-sp-body" style={{ whiteSpace: "pre-wrap" }}>
                                     {arrived.response}
                                 </div>
-                                <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
-                                    <div className="bc-sig-label">{sigLabel}</div>
-                                </div>
+                                {!isError && (
+                                    <div className={`bc-sig-close ${sigColorClass}`} style={{ marginTop: "auto" }}>
+                                        <div className="bc-sig-label">{sigLabel}</div>
+                                    </div>
+                                )}
                             </div>
                         )
                     })}
@@ -2052,6 +2070,8 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     </div>
                     <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
                         {sessionCouncilMembers.map((specialist) => {
+                            const r1Entry = session.specialistResponses.find(r => r.id === specialist.id)
+                            const r1Failed = r1Entry?.modelLabel === "error"
                             const r2arrived = session.specialistResponses.find(r => r.id === specialist.id && r.round2Response)
                             const avatarClass = getAvatarClass(specialist.id)
                             const initials = specialist.name.slice(0, 2).toUpperCase()
@@ -2064,6 +2084,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                                 "fundraising-advisor": "bc-sig-fiona",
                             }
                             const sigColorClass = sigColorMap[specialist.id] ?? ""
+
+                            if (r1Failed) {
+                                return (
+                                    <div key={`r2-skipped-${specialist.id}`} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border-soft)", opacity: 0.5 }}>
+                                        <div className={`bc-sp-avatar ${avatarClass}`} style={{ margin: "0 auto 12px", opacity: 0.5 }}>
+                                            {initials}
+                                        </div>
+                                        <h3>{specialist.name}</h3>
+                                        <p style={{ fontStyle: "italic", color: "var(--bc-fg-subtle)" }}>Unavailable this session</p>
+                                    </div>
+                                )
+                            }
 
                             if (!r2arrived) {
                                 return (
