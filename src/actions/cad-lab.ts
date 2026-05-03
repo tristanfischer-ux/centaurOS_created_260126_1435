@@ -2643,7 +2643,15 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
       success: true,
       moduleId: targetModuleId,
       expansion: {
-        keyParts: Array.isArray(parsed.keyParts) ? parsed.keyParts.map(String) : [],
+        keyParts: (() => {
+          if (Array.isArray(parsed.keyParts) && parsed.keyParts.length > 0) {
+            return parsed.keyParts.map(String)
+          }
+          console.warn(
+            `[THE-FORGE] Module expansion [${targetModuleId}]: keyParts is ${Array.isArray(parsed.keyParts) ? "empty array" : typeof parsed.keyParts + " (" + String(parsed.keyParts).slice(0, 80) + ")"} — ${target.name}. Prompt asked for ≥3 keyParts.`
+          )
+          return []
+        })(),
         leadWeeks: typeof parsed.leadWeeks === "number" ? parsed.leadWeeks : 4,
         estimatedMassKg: typeof parsed.estimatedMassKg === "number" && parsed.estimatedMassKg > 0
           ? parsed.estimatedMassKg : undefined,

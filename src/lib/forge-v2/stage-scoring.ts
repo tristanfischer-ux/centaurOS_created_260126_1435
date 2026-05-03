@@ -331,26 +331,58 @@ function summariseResearch(research: Record<string, unknown> | null): string {
 
 function summariseModules(modules: Record<string, unknown> | null): string {
     if (!modules) return "No modules data found."
-    const moduleEntries = Object.entries(modules)
-    if (moduleEntries.length === 0) return "Modules object is empty."
 
-    const lines: string[] = [`=== MODULES SUMMARY (${moduleEntries.length} modules) ===\n`]
+    // Modules can be an array (CadLabModule[]) or an object keyed by id.
+    const entries: Array<{ id: string; m: Record<string, unknown> }> = Array.isArray(modules)
+        ? modules.map((m, i) => ({ id: (m as Record<string, unknown>).id as string || `module_${i}`, m }))
+        : Object.entries(modules).map(([id, m]) => ({ id, m: m as Record<string, unknown> }))
 
-    for (const [id, mod] of moduleEntries) {
-        const m = mod as Record<string, unknown>
+    if (entries.length === 0) return "Modules data is empty."
+
+    const lines: string[] = [`=== MODULES SUMMARY (${entries.length} modules) ===\n`]
+
+    for (const { id, m } of entries) {
         const name = m.name ?? m.title ?? id
-        const description = m.description ?? m.summary
-        const material = m.material ?? m.primaryMaterial ?? m.materials
-        const dims = m.dimensions ?? m.size ?? m.keyDimensions
-        const specs = m.specifications ?? m.keySpecs ?? m.technicalSpecs
-        const cost = m.estimatedCost ?? m.costGbp ?? m.unitCost
+        const purpose = m.purpose ?? ""
+        const description = m.description ?? m.summary ?? ""
+        const keyParts = m.keyParts
+        const specs = m.specs ?? m.specifications ?? m.keySpecs ?? m.technicalSpecs
+        const estimatedMassKg = m.estimatedMassKg
+        const leadWeeks = m.leadWeeks
+        const failureModes = m.failureModes
+        const inputs = m.inputs
+        const outputs = m.outputs
+        const mirrorOf = m.mirrorOf
 
-        lines.push(`MODULE: ${name} (${id})`)
-        if (description) lines.push(`  Description: ${String(description).slice(0, 200)}`)
-        if (material) lines.push(`  Material: ${typeof material === "object" ? JSON.stringify(material).slice(0, 120) : String(material)}`)
-        if (dims) lines.push(`  Dimensions: ${typeof dims === "object" ? JSON.stringify(dims).slice(0, 120) : String(dims)}`)
-        if (specs) lines.push(`  Key specs: ${typeof specs === "object" ? JSON.stringify(specs).slice(0, 200) : String(specs).slice(0, 200)}`)
-        if (cost != null) lines.push(`  Estimated cost: £${cost}`)
+        lines.push(`MODULE: ${name} (${id})${mirrorOf ? ` [mirror of ${mirrorOf}]` : ""}`)
+        if (purpose) lines.push(`  Purpose: ${String(purpose).slice(0, 200)}`)
+        if (description) lines.push(`  Description: ${String(description).slice(0, 300)}`)
+        if (Array.isArray(keyParts) && keyParts.length > 0) {
+            lines.push(`  Key parts (${keyParts.length}):`)
+            for (const kp of keyParts.slice(0, 6)) {
+                lines.push(`    - ${String(kp).slice(0, 150)}`)
+            }
+            if (keyParts.length > 6) lines.push(`    ... and ${keyParts.length - 6} more`)
+        } else {
+            lines.push(`  Key parts: NONE`)
+        }
+        if (specs && typeof specs === "object" && Object.keys(specs).length > 0) {
+            lines.push(`  Specs: ${JSON.stringify(specs).slice(0, 200)}`)
+        }
+        if (estimatedMassKg) lines.push(`  Estimated mass: ${estimatedMassKg} kg`)
+        if (leadWeeks) lines.push(`  Lead time: ${leadWeeks} weeks`)
+        if (Array.isArray(inputs) && inputs.length > 0) {
+            lines.push(`  Inputs: ${inputs.map(String).join(", ").slice(0, 150)}`)
+        }
+        if (Array.isArray(outputs) && outputs.length > 0) {
+            lines.push(`  Outputs: ${outputs.map(String).join(", ").slice(0, 150)}`)
+        }
+        if (Array.isArray(failureModes) && failureModes.length > 0) {
+            lines.push(`  Failure modes (${failureModes.length}):`)
+            for (const fm of failureModes.slice(0, 4)) {
+                lines.push(`    - ${String(fm).slice(0, 120)}`)
+            }
+        }
         lines.push("")
     }
 
