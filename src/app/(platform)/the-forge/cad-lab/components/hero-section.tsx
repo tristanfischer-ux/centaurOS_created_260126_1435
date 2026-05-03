@@ -115,6 +115,14 @@ export function HeroSection({
 
   // INTENT: First-time research triggers interview; re-research skips it.
   const handleResearchClick = () => {
+    // Read DOM value on form submission (for agent-browser compatibility)
+    if (typeof window !== "undefined") {
+      const el = document.getElementById("subject") as HTMLInputElement | null;
+      if (el && el.value && el.value !== subject) {
+        setSubject(el.value);
+      }
+    }
+
     if (hasResearch) {
       setIsConfirmReResearchOpen(true)
     } else if (onStartInterview) {
@@ -154,7 +162,8 @@ export function HeroSection({
               className="pl-10 h-12 text-base"
               disabled={isAnyLoading}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && subjectTrimmed && !isAnyLoading) {
+                const nativeValue = (e.target as HTMLInputElement).value.trim()
+                if (e.key === "Enter" && nativeValue.length > 0 && !isAnyLoading) {
                   handleResearchClick()
                 }
               }}

@@ -456,6 +456,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   const [subject, setSubject] = useState("")
   const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-7")
 
+  // Sync DOM value to React state on mount (for agent-browser compatibility)
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const el = document.getElementById("subject") as HTMLInputElement | null
+      if (el && el.value && !subject) {
+        setSubject(el.value)
+      }
+    }
+  }, []) // Only run on mount
+
   // Persist draft subject so it survives navigation before Research is triggered
   useEffect(() => {
     if (typeof window === "undefined") return
@@ -1396,11 +1406,12 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
   }, [activeProjectId])
 
   // ── Ensure project exists for auto-save ──
-  const ensureProject = useCallback(async (): Promise<string | null> => {
+  const ensureProject = useCallback(async (explicitSubject?: string): Promise<string | null> => {
+    const sub = explicitSubject ?? subject
     if (activeProjectId) return activeProjectId
-    if (!subject.trim()) return null
+    if (!sub.trim()) return null
     try {
-      const res = await createCadLabProject(subject, modelId)
+      const res = await createCadLabProject(sub, modelId)
       if ("projectId" in res) {
         setActiveProjectId(res.projectId)
         return res.projectId
@@ -3349,6 +3360,16 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Research ──
   const handleResearch = useCallback(async () => {
+    // Read directly from DOM to catch agent-browser manipulation that bypassed React state
+    let currentSubject = subject
+    if (typeof window !== "undefined") {
+      const el = document.getElementById("subject") as HTMLInputElement | null
+      if (el && el.value && el.value !== subject) {
+        currentSubject = el.value
+        setSubject(el.value)
+      }
+    }
+
     // SECURITY: Synchronous guard prevents concurrent research calls (React batching window)
     if (researchInFlightRef.current) {
       console.warn("[CAD-LAB] Research already in flight — ignoring duplicate call")
@@ -3373,7 +3394,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
     try {
       // INTENT: ensureProject() early — needed for storage paths (uploads + extraction).
       // Idempotent: returns cached ID if project already exists.
-      const projId = await ensureProject()
+      const projId = await ensureProject(currentSubject)
 
       // GOTCHA: If project creation fails but user uploaded files, warn them
       // that their uploads won't be included in research.
@@ -3560,7 +3581,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
       researchTimers.push(setTimeout(() => addProgressLine("Synthesising research report..."), 18000))
       researchTimers.push(setTimeout(() => addProgressLine("This typically takes 20-40 seconds depending on product complexity..."), 25000))
 
-      const res = await runCadLabResearch(subject, {
+      const res = await runCadLabResearch(currentSubject, {
         designBrief,
         assumptionNotes,
         documentContext: freshDocumentContext || documentContext || undefined,
