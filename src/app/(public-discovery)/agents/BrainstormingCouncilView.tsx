@@ -33,13 +33,57 @@ import Link from "next/link"
 import { ChevronRight } from "lucide-react"
 import { SPECIALISTS } from "@/lib/agents/specialists-config"
 import type { Specialist } from "@/lib/agents/specialists-config"
-import {
-    getCalFraming,
-    getSpecialistRound1Response,
-    getSpecialistRound2Response,
-    getCalClosingResponse,
-} from "@/actions/brainstorming-council"
 import type { SpecialistResponse } from "@/actions/brainstorming-council-types"
+
+// Council LLM calls go through an API route (/api/agents/council-call)
+// instead of server actions to avoid RSC revalidation blocking state updates.
+async function getCalFraming(question: string, specialistNames: string[]) {
+    const res = await fetch("/api/agents/council-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cal-framing", question, specialistNames }),
+    })
+    return res.json() as Promise<{ ok: true; framing: string } | { ok: false; error: string }>
+}
+
+async function getSpecialistRound1Response(
+    question: string,
+    specialist: { id: string; name: string; title: string; tagline: string },
+) {
+    const res = await fetch("/api/agents/council-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "specialist-r1", question, specialist }),
+    })
+    return res.json() as Promise<{ ok: true; response: SpecialistResponse } | { ok: false; error: string }>
+}
+
+async function getSpecialistRound2Response(
+    question: string,
+    specialist: { id: string; name: string; title: string; tagline: string },
+    calFraming: string,
+    specialistResponses: Array<{ name: string; response: string }>,
+) {
+    const res = await fetch("/api/agents/council-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "specialist-r2", question, specialist, calFraming, specialistResponses }),
+    })
+    return res.json() as Promise<{ ok: true; response: SpecialistResponse } | { ok: false; error: string }>
+}
+
+async function getCalClosingResponse(
+    question: string,
+    round1Responses: Array<{ name: string; response: string }>,
+    round2Responses: Array<{ name: string; response: string }>,
+) {
+    const res = await fetch("/api/agents/council-call", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "cal-closing", question, specialistResponses: round1Responses, round2Responses }),
+    })
+    return res.json() as Promise<{ ok: true; closing: string } | { ok: false; error: string }>
+}
 import {
     createMeetingThread,
     startMeetingThread,
