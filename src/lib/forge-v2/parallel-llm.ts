@@ -168,7 +168,46 @@ export const STAGE_MODEL_TRIADS: Record<string, ModelConfig[]> = {
     ],
 }
 
-// ── DB grounding tables per stage ─────────────────────────────────────
+// ── Scout model (fast first-pass survey) ────────────────────────────
+
+/**
+ * The scout runs a fast, cheap model (DeepSeek V4-Flash) before the triad.
+ * It produces a quick first-pass output that the triad models can use as
+ * context — like a recon helicopter mapping the terrain before the main
+ * force moves in. This saves the expensive triad models from spending
+ * tokens on basic understanding and lets them focus on quality.
+ *
+ * The scout output is appended to the user prompt as "PRELIMINARY ANALYSIS"
+ * so each triad model can choose to incorporate or ignore it.
+ */
+async function runScout(
+    systemPrompt: string,
+    userPrompt: string,
+    stage: string,
+): Promise<string | null> {
+    try {
+        const start = Date.now()
+        const { text } = await callOpenAI(
+            systemPrompt,
+            userPrompt,
+            "gpt-4.1-mini", // Fast, cheap, good enough for first-pass
+            8192,
+            30_000, // 30s timeout — scout must be fast
+        )
+        const elapsed = Date.now() - start
+        console.info(`[parallel-llm] Scout completed for stage ${stage} in ${elapsed}ms (${text.length} chars)`)
+        return text
+    } catch (err) {
+        console.warn(`[parallel-llm] Scout failed for stage ${stage}: ${err instanceof Error ? err.message : String(err)} — proceeding without scout`)
+        return null
+    }
+}
+
+/** Format scout output as context for the triad models */
+function buildScoutContext(scoutOutput: string | null): string {
+    if (!scoutOutput) return ""
+    return `\n\n=== PRELIMINARY ANALYSIS (fast first-pass) ===\n${scoutOutput.slice(0, 3000)}\nUse this as starting context, but produce your own complete, independent output. Improve upon or correct the preliminary analysis where needed.\n`
+}
 
 /**
  * Maps each parallel-compare stage to the database tables it should
@@ -307,12 +346,20 @@ export async function runParallelAndCompare(
 
     console.info(`[parallel-llm] Starting parallel-and-compare for stage ${stage} with ${models.length} models: ${models.map((m) => m.displayName).join(", ")}`)
 
-    // Run all 3 models in parallel
+    // ── Scout: fast first-pass survey ──
+    // The scout (gpt-4.1-mini) runs first and its output is appended to each
+    // triad model's prompt as context. This lets the expensive models focus on
+    // quality rather than basic understanding — like recon before main force.
+    const scoutOutput = await runScout(systemPrompt, userPrompt, stage)
+    const scoutContext = buildScoutContext(scoutOutput)
+    const enrichedUserPrompt = userPrompt + scoutContext
+
+    // Run all 3 models in parallel with scout context
     const results = await Promise.allSettled(
         models.map(async (model) => {
             const start = Date.now()
             try {
-                const output = await model.call(systemPrompt, userPrompt)
+                const output = await model.call(systemPrompt, enrichedUserPrompt)
                 const elapsed = Date.now() - start
                 console.info(`[parallel-llm] ${model.displayName} completed in ${elapsed}ms (${output.length} chars)`)
                 return { model: model.displayName, lineage: model.lineage, output, error: undefined }
