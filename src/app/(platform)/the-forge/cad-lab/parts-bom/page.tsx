@@ -78,7 +78,7 @@ const processLabel: Record<string, string> = {
 export default function PartsAndBomPage(): React.ReactNode {
   const router = useRouter()
   const {
-    modules,
+    modules = [],
     subject,
     activeProjectId,
     diagnosticAnswers,

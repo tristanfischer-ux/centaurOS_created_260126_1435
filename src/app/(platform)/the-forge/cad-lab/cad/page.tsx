@@ -48,7 +48,7 @@ export default function CadStagePage(): React.ReactNode {
   const {
     subject,
     hasResearch,
-    modules,
+    modules = [],
     diagnosticAnswers,
     isResearching,
     isDecomposing,

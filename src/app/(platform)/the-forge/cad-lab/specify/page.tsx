@@ -149,7 +149,7 @@ export default function SpecifyPage(): React.ReactNode {
   const {
     subject, modelId,
     hasResearch,
-    modules,
+    modules = [],
     setModules,
     diagnosticAnswers,
     setDiagnosticAnswers,

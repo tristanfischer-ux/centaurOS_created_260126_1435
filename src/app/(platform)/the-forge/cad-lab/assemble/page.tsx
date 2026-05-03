@@ -109,7 +109,7 @@ export default function AssemblePage(): React.ReactNode {
     subject,
     activeProjectId,
     hasResearch,
-    modules,
+    modules = [],
     diagnosticAnswers,
     aiCostEstimates,
     specifiedModuleCount,

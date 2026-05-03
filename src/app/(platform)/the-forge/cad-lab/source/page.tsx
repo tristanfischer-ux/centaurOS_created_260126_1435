@@ -102,7 +102,7 @@ export default function SourcePage(): React.ReactNode {
   const {
     subject,
     hasResearch,
-    modules,
+    modules = [],
     diagnosticAnswers,
     designBrief,
     assumptionNotes,

@@ -71,7 +71,7 @@ export default function CadLabReviewPage(): React.ReactNode {
   }, [router])
 
   const {
-    modules, generatedModuleCount, subject, hasResearch,
+    modules = [], generatedModuleCount, subject, hasResearch,
     editableReport, diagnosticAnswers, setDiagnosticAnswers,
     aiPrefilled, designBrief, assumptionNotes,
     activeProjectId, linkedRfqId,

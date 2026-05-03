@@ -36,7 +36,7 @@ const LEGEND_ITEMS = [
 
 export default function SupplyFlowPage(): React.ReactNode {
   const router = useRouter()
-  const { modules, subject, diagnosticAnswers } = useCadLab()
+  const { modules = [], subject, diagnosticAnswers } = useCadLab()
 
   const [data, setData] = useState<SupplyFlowData | null>(null)
   const [loading, setLoading] = useState(false)

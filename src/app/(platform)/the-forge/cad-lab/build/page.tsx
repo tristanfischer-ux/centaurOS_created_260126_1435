@@ -110,7 +110,7 @@ export default function CadLabBuildPage(): React.ReactNode {
     showSources, setShowSources,
     handleReset, handleResearch,
     systemIllustrationUrl, systemIllustrationStatus,
-    modules, expandedModuleId, setExpandedModuleId,
+    modules = [], expandedModuleId, setExpandedModuleId,
     generatingModuleIds,
     isDecomposing, handleDecompose,
     handleModuleGenerate, handleGenerateSingleModule, handleGenerateAllModules,
