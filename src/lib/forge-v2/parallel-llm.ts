@@ -2,7 +2,7 @@
  * @file parallel-llm.ts — Parallel-and-compare multi-model pattern
  *
  * @description Runs 3 models from DIFFERENT lineages on the SAME prompt,
- * then uses a cheap judge model (gpt-4.1-mini) to select or synthesise
+ * then uses MiMo V2.5 Pro (Intelligence 54, $1.50/M) as judge to select or synthesise
  * the best output. This is fundamentally different from primary+fallback:
  *
  *   primary+fallback = reliability (if model A fails, try model B)
@@ -203,6 +203,42 @@ export const STAGE_MODEL_TRIADS: Record<string, ModelConfig[]> = {
     ],
 }
 
+// ── Judge model (quality selection) ─────────────────────────────────
+
+/**
+ * MiMo V2.5 Pro as judge — Intelligence 54, $1.50/M, Xiaomi (China).
+ * Chosen over MiMo V2.5 Pro (Intelligence 49) because the judge's job is
+ * to pick the BEST output from the triad. A weak judge wastes the triad's
+ * diversity. Cost is negligible: ~3000 input tokens + ~100 output = $0.005/run.
+ */
+async function callJudge(system: string, user: string, maxTokens: number = 8192): Promise<string> {
+    const apiKey = process.env.OPENROUTER_API_KEY?.trim()
+    if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
+    const response = await fetchWithTimeout(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+            method: "POST",
+            headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+            body: JSON.stringify({
+                model: "xiaomi/mimo-v2.5-pro",
+                max_tokens: maxTokens,
+                temperature: 0.1,
+                messages: [
+                    { role: "system", content: system },
+                    { role: "user", content: user },
+                ],
+            }),
+        },
+        60_000,
+    )
+    if (!response.ok) {
+        const errText = await response.text()
+        throw new Error(`Judge API error (${response.status}): ${errText.slice(0, 300)}`)
+    }
+    const data = await response.json()
+    return data.choices?.[0]?.message?.content || ""
+}
+
 // ── Scout model (fast first-pass survey) ────────────────────────────
 
 /**
@@ -378,7 +414,7 @@ export async function loadGroundingData(
 
 /**
  * Runs 3 models from different lineages on the same prompt in parallel,
- * then uses gpt-4.1-mini to pick or synthesise the best output.
+ * then uses MiMo V2.5 Pro to pick or synthesise the best output.
  *
  * @param systemPrompt - The system prompt for all 3 models
  * @param userPrompt - The user prompt for all 3 models (should include DB grounding)
@@ -400,7 +436,7 @@ export async function runParallelAndCompare(
     console.info(`[parallel-llm] Starting parallel-and-compare for stage ${stage} with ${models.length} models: ${models.map((m) => m.displayName).join(", ")}`)
 
     // ── Scout: fast first-pass survey ──
-    // The scout (gpt-4.1-mini) runs first and its output is appended to each
+    // The scout (MiMo V2.5 Pro) runs first and its output is appended to each
     // triad model's prompt as context. This lets the expensive models focus on
     // quality rather than basic understanding — like recon before main force.
     const scoutOutput = await runScout(systemPrompt, userPrompt, stage)
@@ -446,7 +482,7 @@ export async function runParallelAndCompare(
         }
     }
 
-    // Use gpt-4.1-mini as cheap judge to pick the best
+    // Use MiMo V2.5 Pro as cheap judge to pick the best
     const judgeSystem = `You are comparing ${successfulOutputs.length} outputs for a hardware product development pipeline stage.
 Your job is to select the BEST output based on: ${selectionCriteria}
 
@@ -467,7 +503,7 @@ Be decisive. Pick one winner. Only synthesise if the combination is clearly bett
         .join("\n")
 
     try {
-        const { text: judgeText } = await callOpenAI(judgeSystem, judgeUser, "gpt-4.1-mini", 8192, 60_000)
+        const { text: judgeText } = await callJudge(judgeSystem, judgeUser, 8192)
         const cleaned = judgeText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
         const judgeResult = JSON.parse(cleaned) as {
             winner: number
@@ -725,7 +761,7 @@ Return ONLY a JSON object with no markdown fences: { "winner": <1-based index>, 
         .join("\n")
 
     try {
-        const { text: judgeText } = await callOpenAI(judgeSystem, judgeUser, "gpt-4.1-mini", 4096, 60_000)
+        const { text: judgeText } = await callJudge(judgeSystem, judgeUser, 4096)
         const cleaned = judgeText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
         const result = JSON.parse(cleaned) as { winner: number; reason: string }
         const winnerIdx = Math.max(0, Math.min(result.winner - 1, candidates.length - 1))
@@ -741,7 +777,7 @@ Return ONLY a JSON object with no markdown fences: { "winner": <1-based index>, 
 
 /**
  * Runs 10 models from different lineages in parallel for Chase (Stage 1),
- * then uses a tournament bracket with gpt-4.1-mini as judge to select the best.
+ * then uses a tournament bracket with MiMo V2.5 Pro as judge to select the best.
  *
  * Tournament structure:
  *   Round 1: 4 groups of ~2-3 models each → 4 group winners
@@ -852,7 +888,7 @@ export async function runChaseMultiLineage(
 
     console.info(`[parallel-llm] Chase multi-lineage winner: ${overallWinner.model}`)
 
-    // ── Synthesis step: take TOP 3 outputs and ask gpt-4.1-mini to synthesise
+    // ── Synthesis step: take TOP 3 outputs and ask MiMo V2.5 Pro to synthesise
     // the best elements of all three into a final output. This produces richer
     // research than any single model alone (council recommendation 2026-04-30).
     //
@@ -886,7 +922,7 @@ Additional rules:
             const synthUser = `Synthesise these ${top3Candidates.length} research reports into the best possible single report:\n\n` +
                 top3Candidates.map((c, i) => `=== REPORT ${i + 1} (${c.model}) ===\n${c.output}`).join("\n\n")
 
-            const { text: synthesised } = await callOpenAI(synthSystem, synthUser, "gpt-4.1-mini", 8192, 120_000)
+            const { text: synthesised } = await callJudge(synthSystem, synthUser, 8192)
 
             if (synthesised && synthesised.length > 500) {
                 console.info(
