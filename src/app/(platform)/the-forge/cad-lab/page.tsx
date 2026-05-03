@@ -104,6 +104,23 @@ export default function CadLabResearchPage(): React.ReactNode {
     illustrationStyle, appliedIllustrationStyle,
   } = useCadLab()
 
+  // DEBUG: Capture full stack trace of the persistent .length error
+  useEffect(() => {
+    const handler = (event: ErrorEvent) => {
+      if (event.message?.includes("reading 'length'") || event.message?.includes("reading `length`")) {
+        console.error("[CAD-LAB-ERROR-TRACE] Full error:", {
+          message: event.message,
+          filename: event.filename,
+          lineno: event.lineno,
+          colno: event.colno,
+          stack: event.error?.stack || "no stack"
+        })
+      }
+    }
+    window.addEventListener("error", handler)
+    return () => window.removeEventListener("error", handler)
+  }, [])
+
   const [isReportDialogOpen, setIsReportDialogOpen] = useState(false)
 
   // ── Design iteration host ref — Phase IV wiring.
