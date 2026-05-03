@@ -1425,7 +1425,11 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Decompose into modules (progressive: skeleton → expand → images) ──
   const handleDecompose = useCallback(async () => {
-    if (!editableReport.trim()) return
+    console.log("[CAD-LAB-DEBUG] handleDecompose called, editableReport.length:", editableReport.length, "activeProjectId:", activeProjectIdRef.current)
+    if (!editableReport.trim()) {
+      console.warn("[CAD-LAB-DEBUG] handleDecompose: editableReport is empty, returning early")
+      return
+    }
 
     // SECURITY: Synchronous double-click guard. Released in `finally` at the
     // bottom of the try block. Prevents the same-tick second click from
