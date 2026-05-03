@@ -302,8 +302,9 @@ type SessionPhase = "idle" | "pending" | "done" | "error"
  * W77: Fine-grained orchestration phase inside "pending" and at the
  * transition to "done". Drives which sections show loading vs content.
  *
- * - "r1-running"    — Cal finished; Round 1 specialists fire in parallel; cards
- *                     arrive one-by-one as individual promises resolve
+ * - "cal-framing"   — only Cal's call is in flight; specialist section is queued
+ * - "r1-running"    — Cal's text is shown; Round 1 specialists are in flight
+ *                     (cards arrive one-by-one as individual promises resolve)
  * - "r2-running"    — R1 shown; Round 2 specialists are in flight
  * - "cal-closing"   — R2 (or R1 for quick tier) shown; Cal closing is in flight
  * - "done"          — everything populated
@@ -311,6 +312,7 @@ type SessionPhase = "idle" | "pending" | "done" | "error"
  */
 type CouncilPhase =
     | "idle"
+    | "cal-framing"
     | "r1-running"
     | "r2-running"
     | "cal-closing"
@@ -490,7 +492,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             } else if (calOpeningEntry) {
                 councilPhase = "r1-running"
             } else {
-                councilPhase = "r1-running"
+                councilPhase = "cal-framing"
             }
 
             setSession({
@@ -614,13 +616,20 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             const useRound2 = tierSnapshot !== "quick"
 
             const calFramingResult = await getCalFraming(trimmedQ, specialistNames)
-            const calFraming = calFramingResult.ok
-                ? calFramingResult.framing
-                : `I've put your question to ${specialistNames.length} specialists — ${specialistNames.slice(0, -1).join(", ")}${specialistNames.length > 1 ? " and " : ""}${specialistNames[specialistNames.length - 1]}. They each look at it through their own lens. Read their take, then I'll close with what to do next.`
+
+            if (!calFramingResult.ok) {
+                setSession(prev => ({
+                    ...prev,
+                    phase: "error",
+                    councilPhase: "idle",
+                    errorMessage: calFramingResult.error,
+                }))
+                return
+            }
 
             setSession(prev => ({
                 ...prev,
-                hostOpening: calFraming,
+                hostOpening: calFramingResult.framing,
             }))
 
             if (liveThreadId) {
@@ -629,15 +638,13 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                     specialistName: "Cal",
                     councilPosition: "opener",
                     roundNumber: 1,
-                    content: calFraming,
+                    content: calFramingResult.framing,
                     role: "specialist",
                 }).catch(err => console.error("[BrainstormingCouncilView] Cal framing entry save failed:", err))
             }
 
-            // ── Step 2: Specialists fire in parallel after Cal finishes ──────
-            // Transition to r1-running so specialist cards show loading state.
-            // Each specialist updates its card independently as it resolves —
-            // progressive reveal: fastest model appears first.
+            // Cal's framing is in — update her card and move to r1-running phase.
+            // W77: specialists are NOW kicked off (gated on Cal resolving).
             setSession(prev => ({
                 ...prev,
                 councilPhase: "r1-running",
@@ -1683,7 +1690,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 <h2>
                     {session.phase === "idle"
                         ? "Cal frames the question"
-                        : !session.hostOpening
+                        : session.councilPhase === "cal-framing"
                         ? "Cal is framing the question…"
                         : "Cal’s framing"}
                 </h2>
@@ -1762,9 +1769,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                         </button>
                     </p>
                 </div>
-            ) : !session.hostOpening ? (
-                /* Cal's call is still in flight — show animated loading placeholder.
-                   Specialists are already running in parallel. */
+            ) : session.councilPhase === "cal-framing" ? (
+                /* W77: Cal's call is in flight — show animated loading placeholder.
+                   Specialists are NOT running yet; this is the only loading card visible. */
                 <div className="bc-fiona-empty">
                     <div className="bc-stub-avatar bc-loading-pulse">CA</div>
                     <p>
@@ -1826,7 +1833,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             <div className="bc-section-label">
                 <span className="bc-step">2</span>
                 <h2>
-                    {session.councilPhase === "r1-running"
+                    {session.councilPhase === "cal-framing"
+                        ? "The council — queued, waiting for Cal"
+                        : session.councilPhase === "r1-running"
                         ? "The council is chiming in…"
                         : "The council"}
                 </h2>
@@ -1880,6 +1889,21 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                             </div>
                         )
                     })}
+                </div>
+            ) : session.councilPhase === "cal-framing" ? (
+                /* W77: Cal is still framing — specialists are queued, NOT yet started.
+                   Show a static roster with a "queued" label, no pulsing animation,
+                   so the user can see who is in the council without implying they are running. */
+                <div className={`bc-council-grid${sessionCouncilMembers.length === 3 ? " specialists-3" : ""}`}>
+                    {sessionCouncilMembers.map((specialist) => (
+                        <div key={specialist.id} className="bc-empty-card" style={{ borderStyle: "solid", borderColor: "var(--bc-border-soft)", opacity: 0.65 }}>
+                            <div className={`bc-sp-avatar ${getAvatarClass(specialist.id)}`} style={{ margin: "0 auto 12px" }}>
+                                {specialist.name.slice(0, 2).toUpperCase()}
+                            </div>
+                            <h3>{specialist.name}</h3>
+                            <p style={{ color: "var(--bc-fg-subtle)", fontStyle: "italic", fontSize: "12px" }}>Queued — waiting for Cal to frame the question</p>
+                        </div>
+                    ))}
                 </div>
             ) : (session.phase === "pending" && (session.councilPhase === "r1-running" || session.councilPhase === "r2-running" || session.councilPhase === "cal-closing")) ||
                (session.phase === "done" && session.specialistResponses.length > 0) ? (
