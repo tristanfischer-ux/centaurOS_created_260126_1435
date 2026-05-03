@@ -884,6 +884,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
 
     function handleReset() {
         setSession(EMPTY_SESSION)
+        setIsSubmitting(false)
         setGraphicStatus("idle")
         setAudioStatus("idle")
         setAudioReadyVisible(false)
