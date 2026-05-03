@@ -579,6 +579,7 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
         })
 
         startTransition(async () => {
+            try {
             // ── Step 0: Create the thread row immediately (progressive persistence) ──
             // Writing now means navigation-away-then-back can recover the session
             // from DB even while Cal and specialists are still in flight.
@@ -615,7 +616,9 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
             const specialistNames = specialistsForTier.map(s => s.name)
             const useRound2 = tierSnapshot !== "quick"
 
+            console.log("[BrainstormingCouncilView] Calling getCalFraming for question:", trimmedQ.slice(0, 80))
             const calFramingResult = await getCalFraming(trimmedQ, specialistNames)
+            console.log("[BrainstormingCouncilView] getCalFraming result:", calFramingResult.ok, calFramingResult.ok ? "framing received" : calFramingResult.error)
 
             if (!calFramingResult.ok) {
                 setSession(prev => ({
@@ -861,6 +864,18 @@ export function BrainstormingCouncilView({ userId }: BrainstormingCouncilViewPro
                 // Non-fatal — the session content is still displayed,
                 // saving is best-effort and must never crash the UI.
                 console.error("[BrainstormingCouncilView] Failed to finalise session:", saveErr)
+            }
+            } catch (orchestrationErr) {
+                // Catch-all: startTransition silently swallows errors — surface them.
+                console.error("[BrainstormingCouncilView] Council orchestration error:", orchestrationErr)
+                setSession(prev => ({
+                    ...prev,
+                    phase: "error",
+                    councilPhase: "idle",
+                    errorMessage: orchestrationErr instanceof Error
+                        ? orchestrationErr.message
+                        : "Something went wrong starting the council. Please try again.",
+                }))
             }
         })
     }, [question, isPending, activeTier, selectedSpecialistIds, pathname, router])
