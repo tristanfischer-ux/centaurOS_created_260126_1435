@@ -10,7 +10,8 @@
  */
 
 import { useState, useRef, useEffect, useCallback } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import { SafeAnimatePresence } from "@/components/ui/safe-animate-presence"
 import { ArrowRight, SkipForward } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
@@ -232,7 +233,7 @@ export function DesignBriefInterview({
 
       {/* Messages */}
       <div ref={scrollRef} className="px-5 py-4 space-y-3 max-h-[400px] overflow-y-auto">
-        <AnimatePresence mode="popLayout">
+        <SafeAnimatePresence mode="popLayout">
           {messages.map((msg, i) => (
             <motion.div
               key={i}
@@ -252,7 +253,7 @@ export function DesignBriefInterview({
               </div>
             </motion.div>
           ))}
-        </AnimatePresence>
+        </SafeAnimatePresence>
 
         {/* Typing indicator */}
         {(isThinking || isSynthesizing) && (

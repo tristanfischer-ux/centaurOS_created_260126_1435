@@ -17,7 +17,8 @@
  */
 
 import { useState, useEffect, useMemo } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import { SafeAnimatePresence } from "@/components/ui/safe-animate-presence"
 import { AlertTriangle, ArrowRight, ArrowRightLeft, Clock, Download, Info, Loader2, Maximize2, Pencil, RefreshCw, ShieldCheck, Sparkles, Wrench, X } from "lucide-react"
 import { ModuleImageCard } from "./module-image-card"
 import {
@@ -554,7 +555,7 @@ export function ModuleImageGrid({
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        <AnimatePresence mode="popLayout">
+        <SafeAnimatePresence mode="popLayout">
           {visibleModules.map((module) => (
             <motion.div
               key={module.id}
@@ -578,7 +579,7 @@ export function ModuleImageGrid({
               />
             </motion.div>
           ))}
-        </AnimatePresence>
+        </SafeAnimatePresence>
       </div>
 
       {/* Module detail dialog */}

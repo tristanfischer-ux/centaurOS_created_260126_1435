@@ -13,7 +13,8 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import { SafeAnimatePresence } from "@/components/ui/safe-animate-presence"
 import {
   Package,
   ArrowLeft,
@@ -779,7 +780,7 @@ export default function AssemblePage(): React.ReactNode {
       </nav>
 
       {/* ── Tab content ── */}
-      <AnimatePresence mode="wait">
+      <SafeAnimatePresence mode="wait">
         {/* ═══ Assembly Flow tab ═══ */}
         {activeTab === "flow" && (
           <motion.div key="flow" role="tabpanel" id="assemble-panel-flow" aria-labelledby="assemble-tab-flow" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
@@ -1121,10 +1122,10 @@ export default function AssemblePage(): React.ReactNode {
             />
           </motion.div>
         )}
-      </AnimatePresence>
+      </SafeAnimatePresence>
 
       {/* ── Floating Compare bar ── */}
-      <AnimatePresence>
+      <SafeAnimatePresence>
         {compareIds.size >= 2 && (
           <motion.div
             initial={{ y: 80, opacity: 0 }}
@@ -1145,7 +1146,7 @@ export default function AssemblePage(): React.ReactNode {
             </Button>
           </motion.div>
         )}
-      </AnimatePresence>
+      </SafeAnimatePresence>
 
       {/* ── Assembler compare dialog ── */}
       <AssemblerCompareDialog

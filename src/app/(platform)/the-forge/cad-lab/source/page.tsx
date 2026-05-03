@@ -14,7 +14,8 @@
 
 import { useState, useCallback, useMemo, useEffect, useRef } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import { SafeAnimatePresence } from "@/components/ui/safe-animate-presence"
 import {
   ShoppingCart,
   ArrowLeft,
@@ -1301,7 +1302,7 @@ export default function SourcePage(): React.ReactNode {
       </nav>
 
       {/* ── Tab content ── */}
-      <AnimatePresence mode="wait">
+      <SafeAnimatePresence mode="wait">
         {/* ═══ Suppliers tab ═══ */}
         {activeTab === "suppliers" && (
           <motion.div key="suppliers" role="tabpanel" id="source-panel-suppliers" aria-labelledby="source-tab-suppliers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
@@ -1613,7 +1614,7 @@ export default function SourcePage(): React.ReactNode {
             </Collapsible>
           </motion.div>
         )}
-      </AnimatePresence>
+      </SafeAnimatePresence>
 
       <DesignReportDialog
         open={isReportDialogOpen}

@@ -19,7 +19,8 @@
 import { useRouter, useSearchParams } from "next/navigation"
 import { FORGE_ROUTES } from "@/lib/forge-routes"
 import { useState, useEffect, useMemo, useCallback, useRef } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { motion } from "framer-motion"
+import { SafeAnimatePresence } from "@/components/ui/safe-animate-presence"
 import React from "react"
 import { toast } from "sonner"
 import {
@@ -506,7 +507,7 @@ export default function CadLabResearchPage(): React.ReactNode {
       />
 
       {/* ── Design brief interview (Max CTO guided Q&A) ── */}
-      <AnimatePresence>
+      <SafeAnimatePresence>
         {interviewPhase === "interviewing" && (
           <motion.div
             initial={{ opacity: 0, y: 10 }}
@@ -532,7 +533,7 @@ export default function CadLabResearchPage(): React.ReactNode {
             />
           </motion.div>
         )}
-      </AnimatePresence>
+      </SafeAnimatePresence>
 
       {/* ── Tab navigation — appears after research is complete ── */}
       {/* a11y: role=tablist + role=tab + arrow-key nav per ARIA APG */}
@@ -603,7 +604,7 @@ export default function CadLabResearchPage(): React.ReactNode {
 
       {/* ── Tab content ── */}
       {hasResearch && (
-        <AnimatePresence mode="wait">
+        <SafeAnimatePresence mode="wait">
           {/* ═══ Research tab ═══ */}
           {activeTab === "research" && (
             <motion.div key="research" role="tabpanel" id="design-panel-research" aria-labelledby="design-tab-research" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }} className="space-y-6">
@@ -1398,7 +1399,7 @@ export default function CadLabResearchPage(): React.ReactNode {
               />
             </motion.div>
           )}
-        </AnimatePresence>
+        </SafeAnimatePresence>
       )}
 
       <DesignReportDialog open={isReportDialogOpen} onOpenChange={setIsReportDialogOpen} stage="concept" />
