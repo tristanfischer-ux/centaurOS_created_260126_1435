@@ -242,11 +242,10 @@ async function callJudge(system: string, user: string, maxTokens: number = 8192)
 // ── Scout model (fast first-pass survey) ────────────────────────────
 
 /**
- * The scout runs a fast, cheap model (DeepSeek V4-Flash) before the triad.
+ * The scout runs MiMo V2 Omni (free, 138 tok/s, multimodal) before the triad.
  * It produces a quick first-pass output that the triad models can use as
  * context — like a recon helicopter mapping the terrain before the main
- * force moves in. This saves the expensive triad models from spending
- * tokens on basic understanding and lets them focus on quality.
+ * force moves in. Omni is free and fast; the triad catches anything it misses.
  *
  * The scout output is appended to the user prompt as "PRELIMINARY ANALYSIS"
  * so each triad model can choose to incorporate or ignore it.
@@ -258,11 +257,39 @@ async function runScout(
 ): Promise<string | null> {
     try {
         const start = Date.now()
-        const apiKey = process.env.DEEPSEEK_API_KEY?.trim()
+        const apiKey = process.env.OPENROUTER_API_KEY?.trim()
         if (!apiKey) {
-            console.warn(`[parallel-llm] DEEPSEEK_API_KEY not set — scout skipped for ${stage}`)
+            console.warn(`[parallel-llm] OPENROUTER_API_KEY not set — scout skipped for ${stage}`)
             return null
         }
+        const response = await fetchWithTimeout(
+            "https://openrouter.ai/api/v1/chat/completions",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+                body: JSON.stringify({
+                    model: "xiaomi/mimo-v2-omni",
+                    max_tokens: 8192,
+                    temperature: 0.2,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: userPrompt },
+                    ],
+                }),
+            },
+            30_000,
+        )
+        if (!response.ok) throw new Error(`OpenRouter error: ${response.status}`)
+        const data = await response.json()
+        const text = data.choices?.[0]?.message?.content || ""
+        const elapsed = Date.now() - start
+        console.info(`[parallel-llm] Scout (Omni) for ${stage}: ${elapsed}ms, ${text.length} chars`)
+        return text
+    } catch (err) {
+        console.warn(`[parallel-llm] Scout failed for ${stage}: ${err instanceof Error ? err.message : String(err)} — proceeding without`)
+        return null
+    }
+}
         const response = await fetchWithTimeout(
             "https://api.deepseek.com/v1/chat/completions",
             {
