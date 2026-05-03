@@ -454,7 +454,7 @@ export function CadLabProvider({ children }: { children: ReactNode }): ReactNode
 
   // ── Input state ──
   const [subject, setSubject] = useState("")
-  const [modelId, setModelId] = useState<ClaudeModelId>("claude-opus-4-7")
+  const [modelId, setModelId] = useState<ClaudeModelId>("gpt-5.5")
 
   // Sync DOM value to React state on mount (for agent-browser compatibility)
   useEffect(() => {

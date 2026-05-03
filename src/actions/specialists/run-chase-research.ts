@@ -68,7 +68,7 @@ import {
     startPipelineRun,
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
-import { callClaude, callOpenAI } from "@/lib/cad-lab/api-helpers"
+import { callAI, callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import type {
     CadLabDesignBrief,

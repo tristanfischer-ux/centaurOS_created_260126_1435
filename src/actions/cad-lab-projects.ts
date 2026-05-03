@@ -321,7 +321,7 @@ export async function loadCadLabProject(
         id: project.id,
         name: project.name,
         subject: project.subject,
-        modelId: (project.model_id || "claude-opus-4-7") as ClaudeModelId,
+        modelId: (project.model_id || "gpt-5.5") as ClaudeModelId,
         status: project.status,
         stage: project.stage,
         research,
@@ -387,7 +387,7 @@ export async function loadCadLabProject(
  */
 export async function createCadLabProject(
   subject: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any,
 ): Promise<{ projectId: string } | { error: string }> {
   return withAuth(async ({ supabase, foundryId, user }) => {
     // VALIDATION: Subject is required

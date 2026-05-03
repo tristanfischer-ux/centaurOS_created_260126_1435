@@ -399,7 +399,7 @@ function parseModelOutput(raw: string): ParsedOutput | null {
 // Generator
 // ---------------------------------------------------------------------------
 
-const MODEL_ID = 'claude-sonnet-4-6'
+const MODEL_ID = 'google/gemini-3.1-pro-preview'
 /** Claude Sonnet 4.6 pricing as of 2026-04: £3.75 / £18.75 per 1M tokens. */
 const SONNET_INPUT_GBP_PER_1M = 3.75
 const SONNET_OUTPUT_GBP_PER_1M = 18.75

@@ -1025,7 +1025,7 @@ export type SupplierWhyFitResult =
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-const MODEL_ID = 'claude-sonnet-4-6' as const
+const MODEL_ID = 'google/gemini-3.1-pro-preview' as const
 
 const WHY_FIT_SYSTEM_PROMPT = `You are Chase, ForgeOS's supply-chain specialist. You write SPECIFIC, evidence-backed supplier match notes for hardware founders. You never use generic filler.
 

@@ -81,7 +81,7 @@ export type RunFangReviewReturn = RunFangReviewResult | RunFangReviewError
 
 const SPECIALIST_ID = "vp-manufacturing"
 const STAGE = "module.review.fang"
-const REVIEW_MODEL = "claude-sonnet-4-6"
+const REVIEW_MODEL = "deepseek-v4-pro"
 const MAX_TOOL_LOOPS = 5
 const MAX_TOKENS = 16384
 

@@ -84,7 +84,7 @@ import {
   lookupUserSector,
   extractJsonArray,
   extractJsonObject,
-  callClaude,
+  callAI,
   callGeminiWithSearch,
   callDeepSeek,
   callTogether,
@@ -680,7 +680,7 @@ Do NOT guess dimensions. Only include measurements you found from real sources.$
 export async function generateCadLabInterface(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
 ): Promise<CadLabInterfaceResult & { templateMatchResult?: TemplateMatchResult }> {
@@ -810,11 +810,12 @@ Extract the real-world scale from the research report and preserve it exactly:
 ${checkpointContext ?? ""}
 Generate the complete interface definition following the exact 4-section format.`
 
-    const { text, tokensIn, tokensOut } = await callClaude(
+    const { callParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+    const { text, tokensIn, tokensOut } = await callParallelAndCompare(
       systemPrompt,
       userPrompt,
-      modelId,
-      8192,
+      "waiting_sizing",
+      "Pick the interface definition with the most mathematically sound space budget and comprehensive placement table."
     )
 
     console.info(`[THE-FORGE] Step 2 complete: ${Date.now() - start}ms`)
@@ -976,7 +977,7 @@ export async function generateCadLabModel(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   checkpointContext?: string,
   interfaceWarnings?: PreExecValidationResult[],
   cachedTemplateMatch?: TemplateMatchResult,
@@ -1271,7 +1272,7 @@ ${finalCode}
       let codeResult: { text: string; tokensIn: number; tokensOut: number }
       const maxOut = attempt === 0 ? 64000 : 32000
       try {
-        codeResult = await callClaude(systemPrompt, userPrompt, modelId, maxOut, undefined, undefined, blueprintImageBase64, prevRenderedSvg)
+        codeResult = await callAI(systemPrompt, userPrompt, modelId, maxOut, undefined, undefined, blueprintImageBase64, prevRenderedSvg)
       } catch (claudeCodeErr) {
         const msg = claudeCodeErr instanceof Error ? claudeCodeErr.message : String(claudeCodeErr)
         console.warn(`[THE-FORGE] Step 3: Claude code gen failed (attempt ${attempt + 1}), trying OpenAI:`, msg.slice(0, 200))
@@ -1743,7 +1744,7 @@ async function generateCadLabModelWithSeed(
   researchReport: string,
   interfaceDefinition: string,
   seedTemplate: { slug: string; name: string; category: string; stepUrl: string; score: number },
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   checkpointContext?: string,
   designBrief?: CadLabDesignBrief,
   domainHint?: CadLabDomain,
@@ -1860,7 +1861,7 @@ Generate CadQuery Python code that:
 4. Creates "result_exploded" (wrap in try/except)`
 
     console.info("[THE-FORGE] Seed path: Generating hybrid CadQuery code...")
-    const codeResult = await callClaude(systemPrompt, userPrompt, modelId, 64000)
+    const codeResult = await callAI(systemPrompt, userPrompt, modelId, 64000)
     totalTokensIn += codeResult.tokensIn
     totalTokensOut += codeResult.tokensOut
 
@@ -1936,7 +1937,7 @@ ${finalCode}
 Fix ALL listed issues and output the corrected Python code inside a single \`\`\`python code fence. Preserve all working logic — only fix the listed issues.`
 
       console.info("[THE-FORGE] Seed path: Attempting repair...")
-      const repairResult = await callClaude(systemPrompt, repairPrompt, modelId, 64000)
+      const repairResult = await callAI(systemPrompt, repairPrompt, modelId, 64000)
       totalTokensIn += repairResult.tokensIn
       totalTokensOut += repairResult.tokensOut
 
@@ -2177,7 +2178,7 @@ export async function prepareDecomposition(
 export async function skeletonDecompose(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   domainHint?: CadLabDomain,
   documentContext?: string,
   // GOTCHA (2026-04-24): when called from the autopilot HTTP-hop context
@@ -2257,7 +2258,7 @@ export async function skeletonDecompose(
     } catch (parallelErr) {
       // Fallback: single-model Claude call if the parallel infrastructure fails
       console.warn("[THE-FORGE] Max skeleton parallel-and-compare failed, falling back to callClaude:", parallelErr instanceof Error ? parallelErr.message : parallelErr)
-      const fallback = await callClaude(systemPrompt, userPrompt, modelId, 16384, 180_000, 1)
+      const fallback = await callAI(systemPrompt, userPrompt, modelId, 16384, 180_000, 1)
       text = fallback.text
       tokensIn = fallback.tokensIn
       tokensOut = fallback.tokensOut
@@ -2396,7 +2397,7 @@ export async function expandModuleDetail(
   targetModuleId: string,
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   domainHint?: CadLabDomain,
   consistencyBrief?: string,
   documentContext?: string,
@@ -2555,8 +2556,12 @@ Provide the detailed engineering specification for this module ONLY. Output ONLY
     // staying well inside the Vercel 300s function cap for a 3-module
     // concurrent batch (3 × 180s sequential worst case = 540s, but
     // concurrency means wall-clock is ~180s worst case per batch).
-    const { text, tokensIn, tokensOut } = await callClaude(
-      systemPrompt, userPrompt, modelId, 6144, 180_000, 2,
+    const { callParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+    const { text, tokensIn, tokensOut } = await callParallelAndCompare(
+      systemPrompt, 
+      userPrompt, 
+      "waiting_max", 
+      "Pick the module expansion detail that provides the most accurate and realistic JSON object matching the requested specification."
     )
 
     // Parse expansion JSON
@@ -2745,7 +2750,7 @@ function dlog(msg: string) {
 export async function decomposeIntoModules(
   description: string,
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   domainHint?: CadLabDomain,
 ): Promise<CadLabDecompositionResult> {
   // AUTH: Verify user is authenticated
@@ -2815,7 +2820,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
     dlog(`>>> CLAUDE (${claudeLabel}, timeout=180s) — authoritative`)
     const claudeStart = Date.now()
     try {
-      const r = await callClaude(modulePrompt, userPrompt, modelId, 8192, 180_000, 1)
+      const r = await callAI(modulePrompt, userPrompt, modelId, 8192, 180_000, 1)
       text = r.text; tokensIn = r.tokensIn; tokensOut = r.tokensOut
       winnerModel = claudeLabel
       dlog(`<<< CLAUDE SUCCEEDED in ${Date.now() - claudeStart}ms`)
@@ -2894,7 +2899,7 @@ Decompose this product into physical modules (sub-assemblies). Output ONLY the J
         const repairSystem = "You are a JSON repair tool. Fix the following broken JSON so it parses correctly. The expected format is a JSON object with \"modules\" (array) and \"connections\" (array) keys, OR a bare JSON array of modules. Output ONLY the corrected JSON, nothing else."
         let repairedText: string
         try {
-          ({ text: repairedText } = await callClaude(repairSystem, text, modelId, 8192))
+          ({ text: repairedText } = await callAI(repairSystem, text, modelId, 8192))
         } catch {
           const { callOpenRouter } = await import("@/lib/ai/openrouter")
           const rGemini = await callOpenRouter({
@@ -3192,7 +3197,7 @@ function buildUnmatchedPortsSummary(
 export async function extractInterfaceContracts(
   modules: CadLabModule[],
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
 ): Promise<InterfaceContractResult> {
   // AUTH: Verify user is authenticated
   const supabase = await createClient()
@@ -3271,7 +3276,7 @@ Rules:
   const userPrompt = `Here are the modules to analyse:\n\n${moduleSummary}\n\nResearch context (abbreviated):\n${researchReport.slice(0, 6000)}`
 
   try {
-    const res = await callClaude(systemPrompt, userPrompt, modelId, 8192)
+    const res = await callAI(systemPrompt, userPrompt, modelId, 8192)
 
     // Parse JSON from response (handle potential markdown fences)
     let jsonText = res.text.trim()
@@ -3320,7 +3325,7 @@ Rules:
 - Use "external" for ports that interface with the environment
 - Return ONLY the JSON array`
 
-        const reExtractRes = await callClaude(reExtractSystem, unmatchedSummary, modelId, 4096)
+        const reExtractRes = await callAI(reExtractSystem, unmatchedSummary, modelId, 4096)
         totalTokensIn += reExtractRes.tokensIn
         totalTokensOut += reExtractRes.tokensOut
 
@@ -3397,7 +3402,7 @@ Rules:
 export async function prefillDiagnostics(
   modules: CadLabModule[],
   researchReport: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   domainHint?: CadLabDomain,
   options?: { useConsensusForMaterial?: boolean },
 ): Promise<{ success: boolean; answers: Record<string, Record<string, string>>; enrichment: DiagnosticEnrichment; error?: string }> {
@@ -3431,7 +3436,7 @@ ${moduleSummaries}
 
 Recommend diagnostic answers for each module. Output JSON only.`
 
-    const { text } = await callClaude(systemPrompt, userPrompt, modelId, 6144)
+    const { text } = await callAI(systemPrompt, userPrompt, modelId, 6144)
 
     // Parse JSON object from response — AI may wrap in markdown fences or add prose
     const jsonText = extractJsonObject(text)
@@ -3693,8 +3698,9 @@ Instruction: ${instruction}
 
 Return the complete modified code.`
 
-    // DECISION: Use Sonnet for refinement — fast and cheap for targeted edits
-    const result = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-6" as ClaudeModelId, 8192, 120_000, 1)
+    // DECISION: Use parallel-and-compare for refinement
+    const { callParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+    const result = await callParallelAndCompare(systemPrompt, userPrompt, "proofreading", "Pick the Python code that most accurately applies the requested changes while maintaining valid CadQuery syntax.")
     const code = extractCode(result.text)
 
     if (!code.trim()) {
@@ -3732,7 +3738,7 @@ export async function generateCadLabModelSmart(
   description: string,
   researchReport: string,
   interfaceDefinition: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any, // Deprecated: now uses parallel-and-compare internally
   checkpointContext?: string,
   cachedTemplateMatch?: TemplateMatchResult,
   designBrief?: CadLabDesignBrief,
@@ -3842,7 +3848,7 @@ export async function generateMashup(
     return { success: false, error: "At least two sources are required" }
   }
 
-  const modelId = options?.modelId ?? "claude-opus-4-7"
+  const modelId = options?.modelId ?? "gpt-5.5"
   const materialDensity = options?.materialDensity ?? 1240
   const startTime = Date.now()
   let tokensIn = 0
@@ -3880,7 +3886,7 @@ export async function generateMashup(
     // ── Step 1: Mashup planning ──
     const planSys = getMashupPlanningSystemPrompt()
     const planUser = getMashupPlanningUserPrompt(sourceInfos, concept)
-    const planResult = await callClaude(planSys, planUser, modelId, 4096)
+    const planResult = await callAI(planSys, planUser, modelId, 4096)
     tokensIn += planResult.tokensIn
     tokensOut += planResult.tokensOut
 
@@ -3912,7 +3918,7 @@ export async function generateMashup(
     const sourceNames = modalSources.map((s) => s.name)
     const codeSys = getMashupCodeGenSystemPrompt(sourceNames)
     const codeUser = getMashupCodeGenUserPrompt(plan, sourceNames)
-    const codeResult = await callClaude(codeSys, codeUser, modelId, 16384)
+    const codeResult = await callAI(codeSys, codeUser, modelId, 16384)
     tokensIn += codeResult.tokensIn
     tokensOut += codeResult.tokensOut
 
@@ -3928,7 +3934,7 @@ export async function generateMashup(
     if (criticalPreExec.length > 0) {
       console.warn(`[THE-FORGE] Mashup pre-exec: ${criticalPreExec.length} critical issue(s), attempting repair`)
       const repairPrompt = `The following CadQuery mashup code has critical issues:\n\nISSUES:\n${criticalPreExec.map((r) => `[${r.ruleId}] ${r.message}${r.repairHint ? ` — Fix: ${r.repairHint}` : ""}`).join("\n")}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix ALL listed issues. Output corrected Python code in a single \`\`\`python code fence.`
-      const repairResult = await callClaude(codeSys, repairPrompt, modelId, 16384)
+      const repairResult = await callAI(codeSys, repairPrompt, modelId, 16384)
       tokensIn += repairResult.tokensIn
       tokensOut += repairResult.tokensOut
       const repairedCode = extractCode(repairResult.text)
@@ -3946,7 +3952,7 @@ export async function generateMashup(
       const catLabel = errorCat?.category ?? "unknown"
       console.warn(`[THE-FORGE] Mashup Modal failed (${catLabel}), attempting single retry`)
       const retryPrompt = `The following CadQuery mashup code failed during execution:\n\nERROR (${catLabel}): ${modalResult.error}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix the error. Output corrected Python code in a single \`\`\`python code fence.`
-      const retryResult = await callClaude(codeSys, retryPrompt, modelId, 16384)
+      const retryResult = await callAI(codeSys, retryPrompt, modelId, 16384)
       tokensIn += retryResult.tokensIn
       tokensOut += retryResult.tokensOut
       const retriedCode = extractCode(retryResult.text)
@@ -4072,7 +4078,7 @@ export async function planMashup(
     return { success: false, error: "At least two sources are required" }
   }
 
-  const modelId = options?.modelId ?? "claude-opus-4-7"
+  const modelId = options?.modelId ?? "gpt-5.5"
   const startTime = Date.now()
 
   try {
@@ -4101,7 +4107,7 @@ export async function planMashup(
 
     const planSys = getMashupPlanningSystemPrompt()
     const planUser = getMashupPlanningUserPrompt(sourceInfos, concept)
-    const planResult = await callClaude(planSys, planUser, modelId, 4096)
+    const planResult = await callAI(planSys, planUser, modelId, 4096)
 
     let plan: MashupPlan
     try {
@@ -4168,7 +4174,7 @@ export async function executeMashupPlan(
   const gate = await enforceCadLabLimit(user.id, 'cad_lab_generate')
   if (!gate.allowed) return { success: false, error: gate.error ?? "AI usage limit reached" } as MashupExecuteResult
 
-  const modelId = options?.modelId ?? "claude-opus-4-7"
+  const modelId = options?.modelId ?? "gpt-5.5"
   const materialDensity = options?.materialDensity ?? 1240
   const startTime = Date.now()
   let tokensIn = 0
@@ -4178,7 +4184,7 @@ export async function executeMashupPlan(
     const sourceNames = resolvedSources.map((s) => s.name)
     const codeSys = getMashupCodeGenSystemPrompt(sourceNames)
     const codeUser = getMashupCodeGenUserPrompt(plan, sourceNames)
-    const codeResult = await callClaude(codeSys, codeUser, modelId, 16384)
+    const codeResult = await callAI(codeSys, codeUser, modelId, 16384)
     tokensIn += codeResult.tokensIn
     tokensOut += codeResult.tokensOut
 
@@ -4208,7 +4214,7 @@ export async function executeMashupPlan(
     if (assemblyCritical.length > 0) {
       console.warn(`[THE-FORGE] Assembly pre-exec: ${assemblyCritical.length} critical issue(s), attempting repair`)
       const repairPrompt = `The following CadQuery assembly code has critical issues:\n\nISSUES:\n${assemblyCritical.map((r) => `[${r.ruleId}] ${r.message}${r.repairHint ? ` — Fix: ${r.repairHint}` : ""}`).join("\n")}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix ALL listed issues. Output corrected Python code in a single \`\`\`python code fence.`
-      const repairResult = await callClaude(codeSys, repairPrompt, modelId, 16384)
+      const repairResult = await callAI(codeSys, repairPrompt, modelId, 16384)
       tokensIn += repairResult.tokensIn
       tokensOut += repairResult.tokensOut
       const repairedCode = extractCode(repairResult.text)
@@ -4225,7 +4231,7 @@ export async function executeMashupPlan(
       const catLabel = errorCat?.category ?? "unknown"
       console.warn(`[THE-FORGE] Assembly Modal failed (${catLabel}), attempting single retry`)
       const retryPrompt = `The following CadQuery assembly code failed during execution:\n\nERROR (${catLabel}): ${modalResult.error}\n\nORIGINAL CODE:\n\`\`\`python\n${mashupCode}\n\`\`\`\n\nFix the error. Output corrected Python code in a single \`\`\`python code fence.`
-      const retryResult = await callClaude(codeSys, retryPrompt, modelId, 16384)
+      const retryResult = await callAI(codeSys, retryPrompt, modelId, 16384)
       tokensIn += retryResult.tokensIn
       tokensOut += retryResult.tokensOut
       const retriedCode = extractCode(retryResult.text)
@@ -4488,7 +4494,13 @@ export async function generateSystemAssembly(
         userPrompt += `\n\nPREVIOUS ATTEMPT FAILED:\nError: ${lastError}\nCode:\n\`\`\`python\n${lastCode}\n\`\`\`\nFix the issue.`
       }
 
-      const codeResult = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-6", 16384)
+      const { callParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+      const codeResult = await callParallelAndCompare(
+        systemPrompt, 
+        userPrompt, 
+        "running_fang_reviews", 
+        "Pick the CadQuery assembly code that correctly integrates all components and avoids bounding-box intersections."
+      )
 
       let assemblyCode = extractCode(codeResult.text)
 
@@ -4670,10 +4682,9 @@ ${catalogue}
 Return 3–4 suggestions as a JSON array.`
 
   try {
-    // DECISION: Using claude-sonnet-4-6 (fast variant) — this is a
-    // lightweight template-matching task, not code generation. Speed matters
-    // here for a real-time UX response.
-    const { text } = await callClaude(systemPrompt, userPrompt, "claude-sonnet-4-6", 2048)
+    // DECISION: Route to gpt-5.5 / parallel proxy.
+    const { callParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+    const { text } = await callParallelAndCompare(systemPrompt, userPrompt, "waiting_max", "Pick the most creative and feasible product mashup combinations based on the available templates.")
 
     let raw: Array<{ name: string; description: string; concept: string; templateSlugs: string[] }>
     try {

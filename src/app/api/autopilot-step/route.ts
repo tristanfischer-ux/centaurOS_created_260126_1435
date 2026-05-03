@@ -56,6 +56,7 @@ import {
     MAX_SCORING_ATTEMPTS,
     shouldScoreStage,
 } from "@/lib/forge-v2/stage-scoring"
+import { runCodeEnhancer } from "@/lib/forge-v2/code-enhancer"
 import { updatePipelineHeartbeat } from "@/actions/pipeline-runs"
 
 export const dynamic = "force-dynamic"
@@ -233,6 +234,42 @@ export async function POST(request: Request): Promise<NextResponse> {
                             `consensusFindings=${diagnosis.consensusFindings.length} ` +
                             `fixes=${diagnosis.consensusFixes.length}`,
                     )
+
+                    // �─ Code enhancer: read council diagnosis, modify prompts/extraction ──
+                    // After the council identifies what's wrong, the code enhancer reads
+                    // the diagnosis and makes targeted changes to the specialist's prompt
+                    // templates or data extraction logic. This creates a true improvement
+                    // loop: specialist runs → scored → council diagnoses → code enhanced →
+                    // specialist runs again with better prompts → higher score.
+                    try {
+                        const diagnosisText = [
+                            ...diagnosis.consensusFindings,
+                            ...diagnosis.consensusFixes,
+                        ].join("; ")
+
+                        const enhancement = await runCodeEnhancer({
+                            stage: rawStage,
+                            diagnosis: diagnosisText,
+                            currentScore: scoreResult.composite,
+                            targetScore: 8.0,
+                            projectPath: process.cwd(),
+                        })
+
+                        if (enhancement.success) {
+                            console.info(
+                                `[autopilot-step:score_and_gate] code enhancer applied ${enhancement.changesApplied} change(s) for project=${projectId} stage=${rawStage}: ${enhancement.summary}`,
+                            )
+                        } else {
+                            console.info(
+                                `[autopilot-step:score_and_gate] code enhancer made no changes for project=${projectId} stage=${rawStage}: ${enhancement.summary}`,
+                            )
+                        }
+                    } catch (enhancerErr) {
+                        console.warn(
+                            `[autopilot-step:score_and_gate] code enhancer failed for project=${projectId} stage=${rawStage}:`,
+                            enhancerErr instanceof Error ? enhancerErr.message : enhancerErr,
+                        )
+                    }
                 } catch (councilErr) {
                     console.warn(
                         `[autopilot-step:score_and_gate] council failed for project=${projectId} stage=${rawStage}:`,

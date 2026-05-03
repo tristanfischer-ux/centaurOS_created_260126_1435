@@ -96,10 +96,10 @@ export function extractJsonObject(text: string): string {
  * @param maxTokens - Maximum output tokens (default 16384)
  * @returns Response text and token counts
  */
-export async function callClaude(
+export async function callAI(
   systemPrompt: string,
   userPrompt: string,
-  modelId: ClaudeModelId = "claude-opus-4-7",
+  modelId?: any,
   maxTokens: number = 16384,
   timeoutMs: number = 600_000, // 10 min default — building models need extended generation time
   maxRetries: number = 3, // INTENT: Callers like decomposition pass 1 to fail fast → Gemini fallback
@@ -288,9 +288,12 @@ export async function callGemini(
     }
   }
 
-  // Route through OpenRouter using OpenAI-compatible chat format.
-  // Map bare model IDs to OpenRouter's google/ namespace (e.g. gemini-3.1-pro-preview → google/gemini-3.1-pro-preview).
-  const orModelId = modelId.startsWith("google/") ? modelId : `google/${modelId}`
+    // Route through OpenRouter using OpenAI-compatible chat format.
+  // If the modelId still includes claude, redirect to DeepSeek or Gemini
+  if (modelId.includes("claude-opus") || modelId.includes("claude-sonnet")) {
+      modelId = "google/gemini-3.1-pro-preview"
+  }
+  const orModelId = modelId.startsWith("google/") || modelId.startsWith("openai/") || modelId.startsWith("anthropic/") || modelId.startsWith("deepseek/") ? modelId : `google/${modelId}`
 
   const response = await fetchWithTimeout(
     "https://openrouter.ai/api/v1/chat/completions",

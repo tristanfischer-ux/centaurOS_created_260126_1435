@@ -7,11 +7,11 @@
  * in client components.
  */
 
-/** Available Claude models for CAD generation */
+/** Available AI models for CAD generation */
 export const CLAUDE_MODELS = [
-  { id: "claude-opus-4-7", label: "Claude Opus 4.7 (recommended)" },
-  { id: "claude-sonnet-4-6", label: "Claude Sonnet 4.6 (fast)" },
-  { id: "claude-haiku-4-5-20251001", label: "Claude Haiku 4.5 (fallback)" },
+  { id: "gpt-5.5", label: "GPT-5.5 (recommended)" },
+  { id: "deepseek-v4-pro", label: "DeepSeek V4-Pro (reasoning)" },
+  { id: "google/gemini-3.1-pro-preview", label: "Gemini 3.1 Pro" },
 ] as const
 
 export type ClaudeModelId = (typeof CLAUDE_MODELS)[number]["id"]

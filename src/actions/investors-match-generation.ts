@@ -307,7 +307,7 @@ function parseModelOutput(raw: string): ParsedOutput | null {
 // Generator
 // ---------------------------------------------------------------------------
 
-const MODEL_ID = 'claude-sonnet-4-6'
+const MODEL_ID = 'google/gemini-3.1-pro-preview'
 
 /**
  * Generate (or reuse from cache) the why-fit / how-to-pitch / drafted-email
