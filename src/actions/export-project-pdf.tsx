@@ -5662,6 +5662,12 @@ async function exportProjectPdfInternal(
             return { ok: false, error: "Project not found.", errorCode: "PROJECT_FORBIDDEN" }
         }
 
+        // Change 2: Make proofreader findings blocking for PDF
+        const proofreadFindings = project.proofread_findings as any;
+        if (proofreadFindings?.block_pdf) {
+            throw new Error("PDF generation blocked: proofreader blockers present");
+        }
+
         // Foundry name for the cover band.
         let foundryName: string | null = null
         {

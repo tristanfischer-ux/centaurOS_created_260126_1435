@@ -87,6 +87,7 @@ import {
   extractJsonObject,
   callAI,
   callGeminiWithSearch,
+  searchBraveFallback,
   callDeepSeek,
   callTogether,
   searchCadModels,
@@ -355,21 +356,68 @@ export async function runCadLabResearch(
       console.warn("[THE-FORGE] Stage 0 training data dump failed (non-fatal, continuing):", stage0Err instanceof Error ? stage0Err.message : stage0Err)
     }
 
-    // 1. Skip Gemini web search per user request — using Stage 0 Training Data Dump instead
-    // NOTE: We will come back to the web search later, once we have improved other aspects of the process
+    // 1. Run Gemini + Google Search and Thingiverse in parallel
+    // NOTE: Gemini prompt is intentionally SHORT — no training data prepended.
+    // Long prompts cause Gemini to silently drop the Google Search tool.
     const intakeContext = formatDesignBriefForPrompt(options?.designBrief, options?.assumptionNotes)
 
-    const [cadResult] = await Promise.allSettled([
+    // Change 5: Cap the Gemini prompt at 1800 chars
+    const basePrompt = `Find the real-world specifications for: ${description}
+
+I need precise engineering dimensions for 3D CAD modelling. Search for:
+
+1. OVERALL DIMENSIONS — length, width, height in mm
+2. WEIGHT — total weight and breakdown if available
+3. MOTOR/ACTUATOR SPECS
+4. KEY COMPONENT DIMENSIONS
+5. CRITICAL CONSTRAINTS
+6. MATERIAL
+7. STANDARD PARTS
+
+You MUST also include the following structured output sections:
+
+**Sources**: Require a "Sources" section listing at least 10 sources, each with title, organization, source type, URL, jurisdiction, and publication date.
+**Regulatory Matrix**: Require a "Regulatory Compliance" table with columns: requirement, jurisdiction, applies_to, mandatory_or_guidance, evidence, design_implication, status. Minimum 8 items, ≥5 UK-specific.
+**Market Sizing**: Require "Market Sizing" section with TAM, SAM, SOM in GBP.
+**Competitor Analysis**: Require a "Competitor Analysis" table. Minimum 5 named competitors.
+**Inline Citations**: Every numeric claim must include [Source: <source_id>] inline.
+**Assumptions vs Facts**: Require claims to be labeled as "Fact (cited)" or "Inference (reasoned)" or "Assumption (unverified)".
+
+Do NOT guess dimensions. Only include measurements you found from real sources.\n\n`
+    
+    // Calculate how much context we can include
+    const maxContextLen = 1800 - basePrompt.length
+    const truncatedContext = intakeContext.length > maxContextLen 
+        ? intakeContext.slice(0, maxContextLen) + "\n...[TRUNCATED]" 
+        : intakeContext
+
+    const finalPrompt = basePrompt + truncatedContext
+
+    const [webResult, cadResult] = await Promise.allSettled([
+      callGeminiWithSearch(finalPrompt),
       searchCadModels(description),
     ])
 
-    const webSpecs = "Web search skipped. Relying entirely on Stage 0 training data dump."
-    const webSources = []
+    const webSpecs = webResult.status === "fulfilled" ? webResult.value.text : ""
+    let webSources = webResult.status === "fulfilled" ? webResult.value.sources : []
     const cadModels = cadResult.status === "fulfilled" ? cadResult.value : []
 
-    // Log Thingiverse failures so they aren't silent
+    // Log Gemini/Thingiverse failures so they aren't silent
+    if (webResult.status === "rejected") {
+      console.error("[THE-FORGE] Step 1: Gemini web search failed:", webResult.reason)
+    }
     if (cadResult.status === "rejected") {
       console.error("[THE-FORGE] Step 1: Thingiverse CAD search failed:", cadResult.reason)
+    }
+
+    // Change 5: Brave Search Fallback
+    if (webResult.status !== "fulfilled" || !webSources || webSources.length === 0) {
+      console.warn("[THE-FORGE] Step 1: Gemini grounding returned 0 sources (or failed), attempting Brave Search fallback")
+      const braveResults = await searchBraveFallback(description, { maxResults: 10 })
+      if (braveResults.length > 0) {
+        webSources = braveResults
+        console.info(`[THE-FORGE] Step 1: Brave Search fallback injected ${braveResults.length} sources`)
+      }
     }
 
     // 2. Build raw data context for Claude

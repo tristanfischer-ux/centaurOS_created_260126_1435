@@ -1254,6 +1254,16 @@ async function runStep(
             // The generatePdf step runs on an 800s Vercel container budget
             // so 360s headroom before PDF render still fits comfortably.
             await waitForRenders(projectId, 360_000)
+
+            // Change 2: Make proofreader findings blocking for PDF
+            const proofread_findings = (project as any).proofread_findings
+            if (proofread_findings?.block_pdf) {
+                return {
+                    ok: false,
+                    error: `Proofreader blockers present (${proofread_findings.blocker_count} blockers). Fix before generating PDF.`,
+                }
+            }
+
             const { exportProjectPdfBackground } = await import(
                 "@/actions/export-project-pdf"
             )

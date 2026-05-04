@@ -285,6 +285,49 @@ async function runFangSizingInternal(
         research?.industryDomain ??
         inferDomainFromSubject(subject)
 
+    // Change 6: Sizing — add domain support guard
+    const SUPPORTED_DOMAINS = ["battery_energy_storage", "vertical_farm", "heat_pump"]
+    if (!SUPPORTED_DOMAINS.includes(industryDomain)) {
+        const dimensionSheet = {
+            feasible: false,
+            reason: `Unsupported domain: ${industryDomain}. Sizing requires manual configuration.`,
+            envelope: null,
+            module_dimensions: {},
+            conflicts: [`Sizing engine does not currently support the ${industryDomain} domain.`],
+            closest_feasible_alternate: null,
+            unsupported_domain: true,
+            rules_domain: industryDomain,
+            rules_version: "1.0",
+            unmatched_module_ids: modules.map(m => m.id),
+            recommendations: ["Manually specify dimensions or choose a supported domain."],
+            notes: ["Domain guard tripped."]
+        }
+        
+        await admin.from("cad_lab_projects").update({ 
+            dimension_sheet: dimensionSheet as unknown as Database["public"]["Tables"]["cad_lab_projects"]["Row"]["dimension_sheet"]
+        }).eq("id", projectId)
+        
+        await completePipelineRun(runId, {
+            output_ref: {
+                table: "cad_lab_projects",
+                column: "dimension_sheet",
+                feasible: false,
+                conflictCount: 1,
+                rulesDomain: industryDomain,
+                rulesVersion: "1.0",
+                moduleCount: 0,
+                unmatchedModuleCount: modules.length,
+            },
+        })
+        
+        return {
+            ok: false,
+            skipped: true,
+            runId,
+            reason: `Unsupported domain: ${industryDomain}`,
+        }
+    }
+
     // Build a single free-text haystack from every brief field that might
     // mention capacity / form factor / market. Order matters only for
     // debugging — extraction is unit-aware so duplicates are fine.

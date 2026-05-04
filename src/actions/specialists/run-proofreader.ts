@@ -615,6 +615,11 @@ export async function runProofreaderBackground(
         }
     }
 
+    // Change 2: Make proofreader findings blocking for PDF
+    if (payload) {
+        payload.block_pdf = (payload.blocker_count ?? 0) > 0 || verdict.status === "red";
+    }
+
     const { error: updateErr } = await admin
         .from("cad_lab_projects")
         .update({

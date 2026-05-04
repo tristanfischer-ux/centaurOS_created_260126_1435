@@ -502,7 +502,7 @@ Be decisive. Pick one winner. Only synthesise if the combination is clearly bett
         .join("\n")
 
     try {
-        const { text: judgeText } = await callJudge(judgeSystem, judgeUser, 8192)
+        const judgeText = await callJudge(judgeSystem, judgeUser, 8192)
         const cleaned = judgeText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
         const judgeResult = JSON.parse(cleaned) as {
             winner: number
@@ -690,7 +690,7 @@ Return ONLY a JSON object with no markdown fences: { "winner": <1-based index>, 
         .join("\n")
 
     try {
-        const { text: judgeText } = await callJudge(judgeSystem, judgeUser, 4096)
+        const judgeText = await callJudge(judgeSystem, judgeUser, 4096)
         const cleaned = judgeText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim()
         const result = JSON.parse(cleaned) as { winner: number; reason: string }
         const winnerIdx = Math.max(0, Math.min(result.winner - 1, candidates.length - 1))
@@ -851,7 +851,7 @@ Additional rules:
             const synthUser = `Synthesise these ${top3Candidates.length} research reports into the best possible single report:\n\n` +
                 top3Candidates.map((c, i) => `=== REPORT ${i + 1} (${c.model}) ===\n${c.output}`).join("\n\n")
 
-            const { text: synthesised } = await callJudge(synthSystem, synthUser, 8192)
+            const synthesised = await callJudge(synthSystem, synthUser, 8192)
 
             if (synthesised && synthesised.length > 500) {
                 finalOutput = synthesised
@@ -1037,13 +1037,19 @@ async function callOpenRouterModel(
     const apiKey = process.env.OPENROUTER_API_KEY?.trim()
     if (!apiKey) throw new Error("OPENROUTER_API_KEY not configured")
 
-    const response = await fetchWithTimeout(
-        "https://openrouter.ai/api/v1/chat/completions",
-        {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+        controller.abort(new Error("Request timeout"));
+    }, 120_000);
+
+    try {
+        const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
                 "Authorization": `Bearer ${apiKey}`,
+                "HTTP-Referer": "https://fractionalforge.app",
+                "X-Title": "ForgeOS",
             },
             body: JSON.stringify({
                 model: modelId,
@@ -1054,17 +1060,24 @@ async function callOpenRouterModel(
                     { role: "user", content: userPrompt },
                 ],
             }),
-        },
-        120_000,
-    )
+            signal: controller.signal,
+        });
 
-    if (!response.ok) {
-        const errText = await response.text()
-        throw new Error(`OpenRouter ${modelId} error (${response.status}): ${errText.slice(0, 300)}`)
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`OpenRouter ${modelId} error (${response.status}): ${errText.slice(0, 300)}`);
+        }
+
+        const data = await response.json();
+        return data.choices?.[0]?.message?.content ?? "";
+    } catch (err: any) {
+        if (err.name === "AbortError" || err.message?.includes("fetch failed") || err.message?.includes("Request timeout")) {
+            throw new Error(`Timeout: ${modelId} failed to respond within 120s`);
+        }
+        throw err;
+    } finally {
+        clearTimeout(timeoutId);
     }
-
-    const data = await response.json()
-    return data.choices?.[0]?.message?.content ?? ""
 }
 
 /**

@@ -142,10 +142,34 @@ function extractGap(m: CadLabModule, src: ProjectGapSource): {
     return { industry, process, material }
 }
 
+async function checkCommercialSignals(url: string): Promise<{
+    hasContactForm: boolean
+    hasQuoteRequest: boolean  
+    hasProductListings: boolean
+}> {
+    try {
+        const { fetchWithTimeout } = await import("@/lib/fetch-with-timeout")
+        const resp = await fetchWithTimeout(url, { 
+            method: "GET", 
+            headers: { "User-Agent": "ForgeOS-SupplierVerifier/1.0" }
+        }, 5000)
+        
+        const html = await resp.text()
+        const lower = html.toLowerCase()
+        return {
+            hasContactForm: lower.includes("contact") || lower.includes("request a quote"),
+            hasQuoteRequest: lower.includes("quote") || lower.includes("rfq"),
+            hasProductListings: lower.includes("product") || lower.includes("catalog") || lower.includes("services"),
+        }
+    } catch {
+        return { hasContactForm: false, hasQuoteRequest: false, hasProductListings: false }
+    }
+}
+
 async function fetchBraveSearch(query: string, apiKey: string): Promise<string> {
     const url = new URL(BRAVE_SEARCH_URL)
     url.searchParams.set("q", query)
-    url.searchParams.set("count", "10")
+    url.searchParams.set("count", "15") // Ask for slightly more since we will filter
     url.searchParams.set("search_lang", "en")
     const res = await fetch(url.toString(), {
         headers: {
@@ -164,7 +188,24 @@ async function fetchBraveSearch(query: string, apiKey: string): Promise<string> 
         url?: string
         description?: string
     }>
-    return results
+    
+    // Change 8: Suppliers post-search commercial verification
+    const verifiedResults = await Promise.all(
+        results.slice(0, 15).map(async (result) => {
+            if (!result.url) return { ...result, verified: false }
+            const signals = await checkCommercialSignals(result.url)
+            const isCommercial = signals.hasContactForm || signals.hasQuoteRequest || signals.hasProductListings
+            return { ...result, verified: isCommercial }
+        })
+    )
+    
+    // Only keep results with commercial signals, fallback to all if filtering is too aggressive
+    let commercialResults = verifiedResults.filter(r => r.verified)
+    if (commercialResults.length < 3) {
+        commercialResults = verifiedResults
+    }
+
+    return commercialResults
         .slice(0, 10)
         .map(
             (r, i) =>

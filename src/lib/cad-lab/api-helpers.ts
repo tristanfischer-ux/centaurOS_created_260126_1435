@@ -131,6 +131,26 @@ export async function callAI(
   return { text: result.text, tokensIn: result.tokensIn, tokensOut: result.tokensOut }
 }
 
+export async function searchBraveFallback(
+  query: string, 
+  opts: { maxResults: number }
+): Promise<Array<{ title: string; url: string; snippet: string }>> {
+  const apiKey = process.env.BRAVE_SEARCH_API_KEY
+  if (!apiKey) return []
+  
+  const resp = await fetch(
+    `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=${opts.maxResults}`,
+    { headers: { "X-Subscription-Token": apiKey, "Accept": "application/json" } }
+  )
+  if (!resp.ok) return []
+  const data = await resp.json()
+  return (data.web?.results ?? []).map((r: any) => ({
+    title: r.title,
+    url: r.url,
+    snippet: r.description,
+  }))
+}
+
 // ─── Gemini API Call with Google Search Grounding ────────────────────
 
 /**

@@ -202,6 +202,30 @@ async function runFangReviewInternal(
             }
         }
 
+        // BUG 2: Per-project fanout cap
+        // Enforce a hard cap on concurrent Fang reviews per project to prevent credit burn
+        // when the autopilot cascade misbehaves.
+        const { count: fangRunsCount, error: countErr } = await admin
+            .from("pipeline_runs")
+            .select("id", { count: "exact", head: true })
+            .eq("project_id", projectId)
+            .or("stage.eq.running_fang_reviews,stage.ilike.%fang%")
+            .neq("status", "done")
+            .neq("status", "failed")
+            .neq("status", "cancelled")
+            
+        if (countErr) {
+            return { ok: false, error: "Couldn't check fanout limits", errorCode: "INTERNAL" }
+        }
+        
+        // Modules length is a safe multiplier. If a project has 5 modules, cap at 15
+        // concurrent pipeline runs related to Fang. (Normally should be 5).
+        const maxAllowed = Math.max(10, modules.length * 3)
+        if (fangRunsCount !== null && fangRunsCount > maxAllowed) {
+             console.error(`[run-fang-review] fanout cap exceeded for project ${projectId}. Count: ${fangRunsCount}, Max: ${maxAllowed}`)
+             throw new Error('Fang fanout cap exceeded')
+        }
+
         // 2. Fang needs parts to DFM-check anything. If the module is still
         //    at skeleton-only (no BOM yet), route the founder to generate BOM
         //    first rather than silently generating a vacuous review.
@@ -778,26 +802,32 @@ async function runFangReviewInternal(
             // Only numeric mass is auto-applied (module has no material/process
             // field yet). Every other critical issue lands in design_change_log
             // as kind='pending' so the founder sees there's something to action.
-            const cascade = await applyFangRecommendationsToModule(
-                projectId,
-                moduleId,
-                foundryId,
-                user.id,
-                reviewResult.review,
-            )
+            const APPLY_FANG_CASCADE = process.env.APPLY_FANG_CASCADE === "true"
             let cascadeApplied = 0
             let cascadePending = 0
-            if (cascade.ok) {
-                cascadeApplied = cascade.appliedCount
-                cascadePending = cascade.pendingCount
-            } else {
-                // Non-fatal: the review is saved, the chip can go green. Just
-                // log — the cascade is a best-effort enhancement, not the core
-                // contract of the pipeline run.
-                console.warn(
-                    "[run-fang-review] cascade failed (non-fatal):",
-                    cascade.error,
+
+            if (APPLY_FANG_CASCADE) {
+                const cascade = await applyFangRecommendationsToModule(
+                    projectId,
+                    moduleId,
+                    foundryId,
+                    user.id,
+                    reviewResult.review,
                 )
+                if (cascade.ok) {
+                    cascadeApplied = cascade.appliedCount
+                    cascadePending = cascade.pendingCount
+                } else {
+                    // Non-fatal: the review is saved, the chip can go green. Just
+                    // log — the cascade is a best-effort enhancement, not the core
+                    // contract of the pipeline run.
+                    console.warn(
+                        "[run-fang-review] cascade failed (non-fatal):",
+                        cascade.error,
+                    )
+                }
+            } else {
+                console.log("[run-fang-review] APPLY_FANG_CASCADE is false — skipping automatic mutation");
             }
 
             // ── L16-G #11b: Fang → canonical-specs patch wiring ──
@@ -1641,6 +1671,9 @@ async function loadLatestFangRun(
         .eq("specialist_id", SPECIALIST_ID)
         .eq("stage", STAGE)
         .contains("input_ref", { moduleId })
+        // Change 4: Fang idempotency guard
+        // Keep most recent active/non-terminal run
+        .not("status", "in", "(done,failed,cancelled)")
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle()
