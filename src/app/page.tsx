@@ -822,8 +822,6 @@ function ProductShowcaseSection() {
 }
 
 function FAQSection() {
-  const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null)
-
   return (
     <section id="faq" className="py-12 sm:py-16 md:py-20 lg:py-24 bg-background border-t border-muted scroll-mt-20">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
@@ -837,37 +835,26 @@ function FAQSection() {
         </AnimatedSection>
 
         <div className="animate-in fade-in duration-500 space-y-3 sm:space-y-4">
-          {FAQS.map((faq, i) => {
-            const isExpanded = expandedFAQ === i;
-            return (
-              <div 
-                key={i}
-                className="border border-border rounded-xl bg-card overflow-hidden transition-all duration-200"
+          {FAQS.map((faq, i) => (
+            <details
+              key={i}
+              className="group border border-border rounded-xl bg-card overflow-hidden transition-all duration-200 [&[open]]:border-international-orange/30"
+            >
+              <summary
+                className="flex items-center justify-between text-left px-4 sm:px-6 py-4 sm:py-5 hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-international-orange/20 cursor-pointer list-none [&::-webkit-details-marker]:hidden"
               >
-                <button
-                  onClick={() => setExpandedFAQ(isExpanded ? null : i)}
-                  className="w-full flex items-center justify-between text-left px-4 sm:px-6 py-4 sm:py-5 hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-international-orange/20"
-                  aria-expanded={isExpanded}
-                  type="button"
-                >
-                  <span className="text-sm sm:text-base font-semibold text-foreground pr-4">
-                    {faq.question}
-                  </span>
-                  <ChevronDown 
-                    className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`} 
-                  />
-                </button>
-                
-                <div 
-                  className={`overflow-hidden transition-all duration-200 ${isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
-                >
-                  <div className="px-4 sm:px-6 pb-4 sm:pb-5 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border/50">
-                    {faq.answer}
-                  </div>
-                </div>
+                <span className="text-sm sm:text-base font-semibold text-foreground pr-4">
+                  {faq.question}
+                </span>
+                <ChevronDown 
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 group-open:rotate-180" 
+                />
+              </summary>
+              <div className="px-4 sm:px-6 pb-4 sm:pb-5 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border/50">
+                {faq.answer}
               </div>
-            );
-          })}
+            </details>
+          ))}
         </div>
       </div>
     </section>
