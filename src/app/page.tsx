@@ -848,6 +848,7 @@ function FAQSection() {
                   onClick={() => setExpandedFAQ(isExpanded ? null : i)}
                   className="w-full flex items-center justify-between text-left px-4 sm:px-6 py-4 sm:py-5 hover:bg-muted/50 transition-colors focus:outline-none focus:ring-2 focus:ring-international-orange/20"
                   aria-expanded={isExpanded}
+                  type="button"
                 >
                   <span className="text-sm sm:text-base font-semibold text-foreground pr-4">
                     {faq.question}
@@ -857,20 +858,13 @@ function FAQSection() {
                   />
                 </button>
                 
-                <AnimatePresence>
-                  {isExpanded && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2, ease: "easeInOut" }}
-                    >
-                      <div className="px-4 sm:px-6 pb-4 sm:pb-5 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border/50">
-                        {faq.answer}
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                <div 
+                  className={`overflow-hidden transition-all duration-200 ${isExpanded ? "max-h-96 opacity-100" : "max-h-0 opacity-0"}`}
+                >
+                  <div className="px-4 sm:px-6 pb-4 sm:pb-5 pt-1 text-sm text-muted-foreground leading-relaxed border-t border-border/50">
+                    {faq.answer}
+                  </div>
+                </div>
               </div>
             );
           })}
