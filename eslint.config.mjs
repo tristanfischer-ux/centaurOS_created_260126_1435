@@ -58,6 +58,9 @@ const eslintConfig = defineConfig([
     "data/",
     // Agent worktrees (temporary isolated copies of the repo)
     ".claude/worktrees/**",
+    // Root-level scratch scripts
+    "generate-realistic-bess.js",
+    "update_pdf.js",
   ]),
   ...nextVitals,
   ...nextTs,
