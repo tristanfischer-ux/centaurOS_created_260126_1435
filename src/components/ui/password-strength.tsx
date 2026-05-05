@@ -32,15 +32,6 @@ export function calculatePasswordStrength(password: string): string {
   return STRENGTH_TIERS[tierIndex]?.label ?? 'Weak'
 }
 
-export function calculatePasswordStrength(password: string): string {
-  const filledSegments = STRENGTH_TIERS.reduce(
-    (count, tier) => (password.length >= tier.minLength ? count + 1 : count),
-    0,
-  )
-  const tierIndex = Math.max(0, filledSegments - 1)
-  return STRENGTH_TIERS[tierIndex]?.label ?? 'Weak'
-}
-
 /**
  * PasswordStrength — Visual 4-segment strength bar driven by length only.
  *

@@ -96,15 +96,15 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
             {/* ─────────────────────────────────────────────────────── */}
             <section className="px-4 sm:px-6 lg:px-0 pt-10 lg:pt-14">
                 <div className="max-w-2xl space-y-5 text-base sm:text-[17px] leading-relaxed text-foreground">
-                    <p className="font-medium">{"Welcome. I’m Tristan Fischer."}</p>
+                    <p className="font-medium">{"Welcome. I'm Tristan Fischer."}</p>
                     <p>
-                        {"I’ve spent 26 years running startups — software and hardware — most recently Fischer Farms, one of the UK’s larger vertical farms. ForgeOS is the wish list of everything I could have had along the way."}
+                        {"I've spent 26 years running startups — software and hardware — most recently Fischer Farms, one of the UK's larger vertical farms. ForgeOS is the wish list of everything I could have had along the way."}
                     </p>
                     <p>
-                        {"A software founder builds one thing: the product. A hardware founder builds two — the product, and all the infrastructure to make it. Finding a factory. Negotiating leases. Procuring equipment. Hiring the people to run it. Eighteen months can disappear before you’ve shipped anything."}
+                        {"A software founder builds one thing: the product. A hardware founder builds two — the product, and all the infrastructure to make it. Finding a factory. Negotiating leases. Procuring equipment. Hiring the people to run it. Eighteen months can disappear before you've shipped anything."}
                     </p>
                     <p>
-                        {"ForgeOS gives you a team of 13 specialists, an investor database of 600 UK funds, and a workspace that turns a paragraph about your product into a system architecture. Use it to think out loud, find capital, and actually build the thing."}
+                        {"ForgeOS gives you a team of 13 specialists and an investor database of 13,000 UK funds. Use it to think out loud, find the right investors, and connect with the manufacturers who can build what you're designing."}
                     </p>
                     <div className="pt-2">
                         <p className="font-semibold text-foreground">{"— Tristan"}</p>
@@ -125,18 +125,18 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
                         <CardContent className="pt-6 pb-6 space-y-5">
                             <FirstHourStep
                                 number={1}
-                                title={"Brainstorm something you’re stuck on."}
+                                title={"Brainstorm something you're stuck on."}
                                 body={"Pick one of the eight idea prompts on the Brainstorming page, or type your own. Sage and three other specialists run the conversation, ask good questions, and leave you with the next step instead of more reading."}
                             />
                             <FirstHourStep
                                 number={2}
                                 title="Search the investor database."
-                                body="Six hundred UK VC and PE firms, matched against your stage, sector, and cheque size. Fiona surfaces the dozen you should actually approach this week and writes the opening line."
+                                body="Over 13,000 UK VC and PE firms, matched against your stage, sector, and cheque size. Fiona surfaces the dozen you should actually approach this week and writes the opening line."
                             />
                             <FirstHourStep
                                 number={3}
-                                title="Drop your product idea into The Forge."
-                                body={"One paragraph in. A system architecture, a module decomposition, a skeleton Bill of Materials, and a shortlist of UK manufacturers — out — before lunch."}
+                                title="Search for suppliers who can build it."
+                                body={"Over 13,700 UK and European manufacturers indexed by capability, location, and specialism. Type what you need — PCB assembly, injection moulding, 3D printing — and get a ranked shortlist back."}
                             />
                         </CardContent>
                     </Card>
@@ -171,79 +171,35 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
                     subtitle="Ideas in, decisions out"
                     startHref="/agents"
                     startLabel="Open Brainstorming"
-                    intro={"The Brainstorming page is the front door. Eight curated questions are waiting — pricing, hiring, fundraising, build-vs-partner — each one already paired with the specialists best placed to answer it. Or type your own topic and four key leaders pick it up. The output isn’t a chat log; it’s a decision and the next step."}
-                    rows={[
-                        [
-                            "Strategy",
-                            "Sage frames the bigger picture. Drop a business plan or paste your one-liner — back comes a strategic tree of pillars, objectives, and atomic tasks, each linked to a measurable outcome.",
-                        ],
-                        [
-                            "Objectives",
-                            "Each objective auto-decomposes into 1–3-day tasks scheduled against your team’s velocity. The system tells you “this objective needs one more engineer to ship on time” before you spend six weeks finding out.",
-                        ],
-                        [
-                            "Tasks",
-                            "Day-to-day work tied to the objectives that justify the burn. Drag, assign, mark done, see it ladder up to the strategic pillar.",
-                        ],
-                        [
-                            "Outputs",
-                            "Every deliverable your specialists have produced — pitch decks, financial models, strategy briefs, CAD exports — searchable by specialist or document type.",
-                        ],
-                    ]}
+                    intro={"The Brainstorming page is the front door. Eight curated questions are waiting — pricing, hiring, fundraising, build-vs-partner — each one already paired with the specialists best placed to answer it. Or type your own topic and four key leaders pick it up. The output isn't a chat log; it's a decision and the next step."}
+                    rows={[]}
                 />
                 <SectionBlock
                     icon={Building2}
                     label="Fundraising"
-                    subtitle={"Find the investors who’d back you"}
+                    subtitle={"Find the investors who'd back you"}
                     startHref="/investors"
                     startLabel="Open the investor database"
-                    intro={"Six hundred UK VC and PE firms profiled and matched to your sector, stage, and cheque size. Filter in plain English — “early-stage food tech”, “hardware climate fund”, “family office angels writing £250K”. Fiona pulls each investor’s portfolio and recent activity into every outreach brief, so the email lands in their inbox already personalised."}
+                    intro={"Over 13,000 UK VC and PE firms profiled and matched to your sector, stage, and cheque size. Filter in plain English — "early-stage food tech", "hardware climate fund", "family office angels writing £250K". Fiona pulls each investor's portfolio and recent activity into every outreach brief, so the email lands in their inbox already personalised."}
                     rows={[]}
                 />
                 <SectionBlock
                     icon={Hammer}
-                    label="Workshop"
+                    label="The Forge (Beta)"
                     subtitle="From idea to manufactured product"
                     startHref="/the-forge-v2"
                     startLabel="Open The Forge"
-                    intro="Type your product idea in one paragraph. Max, your CTO specialist, returns a system architecture diagram, a module decomposition, a skeleton Bill of Materials, reference images of each module, and a design report with research, risks, and next steps. Jian (engineering), Fang (manufacturing), and Chase (supply chain) take it from there."
-                    rows={[
-                        [
-                            "Build",
-                            "Jian generates detailed CAD specs, tolerance stack-ups, manufacturing process recommendations, and cost-per-unit estimates from live supplier quotes.",
-                        ],
-                        [
-                            "Assemble",
-                            "Fang returns assembly method sheets, tooling lists, and labour-hour estimates.",
-                        ],
-                        [
-                            "Procurement",
-                            "Chase searches hundreds of thousands of parts, auto-fills supplier quotes, flags long lead times, and ranks suppliers on reliability and price.",
-                        ],
-                    ]}
-                    footnote="IP-sensitive? Mark the project, and designs never touch shared storage."
+                    intro="Currently in beta. Type your product idea in one paragraph and The Forge will return a system architecture, module decomposition, skeleton Bill of Materials, and a design report. The goal: take a product concept through engineering, manufacturing, and procurement — all the way to a supplier shortlist and cost estimate."
+                    rows={[]}
                 />
                 <SectionBlock
                     icon={Store}
-                    label="Marketplace"
-                    subtitle="Fractional Executives · Suppliers · Manufacturing Techniques"
+                    label="Suppliers"
+                    subtitle="Find who can build what you're designing"
                     startHref="/marketplace"
-                    startLabel="Open the Marketplace"
-                    intro="Three doors into the same physical world: experienced fractional executives ready to fill a gap on your team, UK suppliers and contract manufacturers ranked on capability and lead time, and a library of manufacturing techniques (injection moulding, PCB assembly, 3D printing, CNC) so you stop over-specifying tolerances by 2x."
-                    rows={[
-                        [
-                            "Fractional Executives",
-                            "Describe the hole in your team. Harper returns matched candidates with portfolios, interview questions, and a culture-fit checklist. Fractional, contract, or full-time — your choice.",
-                        ],
-                        [
-                            "Suppliers",
-                            "Your Bill of Materials goes in. Ranked supplier shortlists come out — PCB assembly, injection moulding, 3D printing, testing labs, fulfilment.",
-                        ],
-                        [
-                            "Manufacturing Techniques",
-                            "Curated tutorials and Q&A on the decisions that quietly cost the most: when to mould vs CNC, when tolerances are overkill, when a cheaper material outperforms.",
-                        ],
-                    ]}
+                    startLabel="Open Suppliers"
+                    intro="Over 13,700 UK and European manufacturers and suppliers indexed by capability, location, and specialism. Search for PCB assembly, injection moulding, 3D printing, CNC, testing labs, fulfilment — and get ranked shortlists back based on what you need built."
+                    rows={[]}
                 />
             </section>
 
