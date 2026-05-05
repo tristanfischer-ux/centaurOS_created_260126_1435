@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useActionState, Suspense } from "react";
+import { useState, useEffect, useActionState, Suspense, startTransition } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -23,7 +23,17 @@ import type { SignupState } from "@/actions/signup";
 import { getDemoAccountData, type DemoAccountData } from "@/actions/demo-accounts";
 import { lookupReferrer } from "@/actions/referrals";
 import { Gift } from "lucide-react";
-import { PasswordStrength } from "@/components/ui/password-strength";
+import { PasswordStrength, calculatePasswordStrength } from "@/components/ui/password-strength";
+
+function getPasswordError(password: string): string | null {
+  if (!password) return null;
+  if (password.length < 8) return "Password must be at least 8 characters";
+  if (!/[A-Z]/.test(password)) return "Password must contain at least one uppercase letter";
+  if (!/[a-z]/.test(password)) return "Password must contain at least one lowercase letter";
+  if (!/[0-9]/.test(password)) return "Password must contain at least one number";
+  if (calculatePasswordStrength(password) === "Weak") return "Please choose a stronger password";
+  return null;
+}
 
 /**
  * GoogleIcon — Inline SVG of the Google "G" logo in brand colours.
@@ -142,9 +152,47 @@ function JoinPageInner() {
   const [state, formAction, isPending] = useActionState<SignupState, FormData>(signup, {});
   const [referrerInfo, setReferrerInfo] = useState<{ name: string; company: string | null } | null>(null);
   const [passwordValue, setPasswordValue] = useState("");
+  const [clientErrors, setClientErrors] = useState<{ email?: string; password?: string }>({});
 
   // INTENT: Default role is executive. Founder deep-link still works for backward compat.
   const effectiveRole = isFounderDeepLink ? "founder" : "executive";
+
+  const [confirmPasswordValue, setConfirmPasswordValue] = useState("");
+  const handleClientAction = (formData: FormData) => {
+    const email = formData.get("email") as string;
+    const password = formData.get("password") as string;
+    const errors: { email?: string; password?: string; confirmPassword?: string } = {};
+
+    if (!email) {
+      errors.email = "Email is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      errors.email = "Please enter a valid email address";
+    }
+
+    if (!password) {
+      errors.password = "Password is required";
+    } else {
+      const pErr = getPasswordError(password);
+      if (pErr) errors.password = pErr;
+    }
+
+    if (isFactorySignup && password !== confirmPasswordValue) {
+        errors.confirmPassword = "Passwords do not match";
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setClientErrors(errors);
+      return;
+    }
+
+    setClientErrors({});
+    startTransition(() => {
+      formAction(formData);
+    });
+  };
+
+  const dynamicPasswordError = passwordValue ? getPasswordError(passwordValue) : clientErrors.password;
+  const isSubmitDisabled = isPending || (passwordValue.length > 0 && !!getPasswordError(passwordValue)) || (clientErrors.email ? true : false) || (isFactorySignup && confirmPasswordValue !== passwordValue);
 
   // Set forge_ref cookie when ?ref= param is present
   useEffect(() => {
@@ -227,7 +275,7 @@ function JoinPageInner() {
               </motion.div>
             )}
 
-            <form action={formAction} className="space-y-5">
+            <form action={handleClientAction} className="space-y-5">
               <input type="hidden" name="role" value="supplier" />
               {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
               {fromParam && <input type="hidden" name="from" value={fromParam} />}
@@ -262,11 +310,24 @@ function JoinPageInner() {
                   placeholder="you@example.com"
                   key={`email-${state.values?.email ?? ""}`}
                   defaultValue={state.values?.email || ""}
+                  onChange={(e) => {
+                     const email = e.target.value;
+                     if (!email) {
+                         setClientErrors(prev => ({ ...prev, email: "Email is required" }));
+                     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                         setClientErrors(prev => ({ ...prev, email: "Please enter a valid email address" }));
+                     } else {
+                         setClientErrors(prev => ({ ...prev, email: undefined }));
+                     }
+                  }}
                   autoComplete="email"
-                  className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                  className={`bg-background border-input focus:border-international-orange focus:ring-international-orange/20 ${clientErrors.email ? 'border-destructive focus:border-destructive focus:ring-destructive/20' : ''}`}
                   required
                   aria-required="true"
                 />
+                {clientErrors.email && (
+                  <p className="text-xs text-destructive mt-1">{clientErrors.email}</p>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -280,30 +341,62 @@ function JoinPageInner() {
                   type="password"
                   placeholder="Create a password"
                   value={passwordValue}
-                  onChange={(e) => setPasswordValue(e.target.value)}
+                  onChange={(e) => {
+                    setPasswordValue(e.target.value);
+                  }}
                   onBlur={(e) => setPasswordValue(e.currentTarget.value)}
                   autoComplete="new-password"
                   enterKeyHint="go"
-                  className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                  className={`bg-background border-input focus:border-international-orange focus:ring-international-orange/20 ${dynamicPasswordError ? 'border-destructive focus:border-destructive focus:ring-destructive/20' : ''}`}
                   required
                   aria-required="true"
                   minLength={8}
                   aria-describedby="supplier-password-hint"
                 />
-                <p id="supplier-password-hint" className="text-xs text-muted-foreground">
-                  Eight characters or more.
-                </p>
+                {dynamicPasswordError ? (
+                  <p id="supplier-password-hint" className="text-xs text-destructive mt-1">
+                    {dynamicPasswordError}
+                  </p>
+                ) : (
+                  <p id="supplier-password-hint" className="text-xs text-muted-foreground mt-1">
+                    Eight characters or more.
+                  </p>
+                )}
                 <PasswordStrength password={passwordValue} />
               </div>
 
+              <div className="space-y-2">
+                <Label htmlFor="confirm_password" className="text-sm font-medium text-foreground">
+                  Confirm Password
+                  <span className="text-destructive ml-1" aria-label="required">*</span>
+                </Label>
+                <Input
+                  id="confirm_password"
+                  name="confirm_password"
+                  type="password"
+                  placeholder="Confirm your password"
+                  value={confirmPasswordValue}
+                  onChange={(e) => setConfirmPasswordValue(e.target.value)}
+                  className={`bg-background border-input focus:border-international-orange focus:ring-international-orange/20 ${clientErrors.confirmPassword || (confirmPasswordValue && confirmPasswordValue !== passwordValue) ? 'border-destructive focus:border-destructive focus:ring-destructive/20' : ''}`}
+                  required
+                  aria-required="true"
+                />
+                {clientErrors.confirmPassword && (
+                    <p className="text-xs text-destructive mt-1">{clientErrors.confirmPassword}</p>
+                )}
+                {confirmPasswordValue && confirmPasswordValue !== passwordValue && !clientErrors.confirmPassword && (
+                    <p className="text-xs text-destructive mt-1">Passwords do not match</p>
+                )}
+              </div>
+
               <motion.div
-                whileHover={isPending ? {} : { scale: 1.01 }}
-                whileTap={isPending ? {} : { scale: 0.98 }}
+                whileHover={isSubmitDisabled ? {} : { scale: 1.01 }}
+                whileTap={isSubmitDisabled ? {} : { scale: 0.98 }}
                 className="pt-2"
               >
                 <Button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isSubmitDisabled}
                   className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
                 >
                   {isPending ? (
@@ -448,7 +541,7 @@ function JoinPageInner() {
           <GoogleOAuthButton redirect={redirectParam} signupContext={signupContext} />
           <OAuthDivider />
 
-          <form action={formAction} className="space-y-5">
+          <form action={handleClientAction} className="space-y-5">
             <input type="hidden" name="role" value={effectiveRole} />
             {redirectParam && <input type="hidden" name="redirect" value={redirectParam} />}
             {fromParam && <input type="hidden" name="from" value={fromParam} />}
@@ -492,11 +585,24 @@ function JoinPageInner() {
                 placeholder="you@example.com"
                 key={`email-${state.values?.email ?? ""}`}
                 defaultValue={state.values?.email || demoData?.email || ""}
+                onChange={(e) => {
+                     const email = e.target.value;
+                     if (!email) {
+                         setClientErrors(prev => ({ ...prev, email: "Email is required" }));
+                     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                         setClientErrors(prev => ({ ...prev, email: "Please enter a valid email address" }));
+                     } else {
+                         setClientErrors(prev => ({ ...prev, email: undefined }));
+                     }
+                }}
                 autoComplete="email"
-                className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                className={`bg-background border-input focus:border-international-orange focus:ring-international-orange/20 ${clientErrors.email ? 'border-destructive focus:border-destructive focus:ring-destructive/20' : ''}`}
                 required
                 aria-required="true"
               />
+              {clientErrors.email && (
+                <p className="text-xs text-destructive mt-1">{clientErrors.email}</p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -519,18 +625,21 @@ function JoinPageInner() {
                 onBlur={(e) => setPasswordValue(e.currentTarget.value)}
                 autoComplete="new-password"
                 enterKeyHint="go"
-                className="bg-background border-input focus:border-international-orange focus:ring-international-orange/20"
+                className={`bg-background border-input focus:border-international-orange focus:ring-international-orange/20 ${dynamicPasswordError ? 'border-destructive focus:border-destructive focus:ring-destructive/20' : ''}`}
                 required
                 aria-required="true"
                 minLength={8}
                 aria-describedby="password-hint"
               />
-              <p
-                id="password-hint"
-                className="text-xs text-muted-foreground"
-              >
-                Eight characters or more.
-              </p>
+              {dynamicPasswordError ? (
+                <p id="password-hint" className="text-xs text-destructive mt-1">
+                  {dynamicPasswordError}
+                </p>
+              ) : (
+                <p id="password-hint" className="text-xs text-muted-foreground mt-1">
+                  Eight characters or more.
+                </p>
+              )}
               <PasswordStrength password={passwordValue} />
             </div>
 
@@ -615,13 +724,13 @@ function JoinPageInner() {
 
             {/* Submit */}
             <motion.div
-              whileHover={isPending ? {} : { scale: 1.01 }}
-              whileTap={isPending ? {} : { scale: 0.98 }}
+              whileHover={isSubmitDisabled ? {} : { scale: 1.01 }}
+              whileTap={isSubmitDisabled ? {} : { scale: 0.98 }}
               className="pt-2"
             >
               <Button
                 type="submit"
-                disabled={isPending}
+                disabled={isSubmitDisabled}
                 className="w-full bg-international-orange hover:bg-international-orange/90 text-white font-bold tracking-widest uppercase min-h-[48px] sm:min-h-[52px] text-sm transition-colors shadow-lg hover:shadow-xl disabled:opacity-70"
               >
                 {isPending ? (

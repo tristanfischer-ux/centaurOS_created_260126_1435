@@ -32,6 +32,7 @@ export default async function LoginPage({
     const params = await searchParams
     const redirect_raw = typeof params.redirect === 'string' ? params.redirect : undefined
     const redirectTo = sanitizeRedirect(redirect_raw)
+    const errorCode = typeof params.error === 'string' ? params.error : undefined
 
     // AUTH: Redirect already-authenticated users to their dashboard
     const supabase = await createClient()
@@ -51,7 +52,7 @@ export default async function LoginPage({
 
     return (
         <Suspense fallback={null}>
-            <LoginView redirect={redirectTo} />
+            <LoginView redirect={redirectTo} error={errorCode} />
         </Suspense>
     )
 }

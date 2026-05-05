@@ -11,7 +11,6 @@
 import { Suspense, useState } from 'react'
 import { useFormStatus } from 'react-dom'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
 import { motion, type Variants } from 'framer-motion'
 import { login } from './actions'
 import { createClient } from '@/lib/supabase/client'
@@ -32,7 +31,7 @@ function SubmitButton(): React.ReactNode {
             whileTap={{ scale: 0.98 }}
         >
             <Button
-                formAction={login}
+                type="submit"
                 className="w-full h-12 bg-international-orange hover:bg-international-orange/90 text-white font-medium tracking-wide uppercase text-sm transition-all duration-300 shadow-md hover:shadow-lg"
                 disabled={pending}
             >
@@ -58,11 +57,9 @@ const ERROR_MESSAGES: Record<string, string> = {
 }
 
 /**
- * ErrorMessage — Displays auth errors from URL params (code-mapped only).
+ * ErrorMessage — Displays auth errors passed from server.
  */
-function ErrorMessage(): React.ReactNode {
-    const searchParams = useSearchParams()
-    const errorCode = searchParams.get('error')
+function ErrorMessage({ errorCode }: { errorCode?: string }): React.ReactNode {
     const message = errorCode ? ERROR_MESSAGES[errorCode] : null
 
     if (!message) return null
@@ -170,8 +167,26 @@ const formItemVariants: Variants = {
 /**
  * LoginForm — Animated form with warm, inviting copy.
  */
-function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode {
+function LoginForm({ redirect, error }: { redirect?: string | null, error?: string }): React.ReactNode {
     const marketingDomain = process.env.NEXT_PUBLIC_MARKETING_DOMAIN || 'https://fractionalforge.app'
+    const [clientErrors, setClientErrors] = useState<{ email?: string; password?: string }>({})
+
+    const handleLoginAction = async (formData: FormData) => {
+        const email = formData.get('email') as string
+        const password = formData.get('password') as string
+        
+        const errors: { email?: string; password?: string } = {}
+        if (!email) errors.email = "Email is required"
+        if (!password) errors.password = "Password is required"
+        
+        if (Object.keys(errors).length > 0) {
+            setClientErrors(errors)
+            return
+        }
+        
+        setClientErrors({})
+        await login(formData)
+    }
 
     return (
         <motion.div
@@ -212,10 +227,8 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                 <OAuthDivider />
             </motion.div>
 
-            <form className="space-y-6">
-                <Suspense fallback={null}>
-                    <ErrorMessage />
-                </Suspense>
+            <form action={handleLoginAction} className="space-y-6">
+                <ErrorMessage errorCode={error} />
                 {redirect && <input type="hidden" name="redirect" value={redirect} />}
 
                 <motion.div variants={formItemVariants} className="space-y-4">
@@ -234,6 +247,12 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                             aria-required="true"
                             className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium"
                         />
+                        {clientErrors.email && (
+                            <div className="p-2 mt-1 text-xs text-destructive bg-status-error-light border border-destructive rounded-sm flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden="true" />
+                                {clientErrors.email}
+                            </div>
+                        )}
                     </div>
                     <div className="space-y-2">
                         <Label htmlFor="password" className="text-xs uppercase tracking-wider text-muted-foreground font-medium">
@@ -249,6 +268,12 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
                             aria-required="true"
                             className="h-11 bg-background border focus:border-international-orange focus:ring-international-orange/20 transition-all font-medium font-mono tracking-widest"
                         />
+                        {clientErrors.password && (
+                            <div className="p-2 mt-1 text-xs text-destructive bg-status-error-light border border-destructive rounded-sm flex items-center gap-2">
+                                <span className="h-1.5 w-1.5 rounded-full bg-destructive" aria-hidden="true" />
+                                {clientErrors.password}
+                            </div>
+                        )}
                     </div>
                     <div className="flex justify-end">
                         <Link
@@ -288,7 +313,7 @@ function LoginForm({ redirect }: { redirect?: string | null }): React.ReactNode 
  * compact mobile banner (mobile), animated login form on right.
  * Continues the energy and optimism from the marketing landing page.
  */
-export function LoginView({ redirect }: { redirect?: string | null }): React.ReactNode {
+export function LoginView({ redirect, error }: { redirect?: string | null, error?: string }): React.ReactNode {
     return (
         <div className="min-h-screen flex flex-col lg:flex-row w-full bg-background">
             {/* Mobile Hero Banner (visible on small screens) */}
@@ -313,7 +338,7 @@ export function LoginView({ redirect }: { redirect?: string | null }): React.Rea
                         backgroundSize: '32px 32px',
                     }}
                 />
-                <LoginForm redirect={redirect} />
+                <LoginForm redirect={redirect} error={error} />
             </div>
         </div>
     )

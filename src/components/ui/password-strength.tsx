@@ -23,6 +23,24 @@ const STRENGTH_TIERS: Array<{ minLength: number; label: string; color: string }>
   { minLength: 20, label: 'Strong', color: 'bg-success' },
 ]
 
+export function calculatePasswordStrength(password: string): string {
+  const filledSegments = STRENGTH_TIERS.reduce(
+    (count, tier) => (password.length >= tier.minLength ? count + 1 : count),
+    0,
+  )
+  const tierIndex = Math.max(0, filledSegments - 1)
+  return STRENGTH_TIERS[tierIndex]?.label ?? 'Weak'
+}
+
+export function calculatePasswordStrength(password: string): string {
+  const filledSegments = STRENGTH_TIERS.reduce(
+    (count, tier) => (password.length >= tier.minLength ? count + 1 : count),
+    0,
+  )
+  const tierIndex = Math.max(0, filledSegments - 1)
+  return STRENGTH_TIERS[tierIndex]?.label ?? 'Weak'
+}
+
 /**
  * PasswordStrength — Visual 4-segment strength bar driven by length only.
  *
@@ -31,17 +49,15 @@ const STRENGTH_TIERS: Array<{ minLength: number; label: string; color: string }>
  * matches the modern length-only validation in the signup action.
  */
 export function PasswordStrength({ password }: PasswordStrengthProps) {
-  const filledSegments = useMemo(() => {
-    return STRENGTH_TIERS.reduce(
-      (count, tier) => (password.length >= tier.minLength ? count + 1 : count),
-      0,
-    )
-  }, [password])
-
+  const label = calculatePasswordStrength(password)
+  const filledSegments = STRENGTH_TIERS.reduce(
+    (count, tier) => (password.length >= tier.minLength ? count + 1 : count),
+    0,
+  )
+  
   if (!password) return null
 
   const tierIndex = Math.max(0, filledSegments - 1)
-  const label = STRENGTH_TIERS[tierIndex]?.label ?? 'Weak'
   const colorClass = STRENGTH_TIERS[tierIndex]?.color ?? 'bg-destructive'
 
   return (
