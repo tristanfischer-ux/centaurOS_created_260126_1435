@@ -93,6 +93,14 @@ export async function runPipeline(
     console.log(`[pipeline] ${name}: ${result.ok ? 'OK' : 'FAILED'} (${result.durationMs}ms)${result.error ? ` — ${result.error}` : ''}`)
   }
 
+  // A1 FIX (2026-05-06): gateResults must be function-scoped so the final
+  // return statement can reference it on every code path (brief-invalid,
+  // feasibility-RED, sizing-INFEASIBLE, and the happy path all end at the
+  // single return block below). Previously declared inside a nested else,
+  // which made it a ReferenceError at the PDF stage on every non-RED run.
+  let gateResults: Array<{ gate: string; passed: boolean; findings: string[] }> = []
+
+
   // ── Product Classification ──────────────────────────────────────────
   console.log('\n[pipeline] === Product Classification ===')
   const classification = classifyProduct(briefText)
@@ -176,8 +184,9 @@ export async function runPipeline(
   ;(state as any).feasibility = feasibility
   console.log(`[pipeline] Feasibility: ${feasibility.status} — ${feasibility.reason}`)
   console.log(`[pipeline] Allowed sections: ${feasibility.allowedSections.join(', ')}`)
-  
-  let gateResults: Array<{ gate: string; passed: boolean; findings: string[] }> = []
+
+  // gateResults declared at function scope (see A1 fix above). Reset here.
+  gateResults = []
 
   // If RED, skip heavy stages and go straight to a short blocked report
   if (feasibility.status === 'RED') {
