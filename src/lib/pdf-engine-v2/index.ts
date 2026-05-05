@@ -117,8 +117,8 @@ export async function runPipeline(
   let groundingData: Awaited<ReturnType<typeof loadAllGroundingData>> | null = null
   try {
     groundingData = await loadAllGroundingData()
-    console.log(`[pipeline] Loaded ${groundingData.totalRecords} records from supplier database`)
-    console.log(`[pipeline]   Materials: ${groundingData.materials.length}, Processes: ${groundingData.processes.length}, Suppliers: ${groundingData.suppliers.length}, Standards: ${groundingData.standards.length}`)
+    console.log(`[pipeline] Loaded ${groundingData.totalRecords} records from grounding database`)
+    console.log(`[pipeline]   Materials: ${groundingData.materials.length}, Processes: ${groundingData.processes.length}, Standards: ${groundingData.standards.length}`)
   } catch (err) {
     console.warn('[pipeline] Failed to load supplier database:', (err as Error).message)
   }

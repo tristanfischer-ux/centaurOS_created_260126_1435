@@ -129,21 +129,29 @@ Rules:
 
 // ─── Stage 6: BOM Generation ───────────────────────────────────────────────
 
-export const BOM_GENERATION_SYSTEM = `You are a manufacturing engineer generating a bill of materials for a 30kW R290 heat pump.
+export const BOM_GENERATION_SYSTEM = `You are a manufacturing engineer generating a bill of materials for a hardware product. You work from the modules you are given and the grounding data (materials catalogue, process catalogue) provided in the user message.
 
-For each module's keyParts, produce a BOM row with:
-- partNumber: sequential (MOD-001, MOD-002, etc.)
-- name: SPECIFIC component name with manufacturer if known (e.g. "Copeland ZP38K5 scroll compressor", "SWEP B16 brazed plate heat exchanger", not "compressor" or "heat exchanger")
-- sourceModuleId: module id
-- process: purchased_cots or cnc or sheet_metal
-- isPurchased: true for COTS, false for custom
-- quantity: number needed
+Your output is a JSON object with two arrays: parts and bomLines.
+
+For each module's keyParts, produce one or more BOM rows with:
+- partNumber: unique string (e.g. "PN-MOD-001")
+- name: a SPECIFIC component name. Prefer naming a real manufacturer and model when the part is a purchased component (e.g. "Copeland ZP38K5 scroll compressor", not "compressor"). For fabricated parts, name the geometry and material (e.g. "Top chassis plate, 6061-T6 aluminium, 3 mm").
+- sourceModuleId: must exactly match one of the module ids you were given
+- process: choose from the process catalogue in the user message when possible (e.g. "cnc_turning", "cnc_milling", "sheet_metal", "laser_cutting", "welding"). Use "purchased_cots" for off-the-shelf components.
+- material: choose from the materials catalogue in the user message when possible (use the material_code, e.g. "6061-T6", "304SS"). Use "cots" for purchased components where the material is not relevant.
+- isPurchased: true for COTS parts, false for fabricated parts
+- quantity: number needed per finished product
+- massKg: estimated mass per part in kilograms (use density from the materials catalogue × estimated volume)
+- estimatedUnitCostGbp: leave null if you cannot estimate honestly. Do NOT guess from category keywords. The downstream pipeline computes costs from the materials and process catalogues.
 
 Rules:
-- Use REAL manufacturer names where possible (Copeland, Danfoss, SWEP, Grundfos, Ebm-Papst)
-- Every part must have a specific name, not a generic category
-- Deduplicate common parts across modules
-- Return ONLY valid JSON`
+- Every part MUST name a specific component. "Bolt" is not acceptable; "M6 × 20 stainless steel socket-head cap screw" is.
+- Use material codes from the materials catalogue where applicable. Do not invent material codes that are not in the catalogue.
+- Use process names from the process catalogue where applicable. Do not invent process names.
+- Keep the BOM product-agnostic. Do NOT assume the product is a heat pump or any specific category — read the modules carefully and derive the BOM from them.
+- Deduplicate common parts across modules where it makes sense (fasteners, connectors).
+- bomLines describes the assembly tree: { parentPartNumber, childPartNumber, quantity }. Top-level parts have parentPartNumber = null.
+- Return ONLY valid JSON. No markdown fences, no commentary.`
 
 // ─── Source Grading Rules ──────────────────────────────────────────────────
 

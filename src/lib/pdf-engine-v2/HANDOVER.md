@@ -3,7 +3,77 @@
 **Date:** 5 May 2026
 **Author:** Claude (Sonnet sub-agent session)
 **Status:** Partially done — code written, quality not validated
-**Recovery:** All code is on disk but UNCOMMITTED. See "Recovery" section below.
+**Recovery:** All code is committed and pushed to `main`. See "Recovery" section below.
+
+---
+
+## UPDATE — 5 May 2026, second session
+
+**Fixed: Problem 3 (Database grounding plumbing was broken).**
+
+Investigation revealed the handover's framing of Problem 3 was slightly wrong.
+The code in `4-bom-cost.ts` DID call `loadAllGroundingData()` and DID try to
+match parts against materials + processes. But:
+
+1. `db-queries.ts` had the WRONG field names (`name`, `category`,
+   `tensile_strength_mpa`, `tolerance_mm`, `cost_rating`) — none of these
+   columns exist in Supabase. The actual columns are `material_name`,
+   `material_family`, `yield_strength_mpa`, `tolerance_typical_mm`,
+   `per_part_cost_multiplier` + `setup_cost_usd_typical`.
+2. Because the interface declared non-existent fields, every lookup returned
+   `undefined`. The `find(m => materialName.includes(m.name.toLowerCase()))`
+   match on line 278 always returned nothing. Grounding silently failed.
+3. `marketplace_listings` was being pulled in as "suppliers" but that table
+   holds 30,049 rows of Forge Capital investor data, not supplier listings.
+   That query was retrieving irrelevant rows and feeding them into an unused
+   path.
+4. The BOM prompt hardcoded "30kW R290 heat pump" and listed brand names
+   (Copeland, Danfoss, SWEP) that encouraged hallucination.
+
+**What was changed** (commit following this update):
+
+- `db-queries.ts` rewritten with correct column names. Added helper formatters
+  `formatMaterialsForPrompt`, `formatProcessesForPrompt`,
+  `formatStandardsForPrompt` for injecting catalogues into LLM prompts.
+  Dropped `marketplace_listings` and `getSupplierListings` — they query the
+  wrong table.
+- `BOM_GENERATION_SYSTEM` rewritten to be product-agnostic. Instructs the LLM
+  to use material codes and process names from the catalogues in the user
+  message. No longer mentions heat pump or specific brands.
+- `4-bom-cost.ts`:
+  - Loads grounding once at the top, or accepts a pre-loaded `grounding`
+    option so `index.ts` can share its copy.
+  - Injects real materials + processes catalogues into the LLM user prompt.
+  - Added `findMaterial(field, catalogue)` and `findProcess(field, catalogue)`
+    with exact-code → exact-name → substring → family fallback matching.
+  - Added `computeFabricatedCost(massKg, material, process, batchSize)` that
+    computes: `material_cost = mass × cost_per_kg × USD→GBP`; then adds
+    `process_labour = material_cost × (multiplier - 1) + setup / batch_size`.
+    Returns null when it can't produce a grounded number (no mass, no cost,
+    no material match) so nothing silently fabricates.
+  - Keyword heuristic is now the LAST-RESORT for COTS parts only, tagged
+    `priceSource: 'heuristic'` so reviewers know the confidence.
+  - New tags on each part: `matchedMaterialCode`, `matchedProcessName`,
+    `priceBreakdown` — so the PDF renderer can show traceability.
+
+**What is NOT fixed by this change:**
+
+- Problem 2 (feasibility gate doesn't block) — pre-existing `gateResults` scope
+  TypeScript error still in `index.ts:403,412`.
+- Problem 8 (PDF renderer null crash) — untouched.
+- Problem 10 (no real FMEA depth) — untouched.
+- `runBomCost` takes a `grounding` option but `index.ts` does not yet pass
+  its pre-loaded `groundingData` in. The stage will load grounding a second
+  time. That's a 2-line wiring fix for the next session.
+
+**Impact expectation:**
+
+The BOM will now carry real material codes (6061-T6, 304SS, etc) and real
+process names (cnc_turning, laser_cutting, etc) wherever the LLM picks from
+the catalogue. Fabricated-part costs become deterministic from density ×
+cost/kg × process multiplier, with full traceability in `priceBreakdown`.
+COTS parts still rely on LLM + heuristic + Brave Search — that's the right
+fallback because the database doesn't have supplier pricing.
 
 ---
 

@@ -1,10 +1,25 @@
 import { calculateCost } from '../cost-model'
-import { loadAllGroundingData } from '../db-queries'
+import {
+  loadAllGroundingData,
+  formatMaterialsForPrompt,
+  formatProcessesForPrompt,
+  type GroundingData,
+  type MaterialProperty,
+  type ProcessCapability,
+} from '../db-queries'
 import type { Module, Part, BomLine, CostBreakdown, StageResult, DimensionSheet } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { BOM_GENERATION_SYSTEM } from '../prompts'
 
 // Stage 4: BOM Generation — uses BOM_GENERATION_SYSTEM from prompts.ts
+
+// USD→GBP conversion. Rough static rate is fine for engineering estimates;
+// anything tighter needs a real FX feed which is out of scope here.
+const USD_TO_GBP = 0.8
+
+// Default batch size for amortising process setup costs when the brief
+// does not specify one. Prototype assumption.
+const DEFAULT_BATCH_SIZE = 25
 
 async function callOpenRouter(systemPrompt: string, userContent: string): Promise<any> {
   const controller = new AbortController()
@@ -48,29 +63,21 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
     console.log('[bom] Response length:', raw.length, 'chars. First 300:', raw.slice(0, 300))
 
     let jsonStr = raw.replace(/^\s*```json\s*/m, '').replace(/```\s*$/m, '').trim()
-    
+
     const firstBrace = jsonStr.indexOf('{')
     const lastBrace = jsonStr.lastIndexOf('}')
     if (firstBrace >= 0 && lastBrace > firstBrace) {
       jsonStr = jsonStr.slice(firstBrace, lastBrace + 1)
     }
-    
+
     try {
       return JSON.parse(jsonStr)
     } catch (e) {
-      // Try finding JSON with 'parts' field
       const partsMatch = jsonStr.match(/\{[\s\S]*"parts"[\s\S]*\}/)
       if (partsMatch) {
         try { return JSON.parse(partsMatch[0]) } catch (e2) { /* continue */ }
       }
       console.error('[bom] JSON parsing failed. First 500 chars:', raw.slice(0, 500))
-      throw new Error('Failed to parse JSON response from LLM')
-    }
-    
-    try {
-      return JSON.parse(jsonStr)
-    } catch (parseError) {
-      console.error('[bom-cost] JSON parsing failed. First 300 chars:', jsonStr.slice(0, 300))
       throw new Error('Failed to parse JSON response from LLM')
     }
   } catch (error) {
@@ -115,32 +122,163 @@ async function searchRealPrice(partName: string, material: string): Promise<numb
 
   const data = await response.json()
   const results = data.web?.results || []
-  
+
   for (const result of results) {
     const text = ((result.title || '') + ' ' + (result.description || '')).toLowerCase()
-    // Look for $ or £ followed by number
     const match = text.match(/(?:£|\$|€|gbp|usd)\s*(\d+(?:,\d{3})*(?:\.\d{2})?)/i)
     if (match && match[1]) {
       const price = parseFloat(match[1].replace(/,/g, ''))
       if (!isNaN(price) && price > 0) {
         const isUsd = text.includes('$') || text.includes('usd')
         const isEur = text.includes('€') || text.includes('eur')
-        return isUsd ? price * 0.8 : isEur ? price * 0.85 : price
+        return isUsd ? price * USD_TO_GBP : isEur ? price * 0.85 : price
       }
     }
   }
   return null
 }
 
-// Run BOM generation: LLM Skeleton + LLM Expansion + cost calculation
+// ─── Grounding lookups ─────────────────────────────────────────────────────
+
+/**
+ * Find a material in the catalogue by code (exact, case-insensitive) or
+ * by family (e.g. "aluminum", "steel"). Returns null if nothing matches.
+ *
+ * Exact code match wins. Family match is a fallback that picks the cheapest
+ * verified entry in that family so the cost estimate doesn't swing wildly
+ * based on which specific alloy the LLM named.
+ */
+function findMaterial(
+  materialField: string | undefined,
+  catalogue: MaterialProperty[]
+): MaterialProperty | null {
+  if (!materialField || catalogue.length === 0) return null
+  const needle = materialField.trim().toLowerCase()
+  if (!needle || needle === 'varies' || needle === 'cots' || needle === 'n/a') return null
+
+  // 1. Exact code match (e.g. "6061-T6", "304SS")
+  const byCode = catalogue.find(m => m.material_code.toLowerCase() === needle)
+  if (byCode) return byCode
+
+  // 2. Exact name match (e.g. "Aluminum 6061-T6")
+  const byName = catalogue.find(m => m.material_name.toLowerCase() === needle)
+  if (byName) return byName
+
+  // 3. Substring match on code (handles "6061" vs "6061-T6")
+  const bySubCode = catalogue.find(m =>
+    m.material_code.toLowerCase().includes(needle) ||
+    needle.includes(m.material_code.toLowerCase())
+  )
+  if (bySubCode) return bySubCode
+
+  // 4. Family match — pick cheapest verified entry in the family
+  const family = catalogue
+    .filter(m => needle.includes(m.material_family.toLowerCase()))
+    .sort((a, b) => (a.cost_per_kg_usd ?? Infinity) - (b.cost_per_kg_usd ?? Infinity))
+  if (family.length > 0) return family[0]
+
+  return null
+}
+
+/**
+ * Find a process in the catalogue by name (exact) or display name.
+ */
+function findProcess(
+  processField: string | undefined,
+  catalogue: ProcessCapability[]
+): ProcessCapability | null {
+  if (!processField || catalogue.length === 0) return null
+  const needle = processField.trim().toLowerCase()
+  if (!needle || needle === 'purchased_cots' || needle === 'cots') return null
+
+  const byName = catalogue.find(p => p.process_name.toLowerCase() === needle)
+  if (byName) return byName
+
+  const byDisplay = catalogue.find(p => p.display_name.toLowerCase() === needle)
+  if (byDisplay) return byDisplay
+
+  // Substring both ways
+  const bySub = catalogue.find(p =>
+    p.process_name.toLowerCase().includes(needle) ||
+    needle.includes(p.process_name.toLowerCase())
+  )
+  if (bySub) return bySub
+
+  return null
+}
+
+/**
+ * Compute a cost for a fabricated part from the material + process catalogue.
+ *
+ * Model: material_cost + process_cost
+ *   material_cost = mass_kg × cost_per_kg_usd × USD_TO_GBP
+ *   process_cost = (setup_cost_usd / batch_size + material_cost × (per_part_cost_multiplier - 1)) × USD_TO_GBP
+ *
+ * Returns null if we don't have enough data to produce a grounded estimate.
+ */
+function computeFabricatedCost(
+  massKg: number | undefined,
+  material: MaterialProperty | null,
+  process: ProcessCapability | null,
+  batchSize: number
+): { cost: number; breakdown: string } | null {
+  if (!massKg || massKg <= 0) return null
+  if (!material || material.cost_per_kg_usd == null) return null
+
+  const materialCostUsd = massKg * material.cost_per_kg_usd
+  const materialCostGbp = materialCostUsd * USD_TO_GBP
+
+  if (!process) {
+    // No process info: just return material cost. This is honest — we can't
+    // estimate machining/forming labour without the process catalogue.
+    return {
+      cost: materialCostGbp,
+      breakdown: `material only: ${massKg.toFixed(2)}kg × $${material.cost_per_kg_usd}/kg = £${materialCostGbp.toFixed(2)}`,
+    }
+  }
+
+  const setupPerPartUsd = (process.setup_cost_usd_typical ?? 0) / Math.max(1, batchSize)
+  const mult = process.per_part_cost_multiplier ?? 1
+  // per_part_cost_multiplier is a multiplier on the full per-part cost in the
+  // engineering handbook schema; we interpret it as a material-cost multiplier
+  // so that (multiplier - 1) is the process labour uplift.
+  const processLabourUsd = materialCostUsd * Math.max(0, mult - 1) + setupPerPartUsd
+  const processLabourGbp = processLabourUsd * USD_TO_GBP
+
+  const total = materialCostGbp + processLabourGbp
+  return {
+    cost: total,
+    breakdown: `${massKg.toFixed(2)}kg ${material.material_code} @ $${material.cost_per_kg_usd}/kg + ${process.display_name} (${mult}× mult, $${process.setup_cost_usd_typical ?? 0} setup / ${batchSize}) = £${total.toFixed(2)}`,
+  }
+}
+
+// ─── Main stage ────────────────────────────────────────────────────────────
+
 export async function runBomCost(
   modules: Module[],
   dimensionSheet: DimensionSheet | null,
-  options?: { domain?: string; ceilingGbp?: number; trainingDataDossier?: string }
+  options?: {
+    domain?: string
+    ceilingGbp?: number
+    trainingDataDossier?: string
+    batchSize?: number
+    grounding?: GroundingData
+  }
 ): Promise<StageResult<{ parts: Part[]; bomLines: BomLine[]; costBreakdown: CostBreakdown }>> {
   const startTime = Date.now()
 
   try {
+    // Load grounding ONCE, up front. If caller passed it in (from index.ts
+    // where it's already loaded) reuse that; otherwise load it ourselves.
+    console.log('[bom-cost] Loading grounding data from database...')
+    const grounding = options?.grounding ?? await loadAllGroundingData(options?.domain)
+    console.log(
+      `[bom-cost] Grounding loaded: ${grounding.materials.length} materials, ${grounding.processes.length} processes, ${grounding.standards.length} standards`
+    )
+
+    const batchSize = options?.batchSize ?? DEFAULT_BATCH_SIZE
+
+    // Build the modules description for the LLM
     const moduleDescriptions = modules.map((m) => {
       return `## Module: ${m.name} (id: ${m.id})
 Purpose: ${m.purpose}
@@ -149,15 +287,30 @@ Description: ${m.description}
 Total mass budget: ${m.estimatedMassKg ?? 0} kg`
     }).join("\n\n")
 
-    const context = options?.trainingDataDossier 
-      ? `\n\nTraining Data Dossier Context:\n${options.trainingDataDossier.slice(0, 5000)}`
+    // Build the grounding block for the LLM. This is the "data-first" shift:
+    // the LLM sees the real catalogue BEFORE it names parts, so its material
+    // codes and process names actually land in our lookup tables.
+    const groundingBlock = `
+You have access to the following grounding catalogues. USE THESE material codes
+and process names in your BOM. Do not invent material codes that are not in this
+list — downstream cost calculation relies on exact-match lookup.
+
+## Materials catalogue (${grounding.materials.length} entries)
+${formatMaterialsForPrompt(grounding.materials)}
+
+## Process catalogue (${grounding.processes.length} entries)
+${formatProcessesForPrompt(grounding.processes)}
+`
+
+    const context = options?.trainingDataDossier
+      ? `\n\n## Training data dossier\n${options.trainingDataDossier.slice(0, 4000)}`
       : ""
 
-    // 1. Generate BOM Skeleton
-    console.log('[bom-cost] Generating BOM skeleton via OpenRouter...')
-    const skeletonUserPrompt = `Generate a BOM skeleton for the modules below:\n\n${moduleDescriptions}${context}\n\nReturn part names, hierarchy, and process types only.`
-    const skeletonRes = await callOpenRouter(BOM_GENERATION_SYSTEM, skeletonUserPrompt)
-    
+    const userPrompt = `Generate a BOM for the modules below. Use the grounding catalogues when naming materials and processes.\n\n${moduleDescriptions}\n${groundingBlock}${context}`
+
+    console.log('[bom-cost] Generating BOM via OpenRouter (grounded with catalogues)...')
+    const skeletonRes = await callOpenRouter(BOM_GENERATION_SYSTEM, userPrompt)
+
     const skeletonParts = Array.isArray(skeletonRes.parts) ? skeletonRes.parts : []
     const bomLines = Array.isArray(skeletonRes.bomLines) ? skeletonRes.bomLines : []
 
@@ -165,157 +318,128 @@ Total mass budget: ${m.estimatedMassKg ?? 0} kg`
       throw new Error('No skeleton parts generated')
     }
 
-    // Skip expensive expansion step — use skeleton parts with cost model estimates
-    console.log('[bom-cost] Using skeleton parts with cost model estimates...')
-    const finalParts: Part[] = skeletonParts.map((sp: any) => {
-      // Apply cost heuristics based on process type and name
-      const name = (sp.name || '').toLowerCase()
-      let cost = 25
-      if (name.includes('compressor')) cost = 800
-      else if (name.includes('heat exchanger') || name.includes('bphe') || name.includes('evaporator') || name.includes('condenser')) cost = 600
-      else if (name.includes('fan') && !name.includes('grille')) cost = 250
-      else if (name.includes('expansion valve') || name.includes('eev')) cost = 150
-      else if (name.includes('pump')) cost = 250
-      else if (name.includes('inverter') || name.includes('drive')) cost = 400
-      else if (name.includes('control') || name.includes('mainboard') || name.includes('hmi')) cost = 180
-      else if (name.includes('enclosure') || name.includes('housing') || name.includes('chassis')) cost = 120
-      else if (name.includes('sensor') || name.includes('transducer')) cost = 60
-      else if (name.includes('valve') || name.includes('prv')) cost = 80
-      else if (name.includes('wiring') || name.includes('harness')) cost = 45
-      else if (name.includes('insulation') || name.includes('gasket') || name.includes('seal')) cost = 15
-      else if (name.includes('fastener') || name.includes('bolt') || name.includes('nut')) cost = 5
-      else if (sp.process === 'cnc') cost = 80
-      else if (sp.process === 'sheet_metal') cost = 60
-      else if (sp.process === 'purchased_cots') cost = 40
+    // Mass lookup for parts where the LLM didn't estimate mass. Keep the
+    // curated table small and domain-agnostic (mechanical primitives only).
+    const MASS_LOOKUP: Record<string, number> = {
+      compressor: 25, scroll: 25, evaporator: 15, condenser: 12, bphe: 8,
+      'heat exchanger': 10, fan: 5, axial: 5, motor: 8, inverter: 12, drive: 12,
+      enclosure: 20, chassis: 30, frame: 25, pump: 8, valve: 2, eev: 1,
+      sensor: 0.2, transducer: 0.3, pcb: 0.5, controller: 1, hmi: 2, display: 1,
+      wiring: 3, harness: 2, cable: 1, insulation: 2, foam: 1, gasket: 0.5,
+      seal: 0.3, fastener: 0.1, bolt: 0.05, bracket: 1.5, panel: 5, casing: 8,
+      jacket: 3,
+    }
+
+    // COTS cost heuristic — used ONLY as a last resort when the LLM declared
+    // the part is_purchased but gave no cost and we have no database match.
+    // Flagged as priceSource: 'heuristic' so readers know the confidence.
+    function heuristicCotsCost(name: string): number {
+      const n = name.toLowerCase()
+      if (n.includes('compressor')) return 800
+      if (n.includes('heat exchanger') || n.includes('bphe') || n.includes('evaporator') || n.includes('condenser')) return 600
+      if (n.includes('fan') && !n.includes('grille')) return 250
+      if (n.includes('expansion valve') || n.includes('eev')) return 150
+      if (n.includes('pump')) return 250
+      if (n.includes('inverter') || n.includes('drive')) return 400
+      if (n.includes('control') || n.includes('mainboard') || n.includes('hmi')) return 180
+      if (n.includes('enclosure') || n.includes('housing') || n.includes('chassis')) return 120
+      if (n.includes('sensor') || n.includes('transducer')) return 60
+      if (n.includes('valve') || n.includes('prv')) return 80
+      if (n.includes('wiring') || n.includes('harness')) return 45
+      if (n.includes('insulation') || n.includes('gasket') || n.includes('seal')) return 15
+      if (n.includes('fastener') || n.includes('bolt') || n.includes('nut')) return 5
+      return 25
+    }
+
+    // Build the final parts list, attaching mass, cost, and source attribution
+    const finalParts: Part[] = skeletonParts.map((sp: any): Part => {
+      const name = sanitiseLlmOutput(sp.name || '')
+      const material = sanitiseLlmOutput(sp.material || '')
+      const process = sanitiseLlmOutput(sp.process || '')
+      const isPurchased = Boolean(sp.isPurchased)
+
+      // Mass: use LLM value if plausible, else keyword lookup, else 0.5kg default
+      let massKg: number = typeof sp.massKg === 'number' && sp.massKg > 0 ? sp.massKg : 0
+      if (massKg === 0) {
+        const nameLower = name.toLowerCase()
+        for (const [kw, m] of Object.entries(MASS_LOOKUP)) {
+          if (nameLower.includes(kw)) { massKg = m; break }
+        }
+        if (massKg === 0) massKg = 0.5
+      }
 
       return {
-        id: sanitiseLlmOutput(sp.partNumber || ""),
-        partNumber: sanitiseLlmOutput(sp.partNumber || ""),
-        name: sanitiseLlmOutput(sp.name || ""),
-        sourceModuleId: sanitiseLlmOutput(sp.sourceModuleId || ""),
-        process: sanitiseLlmOutput(sp.process || ""),
-        isPurchased: Boolean(sp.isPurchased),
-        material: 'varies',
-        estimatedUnitCostGbp: cost
+        id: sanitiseLlmOutput(sp.partNumber || ''),
+        partNumber: sanitiseLlmOutput(sp.partNumber || ''),
+        name,
+        sourceModuleId: sanitiseLlmOutput(sp.sourceModuleId || ''),
+        process,
+        isPurchased,
+        material: material || (isPurchased ? 'cots' : 'varies'),
+        massKg,
+        // Cost is computed in the next pass after grounding lookups
+        estimatedUnitCostGbp: typeof sp.estimatedUnitCostGbp === 'number' ? sp.estimatedUnitCostGbp : undefined,
       }
     })
 
     const finalBomLines: BomLine[] = bomLines.map((bl: any) => ({
       parentPartId: bl.parentPartNumber ? sanitiseLlmOutput(bl.parentPartNumber) : null,
-      childPartId: sanitiseLlmOutput(bl.childPartNumber || ""),
-      quantity: Number(bl.quantity) || 1
+      childPartId: sanitiseLlmOutput(bl.childPartNumber || ''),
+      quantity: Number(bl.quantity) || 1,
     }))
 
-    const MASS_LOOKUP: Record<string, number> = {
-      'compressor': 25,
-      'scroll': 25,
-      'evaporator': 15,
-      'condenser': 12,
-      'bphe': 8,
-      'heat exchanger': 10,
-      'fan': 5,
-      'axial': 5,
-      'motor': 8,
-      'inverter': 12,
-      'drive': 12,
-      'enclosure': 20,
-      'chassis': 30,
-      'frame': 25,
-      'pump': 8,
-      'valve': 2,
-      'eev': 1,
-      'sensor': 0.2,
-      'transducer': 0.3,
-      'pcb': 0.5,
-      'controller': 1,
-      'hmi': 2,
-      'display': 1,
-      'wiring': 3,
-      'harness': 2,
-      'cable': 1,
-      'insulation': 2,
-      'foam': 1,
-      'gasket': 0.5,
-      'seal': 0.3,
-      'fastener': 0.1,
-      'bolt': 0.05,
-      'bracket': 1.5,
-      'panel': 5,
-      'casing': 8,
-      'jacket': 3,
-    }
+    // ─── Ground each part against the catalogue ──────────────────────────
+    let groundedCount = 0
+    let heuristicCount = 0
+    let llmCount = 0
 
-    // Apply to each part
     for (const part of finalParts) {
-      if (!part.massKg || part.massKg === 0) {
-        const name = (part.name || '').toLowerCase()
-        for (const [keyword, mass] of Object.entries(MASS_LOOKUP)) {
-          if (name.includes(keyword)) {
-            part.massKg = mass
-            break
-          }
+      const material = findMaterial(part.material, grounding.materials)
+      const process = findProcess(part.process, grounding.processes)
+
+      // Record what we matched for audit purposes
+      ;(part as any).matchedMaterialCode = material?.material_code ?? null
+      ;(part as any).matchedProcessName = process?.process_name ?? null
+
+      if (!part.isPurchased) {
+        // Fabricated: compute from material + process catalogue
+        const computed = computeFabricatedCost(part.massKg, material, process, batchSize)
+        if (computed) {
+          part.estimatedUnitCostGbp = computed.cost
+          ;(part as any).priceSource = 'database'
+          ;(part as any).priceBreakdown = computed.breakdown
+          groundedCount++
+        } else if (typeof part.estimatedUnitCostGbp === 'number' && part.estimatedUnitCostGbp > 0) {
+          ;(part as any).priceSource = 'llm'
+          llmCount++
+        } else {
+          // Last resort: heuristic by keyword
+          part.estimatedUnitCostGbp = heuristicCotsCost(part.name)
+          ;(part as any).priceSource = 'heuristic'
+          heuristicCount++
         }
-        if (!part.massKg) part.massKg = 1 // Default 1kg for unknown
-      }
-      if (part.massKg === 0) {
-        part.massKg = 0.5
-        console.warn(`[bom-cost] Warning: part ${part.name} still has 0 mass, setting to 0.5`)
-      }
-    }
-
-    console.log('[bom-cost] Loading grounding data from database...')
-    const groundingData = await loadAllGroundingData()
-    console.log(`[bom-cost] Loaded ${groundingData.totalRecords} grounding records.`)
-
-    for (const part of finalParts) {
-      const heuristicCost = part.estimatedUnitCostGbp || 0;
-      
-      const partName = (part.name || '').toLowerCase()
-      const materialName = (part.material || '').toLowerCase()
-      const processName = (part.process || '').toLowerCase()
-
-      let dbCost: number | null = null;
-      const matchedMaterial = groundingData.materials.find(m => 
-        materialName.includes(m.name.toLowerCase()) || 
-        partName.includes(m.name.toLowerCase())
-      )
-      
-      if (matchedMaterial && matchedMaterial.cost_per_kg_usd && part.massKg) {
-        dbCost = matchedMaterial.cost_per_kg_usd * part.massKg * 0.8; // Convert USD to GBP
-      }
-
-      let costMultiplier = 1;
-      const matchedProcess = groundingData.processes.find(p => 
-        processName.includes(p.process_name.toLowerCase()) ||
-        partName.includes(p.process_name.toLowerCase())
-      )
-      
-      if (matchedProcess) {
-        const rating = (matchedProcess.cost_rating || '').toLowerCase()
-        if (rating.includes('high') || rating.includes('$$$')) costMultiplier = 1.5
-        else if (rating.includes('low') || rating.includes('$')) costMultiplier = 0.8
-        else costMultiplier = 1.2
-      }
-
-      if (dbCost !== null) {
-        const finalDbCost = dbCost * costMultiplier;
-        part.estimatedUnitCostGbp = finalDbCost;
-        (part as any).priceSource = 'database';
-        console.log(`[bom-cost] DB cost applied to ${part.name}: £${finalDbCost.toFixed(2)} (Material: ${matchedMaterial?.name || 'unknown'}, Process: ${matchedProcess?.process_name || 'none'})`);
-      } else if (matchedProcess) {
-        const finalDbCost = heuristicCost * costMultiplier;
-        part.estimatedUnitCostGbp = finalDbCost;
-        (part as any).priceSource = 'database';
-        console.log(`[bom-cost] DB process cost applied to ${part.name}: £${finalDbCost.toFixed(2)} (Process: ${matchedProcess.process_name})`);
       } else {
-        (part as any).priceSource = 'heuristic';
+        // COTS: prefer LLM estimate (often quite good for named manufacturers),
+        // else heuristic. Database lookup doesn't apply for COTS.
+        if (typeof part.estimatedUnitCostGbp === 'number' && part.estimatedUnitCostGbp > 0) {
+          ;(part as any).priceSource = 'llm'
+          llmCount++
+        } else {
+          part.estimatedUnitCostGbp = heuristicCotsCost(part.name)
+          ;(part as any).priceSource = 'heuristic'
+          heuristicCount++
+        }
       }
     }
 
-    // Top 10 most expensive parts -> Search real prices
-    console.log('[bom-cost] Searching Brave for real prices for top 10 expensive parts...')
+    console.log(
+      `[bom-cost] Grounded cost sources: ${groundedCount} database, ${llmCount} LLM, ${heuristicCount} heuristic (of ${finalParts.length} total)`
+    )
+
+    // ─── Top-N web price lookup for the most expensive parts ──────────────
+    console.log('[bom-cost] Searching Brave for real prices on top 10 most expensive parts...')
     const sortedIndices = finalParts
-      .map((p, i) => ({ i, cost: p.estimatedUnitCostGbp || 0 }))
+      .map((p, i) => ({ i, cost: p.estimatedUnitCostGbp ?? 0 }))
       .sort((a, b) => b.cost - a.cost)
       .slice(0, 10)
 
@@ -327,26 +451,24 @@ Total mass budget: ${m.estimatedMassKg ?? 0} kg`
         part.isPurchased = true
         part.process = 'purchased_cots'
         ;(part as any).priceSource = 'search'
-      } else {
-        ;(part as any).priceSource = 'heuristic'
       }
     })
     await Promise.all(searchPromises)
 
     const costBreakdown = calculateCost(finalParts, options?.domain || 'default', options?.ceilingGbp || null)
 
-    console.log('[bom-cost] Successfully generated and expanded BOM.')
+    console.log('[bom-cost] BOM generation complete.')
     return {
       ok: true,
       data: { parts: finalParts, bomLines: finalBomLines, costBreakdown },
-      durationMs: Date.now() - startTime
+      durationMs: Date.now() - startTime,
     }
   } catch (error: any) {
     console.error('[bom-cost] Stage failed:', error)
     return {
       ok: false,
       error: error.message || 'Unknown error during BOM generation',
-      durationMs: Date.now() - startTime
+      durationMs: Date.now() - startTime,
     }
   }
 }
