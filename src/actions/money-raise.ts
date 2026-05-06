@@ -24,6 +24,26 @@ import type {
 import { searchMarketplaceListingsSemantic } from '@/lib/search/semantic-search'
 import { sanitizeFilterValue } from '@/lib/security/sanitize-filter'
 import { getInvestorTierAccess } from '@/actions/investors'
+import { extractThesisFromBusinessPlan } from '@/actions/money-thesis'
+
+export async function extractThesisFromText(text: string): Promise<{ thesis: MatchThesis } | { error: string }> {
+  const result = await extractThesisFromBusinessPlan({ text });
+  if ('error' in result) {
+    return { error: result.error };
+  }
+  const extracted = result.extracted;
+  const thesis: MatchThesis = {
+    stage_tags: extracted.stage_tags,
+    sector_tags: extracted.sector_tags,
+    geography: extracted.geography,
+    cheque_min_cents: extracted.cheque_min_cents,
+    cheque_max_cents: extracted.cheque_max_cents,
+    keywords: extracted.keywords,
+    instrument: extracted.instrument,
+    lead_or_follower: null,
+  };
+  return { thesis };
+}
 
 export type RaiseRound = {
   id: string
@@ -953,6 +973,8 @@ async function loadActiveThesisForScoring(
 export async function scoreInvestorsAgainstThesis(args: {
   limit?: number
   filters?: RichInvestorFilters
+  overrideThesis?: MatchThesis
+  listingIds?: string[]
 }): Promise<
   | { error: string }
   | {
@@ -969,8 +991,20 @@ export async function scoreInvestorsAgainstThesis(args: {
     const limit = Math.min(Math.max(args.limit ?? 50, 1), 200)
     const filters = args.filters ?? {}
 
-    const active = await loadActiveThesisForScoring(supabase, foundryId)
-    if (!active) return { error: 'no_active_thesis' }
+    let activeThesis: MatchThesis | null = null
+    let thesisId: string = ''
+    let thesisVersion: number = 0
+
+    if (args.overrideThesis) {
+      activeThesis = args.overrideThesis
+      thesisId = 'override'
+    } else {
+      const active = await loadActiveThesisForScoring(supabase, foundryId)
+      if (!active) return { error: 'no_active_thesis' }
+      activeThesis = active.thesis
+      thesisId = active.id
+      thesisVersion = active.version
+    }
 
     // Cap candidate set at 200 to bound scoring work per call.
     let candidatesQuery = supabase
@@ -978,10 +1012,15 @@ export async function scoreInvestorsAgainstThesis(args: {
       .select(SCOREABLE_LISTING_COLUMNS)
       .eq('category', 'Finance')
       .not('title', 'is', null)
-    candidatesQuery = applyRichFilters(candidatesQuery, filters)
-    candidatesQuery = candidatesQuery
-      .order('data_quality_score', { ascending: false })
-      .limit(200)
+
+    if (args.listingIds && args.listingIds.length > 0) {
+      candidatesQuery = candidatesQuery.in('id', args.listingIds)
+    } else {
+      candidatesQuery = applyRichFilters(candidatesQuery, filters)
+      candidatesQuery = candidatesQuery
+        .order('data_quality_score', { ascending: false })
+        .limit(200)
+    }
 
     const { data: candidates, error } = await candidatesQuery
     if (error) return { error: error.message }
@@ -990,14 +1029,14 @@ export async function scoreInvestorsAgainstThesis(args: {
     const now = new Date()
     const scored = rows.map((row) => ({
       row,
-      breakdown: scoreListing(row, active.thesis, { now }),
+      breakdown: scoreListing(row, activeThesis!, { now }),
     }))
     scored.sort((a, b) => b.breakdown.total - a.breakdown.total)
     const top = scored.slice(0, limit)
 
     // Cache into investor_pipeline_state for any listing the foundry already tracks.
     const listingIds = top.map((s) => s.row.id)
-    if (listingIds.length > 0) {
+    if (listingIds.length > 0 && !args.overrideThesis) {
       const { data: existing } = await supabase
         .from('investor_pipeline_state')
         .select('id, marketplace_listing_id')
@@ -1024,7 +1063,7 @@ export async function scoreInvestorsAgainstThesis(args: {
               match_breakdown_json: JSON.parse(JSON.stringify(s.breakdown)),
               match_scored_at: scoredAt,
               match_score_computed_at: scoredAt,
-              match_score_thesis_version: active.version,
+              match_score_thesis_version: thesisVersion,
             })
             .eq('id', stateId)
             .eq('foundry_id', foundryId)
@@ -1053,7 +1092,7 @@ export async function scoreInvestorsAgainstThesis(args: {
 
     return {
       success: true as const,
-      thesis_id: active.id,
+      thesis_id: thesisId,
       scored: top.map(({ row, breakdown }) => ({
         listing: toScoredListingRow(row),
         breakdown,

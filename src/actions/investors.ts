@@ -1593,6 +1593,7 @@ export async function searchInvestors(
       userId: user.id,
       investorListingIds: enrichIds,
       maxParallel: 8,
+      overrideDeckText: filters.query && looksLikeProse(filters.query) ? filters.query : undefined,
     })
     matchOutputs = generated as Record<string, InvestorMatchOutputView>
   } catch (err) {

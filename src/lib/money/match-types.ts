@@ -29,13 +29,8 @@ export type MatchThesis = {
 }
 
 /**
- * 6-pillar breakdown (legacy parity, Forge-Capital-Dashboard.html:1172-1237).
- * Composite weights: thesis 55% / geography 15% / stage 10% / cheque 10% /
- * activity 3% / confidence 7%.
- *
- * Confidence bumped from 2% (legacy) → 7% because Money drops the
- * `hardware_fit_score` pillar — the extra weight lands on confidence so
- * data-freshness still matters.
+ * 5-pillar breakdown.
+ * Composite weights: thesis 30% / geography 20% / stage 20% / cheque 15% / confidence 15%.
  */
 export type MatchBreakdown = {
   /** 0-100 composite */
@@ -45,7 +40,6 @@ export type MatchBreakdown = {
     geography: number
     stage: number
     cheque: number
-    activity: number
     confidence: number
   }
   /** Top 3 human-readable reasons for the score. */

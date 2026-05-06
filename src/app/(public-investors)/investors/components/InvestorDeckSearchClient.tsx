@@ -22,7 +22,6 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import {
   searchInvestors,
-  computeMatchScores,
   enrichInvestorMatchOnDemand,
   addToShortlist,
   removeFromShortlist,
@@ -34,6 +33,8 @@ import {
   type InvestorViewCapResult,
   type FirmMatchResult,
 } from '@/actions/investors'
+import { extractThesisFromText, scoreInvestorsAgainstThesis } from '@/actions/money-raise'
+import type { MatchThesis } from '@/lib/money/match-types'
 import { Loader2 } from 'lucide-react'
 import { extractDocumentText } from '@/actions/extract-document-text'
 import { recordSearchClick } from '@/actions/search-click'
@@ -245,6 +246,15 @@ export function InvestorDeckSearchClient({
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
     startTransition(async () => {
       try {
+        let overrideThesis: MatchThesis | undefined;
+        // Only extract thesis if it's a substantive query, not just a keyword search
+        if (trimmed.length > 30) {
+          const extResult = await extractThesisFromText(trimmed);
+          if ('success' in extResult) {
+            overrideThesis = extResult.thesis;
+          }
+        }
+
         const result = await searchInvestors({
           query: trimmed,
           sortBy: 'match',
@@ -281,17 +291,23 @@ export function InvestorDeckSearchClient({
             const s = (f.attributes as Record<string, unknown>)?._similarity
             if (typeof s === 'number') sims[f.id] = s
           }
-          computeMatchScores(ids, sims)
-            .then(scores => {
-              setMatchScores(prev => ({ ...prev, ...scores }))
-              // W47: re-sort firms so display order matches displayed % (the
-              // score from computeMatchScores). Server sort used _fcComposite;
-              // the card displays scores[id].score — they can disagree.
-              // After scores land, re-order to be strictly descending by the
-              // value the founder actually sees on each card.
-              setFirms(prev =>
-                [...prev].sort((a, b) => (scores[b.id]?.score ?? 0) - (scores[a.id]?.score ?? 0))
-              )
+          scoreInvestorsAgainstThesis({ listingIds: ids, limit: 200, overrideThesis })
+            .then(res => {
+              if ('success' in res) {
+                const scores: Record<string, FirmMatchResult> = {}
+                for (const s of res.scored) {
+                  scores[s.listing.id] = { score: s.breakdown.total, pillars: s.breakdown.pillars }
+                }
+                setMatchScores(prev => ({ ...prev, ...scores }))
+                // W47: re-sort firms so display order matches displayed % (the
+                // score from computeMatchScores). Server sort used _fcComposite;
+                // the card displays scores[id].score — they can disagree.
+                // After scores land, re-order to be strictly descending by the
+                // value the founder actually sees on each card.
+                setFirms(prev =>
+                  [...prev].sort((a, b) => (scores[b.id]?.score ?? 0) - (scores[a.id]?.score ?? 0))
+                )
+              }
             })
             .catch(() => { /* non-critical — cards show without bars */ })
         }

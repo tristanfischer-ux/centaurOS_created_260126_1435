@@ -94,7 +94,7 @@ export function ExampleInvestorMatch() {
             <CardContent className="space-y-5 pt-5 pb-5">
               <section>
                 <h4 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-                  Why Planet A would back you
+                  Why Planet A might back you
                 </h4>
                 <p className="text-sm leading-relaxed text-foreground">
                   Planet A&apos;s in-house science team calculates life cycle
@@ -168,7 +168,7 @@ export function ExampleInvestorMatch() {
 
               <p className="text-[11px] text-muted-foreground italic border-t border-border pt-3">
                 This card is illustrative. Your matches are drawn from your
-                live foundry profile, scored against 7,800 investors and
+                live foundry profile, scored against 13,000 investors and
                 49,000 partner contacts.
               </p>
             </CardContent>

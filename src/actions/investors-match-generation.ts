@@ -55,6 +55,7 @@ interface GenerateParams {
   foundryId: string
   userId: string
   investorListingId: string
+  overrideDeckText?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -66,6 +67,15 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 // ---------------------------------------------------------------------------
 // Foundry-context loader
 // ---------------------------------------------------------------------------
+
+function hashString(str: string): string {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = ((hash << 5) - hash) + str.charCodeAt(i)
+    hash |= 0 // Convert to 32bit integer
+  }
+  return Math.abs(hash).toString(36)
+}
 
 interface FoundryProfileRow {
   name?: string | null
@@ -323,15 +333,29 @@ const MODEL_ID = 'google/gemini-3.1-pro-preview'
 export async function generateInvestorMatchOutput(
   params: GenerateParams
 ): Promise<InvestorMatchOutput> {
-  const { foundryId, userId, investorListingId } = params
+  const { foundryId, userId, investorListingId, overrideDeckText } = params
 
   if (!UUID_RE.test(investorListingId)) {
     throw new Error('Invalid investor listing id')
   }
 
   // 1. Build foundry context + hash
-  const { input, foundryName } = await loadFoundryContextInput(foundryId)
-  const { contextString, contextHash } = buildFoundryContext(input)
+  let foundryName: string | null = null
+  let contextString: string
+  let contextHash: string
+
+  if (overrideDeckText) {
+    // Phase G extension: Use the pasted deck text directly as context instead of the saved foundry profile.
+    contextString = `Business plan/deck text:\n\n${overrideDeckText.slice(0, 10000)}`
+    contextHash = `deck_${hashString(contextString)}`
+    foundryName = 'Your startup'
+  } else {
+    const { input, foundryName: name } = await loadFoundryContextInput(foundryId)
+    const ctx = buildFoundryContext(input)
+    contextString = ctx.contextString
+    contextHash = ctx.contextHash
+    foundryName = name
+  }
 
   // 2. Cache lookup (uses authed client so RLS is enforced).
   const supabase = await createClient()
@@ -455,8 +479,9 @@ export async function generateInvestorMatchOutputs(args: {
   userId: string
   investorListingIds: string[]
   maxParallel?: number
+  overrideDeckText?: string
 }): Promise<Record<string, InvestorMatchOutput>> {
-  const { foundryId, userId, investorListingIds, maxParallel = 8 } = args
+  const { foundryId, userId, investorListingIds, maxParallel = 8, overrideDeckText } = args
   if (investorListingIds.length === 0) return {}
 
   const results: Record<string, InvestorMatchOutput> = {}
@@ -472,6 +497,7 @@ export async function generateInvestorMatchOutputs(args: {
           foundryId,
           userId,
           investorListingId: id,
+          overrideDeckText,
         })
       } catch (err) {
         console.warn(`[generateInvestorMatchOutputs] Skipped ${id}:`, err)

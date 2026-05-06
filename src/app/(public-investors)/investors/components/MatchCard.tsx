@@ -536,7 +536,7 @@ export function MatchCard({
               {!isEnriching && !enrichFailed && matchOutput && (
                 <>
                   <div>
-                    <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">Why they would back you</p>
+                    <p className="text-[10px] font-bold text-international-orange uppercase tracking-wider mb-1">Why they might back you</p>
                     <p className="text-sm text-foreground leading-relaxed">{matchOutput.whyFit}</p>
                   </div>
                   <div>

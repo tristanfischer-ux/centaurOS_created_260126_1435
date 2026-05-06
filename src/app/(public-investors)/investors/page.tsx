@@ -21,10 +21,10 @@ import { AnonymousInvestorsView } from '../../(platform)/investors/components/An
 
 export const metadata: Metadata = {
   title: 'Investor Match',
-  description: 'Paste your deck. Get the investors who would back it.',
+  description: 'Paste your deck. Get the investors who might back it.',
   openGraph: {
     title: 'Investor Match',
-    description: 'Paste your deck. Get the investors who would back it.',
+    description: 'Paste your deck. Get the investors who might back it.',
     type: 'website',
   },
 }
@@ -140,7 +140,7 @@ export default async function InvestorDirectoryPage() {
           <h1 className="text-2xl font-display font-bold tracking-tight text-foreground">Investor Match</h1>
         </div>
         <p className="text-muted-foreground text-sm font-medium pl-4">
-          Paste your deck. Get the investors who would back it. Free for the first 5 matches.
+          Paste your deck. Get the investors who might back it. Free for the first 5 matches.
         </p>
       </div>
 

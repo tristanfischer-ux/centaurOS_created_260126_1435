@@ -112,7 +112,7 @@ function TeaserMatchCard({ card }: { card: AnonymousTeaserCard }) {
             <CardContent className="space-y-5 pt-1 pb-5">
                 <section>
                     <h4 className="text-[11px] uppercase tracking-wider font-semibold text-muted-foreground mb-1.5">
-                        Why {card.title} would back you
+                        Why {card.title} might back you
                     </h4>
                     <p className="text-sm leading-relaxed text-foreground">
                         {card.matchOutput.whyFit}

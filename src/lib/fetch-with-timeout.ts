@@ -42,3 +42,39 @@ export async function fetchWithTimeout(
     clearTimeout(timer!)
   }
 }
+
+/**
+ * Enhanced fetch wrapper that safely protects BOTH the headers and the body streaming phase
+ * from hanging infinitely. Use this for LLM API calls where response.json() can stall.
+ */
+export async function fetchAndParseJsonWithTimeout<T = any>(
+  url: string,
+  init: RequestInit,
+  timeoutMs: number,
+): Promise<{ data: T; headers: Headers }> {
+  const controller = new AbortController()
+  let timer: ReturnType<typeof setTimeout>
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      controller.abort()
+      reject(new Error("Request timeout"))
+    }, timeoutMs)
+  })
+
+  const fetchAndParse = async () => {
+    const response = await fetch(url, { ...init, signal: controller.signal })
+    if (!response.ok) {
+      const errText = await response.text()
+      throw new Error(`HTTP ${response.status}: ${errText.slice(0, 300)}`)
+    }
+    const data = await response.json()
+    return { data, headers: response.headers }
+  }
+
+  try {
+    return await Promise.race([fetchAndParse(), timeoutPromise])
+  } finally {
+    clearTimeout(timer!)
+  }
+}

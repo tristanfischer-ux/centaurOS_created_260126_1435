@@ -44,6 +44,91 @@ function stageLabelToLower(s: unknown): string | null {
 }
 
 // ---------------------------------------------------------------------------
+// Thesis matching helpers (synonym expansion)
+// ---------------------------------------------------------------------------
+
+const SYNONYM_CLUSTERS: string[][] = [
+  ["hardware", "deeptech", "deep-tech", "deep tech", "physical", "tangible", "atoms"],
+  ["climate", "cleantech", "clean-tech", "clean tech", "sustainability", "green", "net-zero", "net zero", "decarbonisation", "decarbonization"],
+  ["energy", "renewable", "renewables", "solar", "wind", "battery", "batteries", "storage", "grid"],
+  ["biotech", "biology", "bio", "life sciences", "life-sciences", "pharmaceutical", "pharma"],
+  ["healthtech", "health-tech", "health tech", "digital health", "medtech", "med-tech", "medical"],
+  ["fintech", "fin-tech", "financial technology", "payments", "banking", "insurtech"],
+  ["agtech", "ag-tech", "agriculture", "farming", "food tech", "foodtech", "agri"],
+  ["proptech", "prop-tech", "property technology", "real estate tech"],
+  ["robotics", "automation", "autonomous", "drones", "unmanned"],
+  ["saas", "software", "platform", "cloud", "enterprise software"],
+  ["mobility", "transport", "automotive", "vehicles", "electric vehicles", "evs"],
+  ["aerospace", "space", "defence", "defense", "aviation"],
+  ["manufacturing", "industrial", "factory", "production"],
+  ["materials", "advanced materials", "composites", "nanomaterials"],
+  ["iot", "internet of things", "sensors", "connected devices", "embedded"],
+  ["data", "analytics", "machine learning", "artificial intelligence"],
+];
+
+function tokenise(s: string | null | undefined): Set<string> {
+  if (!s) return new Set();
+  const stopwords = new Set([
+    "the","a","an","and","or","but","of","to","in","on","for","with","by","at","is","are","was","were","be","been","being","we","you","our","your","their","they","this","that","these","those","it","its","from","as","has","have","had","not","no","do","does","will","can","may","so","if","when","where","why","how","who","what","than","then","also","just","more","most","some","any","all","into","out","over","under","up","down",
+  ]);
+  return new Set(
+    s
+      .toLowerCase()
+      .replace(/[^a-z0-9€£$\-\s]/g, " ")
+      .split(/\s+/)
+      .filter((w) => w.length >= 3 && !stopwords.has(w)),
+  );
+}
+
+function jaccard(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const t of a) if (b.has(t)) inter++;
+  const union = a.size + b.size - inter;
+  return union === 0 ? 0 : inter / union;
+}
+
+function thesisCoverage(heroTokens: Set<string>, investorBag: Set<string>): number {
+  if (heroTokens.size === 0) return 0;
+
+  let covered = 0;
+  for (const token of heroTokens) {
+    if (investorBag.has(token)) {
+      covered++;
+      continue;
+    }
+    let found = false;
+    for (const inv of investorBag) {
+      if (inv.includes(token) || token.includes(inv)) {
+        found = true;
+        break;
+      }
+    }
+    if (found) {
+      covered++;
+      continue;
+    }
+    for (const cluster of SYNONYM_CLUSTERS) {
+      const heroInCluster = cluster.some((syn) => {
+        const synTokens = syn.split(/\s+/);
+        return synTokens.some((st) => st === token || token.includes(st) || st.includes(token));
+      });
+      if (!heroInCluster) continue;
+      const investorInCluster = cluster.some((syn) => {
+        const synTokens = syn.split(/\s+/);
+        return synTokens.some((st) => investorBag.has(st) || Array.from(investorBag).some((inv) => inv.includes(st) || st.includes(inv)));
+      });
+      if (investorInCluster) {
+        covered++;
+        break;
+      }
+    }
+  }
+
+  return covered / heroTokens.size;
+}
+
+// ---------------------------------------------------------------------------
 // Attribute plucker — marketplace_listings.attributes is loose JSON
 // ---------------------------------------------------------------------------
 
@@ -190,25 +275,31 @@ export function scoreListing(
     }
   }
 
-  // ---- 2. Sector overlap -------------------------------------------------
-  let sectorScore = 0 // 0-25
-  {
-    const thesisSectors = (thesis.sector_tags ?? [])
-      .map((s) => s.toLowerCase().trim())
-      .filter(Boolean)
-    const firmSectors = attrs.sectors.map((s) => s.toLowerCase())
-    if (thesisSectors.length > 0 && firmSectors.length > 0) {
-      const hitCount = thesisSectors.filter((ts) =>
-        firmSectors.some((fs) => fs.includes(ts) || ts.includes(fs)),
-      ).length
-      if (hitCount >= 2) {
-        sectorScore = 25
-        reasons.push('Strong sector fit')
-      } else if (hitCount >= 1) {
-        sectorScore = 15
-        reasons.push('Sector overlap')
-      }
-    }
+  // ---- 2 & 5. Unified Thesis (Sector + Keywords) --------------------------
+  const heroTokens = new Set([
+    ...(thesis.sector_tags ?? []).map((s) => s.toLowerCase().trim()).filter(Boolean),
+    ...(thesis.keywords ?? []).map((s) => s.toLowerCase().trim()).filter(Boolean),
+  ])
+  
+  const investorText = [
+    attrs.sectors.join(' '),
+    attrs.investment_thesis ?? '',
+    attrs.ideal_company_profile ?? '',
+    attrs.portfolio_text ?? '',
+    attrs.notable_portfolio.join(' '),
+  ].join(' ')
+  
+  const investorBag = tokenise(investorText)
+  const coverage = thesisCoverage(heroTokens, investorBag)
+  const jaccardScore = jaccard(heroTokens, investorBag)
+  const lexicalBlended = coverage * 0.7 + jaccardScore * 0.3
+  
+  // Base score 20, max 100. Matches Outreach.
+  const thesisPillar = heroTokens.size === 0 ? 0 : Math.min(100, Math.round(lexicalBlended * 100 * 1.2 + 20))
+  if (thesisPillar >= 80) {
+    reasons.push('Strong thesis fit')
+  } else if (thesisPillar >= 50) {
+    reasons.push('Sector overlap')
   }
 
   // ---- 3. Cheque range ---------------------------------------------------
@@ -273,56 +364,7 @@ export function scoreListing(
     }
   }
 
-  // ---- 5. Thesis keyword bonus ------------------------------------------
-  let thesisBonus = 0 // 0-10
-  {
-    const kws = (thesis.keywords ?? [])
-      .map((k) => k.toLowerCase().trim())
-      .filter(Boolean)
-    if (kws.length > 0) {
-      const investorText = [
-        attrs.investment_thesis ?? '',
-        attrs.ideal_company_profile ?? '',
-        attrs.portfolio_text ?? '',
-        attrs.notable_portfolio.join(' '),
-      ]
-        .join(' ')
-        .toLowerCase()
-      if (investorText) {
-        const hits = kws.filter((k) => investorText.includes(k)).length
-        if (hits >= 4) {
-          thesisBonus = 10
-          reasons.push('Thesis alignment')
-        } else if (hits >= 2) {
-          thesisBonus = 5
-        }
-      }
-    }
-  }
-
-  // ---- 6. Activity (active deploying + recency) --------------------------
-  let activityScore = 0 // 0-5
-  {
-    if (attrs.is_active_deploying) {
-      activityScore = 5
-      reasons.push('Actively deploying')
-    } else if (attrs.is_active_deploying === false) {
-      activityScore = 0
-    } else {
-      activityScore = 2
-    }
-    // Freshness boost — if enriched in last 90d, +up to 2 (capped at 5).
-    if (listing.last_enriched_at) {
-      const enrichedAt = new Date(listing.last_enriched_at).getTime()
-      const days = (now.getTime() - enrichedAt) / (1000 * 60 * 60 * 24)
-      if (Number.isFinite(days)) {
-        if (days < 30) activityScore = Math.min(5, activityScore + 2)
-        else if (days < 90) activityScore = Math.min(5, activityScore + 1)
-      }
-    }
-  }
-
-  // ---- 7. Confidence / data quality --------------------------------------
+  // ---- 4. Geo focus ------------------------------------------------------
   // Data quality is stored top-level (data_quality_score 0-10) and also in
   // attributes.data_quality_score on legacy rows. Prefer top-level.
   const dq =
@@ -332,31 +374,27 @@ export function scoreListing(
   const confidencePillar = Math.max(0, Math.min(100, dq * 10))
 
   // ---- Pillar translation (legacy parity) --------------------------------
-  const thesisPillar = Math.round(
-    Math.min(100, (sectorScore / 25) * 70 + (thesisBonus / 10) * 30),
-  )
   const stagePillar = Math.round((stageScore / 25) * 100)
   const geoPillar = Math.round((geoScore / 5) * 100)
   const chequePillar = Math.round((chequeScore / 15) * 100)
-  const activityPillar = Math.round((activityScore / 5) * 100)
 
   // ---- Composite --------------------------------------------------------
-  // thesis 55% / geography 15% / stage 10% / cheque 10% / activity 3% / confidence 7%
+  // thesis 30% / geography 20% / stage 20% / cheque 15% / confidence 15%
   // Missing-pillar renormalisation (same as legacy): if a pillar has no
   // signal (zero and its input was empty), drop it + renormalise.
-  let composite = thesisPillar * 0.55 + confidencePillar * 0.07 + activityPillar * 0.03
-  let weight = 0.55 + 0.07 + 0.03
+  let composite = thesisPillar * 0.30 + confidencePillar * 0.15
+  let weight = 0.30 + 0.15
   if (geoPillar > 0) {
-    composite += geoPillar * 0.15
-    weight += 0.15
+    composite += geoPillar * 0.20
+    weight += 0.20
   }
   if (stagePillar > 0) {
-    composite += stagePillar * 0.1
-    weight += 0.1
+    composite += stagePillar * 0.20
+    weight += 0.20
   }
   if (chequePillar > 0) {
-    composite += chequePillar * 0.1
-    weight += 0.1
+    composite += chequePillar * 0.15
+    weight += 0.15
   }
   const total = weight > 0 ? Math.round(Math.max(0, Math.min(100, composite / weight))) : 0
 
@@ -367,7 +405,6 @@ export function scoreListing(
       geography: geoPillar,
       stage: stagePillar,
       cheque: chequePillar,
-      activity: activityPillar,
       confidence: Math.round(confidencePillar),
     },
     reasons: reasons.slice(0, 3),
