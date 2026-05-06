@@ -62,14 +62,35 @@ export async function runPipeline(
   const stages: EngineResult['stages'] = []
   let llmCalls = 0
 
-  // Generate meaningful project name from brief
-  const projectName = briefText
-    .slice(0, 80)
-    .replace(/[^a-zA-Z0-9\s]/g, '')
-    .split(/\s+/)
-    .slice(0, 6)
-    .join('_')
-    .toLowerCase() || 'engineering_report'
+  // CX-002 FIX (2026-05-06): generate a human-readable project name from the
+  // brief. Previously the first 6 words of the raw brief were snake-cased,
+  // producing "_bess_test_brief_we_are" because briefs start with a markdown
+  // header like "# BESS Test Brief". Now strip markdown headers and boilerplate
+  // words first, then take a clean noun-phrase.
+  const projectName = (() => {
+    // Remove markdown headers (lines starting with #) and empty lines.
+    const cleaned = briefText
+      .split('\n')
+      .filter(l => !l.trim().startsWith('#'))
+      .join(' ')
+      .trim()
+    // Take content up to the first full stop (usually the opening description sentence).
+    const firstSentence = cleaned.split(/\.\s+/)[0] || cleaned
+    // Remove common sentence-opening filler ("We are designing", "This is a",
+    // "The product is", "A brief for", "The following brief describes").
+    const BOILERPLATE = /^(?:we are (?:designing|building|developing|creating)|this is|this document|this brief|this report|the product is|the design is|a brief for|the following|describes?|outlines?|covers?|introduces?|for)\s+(?:a |an |the |our )?/i
+    const trimmed = firstSentence.replace(BOILERPLATE, '').trim()
+    const tokens = trimmed
+      .replace(/[^a-zA-Z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 7)
+    const title = tokens.join(' ').trim()
+    if (!title) return 'engineering_report'
+    // Return title as-is for human display, with underscore-cased filesystem
+    // id appended in projectId below.
+    return title.toLowerCase().replace(/\s+/g, '_')
+  })()
 
   const state: PipelineState = {
     projectId: options?.projectId || projectName,
