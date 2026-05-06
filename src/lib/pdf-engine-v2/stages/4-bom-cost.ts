@@ -327,25 +327,102 @@ ${formatProcessesForPrompt(grounding.processes)}
       jacket: 3,
     }
 
-    // COTS cost heuristic — used ONLY as a last resort when the LLM declared
-    // the part is_purchased but gave no cost and we have no database match.
-    // Flagged as priceSource: 'heuristic' so readers know the confidence.
+    // B2 FIX (2026-05-06): expanded COTS cost heuristic — last resort when the
+    // LLM declared the part is_purchased but gave no cost and database lookup
+    // didn't match. Previous table had a few common heat-pump parts then £25
+    // default; that default dominated on BESS / farm BOMs where most parts
+    // aren't heat-pump specific. Tagged priceSource: 'heuristic' so the PDF
+    // can show reader-visible source grade.
     function heuristicCotsCost(name: string): number {
       const n = name.toLowerCase()
-      if (n.includes('compressor')) return 800
-      if (n.includes('heat exchanger') || n.includes('bphe') || n.includes('evaporator') || n.includes('condenser')) return 600
-      if (n.includes('fan') && !n.includes('grille')) return 250
-      if (n.includes('expansion valve') || n.includes('eev')) return 150
-      if (n.includes('pump')) return 250
-      if (n.includes('inverter') || n.includes('drive')) return 400
-      if (n.includes('control') || n.includes('mainboard') || n.includes('hmi')) return 180
-      if (n.includes('enclosure') || n.includes('housing') || n.includes('chassis')) return 120
-      if (n.includes('sensor') || n.includes('transducer')) return 60
-      if (n.includes('valve') || n.includes('prv')) return 80
-      if (n.includes('wiring') || n.includes('harness')) return 45
-      if (n.includes('insulation') || n.includes('gasket') || n.includes('seal')) return 15
-      if (n.includes('fastener') || n.includes('bolt') || n.includes('nut')) return 5
-      return 25
+
+      // ─── Battery / BESS-specific ───────────────────────────────────────
+      if (/prismatic|lfp|lithium|li-?ion/.test(n) && /cell/.test(n)) return 42   // CATL 280 Ah cell ~£42
+      if (/battery module|cell module/.test(n)) return 250
+      if (/\brack\b.*(?:batter|cell)/.test(n) || /battery rack/.test(n)) return 180
+      if (/bms.*master|master.*bms/.test(n)) return 350
+      if (/bms.*slave|slave.*bms/.test(n)) return 85
+
+      // ─── Power electronics ────────────────────────────────────────────
+      if (/pcs\b|power conversion/.test(n)) return 38000                          // 1 MW PCS ~£38k
+      if (/\binverter\b|drive\b/.test(n)) return 450
+      if (/transformer/.test(n)) return 8500
+      if (/step.?up|step.?down/.test(n) && /transformer|converter/.test(n)) return 7200
+      if (/protection relay|relay.*(g99|sel-|siprotec)/.test(n)) return 2400
+      if (/\bigbt\b|power module/.test(n)) return 180
+      if (/capacitor.*(dc|power|film|snap-in)/.test(n)) return 45
+      if (/busbar|bus-bar|bus bar/.test(n)) return 28
+      if (/fuse.*(1500|hrc|dc)/.test(n)) return 45
+      if (/\bfuse\b/.test(n)) return 8
+
+      // ─── Thermal management ───────────────────────────────────────────
+      if (/compressor/.test(n)) return 1200                                        // scroll ~£800-2k
+      if (/bphe|brazed.?plate heat/.test(n)) return 620
+      if (/heat exchanger|evaporator|condenser/.test(n)) return 580
+      if (/chiller|cdu|cooling distribution/.test(n)) return 8500
+      if (/\bfan\b(?!.*grille)/.test(n)) return 280
+      if (/expansion valve|eev|txv/.test(n)) return 180
+      if (/\bpump\b/.test(n)) return 320
+      if (/cold plate/.test(n)) return 220
+      if (/manifold/.test(n)) return 75
+
+      // ─── Safety / fire / detection ────────────────────────────────────
+      if (/novec|fm-?200|fk-?5-1-12|clean agent/.test(n)) return 3800
+      if (/stat-?x|aerosol.*suppress/.test(n)) return 420
+      if (/off-?gas|li-?ion tamer|voc detect/.test(n)) return 2400
+      if (/smoke detect/.test(n)) return 85
+      if (/gas (?:detector|sensor)|h2 sensor|co sensor/.test(n)) return 180
+      if (/fire (?:alarm )?control panel|facp/.test(n)) return 1200
+
+      // ─── Enclosure / structure ────────────────────────────────────────
+      if (/\bcontainer\b.*(?:iso|40.?ft|20.?ft)/.test(n) || /40.?foot iso container/.test(n)) return 4200
+      if (/enclosure|housing|chassis|cabinet/.test(n)) return 250
+      if (/bracket|mount/.test(n)) return 18
+      if (/panel(?!.*solar)/.test(n)) return 95
+
+      // ─── Electrical ─────────────────────────────────────────────────────
+      if (/contactor/.test(n)) return 320
+      if (/current transducer|current sensor|lem.*hab|lem.*dhab/.test(n)) return 95
+      if (/switchgear|disconnect|isolator/.test(n)) return 680
+      if (/circuit breaker|mccb|mcb/.test(n)) return 180
+
+      // ─── Controls / comms ──────────────────────────────────────────────
+      if (/plc|industrial pc|beckhoff/.test(n)) return 1800
+      if (/hmi|display.*touch|touchscreen/.test(n)) return 420
+      if (/cellular modem|4g|5g modem/.test(n)) return 350
+      if (/ethernet switch.*industrial|managed switch/.test(n)) return 280
+      if (/\bups\b/.test(n)) return 420
+      if (/controller|mainboard|control board/.test(n)) return 180
+
+      // ─── Horticulture / farm ───────────────────────────────────────────
+      if (/led.*grow|horticultural led|grow light/.test(n)) return 280
+      if (/fertigation|dosing pump|peristaltic/.test(n)) return 220
+      if (/ec sensor|ph sensor|par sensor/.test(n)) return 280
+      if (/co2.*(sensor|dosing|cylinder)/.test(n)) return 320
+      if (/hepa filter/.test(n)) return 180
+      if (/\btray\b.*(?:dwc|nft|flood|ebb)/.test(n)) return 85
+
+      // ─── Sensors generic ───────────────────────────────────────────────
+      if (/\b(?:temperature|thermistor|rtd|ntc).*sensor/.test(n) || /\bntc\b/.test(n)) return 12
+      if (/pressure transducer|pressure sensor/.test(n)) return 85
+      if (/sensor|transducer|transmitter|detector/.test(n)) return 65
+
+      // ─── Wiring / connections ──────────────────────────────────────────
+      if (/wiring harness|cable harness/.test(n)) return 180
+      if (/connector|header/.test(n)) return 12
+      if (/cable gland/.test(n)) return 18
+      if (/cable\b(?!.*assembly)/.test(n)) return 8   // per-metre cable
+      if (/terminal block|din rail terminal/.test(n)) return 6
+
+      // ─── Insulation / sealing / hardware ──────────────────────────────
+      if (/insulation|foam|acoustic pad/.test(n)) return 14
+      if (/gasket|o-?ring|\bseal\b/.test(n)) return 8
+      if (/fastener|washer/.test(n)) return 0.4
+      if (/\bbolt\b|\bnut\b|\bscrew\b|\brivet\b|insert|helicoil/.test(n)) return 0.8
+      if (/thermal paste|\btim\b|thermal pad/.test(n)) return 6
+
+      // ─── Default small-part fallback ───────────────────────────────────
+      return 18
     }
 
     // Build the final parts list, attaching mass, cost, and source attribution
