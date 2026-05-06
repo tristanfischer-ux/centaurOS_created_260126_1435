@@ -39,15 +39,17 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 |---|---|---|---|---|
 | Setup | S1 engine-evidence.sh wrapper | **done** | scripts/ | committed 5caf6914 |
 | Setup | S2 test briefs (bess, heatpump, farm) | **done** | briefs/ | committed 5caf6914 |
-| Setup | S3 baseline run × 3 briefs | **in progress** | baseline-0/ | BESS in Polish stage; hp+farm queued |
-| Setup | S4 BASELINE-AUDIT.md | todo | baseline-0/ | Will write after all 3 baselines land |
-| A | A1 `gateResults` scope fix | **done** | baseline-PRE-A1-CRASH + baseline-0 | commit defa15a0 — unblocks every non-RED, non-INFEASIBLE run |
+| Setup | S3 baseline run × 3 briefs | **done** | baseline-0/ | All 3 PDFs captured — see BASELINE-AUDIT.md |
+| Setup | S4 BASELINE-AUDIT.md | **done** | ~/Downloads/engine-evidence/baseline-0/BASELINE-AUDIT.md | 20 numbered observations (BESS, HP, farm, CX) + fix map |
+| A | A1 `gateResults` scope fix | **done** | baseline-PRE-A1-CRASH | commit defa15a0 — unblocks every non-RED, non-INFEASIBLE run |
 | A | A5 sizing domain regex normalise | **done** | baseline-PRE-A5/ | commit 13c1b583 — unblocks Stage 3 for every brief |
-| A | A6+A7 product-agnostic prompts + robust decompose JSON | **done** | (implicit via A10 run) | commit d0b636d5 — research/decompose no longer hallucinate heat pumps |
-| A | A8 sizing tolerates missing module-mass | **done** | (implicit via A10 run) | commit 1de66980 — unblocks Stage 4 even when decompose doesn't set mass |
-| A | A9 centralised lib/llm-json.ts, wire into BOM | **done** | (implicit via A10 run) | commit 7b8bc927 — string-aware brace balancing + raw dump on failure |
-| A | A10 BOM uses Gemini + json_object + model fallback | **done** | baseline-0/ (in progress) | commit 8bf529fd — GLM-5.1 replaced; BOM parses reliably |
-| A | A2 pass pre-loaded grounding into Stage 4 | **coded, not committed** | A2-grounding-wired/ | Hold until baseline finishes to keep baseline code consistent |
+| A | A6+A7 product-agnostic prompts + robust decompose JSON | **done** | (implicit via later baselines) | commit d0b636d5 — research/decompose no longer hallucinate heat pumps |
+| A | A8 generic-domain sizing tolerates missing module-mass | **done** | (implicit) | commit 1de66980 — unblocks Stage 4 when decompose doesn't set mass |
+| A | A9 centralised lib/llm-json.ts, wire into BOM | **done** | (implicit) | commit 7b8bc927 — string-aware brace balancing + raw dump on failure |
+| A | A10 BOM uses Gemini + json_object + model fallback | **done** | baseline-0/bess | commit 8bf529fd — GLM-5.1 replaced; BOM parses reliably |
+| A | A2 pass pre-loaded grounding into Stage 4 | **done** | baseline-1/ (running) | commit a66c15ee — Stage 4 reuses groundingData; sets up Phase C swap |
+| A | A11 HP sizing branch respects missing-lookup-matches | **done** | baseline-1/heatpump (running) | commit cda26726 — unblocks heatpump end-to-end |
+| A | FARM-CLS-1 tighten classifier / add vertical_farm class | **done** | baseline-1/farm (running) | commit cda26726 — "kWh" alone no longer forces energy_storage |
 | A | A3 defensive rendering / null safety | todo | A3-defensive/ | 10 runs in a row all produce valid PDFs |
 | A | A4 abort on critical-stage failure | todo | A4-abort-on-fail/ | Short error PDF when decompose/sizing fails |
 | B | B1 render source grades inline | todo | B1-grades/ | Every section header + BOM row shows A–E grade |
@@ -79,9 +81,15 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 ## Active increment
 
-Currently: **S3 — waiting for 3 baselines to finish (BESS in Polish stage; hp+farm queued)**
+Currently: **baseline-1 running** (post A2 + A11 + FARM-CLS-1).
 
-Budget note: ~£4-6 of £40 spent. 7 commits shipped tonight. A2 is coded and waiting for clean baselines.
+**Post-baseline plan (in order):**
+1. Audit baseline-1 PDFs vs baseline-0, update BASELINE-AUDIT observation map.
+2. **Next highest-leverage fix on BESS:** BESS-002 (BOM quantity column) + BESS-003 (supplier wired to BOM). These two together should finally produce a BOM that sums to realistic figures once quantities are counted.
+3. Then B1 (inline source grades per-row), B2 (cost-basis column), B3 (feasibility dashboard).
+4. Then C1 (lib/local-corpus.ts) — the big swap.
+
+Budget: ~£12-14 of £40 spent across baseline-0 + A10 rerun + baseline-1. Plenty of headroom.
 
 ---
 
@@ -89,8 +97,21 @@ Budget note: ~£4-6 of £40 spent. 7 commits shipped tonight. A2 is coded and wa
 
 (newest first)
 
-### 2026-05-06 06:12 — BESS baseline post-A10 reached Polish stage
-First full pipeline run that got past all LLM stages. Review OK (332s), Council 6.2/10 avg, rubric 96/100. Concrete council criticisms surfaced (placeholder BOM fields, unrealistic cost ceiling, process mismatches) — these become the first BASELINE-AUDIT observations.
+### 2026-05-06 06:40 — baseline-1 launched (post A2 + A11 + FARM-CLS-1)
+Baseline-0 captured. BASELINE-AUDIT written (20 observations). 3 new commits to close the remaining stage-3/classifier blockers:
+- **A2** (commit a66c15ee): wire pre-loaded grounding into Stage 4 — stops double DB query, sets up for local-corpus swap.
+- **A11** (commit cda26726): HP sizing branch gets A8-style missing-lookup-matches fallback. Unblocks heatpump full pipeline.
+- **FARM-CLS-1** (commit cda26726): product classifier requires 2 signals for energy_storage; adds vertical_farm class with domain-specific required fields. Unblocks farm full pipeline.
+
+### 2026-05-06 06:30 — baseline-0 complete, BASELINE-AUDIT.md written
+All 3 PDFs captured: BESS 55 pages / 185 KB (full pipeline), heatpump 37 pages / 122 KB (sizing INFEASIBLE → BOM skipped), farm 27 pages / 85 KB (classifier misclassified as BESS → brief INVALID → short report).
+
+Audit has 20 numbered observations with fix-path mapping. Top 5 highest-impact (all BESS):
+- BESS-001 🔴 Unit cost £9,461 — reference is £247k. BOM £25 heuristic dominates.
+- BESS-002 🔴 No quantity column; BOM rollup treats every line as qty=1.
+- BESS-003 🔴 Every Supplier column shows "TBD" despite Stage 5 matching.
+- BESS-004 🔴 NRE £6k for a BESS platform — reference is £355k total / £14k/unit.
+- BESS-005 🔴 No module dividers in BOM table — reader can't tell which parts belong where.
 
 ### 2026-05-06 05:40 — A10 BOM model swap (commit 8bf529fd)
 GLM-5.1 returned 10KB of prose reasoning + numbered list instead of JSON despite "Return ONLY JSON" instruction. Switched primary to Gemini 3.1 Pro + response_format:json_object. Fallback chain Gemini → Claude → GPT-4.1-mini. Every model gets 300s timeout.
