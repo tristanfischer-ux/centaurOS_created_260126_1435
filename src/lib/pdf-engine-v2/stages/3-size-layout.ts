@@ -157,6 +157,21 @@ function solveSizing(
       console.log(`[size-layout:hp]   ${mod.name}: ${d.w_mm}×${d.d_mm} ${d.floor_m2.toFixed(3)}m² ${d.mount} (${d.scaled_by})`)
     }
 
+    // A12 FIX (2026-05-06): monobloc detection.
+    // Split-system heat pumps have a hydrobox (indoor unit) and an outdoor
+    // unit. Monobloc heat pumps (common for UK residential + small commercial
+    // retrofit) have everything in one enclosure — no indoor/outdoor split.
+    // Decompose doesn't reliably produce a "hydrobox" module for monobloc
+    // briefs, so indoorArea = 0 and everything gets packed into outdoor,
+    // blowing past the 0.55 m² outdoor budget.
+    //
+    // Detection: if zero modules fell into the indoor bucket AND we matched
+    // enough lookup keys to trust the footprint math, treat as monobloc and
+    // merge the two envelope budgets. Net effect: budget for a monobloc
+    // becomes 0.55 + 0.24 = 0.79 m² which is realistic for a single
+    // enclosure housing the full refrigerant circuit.
+    const isMonobloc = indoorArea === 0 && matchedCount > 0
+
     // A11+A11c FIX (2026-05-06): defer sizing if less than half the modules
     // matched the lookup. Even with A11b's expanded keyword set, some briefs
     // will produce module names that escape it. When more than half are
@@ -169,9 +184,17 @@ function solveSizing(
         'Feasibility assessed conservatively. Recompute once modules carry estimatedMassKg or dimensions.'
       )
     } else {
-      if (outdoorArea > outdoorEnv.interior_floor_m2) conflicts.push(`Outdoor modules footprint (${outdoorArea.toFixed(2)} m²) exceeds outdoor unit budget (${outdoorEnv.interior_floor_m2} m²)`);
-      if (indoorArea > indoorEnv.interior_floor_m2) conflicts.push(`Indoor modules footprint (${indoorArea.toFixed(2)} m²) exceeds indoor unit budget (${indoorEnv.interior_floor_m2} m²)`);
-      if (outdoorMass > 250) conflicts.push(`Outdoor unit mass (${outdoorMass} kg) exceeds 250 kg limit for two-person handling`);
+      // A12: monobloc gets the merged envelope budget (everything in one box).
+      // Split-system gets the strict per-enclosure check.
+      const outdoorBudget = isMonobloc
+        ? outdoorEnv.interior_floor_m2 + indoorEnv.interior_floor_m2
+        : outdoorEnv.interior_floor_m2
+      if (outdoorArea > outdoorBudget) conflicts.push(`${isMonobloc ? 'Monobloc' : 'Outdoor'} modules footprint (${outdoorArea.toFixed(2)} m²) exceeds enclosure budget (${outdoorBudget.toFixed(2)} m²)`);
+      if (!isMonobloc && indoorArea > indoorEnv.interior_floor_m2) conflicts.push(`Indoor modules footprint (${indoorArea.toFixed(2)} m²) exceeds indoor unit budget (${indoorEnv.interior_floor_m2} m²)`);
+      if (outdoorMass > (isMonobloc ? 300 : 250)) conflicts.push(`${isMonobloc ? 'Monobloc unit' : 'Outdoor unit'} mass (${outdoorMass} kg) exceeds ${isMonobloc ? 300 : 250} kg limit for two-person handling`);
+      if (isMonobloc) {
+        console.log('[size-layout:hp] monobloc detected → using merged envelope')
+      }
     }
 
     const feasible = mostlyUnmatched || conflicts.length === 0;
