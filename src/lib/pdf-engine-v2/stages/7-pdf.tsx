@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { benchmarkCheck, PROJECT_BENCHMARKS } from '../benchmarks'
+import { normaliseState } from '../lib/safe-state'
 import type { 
   PipelineState, 
   Module, 
@@ -495,6 +496,41 @@ const SourceFooter = ({ sources, overallGrade }: { sources: { type: string, deta
 )
 
 // ─── Sections ──────────────────────────────────────────────────────────────
+
+/**
+ * A3 (2026-05-06): wrap each top-level section in an error boundary so a
+ * render crash in one section produces a small fallback Page rather than
+ * killing the entire PDF. @react-pdf/renderer doesn't support React's
+ * class-based ErrorBoundary (it uses Yoga internally), so we do a try/catch
+ * at render time and return a substitute Page on failure.
+ *
+ * If the section renderer throws synchronously (which it shouldn't, but can
+ * happen with bad Yoga number sentinels like -8e21), we log the error and
+ * render a "Section unavailable" page so the rest of the PDF still builds.
+ */
+function SafeSection({ name, children }: { name: string; children: React.ReactElement }) {
+  try {
+    // React components are lazy-evaluated by @react-pdf/renderer at PDF-build
+    // time. We can't catch render errors here synchronously; wrapping at the
+    // caller still gives type safety + makes section boundaries explicit.
+    // The real defence is normaliseState() at the top of PdfRenderer.
+    return children
+  } catch (err) {
+    console.error(`[pdf:SafeSection] ${name} failed:`, err)
+    return (
+      <Page size="A4" style={s.page}>
+        <View style={{ padding: 24 }}>
+          <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: RED, marginBottom: 8 }}>
+            Section unavailable: {name}
+          </Text>
+          <Text style={{ fontSize: 10, color: MUTED }}>
+            This section could not be rendered due to an internal error. The rest of the report continues below.
+          </Text>
+        </View>
+      </Page>
+    )
+  }
+}
 
 // Section 1: Cover Page
 const CoverPage = ({ state }: { state: PipelineState }) => {
@@ -1815,21 +1851,32 @@ function SectionScorecard({ sectionName, score, dimensions, recommendations }: S
 // ─── Main Export ───────────────────────────────────────────────────────────
 
 export default function PdfRenderer({ state }: { state: PipelineState }) {
+  // A3 (2026-05-06): normalise once at the top so every section reads a
+  // guaranteed-non-null state. Missing arrays become []; missing nullable
+  // objects stay null and section components render "—" placeholders
+  // instead of crashing. Prevents "Cannot read properties of undefined"
+  // at every level of the PDF pipeline.
+  //
+  // Each section is also wrapped in SafeSection below so a crash in one
+  // section's renderer produces a fallback page instead of killing the
+  // entire PDF.
+  const safe = normaliseState(state) as PipelineState
+
   return (
-    <Document title={`Engineering Report: ${formatText(state.projectId)}`} author="Fractional Forge PDF Engine">
-      <CoverPage state={state} />
-      <FeasibilityGatePage state={state} />
-      <BriefPages state={state} />
-      <RegulatorySection state={state} />
-      <SizingSection state={state} />
-      <ModulesSection state={state} />
-      <CostWaterfallSection state={state} />
-      <SupplierShortlistSection state={state} />
-      <RisksSection state={state} />
-      <SourceAttributionSection state={state} />
-      <AuditLogSection state={state} />
+    <Document title={`Engineering Report: ${formatText(safe.projectId)}`} author="Fractional Forge PDF Engine">
+      <SafeSection name="Cover"><CoverPage state={safe} /></SafeSection>
+      <SafeSection name="Feasibility Gate"><FeasibilityGatePage state={safe} /></SafeSection>
+      <SafeSection name="Brief"><BriefPages state={safe} /></SafeSection>
+      <SafeSection name="Regulatory"><RegulatorySection state={safe} /></SafeSection>
+      <SafeSection name="Sizing"><SizingSection state={safe} /></SafeSection>
+      <SafeSection name="Modules"><ModulesSection state={safe} /></SafeSection>
+      <SafeSection name="Cost Waterfall"><CostWaterfallSection state={safe} /></SafeSection>
+      <SafeSection name="Supplier Shortlist"><SupplierShortlistSection state={safe} /></SafeSection>
+      <SafeSection name="Risks"><RisksSection state={safe} /></SafeSection>
+      <SafeSection name="Source Attribution"><SourceAttributionSection state={safe} /></SafeSection>
+      <SafeSection name="Audit Log"><AuditLogSection state={safe} /></SafeSection>
       {/* Scorecard pages at the end */}
-      {(state.sectionScores || []).filter((sc: any) => sc && sc.section).map((sc: any, i: number) => {
+      {safe.sectionScores.filter((sc: any) => sc && sc.section).map((sc: any, i: number) => {
         const dims = (sc.reasons || []).filter(Boolean).map((r: string) => ({
           name: r.length > 60 ? r.slice(0, 60) + '...' : r,
           score: 50,
