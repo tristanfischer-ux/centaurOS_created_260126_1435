@@ -415,7 +415,13 @@ ${formatProcessesForPrompt(grounding.processes)}
       if (/terminal block|din rail terminal/.test(n)) return 6
 
       // ─── Insulation / sealing / hardware ──────────────────────────────
-      if (/insulation|foam|acoustic pad/.test(n)) return 14
+      // B2b (2026-05-06): thermal-pad / intumescent / inter-cell barriers are
+      // typically cheap sheet-cut pieces, NOT £18 each. They DO sometimes
+      // appear in BOMs with quantities of 5,000+ per BESS. Keep them at
+      // £0.80-3 unless they are specifically a named acoustic enclosure pad.
+      if (/thermal pad|intumescent|inter.?cell.*barrier|inter.?cell.*pad|poron|ceramic fibre|mica.?composite|mica.?based|mica paper/.test(n)) return 0.80
+      if (/acoustic (?:pad|panel|insulation).*(?:enclosure|panel)/.test(n)) return 35
+      if (/insulation|foam/.test(n)) return 14
       if (/gasket|o-?ring|\bseal\b/.test(n)) return 8
       if (/fastener|washer/.test(n)) return 0.4
       if (/\bbolt\b|\bnut\b|\bscrew\b|\brivet\b|insert|helicoil/.test(n)) return 0.8
