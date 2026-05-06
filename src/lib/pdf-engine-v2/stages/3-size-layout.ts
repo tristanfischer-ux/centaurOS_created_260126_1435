@@ -167,36 +167,70 @@ function solveSizing(
 
   const module_dimensions: Record<string, ModuleDimensions> = {};
   let total_floor_m2 = 0;
+  let modulesWithoutMass = 0;
 
   for (const mod of modules) {
     let m2 = 0;
+    // A8 FIX (2026-05-06): the decompose stage doesn't populate
+    // estimatedMassKg, so the old `|| 1000` fallback turned every module into
+    // 1,000 kg which the `× 0.01` heuristic blew up to 10 m² per module — any
+    // multi-module brief then exceeded the envelope and the whole pipeline
+    // was blocked on sizing. Track missing-mass modules explicitly and cap
+    // the fallback at 0.5 m² rather than 10 m².
+    const massKg = typeof mod.estimatedMassKg === 'number' && mod.estimatedMassKg > 0
+      ? mod.estimatedMassKg
+      : null
+    if (massKg === null) modulesWithoutMass++
+
     if (domain === 'battery_energy_storage') {
-      m2 = (mod.estimatedMassKg || 1000) * 0.01;
+      // Dense components (~2,500 kg/m³ volumetric). Footprint in m² ≈
+      // mass / (density × height_m). For BESS racks ~1.8 m tall this gives
+      // ~mass / 4500 ≈ mass × 0.00022. Use 0.0002 as a realistic heuristic.
+      m2 = (massKg ?? 50) * 0.0002;
     } else if (domain === 'vertical_farm') {
       const canopy = targets.canopy_m2 || 100;
       m2 = canopy / (modules.length || 1);
     } else if (domain === 'heat_pump') {
-      m2 = (mod.estimatedMassKg || 500) * 0.005;
+      // Mid-density components, compact. ~0.001 m² per kg is plausible for
+      // a 1-1.5 m tall outdoor unit.
+      m2 = (massKg ?? 20) * 0.001;
     } else {
-      m2 = (mod.estimatedMassKg || 500) * 0.01;
+      m2 = (massKg ?? 20) * 0.001;
     }
 
     // simplistic dimension setting (assume square footprint for simplicity)
-    const side = Math.sqrt(m2);
+    const side = Math.sqrt(Math.max(0.01, m2));
     module_dimensions[mod.id] = {
       w_mm: Math.round(side * 1000),
       d_mm: Math.round(side * 1000),
       h_mm: Math.round(envelope.interior_h_mm * 0.8), // 80% of height
       floor_m2: m2,
       mount: 'floor',
-      scaled_by: 'mass_proportional'
+      scaled_by: massKg !== null ? 'mass_proportional' : 'count_fallback'
     };
-    
+
     total_floor_m2 += m2;
   }
 
-  const feasible = total_floor_m2 <= floor_budget_m2;
-  
+  // A8: If all modules lacked mass data, the computed total is meaningless.
+  // Mark feasible-with-warning rather than blocking the entire pipeline — the
+  // downstream BOM/cost/supplier stages have their own data to work from and
+  // shouldn't be gated on a sizing heuristic that never had real inputs.
+  const massCoverageUnknown = modulesWithoutMass === modules.length && modules.length > 0
+  const feasible = massCoverageUnknown || total_floor_m2 <= floor_budget_m2
+  const conflicts: string[] = []
+  if (!feasible) {
+    conflicts.push(`Total module footprint (${total_floor_m2.toFixed(1)} m²) exceeds envelope budget (${floor_budget_m2.toFixed(1)} m²)`)
+  }
+  const recommendations: string[] = []
+  if (massCoverageUnknown) {
+    recommendations.push(`Sizing deferred: no module had estimatedMassKg set. Feasibility assessed on module count only — recompute once mass data is available.`)
+  }
+  if (!feasible) {
+    recommendations.push('Consider a larger envelope')
+    recommendations.push('Optimise module footprint')
+  }
+
   return {
     feasible,
     rules_domain: domain,
@@ -204,8 +238,8 @@ function solveSizing(
     target: targets,
     floor_budget_m2,
     module_dimensions,
-    conflicts: feasible ? [] : [`Total module footprint (${total_floor_m2.toFixed(1)}m2) exceeds envelope budget (${floor_budget_m2.toFixed(1)}m2)`],
-    recommendations: feasible ? [] : ['Consider a larger envelope', 'Optimize module footprint']
+    conflicts,
+    recommendations,
   };
 }
 
