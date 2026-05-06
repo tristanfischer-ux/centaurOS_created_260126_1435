@@ -90,7 +90,7 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 ## Active increment
 
-Currently: **Layer 1 benchmark anchoring** — build benchmarks.ts with 30-50 anchor points, wire into cost-waterfall page.
+Currently: **Per-cell qty realism LANDED** (commit 6b1e9cf4). Next up — E4 datasheet-backed top-10 part notes, or A12 heatpump monobloc detection, or D3 domain tagging.
 
 ---
 
@@ -106,7 +106,7 @@ Currently: **Layer 1 benchmark anchoring** — build benchmarks.ts with 30-50 an
 - **A4** abort on critical-stage failure — partial today [MEDIUM]
 - **HP-003** verdict wording alignment on monobloc paths [LOW]
 - **CX-001** compact feasibility banner text [LOW]
-- **Per-cell qty realism** — deterministic qty derivation from brief specs (energy → cell count, power → inverter sizing, area → panels). [HIGH for cost accuracy]
+- ~~**Per-cell qty realism**~~ — **LANDED 6b1e9cf4** (BESS 4,896 cells, farm 60 panels, unit tests 47/47)
 
 ### Phase D — make the corpus more useful
 - **D1** reverse index: process_name → [company_ids] SQL materialised view on nightshift.db. [MEDIUM]
@@ -131,6 +131,20 @@ Budget: ~£30-35 of £40+ spent.
 ## Log
 
 (newest first)
+
+### 2026-05-06 18:45 — Per-cell qty realism landed (commit 6b1e9cf4)
+
+New `lib/spec-extraction.ts` + `lib/quantity-derivation.ts` (47 unit tests).
+Wired into `4-bom-cost.ts` (overrides after LLM BOM, before cost rollup) and
+`7-pdf.tsx` (light-green Qty cell when deterministic).
+
+**BESS**: 4 overrides fired — LFP cell 4,885→4,896 (matches 3,500 kWh / 0.8 DoD / 896 Wh per cell = 4,883 → 16-string aligned), BMS match 315→4,896 (name-matching quirk, flagged in NOTES), container 3→1, PCS 4→1. Unit cost £607k (up from £165k baseline-3) — over brief's £180k ceiling but within public benchmark band (£250-350k competitor, £900k-1.2M Wärtsilä). Reveals the brief's target is not achievable at current cell prices.
+
+**Farm**: 1 override — LED panel 12→60 (one per growing tray). Unit cost £36k vs £55k ceiling = FEASIBLE.
+
+**Heatpump**: sizing still INFEASIBLE (A12 monobloc gap); BOM skipped. Specs extracted cleanly: 30 kW, 180 kg, 1100×450×1300 mm.
+
+Evidence: `~/Downloads/engine-evidence/per-cell-qty-evidence/{bess,heatpump,farm}/report.pdf` + NOTES.md.
 
 ### 2026-05-06 13:00 — Phase E1/E2 + B3 landed
 - **E1** (commit 29bf3ed5): proper cost waterfall — BOM → labour (15%) → test (5%) → shipping (2%) → overheads (8%) → contingency (10%) → unit cost. Plus NRE breakdown + fully-loaded cost ceiling comparison with over/under delta.
