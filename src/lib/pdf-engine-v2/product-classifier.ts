@@ -9,21 +9,59 @@ export interface ProductClassification {
 
 export function classifyProduct(briefText: string): ProductClassification {
   const lower = briefText.toLowerCase()
-  
-  // Product class detection
+
+  // FARM-CLS-1 FIX (2026-05-06): order matters — specific/rare product classes
+  // are tested first so loose single-token matches don't capture the class.
+  // Previously a farm brief containing "2.5 kWh per kg" was classified as
+  // energy_storage because the regex `/.../.test()` hit `kwh` and won the
+  // cascade. Also tightened each class: require two distinct token matches
+  // for the energy_storage class to prevent broad single-keyword matches.
+
+  // Product class detection — specific classes first
   let productClass = 'unknown'
-  if (lower.match(/battery|bess|energy storage|kwh|lithium|cell/)) productClass = 'energy_storage'
-  else if (lower.match(/heat pump|chiller|refriger| hvac|thermal|boiler/)) productClass = 'thermal_system'
-  else if (lower.match(/satellite|cubesat|orbit|payload|launch/)) productClass = 'aerospace'
-  else if (lower.match(/robot|actuator|manipulator|autonomous/)) productClass = 'robotics'
-  else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) productClass = 'vehicle'
-  else if (lower.match(/phone|tablet|wearable|display|pcb/)) productClass = 'consumer_electronics'
-  else if (lower.match(/machine|press|mill|conveyor|industrial/)) productClass = 'industrial_machine'
-  else if (lower.match(/appliance|washer|dryer|dishwasher|oven/)) productClass = 'appliance'
-  else if (lower.match(/clock|watch|escapement|pendulum|cuckoo/)) productClass = 'mechanical_clockwork'
-  else if (lower.match(/medical|implant|surgical|diagnostic|patient/)) productClass = 'medical_device'
-  else if (lower.match(/pump|valve|pipe|filtr|desalination|processing/)) productClass = 'fluid_processing'
-  else if (lower.match(/structure|frame|building|bridge|enclosure/)) productClass = 'structural_product'
+  if (lower.match(/vertical farm|indoor farm|hydroponic|fertigation|growing (?:tray|rack|tier)|horticultur|agricultural lighting/)) {
+    productClass = 'vertical_farm'
+  } else if (lower.match(/heat pump|chiller|refriger| hvac|thermal\s|boiler/)) {
+    productClass = 'thermal_system'
+  } else if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
+    productClass = 'aerospace'
+  } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
+    productClass = 'robotics'
+  } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
+    productClass = 'vehicle'
+  } else if (lower.match(/phone|tablet|wearable|display|pcb/)) {
+    productClass = 'consumer_electronics'
+  } else if (lower.match(/machine|press|mill|conveyor|industrial/)) {
+    productClass = 'industrial_machine'
+  } else if (lower.match(/appliance|washer|dryer|dishwasher|oven/)) {
+    productClass = 'appliance'
+  } else if (lower.match(/clock|watch|escapement|pendulum|cuckoo/)) {
+    productClass = 'mechanical_clockwork'
+  } else if (lower.match(/medical|implant|surgical|diagnostic|patient/)) {
+    productClass = 'medical_device'
+  } else if (lower.match(/pump|valve|pipe|filtr|desalination|processing/)) {
+    productClass = 'fluid_processing'
+  } else if (lower.match(/structure|frame|building|bridge|enclosure/)) {
+    productClass = 'structural_product'
+  }
+
+  // Energy storage — require TWO distinct signals so narrative mentions of
+  // "kwh" or "battery" alone (in passing, e.g. "2.5 kWh per kg" for a farm,
+  // or "battery-backed UPS" for a machine) don't override more specific
+  // classifications above.
+  if (productClass === 'unknown') {
+    const storageSignals = [
+      /\bbess\b/,
+      /battery energy storage/,
+      /lithium[- ]?ion|li-ion|lfp|nmc|lmfp|sodium[- ]ion/,
+      /cell(s)?\s+(?:chemistry|stack|pack|rack|module)/,
+      /kwh.*(?:capacity|usable|storage|pack|cell)/,
+      /power conversion system|pcs\b/,
+      /cycle life/,
+    ]
+    const storageHits = storageSignals.filter(r => r.test(lower)).length
+    if (storageHits >= 2) productClass = 'energy_storage'
+  }
   
   // Technology domains
   const techDomains: string[] = []
@@ -98,6 +136,7 @@ export function getRequiredFields(productClass: string): string[] {
   const specific: Record<string, string[]> = {
     thermal_system: ['thermal_capacity_kw', 'cop_target', 'refrigerant_type', 'acoustic_target_dba', 'architecture_type'],
     energy_storage: ['energy_kwh', 'power_kw', 'voltage', 'chemistry', 'cycle_life'],
+    vertical_farm: ['growing_footprint', 'target_yield', 'lighting_ppfd', 'water_use', 'energy_use'],
     aerospace: ['mass_budget_kg', 'power_budget_w', 'orbit_type', 'payload_mass', 'launch_vehicle'],
     vehicle: ['powertrain_type', 'range_km', 'top_speed', 'crash_rating', 'kerb_mass'],
     consumer_electronics: ['battery_capacity_wh', 'display_size', 'ip_rating', 'drop_test_standard'],

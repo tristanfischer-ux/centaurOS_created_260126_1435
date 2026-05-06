@@ -89,23 +89,25 @@ function solveSizing(
     let indoorArea = 0;
     let outdoorMass = 0;
     let indoorMass = 0;
+    let matchedCount = 0;
 
     for (const mod of modules) {
       const n = mod.name.toLowerCase();
       let matched = false;
       let dim = { w: 300, d: 300, h: 300, mass: mod.estimatedMassKg || 10 };
-      
+
       for (const [key, val] of Object.entries(MODULE_DIMENSIONS)) {
         if (n.includes(key)) {
           dim = val;
           matched = true;
+          matchedCount++
           break;
         }
       }
 
       const m2 = (dim.w * dim.d) / 1_000_000;
       const isIndoor = n.includes('hydrobox') || n.includes('pump') || n.includes('hmi') || n.includes('indoor') || n.includes('control');
-      
+
       if (isIndoor) {
         indoorArea += m2;
         indoorMass += dim.mass;
@@ -113,7 +115,7 @@ function solveSizing(
         outdoorArea += m2;
         outdoorMass += dim.mass;
       }
-      
+
       module_dimensions[mod.id] = {
         w_mm: dim.w,
         d_mm: dim.d,
@@ -127,12 +129,30 @@ function solveSizing(
     const outdoorEnv = HEAT_PUMP_ENVELOPES.outdoor_unit;
     const indoorEnv = HEAT_PUMP_ENVELOPES.indoor_hydrobox;
 
-    const conflicts = [];
-    if (outdoorArea > outdoorEnv.interior_floor_m2) conflicts.push(`Outdoor modules footprint (${outdoorArea.toFixed(2)}m²) exceeds outdoor unit budget (${outdoorEnv.interior_floor_m2}m²)`);
-    if (indoorArea > indoorEnv.interior_floor_m2) conflicts.push(`Indoor modules footprint (${indoorArea.toFixed(2)}m²) exceeds indoor unit budget (${indoorEnv.interior_floor_m2}m²)`);
-    if (outdoorMass > 250) conflicts.push(`Outdoor unit mass (${outdoorMass}kg) exceeds 250kg limit for two-person handling`);
+    const conflicts: string[] = [];
+    const recommendations: string[] = [];
 
-    const feasible = conflicts.length === 0;
+    // A11 FIX (2026-05-06): if no modules matched the MODULE_DIMENSIONS lookup
+    // at all, every module defaulted to 300×300 mm and the 0.55 m² outdoor
+    // envelope was trivially blown past — yielding INFEASIBLE regardless of
+    // the actual engineering content. Treat no-lookup-match same as A8's
+    // no-mass-data path: feasible-with-warning, let the downstream stages run.
+    const noLookupMatches = matchedCount === 0 && modules.length > 0
+    if (noLookupMatches) {
+      recommendations.push(
+        'Sizing deferred: no module name matched the heat-pump dimension lookup table. ' +
+        'Feasibility assessed conservatively. Recompute once modules carry estimatedMassKg or dimensions.'
+      )
+    } else {
+      if (outdoorArea > outdoorEnv.interior_floor_m2) conflicts.push(`Outdoor modules footprint (${outdoorArea.toFixed(2)} m²) exceeds outdoor unit budget (${outdoorEnv.interior_floor_m2} m²)`);
+      if (indoorArea > indoorEnv.interior_floor_m2) conflicts.push(`Indoor modules footprint (${indoorArea.toFixed(2)} m²) exceeds indoor unit budget (${indoorEnv.interior_floor_m2} m²)`);
+      if (outdoorMass > 250) conflicts.push(`Outdoor unit mass (${outdoorMass} kg) exceeds 250 kg limit for two-person handling`);
+    }
+
+    const feasible = noLookupMatches || conflicts.length === 0;
+    if (!feasible) {
+      recommendations.push('Optimise module footprint', 'Review component selection for mass reduction')
+    }
 
     return {
       feasible,
@@ -150,7 +170,7 @@ function solveSizing(
       floor_budget_m2: outdoorEnv.interior_floor_m2 + indoorEnv.interior_floor_m2,
       module_dimensions,
       conflicts,
-      recommendations: feasible ? [] : ['Optimize module footprint', 'Review component selection for mass reduction']
+      recommendations,
     };
   } else {
     envelope = {
