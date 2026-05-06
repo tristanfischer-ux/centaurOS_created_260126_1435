@@ -38,15 +38,29 @@ const HEAT_PUMP_ENVELOPES = {
 const MODULE_DIMENSIONS: Record<string, { w: number; d: number; h: number; mass: number }> = {
   'refrigerant': { w: 400, d: 350, h: 350, mass: 30 },
   'compressor': { w: 380, d: 280, h: 320, mass: 25 },
+  // A11b FIX: heat-pump module names from the decompose LLM rarely include
+  // the lookup keys verbatim ("R290 Vapor Compression Circuit" misses
+  // "compressor"; "Heat Absorption Assembly" misses "evaporator"). Add the
+  // semantic aliases that typically appear in module names.
+  'compression': { w: 380, d: 280, h: 320, mass: 25 },
+  'vapor': { w: 400, d: 300, h: 400, mass: 20 },
+  'absorption': { w: 800, d: 250, h: 700, mass: 12 },
+  'expansion': { w: 150, d: 100, h: 80, mass: 2 },
+  'circuit': { w: 400, d: 200, h: 200, mass: 8 },
+  'loop': { w: 400, d: 200, h: 200, mass: 8 },
   'evaporator': { w: 1100, d: 250, h: 800, mass: 15 },
   'fan': { w: 800, d: 200, h: 800, mass: 8 },
   'condenser': { w: 500, d: 120, h: 250, mass: 10 },
   'bphe': { w: 500, d: 120, h: 250, mass: 8 },
+  'brazed': { w: 500, d: 120, h: 250, mass: 8 },
+  'plate heat': { w: 500, d: 120, h: 250, mass: 8 },
   'power': { w: 400, d: 300, h: 200, mass: 12 },
   'inverter': { w: 400, d: 300, h: 200, mass: 12 },
   'structural': { w: 1000, d: 450, h: 1600, mass: 30 },
   'chassis': { w: 1000, d: 450, h: 1600, mass: 30 },
+  'enclosure': { w: 1000, d: 450, h: 1600, mass: 30 },
   'safety': { w: 300, d: 200, h: 200, mass: 5 },
+  'leak detection': { w: 200, d: 100, h: 150, mass: 2 },
   'hydrobox': { w: 600, d: 400, h: 1500, mass: 15 },
   'pump': { w: 300, d: 200, h: 400, mass: 8 },
   'hmi': { w: 300, d: 50, h: 200, mass: 2 },
@@ -132,15 +146,15 @@ function solveSizing(
     const conflicts: string[] = [];
     const recommendations: string[] = [];
 
-    // A11 FIX (2026-05-06): if no modules matched the MODULE_DIMENSIONS lookup
-    // at all, every module defaulted to 300×300 mm and the 0.55 m² outdoor
-    // envelope was trivially blown past — yielding INFEASIBLE regardless of
-    // the actual engineering content. Treat no-lookup-match same as A8's
-    // no-mass-data path: feasible-with-warning, let the downstream stages run.
-    const noLookupMatches = matchedCount === 0 && modules.length > 0
-    if (noLookupMatches) {
+    // A11+A11c FIX (2026-05-06): defer sizing if less than half the modules
+    // matched the lookup. Even with A11b's expanded keyword set, some briefs
+    // will produce module names that escape it. When more than half are
+    // falling back to the generic 300×300mm default, the feasibility answer
+    // is essentially made-up — better to defer than block the pipeline.
+    const mostlyUnmatched = matchedCount < Math.ceil(modules.length / 2) && modules.length > 0
+    if (mostlyUnmatched) {
       recommendations.push(
-        'Sizing deferred: no module name matched the heat-pump dimension lookup table. ' +
+        `Sizing deferred: only ${matchedCount}/${modules.length} modules matched the heat-pump dimension lookup. ` +
         'Feasibility assessed conservatively. Recompute once modules carry estimatedMassKg or dimensions.'
       )
     } else {
@@ -149,7 +163,7 @@ function solveSizing(
       if (outdoorMass > 250) conflicts.push(`Outdoor unit mass (${outdoorMass} kg) exceeds 250 kg limit for two-person handling`);
     }
 
-    const feasible = noLookupMatches || conflicts.length === 0;
+    const feasible = mostlyUnmatched || conflicts.length === 0;
     if (!feasible) {
       recommendations.push('Optimise module footprint', 'Review component selection for mass reduction')
     }
