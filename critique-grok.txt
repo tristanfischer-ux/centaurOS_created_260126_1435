@@ -1,0 +1,88 @@
+**Critique: V3 PDF Engine Layout & Narrative Quality**
+
+Here is a direct assessment of the current structure. Scores reflect both visual execution constraints inherent to `@react-pdf/renderer` and narrative effectiveness for an 80-page engineering document.
+
+### 1. Cover Page & Totals
+**Score: 6/10**
+
+Visually, this is likely the weakest page. React-PDF documents often default to centered text stacks with minimal visual tension. The totals section probably appears as a flat list rather than a strong dashboard-style summary. The page lacks a clear hierarchy between high-level metrics (total mass, cost, critical path items) and supporting context. Narrative depth is shallow — it tells the reader *what* exists rather than establishing credibility or engineering stance.
+
+### 2. Feasibility Exception (RAG alerts)
+**Score: 4/10**
+
+This section is conceptually useful but structurally brittle. A flat list of Red/Amber/Green items will read like a compliance checklist rather than an executive signal. The biggest issue is likely poor use of visual weight — red items need to dominate visually, not just change color. Without proper card-like grouping or a summary "traffic light" at the top, this page fights the reader. Narrative depth is low because it focuses on *status* without explaining *implication* or required action.
+
+### 3. Brief (Mission, Use Case, Constraints)
+**Score: 7/10**
+
+Narrative strength is the best part of this section. However, the layout is probably weakest here. Long-form text in React-PDF tends to produce poor line lengths and insufficient paragraph spacing. The Constraints subsection is at risk of becoming a wall of text. Visually, the section lacks clear differentiation between "Mission" (strategic) and "Constraints" (technical boundaries). It needs stronger typographic separation and possibly a constraints matrix rather than paragraphs.
+
+### 4. Regulatory Posture (Compliance matrix)
+**Score: 5/10**
+
+Matrices are one of the hardest things to execute well in React-PDF. This section almost certainly suffers from either (a) excessive horizontal scrolling behavior or (b) extreme font reduction to fit. The compliance matrix will feel either cramped or overly simplified. Narrative depth suffers because requirements and status blur together. A vertical "regulatory spine" approach (standard on left, status in middle, evidence on right) would be stronger than a traditional table.
+
+### 5. Modules (1 page per module)
+**Score: 3/10**
+
+This is the most problematic section by far. Cramming an image, mass/cost numbers, key parts, failure modes, unknowns, *and* Engineering Reviews onto one page is fundamentally flawed. React-PDF's rendering model makes this especially painful — images will force text compression, and the "unknowns" section will likely be rendered in microscopic text. The narrative is fractured. Each module page should either be allowed 1.5–2 pages or the content must be radically prioritized (e.g., image + summary stats on page 1, engineering depth on following pages).
+
+### 6. Bill of Materials (Table of parts)
+**Score: 6/10**
+
+Tables are workable in React-PDF but require disciplined column width management. The current implementation is likely either too wide (causing overflow on certain pages) or uses excessive font reduction. Narrative quality is adequate for a parts list but lacks context — readers need to understand *why* certain components were chosen or what makes them critical. The table probably treats every part as equal.
+
+### 7. Cost Waterfall
+**Score: 5/10**
+
+Waterfall charts are very difficult to render meaningfully in React-PDF without custom drawing. Most implementations either use stacked bars (losing the "waterfall" effect) or fall back to tables. The aggregate vs per-module breakdown is conceptually good, but without strong visual decomposition, this page reads as accounting output rather than engineering insight. The lack of visual hierarchy between module-level contributions is a missed opportunity.
+
+### 8. Risks Register (FMEA tables per module)
+**Score: 4/10**
+
+FMEA tables are notorious for density. At one table per module, this section will either feel overwhelming or be heavily truncated. The classic FMEA columns (Severity, Occurrence, Detection, RPN) create very wide tables that fight React-PDF's layout engine. Narrative depth is lost because the risk *story* (how risks were identified and mitigated) is missing — only the table remains.
+
+### 9. Suppliers (Matched suppliers, scores, descriptions, reasons)
+**Score: 7/10**
+
+This section has the best structural potential. Supplier cards with scores work well in React-PDF if implemented as clean `<View>` blocks rather than tables. The "reasons" subsection is where narrative value lives. The main risk is that supplier evaluations will feel generic if the descriptions aren't sufficiently specific. Visual treatment of the score (progress bar or chip) will determine whether this feels analytical or list-like.
+
+### 10. Audit Log
+**Score: 2/10**
+
+This should not be a primary section in an 80-page engineering document. An audit log belongs in an appendix or separate traceable document. Including it in the main flow breaks narrative momentum and makes the document feel like internal tooling output. If kept, it should be extremely compressed (maximum 1–2 pages) and positioned at the very end.
+
+---
+
+### Injecting Provenance & LLM Attribution
+
+The goal is to make attribution feel like engineering metadata rather than debug output. Here are the recommended approaches, ranked by elegance:
+
+**Best Approach (Recommended)**
+Create a thin **metadata strip** that appears at the top of major sections (not every paragraph). Use a consistent 8–9pt font with the following pattern:
+
+- **Left**: Section title
+- **Right**: Small pill(s) with subtle background
+  - `DB` (light blue) or `LLM` (light purple) 
+  - Followed by model name in parentheses when LLM-generated
+
+Example visual treatment:
+```
+Regulatory Posture                          [DB]  [gemini-3.1-pro]
+```
+
+Use very low opacity backgrounds on the pills so they read as metadata rather than alerts. The strip should use the same typography family as the body text but at a noticeably smaller size.
+
+**Alternative Elegant Methods**
+
+- **Footer per section block**: A single line below the last content element of a section:  
+  `Data: Internal database • Generated using gemini-3.1-pro (v3 engine)`
+- **Critical fields only**: Only attach provenance to high-stakes content (Regulatory Posture, Risk Register, Suppliers). Everything else inherits document-level attribution via the cover page.
+- **Icon-based minimalism**: Use a small database icon (no text) vs a sparkle icon. Only reveal the model name on hover (if the PDF viewer supports it) or in a dedicated "Data Notes" appendix.
+
+**What to Avoid**
+- Adding provenance to every table row or every paragraph.
+- Using bright colors or large text for the badges.
+- Placing model names in isolation without context (readers interpret this as "this data might be wrong").
+
+**Structural Recommendation**: Introduce a `DataAttribution` component that accepts `source` and `model` props and renders consistently. Use it at the section level, not the content level. This preserves credibility while maintaining visual discipline.

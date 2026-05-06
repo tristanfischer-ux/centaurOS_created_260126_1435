@@ -184,6 +184,7 @@ export function InvestorDeckSearchClient({
   const [query, setQuery] = useState('')
   const [firms, setFirms] = useState<InvestorFirm[]>(initialFirms)
   const [total, setTotal] = useState(initialTotal)
+  const [topN, setTopN] = useState<100 | 50 | 25>(100)
   const [matchScores, setMatchScores] = useState<Record<string, FirmMatchResult>>(initialMatchScores)
   const [matchOutputs, setMatchOutputs] = useState<Record<string, InvestorMatchOutputView>>(initialMatchOutputs)
   const [shortlistIds, setShortlistIds] = useState<Record<string, ShortlistStage>>(initialShortlistIds)
@@ -264,10 +265,7 @@ export function InvestorDeckSearchClient({
           query: trimmed,
           sortBy: 'match',
           page: 1,
-          // Tristan 2026-04-27: "Why are you only showing the top 50 most
-          // relevant matches and not all of the matches?" — bump to 200 (the
-          // ceiling the underlying pgvector RPC returns).
-          pageSize: 200,
+          pageSize: topN,
           skipMatchEnrichment: true,
         })
         if (cancelRef.current) return // Search was cancelled — discard results
@@ -296,7 +294,7 @@ export function InvestorDeckSearchClient({
             const s = (f.attributes as Record<string, unknown>)?._similarity
             if (typeof s === 'number') sims[f.id] = s
           }
-          scoreInvestorsAgainstThesis({ listingIds: ids, limit: 200, overrideThesis })
+          scoreInvestorsAgainstThesis({ listingIds: ids, limit: topN, overrideThesis })
             .then(res => {
               if ('success' in res) {
                 const scores: Record<string, FirmMatchResult> = {}
@@ -326,6 +324,16 @@ export function InvestorDeckSearchClient({
 
   // W45b: sync runSearch ref so the restoration effect below can call it
   runSearchRef.current = runSearch
+
+  // Re-run search when topN changes (after initial mount)
+  const topNRef = useRef(topN)
+  useEffect(() => {
+    if (topNRef.current === topN) return // skip initial mount
+    topNRef.current = topN
+    if (lastQuery) {
+      startTransition(() => runSearch(lastQuery))
+    }
+  }, [topN])
 
   // W45b: on mount, restore search state if ?q= is present in the URL
   // (happens when user presses Back from /investors/[id]).
@@ -658,6 +666,8 @@ export function InvestorDeckSearchClient({
               freeVisible={FREE_VISIBLE}
               lastQuery={lastQuery}
               isPending={isPending}
+              topN={topN}
+              onTopNChange={setTopN}
             />
           )}
 
@@ -1224,6 +1234,8 @@ function ResultsBar({
   freeVisible,
   lastQuery,
   isPending,
+  topN,
+  onTopNChange,
 }: {
   total: number
   visibleCount: number
@@ -1232,16 +1244,37 @@ function ResultsBar({
   freeVisible: number
   lastQuery: string
   isPending: boolean
+  topN: 25 | 50 | 100
+  onTopNChange: (v: 25 | 50 | 100) => void
 }) {
   // Show X of Y scored — matches Outreach display pattern.
   const shownNow = isPending ? '…' : (isFree ? Math.min(freeVisible, total) : visibleCount)
+  const pageSizes = [25, 50, 100] as const
   return (
     <div className="flex flex-col gap-1 py-4 mb-0">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="text-sm">
+        <div className="text-sm flex items-center gap-3">
           <strong className="text-international-orange">
             Showing {shownNow} of {isPending ? '…' : total.toLocaleString()} scored{isFree ? ' (free preview)' : ''}
           </strong>
+          {!isFree && (
+            <span className="flex items-center gap-1 text-xs text-muted-foreground">
+              <span>Show:</span>
+              {pageSizes.map(n => (
+                <button
+                  key={n}
+                  onClick={() => onTopNChange(n)}
+                  className={`px-2 py-0.5 rounded-full border transition-all ${
+                    topN === n
+                      ? 'bg-international-orange/10 border-international-orange text-international-orange font-semibold'
+                      : 'border-border hover:border-international-orange/50'
+                  }`}
+                >
+                  {n}
+                </button>
+              ))}
+            </span>
+          )}
         </div>
         <div className="flex gap-2 flex-wrap">
           <FilterChip active>Best match</FilterChip>

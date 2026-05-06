@@ -1,0 +1,109 @@
+{
+  "projectId": "a_compact_commercial_airsource_heat_pump",
+  "scores": [
+    {
+      "section": "Brief",
+      "score": 6,
+      "reasons": [
+        "Cost ceiling declared"
+      ],
+      "suggestions": [
+        "Expand use case description",
+        "Add mission statement",
+        "Define target customers",
+        "Add why-now rationale",
+        "Declare mass constraint",
+        "Add compliance notes"
+      ]
+    },
+    {
+      "section": "Regulatory",
+      "score": 1,
+      "reasons": [
+        "No regulatory standards found"
+      ],
+      "suggestions": [
+        "Research must identify applicable standards"
+      ]
+    },
+    {
+      "section": "Sizing",
+      "score": 6,
+      "reasons": [
+        "Design is infeasible — shown as exception",
+        "Module dimensions computed",
+        "1 conflicts identified",
+        "Recommendations provided"
+      ],
+      "suggestions": []
+    },
+    {
+      "section": "Modules",
+      "score": 8,
+      "reasons": [
+        "10 modules — good granularity",
+        "Most modules have detailed descriptions",
+        "Most modules have 3+ key parts",
+        "Most modules have risk matrices"
+      ],
+      "suggestions": [
+        "More modules need engineering reviews"
+      ]
+    },
+    {
+      "section": "BOM",
+      "score": 1,
+      "reasons": [
+        "No parts generated"
+      ],
+      "suggestions": [
+        "Run BOM generation"
+      ]
+    },
+    {
+      "section": "Cost",
+      "score": 1,
+      "reasons": [
+        "No cost breakdown"
+      ],
+      "suggestions": [
+        "Run cost calculation"
+      ]
+    },
+    {
+      "section": "Risks",
+      "score": 7,
+      "reasons": [
+        "20 risks identified — comprehensive",
+        "Most risks have mitigations",
+        "5 high-priority risks (score >= 10)"
+      ],
+      "suggestions": [
+        "Assign owners to more risks"
+      ]
+    },
+    {
+      "section": "Suppliers",
+      "score": 2,
+      "reasons": [
+        "No supplier matches"
+      ],
+      "suggestions": [
+        "Set BRAVE_API_KEY and re-run supplier stage"
+      ]
+    },
+    {
+      "section": "Research",
+      "score": 4,
+      "reasons": [
+        "Domain detected: hardware_product"
+      ],
+      "suggestions": [
+        "Research report too short",
+        "Need 5+ sources"
+      ]
+    }
+  ],
+  "councilScores": [],
+  "generatedAt": "2026-05-05T16:23:52.553Z"
+}

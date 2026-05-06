@@ -1,0 +1,104 @@
+{
+  "projectId": "30kw_heat_pump_r290_4500_gbp",
+  "scores": [
+    {
+      "section": "Brief",
+      "score": 9,
+      "reasons": [
+        "Use case is detailed",
+        "Mission statement present",
+        "Target customers defined",
+        "Market timing rationale present",
+        "Cost ceiling declared",
+        "Mass constraint declared"
+      ],
+      "suggestions": [
+        "Add compliance notes"
+      ]
+    },
+    {
+      "section": "Regulatory",
+      "score": 8,
+      "reasons": [
+        "8 standards identified",
+        "Comprehensive regulatory coverage",
+        "Most standards have applicability detail",
+        "Most standards have design impact analysis",
+        "Gap actions defined for some standards"
+      ],
+      "suggestions": []
+    },
+    {
+      "section": "Sizing",
+      "score": 2,
+      "reasons": [
+        "No sizing data"
+      ],
+      "suggestions": [
+        "Run sizing solver"
+      ]
+    },
+    {
+      "section": "Modules",
+      "score": 1,
+      "reasons": [
+        "No modules decomposed"
+      ],
+      "suggestions": [
+        "Run decomposition stage"
+      ]
+    },
+    {
+      "section": "BOM",
+      "score": 1,
+      "reasons": [
+        "No parts generated"
+      ],
+      "suggestions": [
+        "Run BOM generation"
+      ]
+    },
+    {
+      "section": "Cost",
+      "score": 1,
+      "reasons": [
+        "No cost breakdown"
+      ],
+      "suggestions": [
+        "Run cost calculation"
+      ]
+    },
+    {
+      "section": "Risks",
+      "score": 1,
+      "reasons": [
+        "No risks identified"
+      ],
+      "suggestions": [
+        "Add risk matrices to modules"
+      ]
+    },
+    {
+      "section": "Suppliers",
+      "score": 2,
+      "reasons": [
+        "No supplier matches"
+      ],
+      "suggestions": [
+        "Set BRAVE_API_KEY and re-run supplier stage"
+      ]
+    },
+    {
+      "section": "Research",
+      "score": 7,
+      "reasons": [
+        "Research report: 3679 chars",
+        "10 sources cited",
+        "Domain detected: thermal_system"
+      ],
+      "suggestions": []
+    }
+  ],
+  "councilScores": [],
+  "generatedAt": "2026-05-05T17:24:33.163Z"
+}

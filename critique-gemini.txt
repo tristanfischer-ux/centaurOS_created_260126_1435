@@ -1,0 +1,72 @@
+As a Staff Design Engineer on ForgeOS, I’m looking at this from two angles: **Information Density** (how much engineering truth can we pack in without overwhelming the reader) and **Renderer Constraints** (`@react-pdf/renderer` is incredibly powerful, but its Flexbox engine hates complex nested wrap logic and orphaned headers).
+
+If we are pushing an 80-page document, "pretty" doesn't cut it. It needs to be a highly scannable, structurally bulletproof instrument of truth.
+
+Before we get to the scores, let’s solve your **Data Provenance & LLM Attribution** problem, because if we do this wrong, as you noted, it will look like a raw JSON dump.
+
+### The Elegant Provenance System
+Do **not** print "Source: Database" or "Model: gemini-3.1-pro" as distinct text blocks. 
+1. **The Symbology System:** Create a tiny, visual lexicon. 
+   * Database = a solid, muted gray cylinder icon `⛁` or a simple `[DB]`.
+   * LLM = a geometric spark/star `✧` or `[AI]`.
+2. **The Micro-Pill:** Use `@react-pdf`'s `<View>` to create a 6pt, uppercase, monospaced pill (e.g., `SF Mono` or `Roboto Mono`). 
+   * Example: `[ ✧ GEMINI 3.1 ]` (Subtle purple/blue tint background). 
+   * Example: `[ ⛁ FORGE-DB ]` (Subtle slate gray background).
+3. **Placement:** Nestle these pills on the *same flex baseline* as the `<Text>` element of the section header or the specific data point, right-justified. Do not give them their own line. At the bottom of the Cover Page, add a 3-line legend explaining the symbology.
+
+---
+
+### Section Critiques & Scores
+
+#### 1. Cover Page & Totals (Score: 5/10)
+* **The Brutal Truth:** Most cover pages highlight the project name and waste 80% of the page on white space. For an engineering document, the cover is the executive dashboard. 
+* **Fix It:** Split the layout. Top 60% is branding, title, date, and document hash. Bottom 40% should be a massive, 3-column macro-summary: **Total Mass**, **Total CAPEX/OPEX**, and **Critical RAG Status**. 
+* **Provenance:** Bottom footer. Text: `Report generated via ForgeOS • Synthesis engine: gemini-3.1-pro` in 8pt text.
+
+#### 2. Feasibility Exception - RAG Alerts (Score: 6/10)
+* **The Brutal Truth:** Relying purely on Red/Amber/Green colors is an accessibility failure and bad print design (what if it's printed in black and white?). 
+* **Fix It:** Combine color with shape. `[Red Hexagon] Critical`, `[Amber Triangle] Warning`, `[Green Circle] Nominal`. Group them strictly by severity. A 80-page doc means there might be 40 exceptions. Use a 2-column flex grid so it doesn't waste vertical space. 
+* **Provenance:** AI usually generates the *exception rationale*. Put a tiny `[ ✧ AI ]` pill next to the rationale text block, but leave the hard data flagged as `[ ⛁ DB ]`.
+
+#### 3. Brief (Mission, Use Case, Constraints) (Score: 4/10)
+* **The Brutal Truth:** Walls of text in a PDF are cognitive friction. Nobody wants to read your LLM’s prose.
+* **Fix It:** Force the layout into a structured metadata format. Use a `<View style={{ flexDirection: 'row' }}>` for Key-Value pairs. Constraints shouldn't be paragraphs; they should be a bulleted checklist. 
+* **Provenance:** Put the LLM pill right-aligned directly in the `<Text>` block of the "Mission" header.
+
+#### 4. Regulatory Posture (Score: 6/10)
+* **The Brutal Truth:** `@react-pdf` is notoriously bad at handling large tables across page breaks. Rows will clip in half if you aren't careful.
+* **Fix It:** Use strict `wrap={false}` on your table row `<View>` components so they break cleanly to the next page. Use stark visual checkmarks or "X" marks for compliance status against ISO/ASTM standards. 
+* **Provenance:** If the LLM determined the compliance matrix, the entire table gets a pill in the top-right of the table header.
+
+#### 5. Modules - 1 Page Per Module (Score: 2/10 -> High Risk)
+* **The Brutal Truth:** Structuring this as "1 page per module" is a massive architectural flaw. What happens when a module has 3 parts vs. 150 parts? The layout will either leave massive white space or overflow and break your renderer. 
+* **Fix It:** Abandon the "1 page" constraint. Implement a dynamic flowing layout. Use a structured grid: Image top right (`object-fit: contain`), specs top left. Failure modes bottom. Let the content dictate the page breaks.
+* **Provenance:** Granular attribution is needed here. The *Cost* and *Mass* come from `[ ⛁ DB ]`, but the *Unknowns* and *Engineering Reviews* come from `[ ✧ AI ]`. Tag the sub-headers accordingly.
+
+#### 6. Bill of Materials (Score: 5/10)
+* **The Brutal Truth:** A raw list of parts is mind-numbing. 
+* **Fix It:** Group the BOM hierarchically by Module/Sub-assembly using bold headers. Right-align all numerical values (Quantity, Cost, Mass) so decimals align cleanly—this is typography 101. Add light zebra striping (`#F9FAFB`) to rows for tracking.
+* **Provenance:** Entire section is `[ ⛁ DB ]`. One badge at the top next to the BOM title is sufficient.
+
+#### 7. Cost Waterfall (Score: 4/10)
+* **The Brutal Truth:** If this is just a table, do not call it a waterfall. If you want a waterfall chart, `@react-pdf` cannot render HTML canvas charts.
+* **Fix It:** You must generate the waterfall chart server-side (using something like QuickChart or a headless Puppeteer script), return it as a base64 string, and inject it as an `<Image>`. Beneath the image, provide the aggregate table. 
+* **Provenance:** `[ ⛁ DB ]` for the numbers, `[ ✧ AI ]` if a summary analysis paragraph is included below it.
+
+#### 8. Risks Register - FMEA Tables (Score: 7/10)
+* **The Brutal Truth:** FMEA (Failure Mode and Effects Analysis) tables live and die by the RPN (Risk Priority Number). If I have to hunt for high numbers, the design failed.
+* **Fix It:** Sort strictly by RPN (Descending). Use conditional formatting for the RPN cell background (e.g., `<View style={{ backgroundColor: rpn > 100 ? '#FEE2E2' : 'transparent' }}>`). 
+* **Provenance:** `[ ✧ AI ]` tag on the FMEA section header, as LLMs frequently write these failure modes based on parts data.
+
+#### 9. Suppliers (Score: 6/10)
+* **The Brutal Truth:** Often ends up looking like a dumped directory. 
+* **Fix It:** Card-based UI. Use `@react-pdf`'s flexbox to make 2 columns of supplier "Cards". Each card has Supplier Name, Score (bolded out of 100), and a 3-line truncated reason for the match. 
+* **Provenance:** Score and Reason are definitely LLM-generated. Place a tiny `✧ gemini-3.1` micro-pill inside the supplier card header. 
+
+#### 10. Audit Log (Score: 3/10)
+* **The Brutal Truth:** It’s a junk drawer. In an 80-page document, the audit log will take up 5 pages of useless timestamps.
+* **Fix It:** Strip it down. Drop the font size to 6pt. Use a 3-column `<View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>` to densely pack the logs. Make it monospaced. It should look like a dense machine readout—beautiful but unobtrusive, pushed to the absolute back of the document.
+* **Provenance:** Not needed per row. Just title it `SYSTEM AUDIT & PROVENANCE LOG`.
+
+### Summary for your V3 Engine
+To get this to a Staff-level execution, build a rigid `<SectionHeader>` and `<DataBlock>` component in React. Pass `source="db" | "llm"` and `modelName="string"` as props. Let the component handle rendering the micro-pills consistently. This ensures your developers aren't hardcoding tags everywhere, and keeps your PDF looking like a polished aerospace spec sheet, not a Node.js console log.

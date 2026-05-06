@@ -1,0 +1,25 @@
+Here are the 6 dimensions I recommend implementing:
+
+**Presentation Quality**  
+Core question: Does the layout, formatting, typography, and visual structure make the information easy to scan and absorb?  
+Why it matters: Engineering readers rarely read documents linearly. Poor presentation increases cognitive load and the chance of missing critical information.
+
+**Linguistic Precision**  
+Core question: Is the language clear, concise, technically accurate in its phrasing, and free of vagueness or jargon misuse?  
+Why it matters: Ambiguous wording in engineering documents frequently leads to misinterpretation during implementation or review.
+
+**Narrative Flow**  
+Core question: Does the section follow a logical progression with clear relationships between data, analysis, and conclusions?  
+Why it matters: Engineers need to understand the reasoning chain (not just the outputs) to trust or challenge the work.
+
+**Factual Accuracy**  
+Core question: Are all numbers, claims, references, and technical statements correct and properly substantiated?  
+Why it matters: Even small inaccuracies can invalidate downstream decisions or expose the organization to technical and legal risk.
+
+**Relevance**  
+Core question: Does the content directly serve the section’s stated purpose without including unnecessary or tangential information?  
+Why it matters: Irrelevant content increases document length and reduces signal-to-noise ratio in technical reviews.
+
+**Actionable Value**  
+Core question: Does the section deliver information that enables better decisions, clearer next steps, or faster understanding of trade-offs?  
+Why it matters: This is the ultimate measure of whether the section justifies the time spent reading it.

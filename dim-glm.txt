@@ -1,0 +1,53 @@
+Here is the definitive 6-dimension rubric designed specifically for judging generated engineering documents. I’ve refined your initial list to ensure each dimension is mutually exclusive, equally weighted, and universally applicable—whether scoring a text-heavy Brief or a data-dense Cost Waterfall.
+
+### 1. Factual Integrity
+* **Core Question:** *Is the data accurate, uncontradicted, and traceable?*
+* **Why it matters:** Engineering decisions are built on data. A single hallucinated cost figure or misstated risk tolerance cascades into catastrophic real-world outcomes. This dimension ensures the numbers, dates, and technical claims are grounded in source truth and internally consistent across the 80 pages.
+
+### 2. Visual & Structural Clarity
+* **Core Question:** *Can the reader instantly parse the information hierarchy and visual layout?*
+* **Why it matters:** Engineers don’t read; they scan. A Cost Waterfall or Risk Register is useless if the table is malformed, the typography is dense, or the callouts are buried. This dimension evaluates whitespace, typographic contrast, chart legibility, and the spatial organization of data. 
+
+### 3. Linguistic Precision
+* **Core Question:** *Is the language unambiguous, concise, and technically appropriate?*
+* **Why it matters:** Engineering documents tolerate zero fluff or vagueness. "We might need to increase the budget" is a failure; "Budget requires a 15% contingency due to Q3 material volatility" is a success. This measures the elimination of weasel words, passive voice, and jargon-mismatch for the target audience.
+
+### 4. Logical Coherence
+* **Core Question:** *Does the section flow logically from premise to conclusion?*
+* **Why it matters:** Even tabular data (like a Risk Register) has a narrative: Context → Threat → Impact → Mitigation. If a section jumps straight to mitigation before defining the threat, the reader is lost. This dimension ensures the "story" of the data holds together, regardless of the section type.
+
+### 5. Actionability & Decision Support
+* **Core Question:** *Does this section explicitly tell the reader what to do next or what decision to make?*
+* **Why it matters:** The ultimate measure of "value." An engineering report that merely presents facts is a database; an engineering report that highlights the critical path, flags the bottleneck, or recommends the vendor is a tool. This measures whether the section drives engineering outcomes.
+
+### 6. Contextual Sufficiency
+* **Core Question:** *Does this section provide the necessary "why" and constraints without requiring outside knowledge?*
+* **Why it matters:** An 80-page PDF must be a self-contained source of truth. If a Brief mentions "Project Falcon constraints" but doesn't define them, or a Cost Waterfall excludes exchange rate assumptions, the section fails. This dimension ensures implicit assumptions are made explicit.
+
+***
+
+### TypeScript Interface Implementation
+Here is the structure ready for your codebase:
+
+```typescript
+export type RubricDimension = 
+  | 'FACTUAL_INTEGRITY'
+  | 'VISUAL_STRUCTURAL_CLARITY'
+  | 'LINGUISTIC_PRECISION'
+  | 'LOGICAL_COHERENCE'
+  | 'ACTIONABILITY_DECISION_SUPPORT'
+  | 'CONTEXTUAL_SUFFICIENCY';
+
+export interface SectionScore {
+  dimension: RubricDimension;
+  score: number; // e.g., 1-5
+  reasoning: string; // Required to justify the score based on the core question
+}
+
+export interface SectionEvaluation {
+  sectionId: string;
+  sectionType: 'Brief' | 'CostWaterfall' | 'RiskRegister' | string;
+  scores: Record<RubricDimension, SectionScore>;
+  overallVerdict: 'PASS' | 'NEEDS_REVISION' | 'FAIL';
+}
+```

@@ -1,0 +1,102 @@
+{
+  "projectId": "30kw_heat_pump_r290_4500_gbp",
+  "scores": [
+    {
+      "section": "Brief",
+      "score": 5,
+      "reasons": [],
+      "suggestions": [
+        "Expand use case description",
+        "Add mission statement",
+        "Define target customers",
+        "Add why-now rationale",
+        "Declare cost ceiling",
+        "Declare mass constraint",
+        "Add compliance notes"
+      ]
+    },
+    {
+      "section": "Regulatory",
+      "score": 1,
+      "reasons": [
+        "No regulatory standards found"
+      ],
+      "suggestions": [
+        "Research must identify applicable standards"
+      ]
+    },
+    {
+      "section": "Sizing",
+      "score": 2,
+      "reasons": [
+        "No sizing data"
+      ],
+      "suggestions": [
+        "Run sizing solver"
+      ]
+    },
+    {
+      "section": "Modules",
+      "score": 1,
+      "reasons": [
+        "No modules decomposed"
+      ],
+      "suggestions": [
+        "Run decomposition stage"
+      ]
+    },
+    {
+      "section": "BOM",
+      "score": 1,
+      "reasons": [
+        "No parts generated"
+      ],
+      "suggestions": [
+        "Run BOM generation"
+      ]
+    },
+    {
+      "section": "Cost",
+      "score": 1,
+      "reasons": [
+        "No cost breakdown"
+      ],
+      "suggestions": [
+        "Run cost calculation"
+      ]
+    },
+    {
+      "section": "Risks",
+      "score": 1,
+      "reasons": [
+        "No risks identified"
+      ],
+      "suggestions": [
+        "Add risk matrices to modules"
+      ]
+    },
+    {
+      "section": "Suppliers",
+      "score": 2,
+      "reasons": [
+        "No supplier matches"
+      ],
+      "suggestions": [
+        "Set BRAVE_API_KEY and re-run supplier stage"
+      ]
+    },
+    {
+      "section": "Research",
+      "score": 4,
+      "reasons": [
+        "Domain detected: hardware_product"
+      ],
+      "suggestions": [
+        "Research report too short",
+        "Need 5+ sources"
+      ]
+    }
+  ],
+  "councilScores": [],
+  "generatedAt": "2026-05-05T16:16:17.378Z"
+}

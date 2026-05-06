@@ -1,0 +1,23 @@
+ Use these six dimensions. They replace the generic “language/narrative” axes with engineering-specific quality gates that remain applicable whether the section is a prose Brief or a tabular Cost Waterfall.
+
+---
+
+### 1. Technical Accuracy
+**Core question:** Are the facts, calculations, data, and engineering assertions technically correct and free of error?  
+**Why it matters:** Every downstream decision—structural, financial, or programmatic—is built on this layer. Incorrect torque specs or summed totals in a Cost Waterfall compound into catastrophic, expensive failures. Accuracy is the non-negotiable baseline.
+
+### 2. Information Completeness
+**Core question:** Does the section contain every mandatory element required by its type (e.g., assumptions, units, contingencies, boundary conditions, risk owners, date ranges)?  
+**Why it matters:** Incomplete engineering deliverables force the reader to interpolate, introducing unverified risk. A Risk Register without probability/impact or a Cost Waterfall without escalation assumptions is an engineering liability, not a deliverable.
+
+### 3. Decision Utility
+**Core question:** Does this section directly enable a stakeholder to make a committed decision, approve a stage-gate, allocate capital, or change a project trajectory?  
+**Why it matters:** Engineering reports are tools, not literature. If consuming the section does not change what the reader does next, it is waste. Value is measured only by the decisions it unlocks.
+
+### 4. Unambiguous Clarity
+**Core question:** Is every statement, requirement, and datum precise enough to be interpreted in exactly one way by any qualified reader?  
+**Why it matters:** Ambiguity in specs or risk descriptions generates rework, scope disputes, and cascading change orders. In engineering communication, precision is safety. One vague clause costs more than a dozen typos.
+
+### 5. Verifiable Credibility
+**Core question:** Can every significant claim, figure, or conclusion be traced to a source, standard, calculation hygiene, or reproducible method?  
+**Why it matters:** Engineering quality relies on

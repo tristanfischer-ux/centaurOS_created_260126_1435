@@ -1,0 +1,43 @@
+Here’s the concise, implementation-ready rubric I’d recommend for scoring **every section** of an engineering PDF.
+
+## Recommended 6 Dimensions
+
+### 1. **Clarity & Language**
+- **Core question:** Is the section easy to read, precise, and unambiguous for its intended audience?
+- **Why it matters:** Engineering documents fail when readers misinterpret wording, terminology, scope, or conclusions. Clear language reduces ambiguity, speeds review, and improves downstream decision-making.
+
+### 2. **Structure & Presentation**
+- **Core question:** Is the information organized and presented in a way that makes it easy to scan, follow, and extract key points?
+- **Why it matters:** Even accurate content loses value if readers cannot find or interpret it quickly. Good structure, hierarchy, tables, visual layout, and formatting are essential for usability in long technical PDFs.
+
+### 3. **Narrative & Logical Flow**
+- **Core question:** Does the section tell a coherent story, with each part logically leading to the next and supporting the section’s purpose?
+- **Why it matters:** Engineering sections should not be a pile of facts. They need clear reasoning: what the issue is, what was analyzed, what was found, and what follows from it. Strong flow improves comprehension and trust.
+
+### 4. **Technical Accuracy & Fidelity**
+- **Core question:** Is the content factually correct, technically sound, and faithful to the underlying data, calculations, assumptions, and source material?
+- **Why it matters:** This is the baseline for engineering credibility. Incorrect numbers, faulty assumptions, or misrepresented evidence make a section actively harmful, regardless of how polished it looks.
+
+### 5. **Completeness & Relevance**
+- **Core question:** Does the section include all material information needed for its purpose, while excluding unnecessary or distracting content?
+- **Why it matters:** A useful section must be complete enough to support decisions, but focused enough to avoid noise. Missing constraints, assumptions, risks, or context often cause more damage than poor writing.
+
+### 6. **Decision Usefulness**
+- **Core question:** Does this section help the reader understand what matters, what action to take, or what decision to make?
+- **Why it matters:** This is the ultimate value test. Engineering reports exist to inform action—approve a design, understand cost, manage risk, or choose next steps. A section can be well-written yet still fail if it is not practically useful.
+
+---
+
+## Why this set works
+These six dimensions cleanly separate:
+- **How it reads** → Clarity & Language
+- **How it looks / is navigated** → Structure & Presentation
+- **How it thinks** → Narrative & Logical Flow
+- **Whether it is correct** → Technical Accuracy & Fidelity
+- **Whether it has the right content** → Completeness & Relevance
+- **Whether it actually helps** → Decision Usefulness
+
+This gives you a rubric that answers the founder’s core question:  
+**“Is this section actually delivering value for the reader and is it useful?”**
+
+If helpful, I can also convert this directly into a **TypeScript enum/interface schema** with normalized scoring descriptions for 1–5 or 1–10.

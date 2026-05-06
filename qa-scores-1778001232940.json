@@ -1,0 +1,110 @@
+{
+  "projectId": "a_compact_commercial_airsource_heat_pump",
+  "scores": [
+    {
+      "section": "Brief",
+      "score": 9,
+      "reasons": [
+        "Use case is detailed",
+        "Mission statement present",
+        "Target customers defined",
+        "Market timing rationale present",
+        "Cost ceiling declared",
+        "Mass constraint declared"
+      ],
+      "suggestions": [
+        "Add compliance notes"
+      ]
+    },
+    {
+      "section": "Regulatory",
+      "score": 8,
+      "reasons": [
+        "10 standards identified",
+        "Comprehensive regulatory coverage",
+        "Most standards have applicability detail",
+        "Most standards have design impact analysis",
+        "Gap actions defined for some standards"
+      ],
+      "suggestions": []
+    },
+    {
+      "section": "Sizing",
+      "score": 6,
+      "reasons": [
+        "Design is infeasible — shown as exception",
+        "Module dimensions computed",
+        "1 conflicts identified",
+        "Recommendations provided"
+      ],
+      "suggestions": []
+    },
+    {
+      "section": "Modules",
+      "score": 8,
+      "reasons": [
+        "9 modules — good granularity",
+        "Most modules have detailed descriptions",
+        "Most modules have 3+ key parts",
+        "Most modules have risk matrices"
+      ],
+      "suggestions": [
+        "More modules need engineering reviews"
+      ]
+    },
+    {
+      "section": "BOM",
+      "score": 1,
+      "reasons": [
+        "No parts generated"
+      ],
+      "suggestions": [
+        "Run BOM generation"
+      ]
+    },
+    {
+      "section": "Cost",
+      "score": 1,
+      "reasons": [
+        "No cost breakdown"
+      ],
+      "suggestions": [
+        "Run cost calculation"
+      ]
+    },
+    {
+      "section": "Risks",
+      "score": 7,
+      "reasons": [
+        "27 risks identified — comprehensive",
+        "Most risks have mitigations",
+        "14 high-priority risks (score >= 10)"
+      ],
+      "suggestions": [
+        "Assign owners to more risks"
+      ]
+    },
+    {
+      "section": "Suppliers",
+      "score": 2,
+      "reasons": [
+        "No supplier matches"
+      ],
+      "suggestions": [
+        "Set BRAVE_API_KEY and re-run supplier stage"
+      ]
+    },
+    {
+      "section": "Research",
+      "score": 7,
+      "reasons": [
+        "Research report: 5444 chars",
+        "13 sources cited",
+        "Domain detected: thermal_system"
+      ],
+      "suggestions": []
+    }
+  ],
+  "councilScores": [],
+  "generatedAt": "2026-05-05T17:13:52.940Z"
+}

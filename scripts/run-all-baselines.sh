@@ -8,14 +8,14 @@
 #   nohup bash scripts/run-all-baselines.sh >> /tmp/baselines.log 2>&1 &
 #   disown
 #
-# Then poll ~/Downloads/engine-evidence/baseline-0/STATUS.txt
+# Then poll ~/Downloads/engine-evidence/baseline-3/STATUS.txt
 
 set -uo pipefail
 
 REPO_ROOT="/Users/tristanfischer/Developer/CentaurOS created 260126 1435"
 cd "$REPO_ROOT"
 
-STATUS_FILE="$HOME/Downloads/engine-evidence/baseline-0/STATUS.txt"
+STATUS_FILE="$HOME/Downloads/engine-evidence/baseline-3/STATUS.txt"
 mkdir -p "$(dirname "$STATUS_FILE")"
 
 echo "=== baselines started at $(date -u +%FT%TZ) ===" > "$STATUS_FILE"
@@ -42,8 +42,8 @@ run_one() {
   fi
 }
 
-run_one "baseline-0/bess"     "src/lib/pdf-engine-v2/briefs/bess.md"
-run_one "baseline-0/heatpump" "src/lib/pdf-engine-v2/briefs/heatpump.md"
-run_one "baseline-0/farm"     "src/lib/pdf-engine-v2/briefs/farm.md"
+run_one "baseline-3/bess"     "src/lib/pdf-engine-v2/briefs/bess.md"
+run_one "baseline-3/heatpump" "src/lib/pdf-engine-v2/briefs/heatpump.md"
+run_one "baseline-3/farm"     "src/lib/pdf-engine-v2/briefs/farm.md"
 
 echo "=== baselines finished at $(date -u +%FT%TZ) ===" >> "$STATUS_FILE"
