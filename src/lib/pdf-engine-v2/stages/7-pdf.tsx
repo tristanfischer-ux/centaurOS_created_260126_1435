@@ -722,49 +722,97 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
 // Section 4: Regulatory
 const RegulatorySection = ({ state }: { state: PipelineState }) => {
   const regs = state.research?.designBrief?.regulatory || []
-  const topRegs = regs.slice(0, 5)
+  const topRegs = regs.slice(0, 8)
 
   return (
     <>
-      {topRegs.map((reg, idx) => (
-        <Page key={idx} size="A4" style={s.page}>
-          <Text style={s.h5}>2. Regulatory & Compliance</Text>
-          <Text style={s.h1}>2.{idx + 1} {formatText(reg.code)} <GradeLabel grade="D" /></Text>
-          
-          <View style={{ marginBottom: 16 }}>
-            <Text style={{ fontSize: 16, fontWeight: 'bold', color: INK_DARK, marginBottom: 8 }}>{formatText(reg.name)}</Text>
-            <View style={s.pillWrap}>
-              <View style={s.pillMuted}><Text>Status: {formatText(reg.status)}</Text></View>
-              <View style={s.pillMuted}><Text>Owner: {formatText(reg.ownerRole)}</Text></View>
+      {regs.length > 0 && (
+        <Page size="A4" style={s.page}>
+          <Text style={s.h1}>2. Regulatory & Compliance <GradeLabel grade="C" /></Text>
+          <Text style={{ ...s.para, color: MUTED, fontSize: 10, marginBottom: 8 }}>
+            Standards identified as applicable to this product, with industry-typical cost and lead time
+            to first-time certification. Cost estimates are UK-market, independent accredited test house,
+            small-batch programme. Detail page follows for each standard.
+          </Text>
+          <View style={s.tableWrap}>
+            <View style={s.tHead}>
+              <Text style={{ ...s.tHC, width: '18%' }}>Code</Text>
+              <Text style={{ ...s.tHC, width: '32%' }}>Name</Text>
+              <Text style={{ ...s.tHC, width: '12%' }}>Status</Text>
+              <Text style={{ ...s.tHC, width: '13%', textAlign: 'right' }}>£ cost</Text>
+              <Text style={{ ...s.tHC, width: '10%', textAlign: 'right' }}>Weeks</Text>
+              <Text style={{ ...s.tHC, width: '15%' }}>Owner role</Text>
+            </View>
+            {topRegs.map((r, i) => {
+              const est = estimateRegulatoryCost(r.code || r.name || '')
+              const statusColor = /complete/i.test(r.status || '') ? GREEN :
+                                  /progress|draft/i.test(r.status || '') ? AMBER :
+                                  RED
+              return (
+                <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                  <Text style={{ ...s.tC, width: '18%', fontWeight: 'bold' }}>{formatText(r.code)}</Text>
+                  <Text style={{ ...s.tC, width: '32%' }}>{formatText(r.name)}</Text>
+                  <Text style={{ ...s.tC, width: '12%', color: statusColor }}>{formatText(r.status) || 'not-started'}</Text>
+                  <Text style={{ ...s.tC, width: '13%', textAlign: 'right' }}>{formatGBP(est.costGbp)}</Text>
+                  <Text style={{ ...s.tC, width: '10%', textAlign: 'right' }}>{est.weeks} wks</Text>
+                  <Text style={{ ...s.tC, width: '15%' }}>{formatText(r.ownerRole) || '—'}</Text>
+                </View>
+              )
+            })}
+            <View style={{ ...s.tRow, backgroundColor: '#fff7ed', borderTopWidth: 2, borderTopColor: BRAND }}>
+              <Text style={{ ...s.tC, width: '62%', fontWeight: 'bold' }}>Total regulatory programme ({topRegs.length} standards)</Text>
+              <Text style={{ ...s.tC, width: '13%', textAlign: 'right', fontWeight: 'bold' }}>{formatGBP(topRegs.reduce((a, r) => a + estimateRegulatoryCost(r.code || r.name || '').costGbp, 0))}</Text>
+              <Text style={{ ...s.tC, width: '25%' }}></Text>
             </View>
           </View>
-
-          <Text style={s.h4}>Summary</Text>
-          <Text style={s.para}>{formatText(reg.summary)}</Text>
-
-          <Text style={s.h4}>Applicability</Text>
-          <View style={s.calloutNeutral}>
-            <Text style={s.para}>{formatText(reg.applicability)}</Text>
-          </View>
-
-          <Text style={s.h4}>Engineering Impact</Text>
-          <Text style={s.para}>{formatText(reg.designImpact)}</Text>
-
-          <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
-            <View style={{ flex: 1, padding: 12, backgroundColor: '#f0fdf4', borderRadius: 4, borderWidth: 1, borderColor: '#bbf7d0' }}>
-              <Text style={s.h5}>Evidence Required</Text>
-              <Text style={{ fontSize: 10 }}>{formatText(reg.evidenceRequired)}</Text>
-            </View>
-            <View style={{ flex: 1, padding: 12, backgroundColor: '#fff7ed', borderRadius: 4, borderWidth: 1, borderColor: '#fed7aa' }}>
-              <Text style={s.h5}>Gap Action</Text>
-              <Text style={{ fontSize: 10, color: AMBER, fontWeight: 'bold' }}>{formatText(reg.gapAction)}</Text>
-            </View>
-          </View>
-
-          <SourceFooter sources={[{ type: 'Regulatory LLM', detail: 'Standards extracted from context' }]} overallGrade="D" />
-          <PageFooter section={`2.${idx + 1} ${reg.code}`} />
+          <SourceFooter sources={[{ type: 'Regulatory LLM', detail: 'Standards extracted from brief context' }, { type: 'Industry heuristic', detail: 'Cost + weeks estimated by standard family' }]} overallGrade="C" />
+          <PageFooter section="2. Regulatory — Overview" />
         </Page>
-      ))}
+      )}
+      {topRegs.map((reg, idx) => {
+        const est = estimateRegulatoryCost(reg.code || reg.name || '')
+        return (
+          <Page key={idx} size="A4" style={s.page}>
+            <Text style={s.h5}>2. Regulatory & Compliance</Text>
+            <Text style={s.h1}>2.{idx + 1} {formatText(reg.code)} <GradeLabel grade="D" /></Text>
+
+            <View style={{ marginBottom: 16 }}>
+              <Text style={{ fontSize: 16, fontWeight: 'bold', color: INK_DARK, marginBottom: 8 }}>{formatText(reg.name)}</Text>
+              <View style={s.pillWrap}>
+                <View style={s.pillMuted}><Text>Status: {formatText(reg.status)}</Text></View>
+                <View style={s.pillMuted}><Text>Owner: {formatText(reg.ownerRole)}</Text></View>
+                <View style={s.pillMuted}><Text>Est. {formatGBP(est.costGbp)}</Text></View>
+                <View style={s.pillMuted}><Text>Est. {est.weeks} weeks</Text></View>
+              </View>
+            </View>
+
+            <Text style={s.h4}>Summary</Text>
+            <Text style={s.para}>{formatText(reg.summary)}</Text>
+
+            <Text style={s.h4}>Applicability</Text>
+            <View style={s.calloutNeutral}>
+              <Text style={s.para}>{formatText(reg.applicability)}</Text>
+            </View>
+
+            <Text style={s.h4}>Engineering Impact</Text>
+            <Text style={s.para}>{formatText(reg.designImpact)}</Text>
+
+            <View style={{ flexDirection: 'row', gap: 16, marginTop: 16 }}>
+              <View style={{ flex: 1, padding: 12, backgroundColor: '#f0fdf4', borderRadius: 4, borderWidth: 1, borderColor: '#bbf7d0' }}>
+                <Text style={s.h5}>Evidence Required</Text>
+                <Text style={{ fontSize: 10 }}>{formatText(reg.evidenceRequired)}</Text>
+              </View>
+              <View style={{ flex: 1, padding: 12, backgroundColor: '#fff7ed', borderRadius: 4, borderWidth: 1, borderColor: '#fed7aa' }}>
+                <Text style={s.h5}>Gap Action</Text>
+                <Text style={{ fontSize: 10, color: AMBER, fontWeight: 'bold' }}>{formatText(reg.gapAction)}</Text>
+              </View>
+            </View>
+
+            <SourceFooter sources={[{ type: 'Regulatory LLM', detail: 'Standards extracted from context' }, { type: 'Industry heuristic', detail: `${est.rationale}` }]} overallGrade="D" />
+            <PageFooter section={`2.${idx + 1} ${reg.code}`} />
+          </Page>
+        )
+      })}
       {regs.length === 0 && (
         <Page size="A4" style={s.page}>
           <Text style={s.h1}>2. Regulatory & Compliance <GradeLabel grade="D" /></Text>
@@ -774,6 +822,55 @@ const RegulatorySection = ({ state }: { state: PipelineState }) => {
       )}
     </>
   )
+}
+
+// E2 FIX (2026-05-06): industry-typical £ + weeks to first-time certification
+// per standard family. UK market, accredited test house, small-batch programme.
+// Values are reference-grade order-of-magnitude — the pdf footnote flags them
+// as industry-heuristic source grade.
+function estimateRegulatoryCost(codeOrName: string): { costGbp: number; weeks: number; rationale: string } {
+  const n = codeOrName.toLowerCase()
+  // Battery / BESS safety
+  if (/ul\s*9540a/.test(n)) return { costGbp: 100000, weeks: 16, rationale: 'UL 9540A: system-level fire / TR-propagation test at UKAS lab' }
+  if (/iec\s*62619/.test(n)) return { costGbp: 40000, weeks: 12, rationale: 'IEC 62619: cell-level safety type test' }
+  if (/ul\s*1973/.test(n)) return { costGbp: 55000, weeks: 12, rationale: 'UL 1973: stationary battery type test' }
+  if (/nfpa\s*855/.test(n)) return { costGbp: 10000, weeks: 8, rationale: 'NFPA 855: installation clearances design review' }
+  // UK grid connection
+  if (/\bg99\b|grid code/.test(n)) return { costGbp: 60000, weeks: 20, rationale: 'G99 Issue 6: UK DNO grid-connection type test' }
+  if (/\bg100\b/.test(n)) return { costGbp: 35000, weeks: 14, rationale: 'G100: UK export-limit testing' }
+  // Switchgear / electrical
+  if (/(bs\s*en\s*)?61439/.test(n)) return { costGbp: 50000, weeks: 14, rationale: 'BS EN 61439: LV switchgear type test' }
+  if (/ip\s*5\d|ip\s*6\d/.test(n)) return { costGbp: 8000, weeks: 4, rationale: 'IP rating test at accredited lab' }
+  // Refrigeration / HVAC
+  if (/en\s*378/.test(n)) return { costGbp: 20000, weeks: 8, rationale: 'EN 378: refrigeration safety review + leak test' }
+  if (/en\s*14825/.test(n)) return { costGbp: 35000, weeks: 10, rationale: 'EN 14825: SCOP performance test at UKAS lab' }
+  if (/ped|pressure equipment/.test(n)) return { costGbp: 12000, weeks: 6, rationale: 'PED 2014/68: notified body assessment for cat II module' }
+  if (/mcs\s*mis|mcs\s*30/.test(n)) return { costGbp: 15000, weeks: 8, rationale: 'MCS MIS 3005: UK microgen accreditation' }
+  if (/f.?gas|517\/2014/.test(n)) return { costGbp: 4000, weeks: 2, rationale: 'F-Gas registration + installer qualification' }
+  // Machinery
+  if (/machinery directive|2006\/42/.test(n)) return { costGbp: 8000, weeks: 4, rationale: 'Machinery Directive conformity assessment + DoC' }
+  if (/en\s*60204/.test(n)) return { costGbp: 15000, weeks: 6, rationale: 'EN 60204-1: machinery electrical safety test' }
+  if (/en\s*60335/.test(n)) return { costGbp: 18000, weeks: 6, rationale: 'EN 60335: appliance safety test' }
+  // Aerospace
+  if (/as\s*9100/.test(n)) return { costGbp: 40000, weeks: 16, rationale: 'AS9100D system certification' }
+  if (/do-?160/.test(n)) return { costGbp: 60000, weeks: 20, rationale: 'DO-160 environmental qualification' }
+  // Medical
+  if (/mdr|2017\/745/.test(n)) return { costGbp: 150000, weeks: 24, rationale: 'EU MDR: notified body class II conformity' }
+  if (/510.?k/.test(n)) return { costGbp: 80000, weeks: 20, rationale: 'FDA 510(k) clearance' }
+  if (/iec\s*62304/.test(n)) return { costGbp: 25000, weeks: 8, rationale: 'IEC 62304: medical software lifecycle audit' }
+  // Food contact / agriculture
+  if (/brcgs|bs\s*en\s*1186|eu\s*10\/2011/.test(n)) return { costGbp: 6000, weeks: 4, rationale: 'Food-contact material compliance statement' }
+  if (/wras/.test(n)) return { costGbp: 3500, weeks: 4, rationale: 'WRAS potable water approval' }
+  // EMC / RED / generic
+  if (/en\s*55|emc directive|2014\/30/.test(n)) return { costGbp: 8000, weeks: 4, rationale: 'EMC test at accredited lab' }
+  if (/rohs|2011\/65/.test(n)) return { costGbp: 2500, weeks: 2, rationale: 'RoHS self-declaration + BoM review' }
+  if (/reach|1907\/2006/.test(n)) return { costGbp: 4000, weeks: 3, rationale: 'REACH substance declaration' }
+  if (/weee|2012\/19/.test(n)) return { costGbp: 2500, weeks: 2, rationale: 'WEEE producer registration' }
+  if (/ce.?mark|uk.?ca.?mark/.test(n)) return { costGbp: 6000, weeks: 4, rationale: 'CE / UKCA technical file compilation' }
+  if (/iso\s*9001/.test(n)) return { costGbp: 12000, weeks: 8, rationale: 'ISO 9001 management system certification' }
+  if (/iso\s*14001/.test(n)) return { costGbp: 8000, weeks: 6, rationale: 'ISO 14001 environmental management cert' }
+  // Fallback
+  return { costGbp: 15000, weeks: 6, rationale: 'Industry-typical certification for unmatched standard' }
 }
 
 // Section 5: Sizing
@@ -999,17 +1096,22 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
   ]
 
   // NRE breakdown: if there's a regulatory section, use per-standard ticket
-  // prices; otherwise show a simpler 'tooling + compliance' single-line.
+  // prices from E2's estimator; otherwise show a simpler 'tooling +
+  // compliance' single-line backed by the domain base NRE.
   const regulatory = state.research?.designBrief?.regulatory || []
-  const nreTotal = cb?.nreTotalGbp ?? 0
-  const nrePerStandard = regulatory.length > 0 ? nreTotal / regulatory.length : 0
+  const regEstimates = regulatory.slice(0, 6).map(r => ({
+    code: r.code || r.name || 'Standard',
+    est: estimateRegulatoryCost(r.code || r.name || ''),
+  }))
+  const regNreTotal = regEstimates.reduce((a, e) => a + e.est.costGbp, 0)
+  const nreTotal = regNreTotal > 0 ? regNreTotal : (cb?.nreTotalGbp ?? 0)
   const nreRows: Array<{ label: string; value: number; note?: string }> = regulatory.length > 0
-    ? regulatory.slice(0, 6).map(r => ({
-        label: r.code || r.name || 'Standard',
-        value: nrePerStandard,
-        note: 'Certification + type testing + documentation',
+    ? regEstimates.map(e => ({
+        label: e.code,
+        value: e.est.costGbp,
+        note: e.est.rationale,
       }))
-    : [{ label: 'Tooling, testing & compliance', value: nreTotal, note: 'Domain-average estimate' }]
+    : [{ label: 'Tooling, testing & compliance', value: nreTotal, note: 'Domain-average estimate (no regulatory entries detected)' }]
   const nrePerUnit = nreTotal / Math.max(1, batchSize)
 
   // Ceiling comparison
