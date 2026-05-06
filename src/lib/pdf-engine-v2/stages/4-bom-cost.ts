@@ -23,54 +23,64 @@ const USD_TO_GBP = 0.8
 const DEFAULT_BATCH_SIZE = 25
 
 async function callOpenRouter(systemPrompt: string, userContent: string): Promise<any> {
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 300_000)
+  // A10 FIX (2026-05-06): GLM-5.1 reliably returns prose reasoning + numbered
+  // list despite "Return ONLY JSON" instruction. Switch to Gemini primary
+  // (same as decompose, which works) with response_format: json_object to
+  // force the shape. Fallback to Claude then GPT if Gemini errors.
+  const models = [
+    'google/gemini-3.1-pro-preview',
+    'anthropic/claude-sonnet-4-6',
+    'openai/gpt-4.1-mini',
+  ]
+  let lastErr: any = null
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'z-ai/glm-5.1',
-        max_tokens: 16384,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-      }),
-      signal: controller.signal
-    })
+  for (const model of models) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 300_000)
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          max_tokens: 16384,
+          response_format: { type: 'json_object' },
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+        }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
 
-    clearTimeout(timeout)
+      if (!response.ok) {
+        throw new Error(`OpenRouter ${model} returned ${response.status}`)
+      }
 
-    if (!response.ok) {
-      throw new Error(`OpenRouter API returned status: ${response.status}`)
+      const json = await response.json()
+      const msg = json.choices?.[0]?.message
+      let raw = msg?.content || msg?.reasoning || ''
+      if (!raw && msg?.reasoning_details?.length) {
+        raw = msg.reasoning_details
+          .filter((d: any) => d.type === 'reasoning.text')
+          .map((d: any) => d.text).join('\n')
+      }
+      if (!raw) throw new Error(`${model}: empty content`)
+
+      console.log(`[bom] ${model} responded: ${raw.length} chars`)
+      return parseJsonFromLlm(raw, { stage: 'bom', expectKey: 'parts', model })
+    } catch (err) {
+      clearTimeout(timeout)
+      lastErr = err
+      console.warn(`[bom] ${model} failed: ${(err as Error).message}. Trying next model...`)
+      continue
     }
-
-    const json = await response.json()
-    const msg = json.choices?.[0]?.message
-    let raw = msg?.content || msg?.reasoning || ''
-    if (!raw && msg?.reasoning_details?.length) {
-      raw = msg.reasoning_details.filter((d: any) => d.type === 'reasoning.text').map((d: any) => d.text).join('\n')
-    }
-
-    if (!raw) {
-      throw new Error('No content in OpenRouter response')
-    }
-
-    console.log('[bom] Response length:', raw.length, 'chars. First 300:', raw.slice(0, 300))
-
-    // A9 FIX (2026-05-06): centralised robust JSON parsing. Handles markdown
-    // fences, reasoning blocks, leading prose, and brace-inside-string
-    // correctly. Dumps full raw to /tmp on failure for debug.
-    return parseJsonFromLlm(raw, { stage: 'bom', expectKey: 'parts', model: 'z-ai/glm-5.1' })
-  } catch (error) {
-    clearTimeout(timeout)
-    throw error
   }
+  throw lastErr || new Error('All BOM models failed')
 }
 
 async function searchRealPrice(partName: string, material: string): Promise<number | null> {
