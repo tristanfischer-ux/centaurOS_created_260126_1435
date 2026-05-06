@@ -167,7 +167,7 @@ export function MatchCard({
     if (!isPaid) return
     if (!whyFitExpanded) onTrackClick?.('expand')
     setWhyFitExpanded(prev => !prev)
-    if (!whyFitExpanded && !matchOutput && onRevealWhyFit) {
+    if (!whyFitExpanded && !matchOutput && !isEnriching && !enrichFailed && onRevealWhyFit) {
       startEnrichTransition(async () => {
         try {
           await onRevealWhyFit()
@@ -190,7 +190,7 @@ export function MatchCard({
         }
       })
     }
-  }, [cardState]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cardState, isPaid, matchOutput, isEnriching, enrichFailed, onRevealWhyFit])
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation()
