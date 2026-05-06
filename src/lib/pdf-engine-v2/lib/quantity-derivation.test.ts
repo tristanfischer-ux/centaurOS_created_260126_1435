@@ -137,6 +137,27 @@ describe('quantity-derivation', () => {
       const overrides = deriveQuantities(bessSpecs, 'battery_energy_storage', parts, bomLines)
       expect(overrides).toHaveLength(0) // already correct
     })
+
+    it('does NOT over-match BMS cell monitoring modules as cells', () => {
+      // Regression guard 2026-05-06: live BESS run matched PN-BMS-002
+      // "BMS cell monitoring module" against the cell rule and over-rode
+      // its qty from 315 to 4,896. The rule must exclude bms/monitor/slave.
+      const parts: PartLike[] = [
+        { partNumber: 'PN-BMS-002', name: 'BMS cell monitoring module (slave)' },
+        { partNumber: 'PN-BMS-003', name: 'Cell monitor IC (LFP)' },
+        { partNumber: 'PN-BMU-001', name: 'BMU battery management unit' },
+      ]
+      const bomLines: BomLineLike[] = [
+        { childPartId: 'PN-BMS-002', quantity: 315 },
+        { childPartId: 'PN-BMS-003', quantity: 400 },
+        { childPartId: 'PN-BMU-001', quantity: 1 },
+      ]
+      const overrides = deriveQuantities(bessSpecs, 'battery_energy_storage', parts, bomLines)
+      // None of these should match the cell rule. BMS-slave rule may still
+      // fire on BMS-002 (it matches "slave"); that's correct behaviour.
+      const cellRuleHits = overrides.filter(o => o.rule === 'bess_cell_count')
+      expect(cellRuleHits).toHaveLength(0)
+    })
   })
 
   describe('Heat pump rules', () => {

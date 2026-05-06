@@ -51,7 +51,12 @@ function isBessCell(name: string): boolean {
   const n = name.toLowerCase()
   // "LFP prismatic cell", "CATL 280Ah cell", "battery cell" but NOT
   // "cell module" (that's a higher-level assembly of ~10 cells).
+  // 2026-05-06 tighten: also exclude BMS / monitor / slave names that
+  // contained "cell" (e.g. "BMS cell monitoring module") — the live
+  // BESS run matched PN-BMS-002 against this rule and over-rode its
+  // qty with the cell count.
   if (/cell\s*module/.test(n)) return false
+  if (/bms|monitor(?:ing)?|slave|master\s*control|bmu|cmu/.test(n)) return false
   return /\bcell\b/.test(n) && /(lfp|prismatic|lithium|li-?ion|catl|280\s*ah|battery)/.test(n)
 }
 

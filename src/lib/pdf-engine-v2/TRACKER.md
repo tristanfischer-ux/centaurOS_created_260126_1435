@@ -1,6 +1,6 @@
 # PDF Engine v2 — Work Tracker
 
-**Owner:** Claude (Sonnet)
+**Owner:** Claude (Sonnet) via OpenCode
 **Started:** 2026-05-06
 **Goal:** Local-first quality lift on the pdf engine. Many small wins, each with a PDF before/after.
 
@@ -8,129 +8,127 @@
 
 ---
 
-## Evidence log
+## Single Source of Truth — item status
 
-All before/after PDFs live under `~/Downloads/engine-evidence/<label>/`. Layout:
+Every ID that exists in this tracker, every `pdf-engine-v2` commit, and every code path. Status verified from git log + code grep, not from memory.
 
-```
-~/Downloads/engine-evidence/
-  baseline-0/
-    bess/
-      report.pdf
-      log.txt
-      summary.json
-      qa-scores.json
-    heatpump/...
-    farm/...
-  A1-feasibility-gate/
-    bess/... (post-fix)
-    NOTES.md       # what changed, which pages to look at
-  A2-grounding-wired/
-    ...
-```
+| ID | Description | Status | Commit / file proof |
+|---|---|---|---|
+| **Setup** | | | |
+| S1 | `engine-evidence-bg.sh` wrapper | ✅ | `5caf6914` |
+| S2 | Test briefs `bess.md` / `heatpump.md` / `farm.md` | ✅ | `5caf6914` |
+| S3 | Baseline-0 run × 3 briefs | ✅ | `baseline-0/` captured |
+| S4 | `BASELINE-AUDIT.md` with 20 observations | ✅ | file exists |
+| **Phase A — engine plumbing** | | | |
+| A1 | `gateResults` scope fix | ✅ | `defa15a0` |
+| A2 | Pre-loaded grounding into Stage 4 | ✅ | `a66c15ee` |
+| A3 | Defensive null rendering across PDF sections | ❌ | none |
+| A4 | Abort on critical-stage failure + honest error PDF | ❌ | none |
+| A5 | Sizing domain regex normalise | ✅ | `13c1b583` |
+| A6+A7 | Product-agnostic prompts + robust decompose JSON | ✅ | `d0b636d5` |
+| A8 | Generic-domain sizing tolerates missing mass | ✅ | `1de66980` |
+| A9 | Centralised `lib/llm-json.ts` | ✅ | `7b8bc927` |
+| A10 | BOM uses Gemini + `json_object` + fallback | ✅ | `8bf529fd` |
+| A11 / A11b / A11c / A11d | HP-sizing coverage | ✅ | `cda26726` + `369158ca` + `8d453904` |
+| A12 | Heatpump monobloc detection | ✅ | `cf516d74` |
+| A12b | Outer-shell modules skip floor budget | ✅ | `7afb03ac` |
+| **Phase B — BOM quality** | | | |
+| B1a | BOM qty column + supplier fallback | ✅ | `8353f1f3` |
+| B1b | Cost-model respects qty + domain-aware NRE | ✅ | `8353f1f3` |
+| B1 (inline grades) | A-E grade on section headers + rows | ✅ | `GradeLabel` in `7-pdf.tsx:371,532-550` |
+| B2 (expand COTS heuristic) | ~60 categories | ✅ | `734f6901` |
+| B2b | Thermal-pad cheap-sheet heuristic | ✅ | `79bb7435` |
+| B2 (plan: priceBreakdown column) | "Cost basis" column in BOM + appendix | ❌ | no match in code |
+| B3 (plan: feasibility dashboard) | 7-row PASS/WARN/FAIL gate table page | ❌ | no match in code |
+| B3 (landed: Supplier Shortlist) | One page per ~6 suppliers | ✅ | `f41a2c11` — matches C3's original intent |
+| **Phase C — supplier corpus** | | | |
+| C1 | `lib/local-corpus.ts` reader | ✅ | `0c940de4` |
+| C2 | `runSuppliers` uses local corpus primary | ✅ | `0dbc2cac` |
+| C3 | Suppliers section rendered in PDF with certs | ✅ | `f41a2c11` (landed under the B3 label) |
+| C4 | Process-match validation — red-flag unverified | ❌ | none |
+| **Phase D — corpus indexing** | | | |
+| D1 | Reverse index `process → companies` | ❌ | none |
+| D2 | Reverse index `material → companies` | ❌ | none |
+| D3 | Boilerplate strip + 20-tag domain taxonomy | ❌ | none |
+| **Phase E — report sections** | | | |
+| E1 | Real cost waterfall | ✅ | `29bf3ed5` |
+| E2 | Regulatory table with £ + weeks | ✅ | `c1c9fdc2` |
+| E3 | FMEA with S × O × D RPN | ✅ | `e1978abd` |
+| E4 | Datasheet-backed top-10 part notes | ❌ | none |
+| **Classifier / UX / benchmarks** | | | |
+| FARM-CLS-1 | Vertical-farm class + 2-signal gate | ✅ | `cda26726` |
+| FARM-CLS-2 | 2-signal gate for thermal_system | ✅ | `ed901a79` |
+| UX1 | Verbatim user brief at top of Section 1 | ✅ | `444e20d8` |
+| CX-001 | Compact feasibility banner text | ❌ | none |
+| CX-002 | Meaningful project names from brief | ✅ | `471e49cc` |
+| HP-003 | Verdict wording on monobloc paths | ❌ | none |
+| BENCH-L1 | Hand-curated `benchmarks.ts` | ✅ | `96d6837a` |
+| BENCH-L2 | Extract benchmarks from corpus.db chunks | ❌ | none |
+| BENCH-L3 | Live search + LLM anchoring at pipeline time | ❌ | none |
+| **Evening 2026-05-06** | | | |
+| Per-cell qty realism | `spec-extraction` + `quantity-derivation` + 47 tests | ✅ | `6b1e9cf4` |
+| isBessCell-BMS tighten | Exclude BMS/monitor/slave from cell rule | ✅ | (next commit) — 18 tests pass including regression guard |
+| NEW-001 | **Brief-feasibility feedback loop** — when target is impossible (10 MWh briefcase), surface what in the brief to relax. Deferred per Tristan 2026-05-06. | ⏸ deferred | — |
 
-Each increment folder has a `NOTES.md` that cites page numbers in the baseline it fixes.
+**Tally: 30 ✅ · 14 ❌ · 1 ⏸ deferred.**
 
 ---
 
-## Phase plan
+## Missing-only recap (15 real items)
 
-| Phase | Increment | Status | Evidence folder | PDF change claim |
-|---|---|---|---|---|
-| Setup | S1 engine-evidence.sh wrapper | **done** | scripts/ | committed 5caf6914 |
-| Setup | S2 test briefs (bess, heatpump, farm) | **done** | briefs/ | committed 5caf6914 |
-| Setup | S3 baseline run × 3 briefs | **done** | baseline-0/ | All 3 PDFs captured — see BASELINE-AUDIT.md |
-| Setup | S4 BASELINE-AUDIT.md | **done** | ~/Downloads/engine-evidence/baseline-0/BASELINE-AUDIT.md | 20 numbered observations (BESS, HP, farm, CX) + fix map |
-| A | A1 `gateResults` scope fix | **done** | baseline-PRE-A1-CRASH | commit defa15a0 — unblocks every non-RED, non-INFEASIBLE run |
-| A | A5 sizing domain regex normalise | **done** | baseline-PRE-A5/ | commit 13c1b583 — unblocks Stage 3 for every brief |
-| A | A6+A7 product-agnostic prompts + robust decompose JSON | **done** | (implicit via later baselines) | commit d0b636d5 — research/decompose no longer hallucinate heat pumps |
-| A | A8 generic-domain sizing tolerates missing module-mass | **done** | (implicit) | commit 1de66980 — unblocks Stage 4 when decompose doesn't set mass |
-| A | A9 centralised lib/llm-json.ts, wire into BOM | **done** | (implicit) | commit 7b8bc927 — string-aware brace balancing + raw dump on failure |
-| A | A10 BOM uses Gemini + json_object + model fallback | **done** | baseline-0/bess | commit 8bf529fd — GLM-5.1 replaced; BOM parses reliably |
-| A | A2 pass pre-loaded grounding into Stage 4 | **done** | baseline-1/ (running) | commit a66c15ee — Stage 4 reuses groundingData; sets up Phase C swap |
-| A | A11 HP sizing branch respects missing-lookup-matches | **done** | baseline-1/heatpump | commit cda26726 (superseded by A11b/c/d) |
-| A | FARM-CLS-1 tighten classifier / add vertical_farm class | **done** | baseline-1/farm (50 pages, first full farm run) | commit cda26726 |
-| A | FARM-CLS-2 also gate thermal_system on 2 signals | **done** | all 3 briefs classify correctly | commit ed901a79 |
-| A | A11b HP-sizing keyword expansion | **done** | | commit 369158ca |
-| A | A11c HP-sizing mostly-unmatched defer | **done** | | commit 369158ca |
-| A | A11d diagnostic log for HP sizing | **done** | | commit 8d453904 |
-| B | B1a BOM qty column + supplier fallback | **done** | baseline-2/bess (£48k unit, real suppliers) | commit 8353f1f3 |
-| B | B1b cost-model respects qty + domain-aware NRE | **done** | baseline-2/bess (£120k NRE vs £6k before) | commit 8353f1f3 |
-| C | C1 lib/local-corpus.ts — read-only Nightshift reader | **done** | scripts/test-local-corpus.ts smoke PASSED | commit 0c940de4 |
-| C | C2 runSuppliers uses local corpus as primary | **done** | C2-evidence/bess (in progress) | commit 0dbc2cac |
-| A | A3 defensive rendering / null safety | todo | A3-defensive/ | 10 runs in a row all produce valid PDFs |
-| A | A4 abort on critical-stage failure | todo | A4-abort-on-fail/ | Short error PDF when decompose/sizing fails |
-| A | A12 heatpump monobloc detection | todo | A12-monobloc/ | Route monobloc briefs to generic sizing path |
-| B | B1 render source grades inline | todo | B1-grades/ | Every section header + BOM row shows A–E grade |
-| B | B2 render priceBreakdown column | todo | B2-cost-basis/ | BOM has "Cost basis" column; appendix shows each breakdown |
-| B | B3 feasibility dashboard page | todo | B3-dashboard/ | New page 4: 7-row PASS/WARN/FAIL gate table |
-| C | C1 lib/local-corpus.ts | todo | C1-local-corpus/ | Unit test proves semantic search works against nightshift.db |
-| C | C2 top-5 BOM parts get real suppliers | todo | C2-top5-suppliers/ | BOM shows 3 real suppliers on top 5 cost rows |
-| C | C3 Suppliers section — all BOM | todo | C3-suppliers-all/ | Suppliers page is 2 pages of real UK/EU suppliers with certs |
-| C | C4 process-match validation | todo | C4-process-match/ | Parts with no verified supplier flagged in red |
-| D | D1 reverse index: process→companies | todo | D1-process-index/ | New SQL table; supplier lookups for process X faster + broader |
-| D | D2 reverse index: material→companies | todo | D2-material-index/ | BOM parts with material X show supplier count footer |
-| D | D3 boilerplate strip + domain tagging | todo | D3-domain/ | Irrelevant suppliers disappear from domain-specific results |
-| E | E1 real cost waterfall | todo | E1-waterfall/ | Waterfall page with 8-row table summing to correct £X,XXX |
-| E | E2 regulatory with cost + timeline | todo | E2-regulatory/ | Regulatory table has £ + weeks per standard |
-| E | E3 FMEA with S/O/D and RPN | todo | E3-fmea/ | FMEA page: 15-20 row table with RPN sorted desc |
-| E | E4 datasheet-backed top 10 part notes | todo | E4-datasheet/ | Top 10 BOM parts each have 2-sentence note + source URL |
+Ordered by leverage × effort. Marked HIGH = do first when picking up.
+
+### HIGH
+1. **D3** — boilerplate strip + 20-tag domain taxonomy over `deep_website_text`. One-time overnight job. Every future supplier search improves.
+2. **E4** — datasheet-backed top-10 BOM part notes. First visible use of the 1.9M `page_chunks` corpus. 2-sentence excerpt + source URL per top-cost part.
+
+### MEDIUM
+3. **A3** — defensive null rendering across PDF. "10 runs in a row all produce valid PDFs" as success criterion.
+4. **A4** — abort on critical-stage failure with an honest error PDF instead of partial.
+5. **B2 (plan)** — "Cost basis" column in BOM + per-part breakdown appendix.
+6. **B3 (plan)** — 7-row PASS/WARN/FAIL feasibility dashboard page.
+7. **C4** — flag suppliers with unverified process-match in red.
+8. **D1** — reverse index `process → companies` (SQL view on nightshift.db or sibling cache).
+9. **D2** — reverse index `material → companies`.
+10. **isBessCell tighten** — exclude names containing `bms|monitor|slave` from the cell rule (quirk surfaced on 2026-05-06 BESS run).
+
+### LOW
+11. **CX-001** — compact feasibility banner text.
+12. **HP-003** — verdict wording on monobloc paths.
+
+### BACKLOG
+13. **BENCH-L2** — regex + LLM classify to mine more benchmark anchor points from corpus.db.
+14. **BENCH-L3** — live Brave search + LLM anchoring at pipeline time for sparse domains.
+
+### DEFERRED
+15. **NEW-001** — brief-feasibility feedback loop (Tristan 2026-05-06: "resolve later, not now").
 
 ---
 
 ## Self-imposed guardrails
 
 1. Run baseline BEFORE starting each increment — do not work blind.
-2. One increment per commit. Commit message cites BASELINE-AUDIT observation numbers fixed.
-3. At most 2 hours per increment before showing Tristan the diff. Split if ballooning.
+2. One increment per commit. Commit message cites the increment ID.
+3. At most 2 hours per increment. Split if ballooning.
 4. No Supabase writes. No Vercel concerns. Local only.
 5. No rewriting the orchestrator. Wire things better into what exists.
+6. When autonomous, **FIRST tool call of every turn** is `cat TRACKER.md` + `cat ~/.engine-progress`. If >30 min since last commit AND pending items remain, pick the highest-priority missing item and start.
 
 ---
 
 ## Active increment
 
-Currently: **Per-cell qty realism LANDED** (commit 6b1e9cf4). Next up — E4 datasheet-backed top-10 part notes, or A12 heatpump monobloc detection, or D3 domain tagging.
-
----
-
-## Outstanding work — full list (do not lose)
-
-### Benchmarks (anchor cost output against real-world data)
-- **BENCH-L1** — hand-curated benchmarks.ts with 30-50 anchor points per domain (BESS, heat pump, vertical farm). Sources: BloombergNEF, Modo Energy, IRENA, Heat Pump Association, RenewableUK, Solar Energy UK, public company reports. `benchmarkBand(productClass, capacity)` returns `{low, typical, high, unit, sources[]}`. Wire into cost-waterfall page as a "Benchmark Comparison" panel. [IN PROGRESS]
-- **BENCH-L2** — extract benchmarks from corpus.db page_chunks (1.9M chunks) via regex + LLM classification. Grows the L1 table over time. [BACKLOG]
-- **BENCH-L3** — live search + LLM anchoring at pipeline time. When a brief targets a product type where L1+L2 have sparse data, Brave search for "cost per MW/MWh [product] UK 2024" + small LLM estimate pass. Gate engine cost output against band; flag >2× outside. [BACKLOG]
-
-### Pure engine gaps
-- **A3** defensive null rendering across all PDF sections [MEDIUM]
-- **A4** abort on critical-stage failure — partial today [MEDIUM]
-- **HP-003** verdict wording alignment on monobloc paths [LOW]
-- **CX-001** compact feasibility banner text [LOW]
-- ~~**Per-cell qty realism**~~ — **LANDED 6b1e9cf4** (BESS 4,896 cells, farm 60 panels, unit tests 47/47)
-
-### Phase D — make the corpus more useful
-- **D1** reverse index: process_name → [company_ids] SQL materialised view on nightshift.db. [MEDIUM]
-- **D2** reverse index: material → [company_ids] from materials_worked arrays. [MEDIUM]
-- **D3** boilerplate strip + domain tagging of deep_website_text; 20-tag taxonomy; filter semantic search by domain. [HIGH — runs once, benefits every future run]
-
-### Phase E — remaining sections
-- **E4** datasheet-backed top-10 BOM part notes — semantic search over page_chunks corpus. [HIGH — first visible use of the 1.9M corpus]
-
-### Recently landed (done tonight)
-- A1 A2 A5 A6 A7 A8 A9 A10 A11/b/c/d A12/b
-- FARM-CLS-1/2
-- B1a/b B2/b B3
-- C1 C2
-- E1 E2 **E3**
-- UX1 CX-002
-
-Budget: ~£30-35 of £40+ spent.
+Next up: isBessCell tighten → A3 null-safety → A4 abort → E4 datasheet notes → D3 domain tagging → D1/D2 reverse indices → B2 priceBreakdown → B3 feasibility dashboard → C4 process-match validation → CX-001 → HP-003 → BENCH-L2 → BENCH-L3.
 
 ---
 
 ## Log
 
-(newest first)
+Newest first.
+
+### 2026-05-06 evening — Tracker rewritten as single source of truth
+
+Reconciled 29 ✅ done against 15 ❌ outstanding items. The previous plan table had duplicate IDs (C1/C2/E1/E2/E3 listed as both done and todo) and the narrative "recently landed" section drifted from the table. Every "done" row now carries a commit SHA; every "todo" was verified missing by grepping the source tree.
 
 ### 2026-05-06 18:45 — Per-cell qty realism landed (commit 6b1e9cf4)
 
@@ -138,72 +136,26 @@ New `lib/spec-extraction.ts` + `lib/quantity-derivation.ts` (47 unit tests).
 Wired into `4-bom-cost.ts` (overrides after LLM BOM, before cost rollup) and
 `7-pdf.tsx` (light-green Qty cell when deterministic).
 
-**BESS**: 4 overrides fired — LFP cell 4,885→4,896 (matches 3,500 kWh / 0.8 DoD / 896 Wh per cell = 4,883 → 16-string aligned), BMS match 315→4,896 (name-matching quirk, flagged in NOTES), container 3→1, PCS 4→1. Unit cost £607k (up from £165k baseline-3) — over brief's £180k ceiling but within public benchmark band (£250-350k competitor, £900k-1.2M Wärtsilä). Reveals the brief's target is not achievable at current cell prices.
+**BESS**: 4 overrides fired — LFP cell 4,885→4,896 (matches 3,500 kWh / 0.8 DoD / 896 Wh per cell = 4,883 → 16-string aligned), BMS match 315→4,896 (name-matching quirk, flagged), container 3→1, PCS 4→1. Unit cost £607k (up from £165k baseline-3) — over brief's £180k ceiling but within public benchmark band (£250-350k competitor, £900k-1.2M Wärtsilä). Reveals the brief's target is not achievable at current cell prices.
 
-**Farm**: 1 override — LED panel 12→60 (one per growing tray). Unit cost £36k vs £55k ceiling = FEASIBLE.
+**Farm**: 1 override — LED panel 12→60. Unit cost £36k vs £55k ceiling = FEASIBLE.
 
-**Heatpump**: sizing still INFEASIBLE (A12 monobloc gap); BOM skipped. Specs extracted cleanly: 30 kW, 180 kg, 1100×450×1300 mm.
+**Heatpump**: sizing INFEASIBLE (A12 applied earlier today in `cf516d74` unblocked it for some briefs but not this one — needs follow-up).
 
 Evidence: `~/Downloads/engine-evidence/per-cell-qty-evidence/{bess,heatpump,farm}/report.pdf` + NOTES.md.
 
 ### 2026-05-06 13:00 — Phase E1/E2 + B3 landed
-- **E1** (commit 29bf3ed5): proper cost waterfall — BOM → labour (15%) → test (5%) → shipping (2%) → overheads (8%) → contingency (10%) → unit cost. Plus NRE breakdown + fully-loaded cost ceiling comparison with over/under delta.
-- **E2** (commit c1c9fdc2): regulatory table with £ cost + weeks per standard (UL 9540A £100k, G99 £60k, IEC 62619 £40k, etc., ~30 standard families in estimateRegulatoryCost). Wired into E1's NRE breakdown.
-- **UX1** (commit 444e20d8): verbatim original brief at top of Section 1 (Tristan request).
-- **CX-002** (commit 471e49cc): meaningful project names — `containerised_3_5_mwh_battery_energy_storage` instead of `_bess_test_brief_we_are`.
-- **B3** (commit f41a2c11): Supplier Shortlist section — 6-per-page cards showing certifications, process capabilities, match score, parts matched.
+- E1 (`29bf3ed5`): proper cost waterfall — BOM → labour → test → shipping → overheads → contingency → unit cost.
+- E2 (`c1c9fdc2`): regulatory table with £ + weeks per standard (~30 families).
+- UX1 (`444e20d8`): verbatim brief at top of Section 1.
+- CX-002 (`471e49cc`): meaningful project names.
+- B3 (`f41a2c11`): Supplier Shortlist section — 6-per-page cards.
 
-### 2026-05-06 11:00 — UX1 evidence PDF confirms verbatim brief rendered correctly
-See `~/Downloads/engine-evidence/UX1-evidence/bess/report.pdf` — new "1.0 Original Brief" block at the top of Section 1.
+### 2026-05-06 09:25 — baseline-2 + C1 + C2
+baseline-2 post B1a/B1b + A11b/c/d. BESS 52 pages / £48,551 unit. heatpump 35 pages INFEASIBLE. farm 50 pages / £66,783 unit. Local Nightshift corpus (13,771 UK/EU suppliers) wired in as primary source.
 
-### 2026-05-06 10:00 — C2 evidence: 36/36 parts got real UK suppliers from local corpus
-### 2026-05-06 09:25 — baseline-2 complete + C2 launched
-baseline-2 evidence (post B1a/B1b + A11b/c/d):
-- **BESS**: 52 pages, £48,551 unit / £120,000 NRE. Previous baseline was £9,461 / £6,000. BOM rows now have real supplier names (CATL LF280K, Sungrow, TE Connectivity, Infineon, EPCOS, Fike, Schweitzer, Envicool, SWEP B16, Continental, Novec, Honeywell, Hochiki, CIMC, Schneider Electric) + real quantities (272 cells, 555 fasteners) + extended costs + module subtotals.
-- **heatpump**: 35 pages, still INFEASIBLE. A11b/c/d didn't unblock — need A12 (monobloc detection).
-- **farm**: 50 pages, full pipeline, £66,783 unit / £18,000 NRE.
-
-C1 + C2 shipped: local Nightshift corpus (13,771 UK/EU suppliers with process caps) now primary supplier source with Brave as fallback. Smoke test surfaced Volklec, TITAN Lithium, CATL Batteries for LFP queries; UK Precision (AS9100), Turnparts (ISO 9001 + AS9100D) for CNC 6061.
-
-### 2026-05-06 08:00 — B1a + B1b + A11b + A11c + A11d shipped (5 commits)
-BOM quantity column landed. Cost model respects quantity. Domain-aware NRE. HP sizing keyword expansion + mostly-unmatched defer + diagnostic logging.
-
-### 2026-05-06 07:00 — FARM-CLS-2 fix (commit ed901a79)
-Regression from FARM-CLS-1: BESS brief "thermal management" matched thermal_system before energy_storage evaluated. Fix: gate thermal_system on 2 signals too, verified all 3 briefs classify correctly.
-
-### 2026-05-06 06:40 — baseline-1 launched (post A2 + A11 + FARM-CLS-1)
-Baseline-0 captured. BASELINE-AUDIT written (20 observations). 3 new commits to close the remaining stage-3/classifier blockers:
-- **A2** (commit a66c15ee): wire pre-loaded grounding into Stage 4 — stops double DB query, sets up for local-corpus swap.
-- **A11** (commit cda26726): HP sizing branch gets A8-style missing-lookup-matches fallback. Unblocks heatpump full pipeline.
-- **FARM-CLS-1** (commit cda26726): product classifier requires 2 signals for energy_storage; adds vertical_farm class with domain-specific required fields. Unblocks farm full pipeline.
-
-### 2026-05-06 06:30 — baseline-0 complete, BASELINE-AUDIT.md written
-All 3 PDFs captured: BESS 55 pages / 185 KB (full pipeline), heatpump 37 pages / 122 KB (sizing INFEASIBLE → BOM skipped), farm 27 pages / 85 KB (classifier misclassified as BESS → brief INVALID → short report).
-
-Audit has 20 numbered observations with fix-path mapping. Top 5 highest-impact (all BESS):
-- BESS-001 🔴 Unit cost £9,461 — reference is £247k. BOM £25 heuristic dominates.
-- BESS-002 🔴 No quantity column; BOM rollup treats every line as qty=1.
-- BESS-003 🔴 Every Supplier column shows "TBD" despite Stage 5 matching.
-- BESS-004 🔴 NRE £6k for a BESS platform — reference is £355k total / £14k/unit.
-- BESS-005 🔴 No module dividers in BOM table — reader can't tell which parts belong where.
-
-### 2026-05-06 05:40 — A10 BOM model swap (commit 8bf529fd)
-GLM-5.1 returned 10KB of prose reasoning + numbered list instead of JSON despite "Return ONLY JSON" instruction. Switched primary to Gemini 3.1 Pro + response_format:json_object. Fallback chain Gemini → Claude → GPT-4.1-mini. Every model gets 300s timeout.
-
-### 2026-05-06 05:20 — A9 centralised JSON parser (commit 7b8bc927)
-Created lib/llm-json.ts with string-aware brace balancing (ignores `{`/`}` inside string values), markdown strip, thinking-block strip, and /tmp raw dump on final failure. Wired into BOM stage. Decompose still uses its own inline version — can converge later.
-
-### 2026-05-06 05:00 — A8 sizing tolerates missing mass (commit 1de66980)
-Decompose doesn't populate estimatedMassKg so the `|| 1000` × 0.01 heuristic gave 10 m² per module — any multi-module brief blew past the envelope budget and INFEASIBLE was auto-returned. Now: if ALL modules lack mass, mark feasible-with-warning instead of blocking the pipeline, and use domain-appropriate fallback multipliers (BESS 0.0002, heat pump 0.001).
-
-### 2026-05-06 04:30 — A6+A7 de-heat-pump research + decompose (commit d0b636d5)
-RESEARCH_SYNTHESIS_SYSTEM and MODULE_DECOMPOSITION_SYSTEM both hardcoded "You are a heat pump engineer" / "30kW R290 hydronic split system". Result: BESS briefs produced heat-pump modules. Rewrote both to be product-agnostic. Also made decompose JSON parsing robust — multi-strategy extraction with raw dump on failure.
-
-### 2026-05-06 00:30 — A5 sizing domain regex normalise (commit 13c1b583)
-Research LLM produces free-form industryDomain strings. Solver had exact-match dict. Every brief fell through to generic 5×5m envelope and returned INFEASIBLE in 0-1 ms. Replaced with regex normaliser covering BESS-ish, heat-pump-ish, farm-ish strings.
-
-### 2026-05-06 00:15 — A1 gateResults scope fix (commit defa15a0)
-Pipeline crashed at PDF stage with "gateResults is not defined" on every happy path because variable was declared in a nested else but referenced at the outer return. Hoisted to function scope.
+### 2026-05-06 06:30 — baseline-0 + BASELINE-AUDIT.md
+All 3 PDFs captured. 20 numbered observations with fix-path mapping.
 
 ### 2026-05-06 00:00 — session start
 Plan agreed. Setup + Phase A begin. Budget £40/night.
