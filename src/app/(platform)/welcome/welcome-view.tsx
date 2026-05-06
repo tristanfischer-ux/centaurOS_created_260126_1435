@@ -180,7 +180,7 @@ export function WelcomeView({ firstName, foundryProfileMissing = false }: Welcom
                     subtitle={"Find the investors who'd back you"}
                     startHref="/investors"
                     startLabel="Open the investor database"
-                    intro={"Over 13,000 UK VC and PE firms profiled and matched to your sector, stage, and cheque size. Filter in plain English — "early-stage food tech", "hardware climate fund", "family office angels writing £250K". Fiona pulls each investor's portfolio and recent activity into every outreach brief, so the email lands in their inbox already personalised."}
+                    intro={"Over 13,000 UK VC and PE firms profiled and matched to your sector, stage, and cheque size. Filter in plain English — \u201Cearly-stage food tech\u201D, \u201Chardware climate fund\u201D, \u201Cfamily office angels writing \u00A3250K\u201D. Fiona pulls each investor\u2019s portfolio and recent activity into every outreach brief, so the email lands in their inbox already personalised."}
                     rows={[]}
                 />
                 <SectionBlock
