@@ -10,57 +10,74 @@ export interface ProductClassification {
 export function classifyProduct(briefText: string): ProductClassification {
   const lower = briefText.toLowerCase()
 
-  // FARM-CLS-1 FIX (2026-05-06): order matters — specific/rare product classes
-  // are tested first so loose single-token matches don't capture the class.
-  // Previously a farm brief containing "2.5 kWh per kg" was classified as
-  // energy_storage because the regex `/.../.test()` hit `kwh` and won the
-  // cascade. Also tightened each class: require two distinct token matches
-  // for the energy_storage class to prevent broad single-keyword matches.
-
-  // Product class detection — specific classes first
+  // FARM-CLS-1 + FARM-CLS-2 FIX (2026-05-06): order matters. Evaluate the
+  // classes that can be verified with multi-signal evidence BEFORE falling
+  // into the single-token cascade. This avoids the regression where a BESS
+  // brief mentioning "thermal management" was classified as thermal_system
+  // because that branch ran first in the cascade.
   let productClass = 'unknown'
-  if (lower.match(/vertical farm|indoor farm|hydroponic|fertigation|growing (?:tray|rack|tier)|horticultur|agricultural lighting/)) {
+
+  // Energy storage — two distinct signals required.
+  const storageSignals = [
+    /\bbess\b/,
+    /battery energy storage/,
+    /lithium[- ]?ion|li[- ]?ion|lfp|nmc|lmfp|sodium[- ]ion/,
+    /prismatic|pouch|cylindrical (?:cell|can)/,
+    /kwh\b.*(?:capacity|usable|storage|pack|cell|system)/,
+    /\b(?:pcs|power conversion system|g99)\b/,
+    /cycle life/,
+    /c[- ]rate/,
+  ]
+  const storageHits = storageSignals.filter(r => r.test(lower)).length
+  if (storageHits >= 2) productClass = 'energy_storage'
+
+  // Vertical farm — at least one specific farm signal.
+  if (productClass === 'unknown' && lower.match(/vertical farm|indoor farm|hydroponic|aeroponic|fertigation|growing (?:tray|rack|tier)|horticultur|agricultural lighting|leafy greens|indoor grow/)) {
     productClass = 'vertical_farm'
-  } else if (lower.match(/heat pump|chiller|refriger| hvac|thermal\s|boiler/)) {
-    productClass = 'thermal_system'
-  } else if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
-    productClass = 'aerospace'
-  } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
-    productClass = 'robotics'
-  } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
-    productClass = 'vehicle'
-  } else if (lower.match(/phone|tablet|wearable|display|pcb/)) {
-    productClass = 'consumer_electronics'
-  } else if (lower.match(/machine|press|mill|conveyor|industrial/)) {
-    productClass = 'industrial_machine'
-  } else if (lower.match(/appliance|washer|dryer|dishwasher|oven/)) {
-    productClass = 'appliance'
-  } else if (lower.match(/clock|watch|escapement|pendulum|cuckoo/)) {
-    productClass = 'mechanical_clockwork'
-  } else if (lower.match(/medical|implant|surgical|diagnostic|patient/)) {
-    productClass = 'medical_device'
-  } else if (lower.match(/pump|valve|pipe|filtr|desalination|processing/)) {
-    productClass = 'fluid_processing'
-  } else if (lower.match(/structure|frame|building|bridge|enclosure/)) {
-    productClass = 'structural_product'
   }
 
-  // Energy storage — require TWO distinct signals so narrative mentions of
-  // "kwh" or "battery" alone (in passing, e.g. "2.5 kWh per kg" for a farm,
-  // or "battery-backed UPS" for a machine) don't override more specific
-  // classifications above.
+  // Heat-pump / thermal — require TWO signals so BESS-with-thermal-management
+  // doesn't trigger it.
   if (productClass === 'unknown') {
-    const storageSignals = [
-      /\bbess\b/,
-      /battery energy storage/,
-      /lithium[- ]?ion|li-ion|lfp|nmc|lmfp|sodium[- ]ion/,
-      /cell(s)?\s+(?:chemistry|stack|pack|rack|module)/,
-      /kwh.*(?:capacity|usable|storage|pack|cell)/,
-      /power conversion system|pcs\b/,
-      /cycle life/,
+    const thermalSignals = [
+      /heat pump/,
+      /chiller/,
+      /refriger(?:ant|ation)/,
+      /\bhvac\b/,
+      /cop\b|scop\b/,
+      /r[- ]?290|r[- ]?32|r[- ]?134a|r[- ]?454b|propane refrigerant/,
+      /monobloc|split system|hydrobox/,
+      /heating (?:mode|cycle)|cooling (?:mode|cycle)/,
+      /evaporator|condenser/,
     ]
-    const storageHits = storageSignals.filter(r => r.test(lower)).length
-    if (storageHits >= 2) productClass = 'energy_storage'
+    const thermalHits = thermalSignals.filter(r => r.test(lower)).length
+    if (thermalHits >= 2) productClass = 'thermal_system'
+  }
+
+  // Fallthrough cascade for the remaining classes — single-keyword OK since
+  // their keywords are specific enough (satellite, cubesat, etc.).
+  if (productClass === 'unknown') {
+    if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
+      productClass = 'aerospace'
+    } else if (lower.match(/robot|actuator|manipulator|autonomous/)) {
+      productClass = 'robotics'
+    } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
+      productClass = 'vehicle'
+    } else if (lower.match(/phone|tablet|wearable|display|pcb/)) {
+      productClass = 'consumer_electronics'
+    } else if (lower.match(/machine|press|mill|conveyor|industrial/)) {
+      productClass = 'industrial_machine'
+    } else if (lower.match(/appliance|washer|dryer|dishwasher|oven/)) {
+      productClass = 'appliance'
+    } else if (lower.match(/clock|watch|escapement|pendulum|cuckoo/)) {
+      productClass = 'mechanical_clockwork'
+    } else if (lower.match(/medical|implant|surgical|diagnostic|patient/)) {
+      productClass = 'medical_device'
+    } else if (lower.match(/pump|valve|pipe|filtr|desalination|processing/)) {
+      productClass = 'fluid_processing'
+    } else if (lower.match(/structure|frame|building|bridge|enclosure/)) {
+      productClass = 'structural_product'
+    }
   }
   
   // Technology domains
