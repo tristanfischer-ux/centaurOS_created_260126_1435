@@ -1238,8 +1238,7 @@ function ResultsBar({
   return (
     <div className="flex flex-col gap-1 py-4 mb-0">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="text-sm text-foreground">
-          {lastQuery && <span className="text-muted-foreground mr-1">{lastQuery.slice(0, 40)}{lastQuery.length > 40 ? '…' : ''} ·</span>}
+        <div className="text-sm">
           <strong className="text-international-orange">
             Showing {shownNow} of {isPending ? '…' : total.toLocaleString()} scored{isFree ? ' (free preview)' : ''}
           </strong>
