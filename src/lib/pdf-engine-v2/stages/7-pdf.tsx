@@ -1266,6 +1266,161 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
   )
 }
 
+// B3 FIX (2026-05-06): Supplier Shortlist — one-page-per-chunk summary of
+// every unique supplier the pipeline matched, pulled from state.suppliers
+// (populated by the local Nightshift corpus in Stage 5). Shows the richer
+// enrichment data (certifications, process capabilities, country/city) that
+// doesn't fit in the BOM's narrow supplier column.
+const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
+  const rawSuppliers = state.suppliers || []
+  if (rawSuppliers.length === 0) {
+    return (
+      <Page size="A4" style={s.page}>
+        <Text style={s.h1}>6. Supplier Shortlist <GradeLabel grade="D" /></Text>
+        <Text style={s.para}>No supplier matches produced by Stage 5.</Text>
+        <PageFooter section="6. Suppliers" />
+      </Page>
+    )
+  }
+
+  // Dedupe suppliers across parts by name — each supplier often matched
+  // several parts. Keep the best-matching part cite per supplier.
+  type RolledSupplier = {
+    name: string
+    country?: string
+    url?: string
+    certifications?: string[]
+    processes?: string[]
+    reason?: string
+    partsMatched: string[]
+    bestScore: number
+  }
+  const seen = new Map<string, RolledSupplier>()
+  for (const sm of rawSuppliers) {
+    for (const sup of sm.suppliers || []) {
+      const key = sup.name
+      const existing = seen.get(key)
+      if (existing) {
+        existing.partsMatched.push(sm.partName)
+        if (sup.score > existing.bestScore) existing.bestScore = sup.score
+      } else {
+        seen.set(key, {
+          name: sup.name,
+          country: sup.country,
+          url: sup.url,
+          certifications: sup.certifications,
+          processes: sup.processes,
+          reason: sup.reason,
+          partsMatched: [sm.partName],
+          bestScore: sup.score,
+        })
+      }
+    }
+  }
+  const rolled = Array.from(seen.values()).sort((a, b) => b.bestScore - a.bestScore)
+
+  // Chunk into pages of 6 suppliers to avoid overflow.
+  const PAGE_SIZE = 6
+  const pages: RolledSupplier[][] = []
+  for (let i = 0; i < rolled.length; i += PAGE_SIZE) {
+    pages.push(rolled.slice(i, i + PAGE_SIZE))
+  }
+
+  return (
+    <>
+      {pages.map((page, pageIdx) => (
+        <Page key={pageIdx} size="A4" style={s.page}>
+          {pageIdx === 0 && (
+            <>
+              <Text style={s.h1}>6. Supplier Shortlist <GradeLabel grade="B" label="local corpus" /></Text>
+              <Text style={{ ...s.para, color: MUTED, fontSize: 10, marginBottom: 8 }}>
+                {rolled.length} unique UK/EU suppliers matched against {rawSuppliers.length} BOM parts
+                via semantic search over the local Nightshift corpus
+                (13,771 embedded suppliers, OpenAI text-embedding-3-small 1536-dim).
+                Sorted by best-match similarity score descending.
+              </Text>
+            </>
+          )}
+          {pageIdx > 0 && (
+            <Text style={s.h2}>Supplier Shortlist — page {pageIdx + 1}</Text>
+          )}
+
+          {page.map((sup, i) => (
+            <View
+              key={i}
+              style={{
+                marginBottom: 10,
+                padding: 10,
+                backgroundColor: i % 2 === 0 ? '#fafafa' : '#ffffff',
+                borderLeftWidth: 2,
+                borderLeftColor: sup.bestScore >= 0.6 ? GREEN : sup.bestScore >= 0.4 ? AMBER : BORDER_DARK,
+              }}
+              wrap={false}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
+                <Text style={{ fontSize: 12, fontWeight: 'bold', color: INK_DARK, flexGrow: 1 }}>
+                  {formatText(sup.name)}
+                  {sup.country ? <Text style={{ fontSize: 10, color: MUTED, fontWeight: 'normal' }}>  ({sup.country})</Text> : null}
+                </Text>
+                <Text style={{ fontSize: 9, color: MUTED }}>
+                  sim {sup.bestScore.toFixed(2)} · {sup.partsMatched.length} part{sup.partsMatched.length > 1 ? 's' : ''}
+                </Text>
+              </View>
+
+              {(sup.certifications && sup.certifications.length > 0) && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 9, color: MUTED, marginRight: 4 }}>Certs:</Text>
+                  {sup.certifications.slice(0, 6).map((c, ci) => (
+                    <View key={ci} style={{ backgroundColor: '#eef2ff', paddingHorizontal: 4, paddingVertical: 1, marginRight: 4, marginBottom: 2 }}>
+                      <Text style={{ fontSize: 8, color: '#3730a3' }}>{formatText(c).slice(0, 40)}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {(sup.processes && sup.processes.length > 0) && (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 3 }}>
+                  <Text style={{ fontSize: 9, color: MUTED, marginRight: 4 }}>Capabilities:</Text>
+                  {sup.processes.slice(0, 5).map((p, pi) => (
+                    <View key={pi} style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 4, paddingVertical: 1, marginRight: 4, marginBottom: 2 }}>
+                      <Text style={{ fontSize: 8, color: '#065f46' }}>{formatText(p).slice(0, 40)}</Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {sup.reason && (
+                <Text style={{ fontSize: 9, color: INK, marginTop: 2, lineHeight: 1.3 }}>
+                  {formatText(sup.reason).slice(0, 280)}
+                </Text>
+              )}
+
+              <Text style={{ fontSize: 8, color: MUTED, marginTop: 3 }}>
+                Matched to: {sup.partsMatched.slice(0, 3).map(x => formatText(x).slice(0, 40)).join(' · ')}
+                {sup.partsMatched.length > 3 ? ` + ${sup.partsMatched.length - 3} more` : ''}
+              </Text>
+              {sup.url && (
+                <Text style={{ fontSize: 8, color: BLUE, marginTop: 2 }}>{sup.url}</Text>
+              )}
+            </View>
+          ))}
+
+          {pageIdx === pages.length - 1 && (
+            <SourceFooter
+              sources={[
+                { type: 'Local corpus', detail: 'Nightshift supplier database (13,771 embedded companies)' },
+                { type: 'Semantic search', detail: 'OpenAI text-embedding-3-small, cosine min 0.30' },
+              ]}
+              overallGrade="B"
+            />
+          )}
+          <PageFooter section={`6. Suppliers — page ${pageIdx + 1}`} />
+        </Page>
+      ))}
+    </>
+  )
+}
+
 // Section 8: Risks FMEA
 const RisksSection = ({ state }: { state: PipelineState }) => {
   const allRisks = state.modules?.flatMap(m => (m.riskMatrix || []).map(r => ({ ...r, moduleName: m.name }))) || []
@@ -1470,6 +1625,7 @@ export default function PdfRenderer({ state }: { state: PipelineState }) {
       <SizingSection state={state} />
       <ModulesSection state={state} />
       <CostWaterfallSection state={state} />
+      <SupplierShortlistSection state={state} />
       <RisksSection state={state} />
       <SourceAttributionSection state={state} />
       <AuditLogSection state={state} />
