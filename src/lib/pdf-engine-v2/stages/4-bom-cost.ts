@@ -10,6 +10,7 @@ import {
 import type { Module, Part, BomLine, CostBreakdown, StageResult, DimensionSheet } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { BOM_GENERATION_SYSTEM } from '../prompts'
+import { parseJsonFromLlm } from '../lib/llm-json'
 
 // Stage 4: BOM Generation — uses BOM_GENERATION_SYSTEM from prompts.ts
 
@@ -62,24 +63,10 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
 
     console.log('[bom] Response length:', raw.length, 'chars. First 300:', raw.slice(0, 300))
 
-    let jsonStr = raw.replace(/^\s*```json\s*/m, '').replace(/```\s*$/m, '').trim()
-
-    const firstBrace = jsonStr.indexOf('{')
-    const lastBrace = jsonStr.lastIndexOf('}')
-    if (firstBrace >= 0 && lastBrace > firstBrace) {
-      jsonStr = jsonStr.slice(firstBrace, lastBrace + 1)
-    }
-
-    try {
-      return JSON.parse(jsonStr)
-    } catch (e) {
-      const partsMatch = jsonStr.match(/\{[\s\S]*"parts"[\s\S]*\}/)
-      if (partsMatch) {
-        try { return JSON.parse(partsMatch[0]) } catch (e2) { /* continue */ }
-      }
-      console.error('[bom] JSON parsing failed. First 500 chars:', raw.slice(0, 500))
-      throw new Error('Failed to parse JSON response from LLM')
-    }
+    // A9 FIX (2026-05-06): centralised robust JSON parsing. Handles markdown
+    // fences, reasoning blocks, leading prose, and brace-inside-string
+    // correctly. Dumps full raw to /tmp on failure for debug.
+    return parseJsonFromLlm(raw, { stage: 'bom', expectKey: 'parts', model: 'z-ai/glm-5.1' })
   } catch (error) {
     clearTimeout(timeout)
     throw error
