@@ -48,10 +48,19 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 | A | A9 centralised lib/llm-json.ts, wire into BOM | **done** | (implicit) | commit 7b8bc927 — string-aware brace balancing + raw dump on failure |
 | A | A10 BOM uses Gemini + json_object + model fallback | **done** | baseline-0/bess | commit 8bf529fd — GLM-5.1 replaced; BOM parses reliably |
 | A | A2 pass pre-loaded grounding into Stage 4 | **done** | baseline-1/ (running) | commit a66c15ee — Stage 4 reuses groundingData; sets up Phase C swap |
-| A | A11 HP sizing branch respects missing-lookup-matches | **done** | baseline-1/heatpump (running) | commit cda26726 — unblocks heatpump end-to-end |
-| A | FARM-CLS-1 tighten classifier / add vertical_farm class | **done** | baseline-1/farm (running) | commit cda26726 — "kWh" alone no longer forces energy_storage |
+| A | A11 HP sizing branch respects missing-lookup-matches | **done** | baseline-1/heatpump | commit cda26726 (superseded by A11b/c/d) |
+| A | FARM-CLS-1 tighten classifier / add vertical_farm class | **done** | baseline-1/farm (50 pages, first full farm run) | commit cda26726 |
+| A | FARM-CLS-2 also gate thermal_system on 2 signals | **done** | all 3 briefs classify correctly | commit ed901a79 |
+| A | A11b HP-sizing keyword expansion | **done** | | commit 369158ca |
+| A | A11c HP-sizing mostly-unmatched defer | **done** | | commit 369158ca |
+| A | A11d diagnostic log for HP sizing | **done** | | commit 8d453904 |
+| B | B1a BOM qty column + supplier fallback | **done** | baseline-2/bess (£48k unit, real suppliers) | commit 8353f1f3 |
+| B | B1b cost-model respects qty + domain-aware NRE | **done** | baseline-2/bess (£120k NRE vs £6k before) | commit 8353f1f3 |
+| C | C1 lib/local-corpus.ts — read-only Nightshift reader | **done** | scripts/test-local-corpus.ts smoke PASSED | commit 0c940de4 |
+| C | C2 runSuppliers uses local corpus as primary | **done** | C2-evidence/bess (in progress) | commit 0dbc2cac |
 | A | A3 defensive rendering / null safety | todo | A3-defensive/ | 10 runs in a row all produce valid PDFs |
 | A | A4 abort on critical-stage failure | todo | A4-abort-on-fail/ | Short error PDF when decompose/sizing fails |
+| A | A12 heatpump monobloc detection | todo | A12-monobloc/ | Route monobloc briefs to generic sizing path |
 | B | B1 render source grades inline | todo | B1-grades/ | Every section header + BOM row shows A–E grade |
 | B | B2 render priceBreakdown column | todo | B2-cost-basis/ | BOM has "Cost basis" column; appendix shows each breakdown |
 | B | B3 feasibility dashboard page | todo | B3-dashboard/ | New page 4: 7-row PASS/WARN/FAIL gate table |
@@ -81,21 +90,34 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 ## Active increment
 
-Currently: **baseline-1 running** (post A2 + A11 + FARM-CLS-1).
+Currently: **C2-evidence run on BESS** (testing local-corpus wiring end-to-end).
 
-**Post-baseline plan (in order):**
-1. Audit baseline-1 PDFs vs baseline-0, update BASELINE-AUDIT observation map.
-2. **Next highest-leverage fix on BESS:** BESS-002 (BOM quantity column) + BESS-003 (supplier wired to BOM). These two together should finally produce a BOM that sums to realistic figures once quantities are counted.
-3. Then B1 (inline source grades per-row), B2 (cost-basis column), B3 (feasibility dashboard).
-4. Then C1 (lib/local-corpus.ts) — the big swap.
+Next candidates after C2 evidence lands:
+- **A12** — heatpump monobloc detection: route monobloc briefs to generic sizing to unblock heatpump full pipeline.
+- **B2** — price-basis column + heuristic tier (fix the flat £25 default that distorts small-part cost).
+- **E1** — cost waterfall page (BOM + labour + test + shipping + overheads + NRE).
 
-Budget: ~£12-14 of £40 spent across baseline-0 + A10 rerun + baseline-1. Plenty of headroom.
+Budget: ~£22-26 of £40 spent across baseline-0 + baseline-1 + baseline-2 + C2 evidence + embedding tests.
 
 ---
 
 ## Log
 
 (newest first)
+
+### 2026-05-06 09:25 — baseline-2 complete + C2 launched
+baseline-2 evidence (post B1a/B1b + A11b/c/d):
+- **BESS**: 52 pages, £48,551 unit / £120,000 NRE. Previous baseline was £9,461 / £6,000. BOM rows now have real supplier names (CATL LF280K, Sungrow, TE Connectivity, Infineon, EPCOS, Fike, Schweitzer, Envicool, SWEP B16, Continental, Novec, Honeywell, Hochiki, CIMC, Schneider Electric) + real quantities (272 cells, 555 fasteners) + extended costs + module subtotals.
+- **heatpump**: 35 pages, still INFEASIBLE. A11b/c/d didn't unblock — need A12 (monobloc detection).
+- **farm**: 50 pages, full pipeline, £66,783 unit / £18,000 NRE.
+
+C1 + C2 shipped: local Nightshift corpus (13,771 UK/EU suppliers with process caps) now primary supplier source with Brave as fallback. Smoke test surfaced Volklec, TITAN Lithium, CATL Batteries for LFP queries; UK Precision (AS9100), Turnparts (ISO 9001 + AS9100D) for CNC 6061.
+
+### 2026-05-06 08:00 — B1a + B1b + A11b + A11c + A11d shipped (5 commits)
+BOM quantity column landed. Cost model respects quantity. Domain-aware NRE. HP sizing keyword expansion + mostly-unmatched defer + diagnostic logging.
+
+### 2026-05-06 07:00 — FARM-CLS-2 fix (commit ed901a79)
+Regression from FARM-CLS-1: BESS brief "thermal management" matched thermal_system before energy_storage evaluated. Fix: gate thermal_system on 2 signals too, verified all 3 briefs classify correctly.
 
 ### 2026-05-06 06:40 — baseline-1 launched (post A2 + A11 + FARM-CLS-1)
 Baseline-0 captured. BASELINE-AUDIT written (20 observations). 3 new commits to close the remaining stage-3/classifier blockers:
