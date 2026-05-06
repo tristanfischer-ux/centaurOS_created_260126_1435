@@ -206,6 +206,9 @@ export async function runPipeline(
     classification.productClass,
   )
   ;(state as any).feasibility = feasibility
+  // BENCH-L1: stamp productClass on state so the PDF renderer can do
+  // benchmark lookups without re-classifying.
+  state.productClass = classification.productClass
   console.log(`[pipeline] Feasibility: ${feasibility.status} — ${feasibility.reason}`)
   console.log(`[pipeline] Allowed sections: ${feasibility.allowedSections.join(', ')}`)
 

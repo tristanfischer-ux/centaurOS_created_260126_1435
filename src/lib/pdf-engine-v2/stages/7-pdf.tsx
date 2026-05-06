@@ -1,5 +1,6 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
+import { benchmarkCheck, PROJECT_BENCHMARKS } from '../benchmarks'
 import type { 
   PipelineState, 
   Module, 
@@ -391,6 +392,53 @@ const MANUFACTURER_STOP_WORDS = new Set([
   'the','and','for','with','of','in','at','on','by','to','from','a','an','per','as',
   'standard','custom','series','type','grade','class','category',
 ])
+// BENCH-L1 helpers: pull capacity + power numbers out of the brief / research
+// so we can feed benchmarkCheck() with real specs.
+function extractCapacityKwh(brief: any): number | undefined {
+  if (!brief) return undefined
+  const text = [
+    brief.useCase,
+    brief.mission,
+    brief.targetCapacity,
+    brief.constraints?.capacityKwh,
+    JSON.stringify(brief.constraints || {}),
+  ].filter(Boolean).join(' ')
+  // match patterns like "3.5 MWh", "280 kWh", "3,500 kWh"
+  const mMWh = text.match(/([\d,.]+)\s*mwh/i)
+  if (mMWh) {
+    const v = parseFloat(mMWh[1].replace(/,/g, ''))
+    if (!isNaN(v)) return v * 1000
+  }
+  const mKWh = text.match(/([\d,.]+)\s*kwh/i)
+  if (mKWh) {
+    const v = parseFloat(mKWh[1].replace(/,/g, ''))
+    if (!isNaN(v)) return v
+  }
+  return undefined
+}
+
+function extractPowerKw(brief: any): number | undefined {
+  if (!brief) return undefined
+  const text = [
+    brief.useCase,
+    brief.mission,
+    brief.targetPower,
+    brief.constraints?.powerKw,
+    JSON.stringify(brief.constraints || {}),
+  ].filter(Boolean).join(' ')
+  const mMW = text.match(/([\d,.]+)\s*mw\b/i)
+  if (mMW) {
+    const v = parseFloat(mMW[1].replace(/,/g, ''))
+    if (!isNaN(v)) return v * 1000
+  }
+  const mKW = text.match(/([\d,.]+)\s*kw\b/i)
+  if (mKW) {
+    const v = parseFloat(mKW[1].replace(/,/g, ''))
+    if (!isNaN(v)) return v
+  }
+  return undefined
+}
+
 function extractManufacturerPrefix(partName: string | undefined): string | null {
   if (!partName) return null
   // Strip everything after the first comma, hyphen descriptor, or slash.
@@ -1241,6 +1289,96 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
               </View>
             )}
           </View>
+
+          {/* BENCH-L1 (2026-05-06): external reality-check panel.
+              Compares the engine's unit cost against public benchmark bands
+              from BloombergNEF, Modo Energy, IRENA, HPA, supplier listings,
+              etc. Surfaces when our output is silently drifting high/low. */}
+          {(() => {
+            const productClass = state.productClass || state.research?.industryDomain
+            if (!productClass || !unitTotalGbp) return null
+            // Derive capacity from brief constraints when present.
+            const brief = state.research?.designBrief
+            const spec = {
+              capacityKwh: extractCapacityKwh(brief),
+              powerKw: extractPowerKw(brief),
+            }
+            const check = benchmarkCheck(productClass, unitTotalGbp, spec)
+            if (!check) return null
+
+            const statusColor = check.status === 'within' ? GREEN
+                              : check.status === 'low' ? AMBER
+                              : check.status === 'high' ? RED
+                              : MUTED
+            const statusLabel = check.status === 'within' ? 'WITHIN BAND'
+                              : check.status === 'low' ? 'BELOW BAND'
+                              : check.status === 'high' ? 'ABOVE BAND'
+                              : 'NO DATA'
+
+            return (
+              <>
+                <Text style={s.h3}>Benchmark comparison <GradeLabel grade="C" label="public data" /></Text>
+                <View
+                  style={{
+                    padding: 12,
+                    backgroundColor: check.status === 'within' ? '#f0fdf4' : check.status === 'low' ? '#fffbeb' : check.status === 'high' ? '#fef2f2' : BG_SOFT,
+                    borderLeftWidth: 3,
+                    borderLeftColor: statusColor,
+                    marginBottom: 10,
+                  }}
+                >
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 6 }}>
+                    <Text style={{ fontSize: 11, fontWeight: 'bold', color: statusColor, flexGrow: 1 }}>
+                      {statusLabel}
+                    </Text>
+                    {check.band && (
+                      <Text style={{ fontSize: 9, color: MUTED }}>
+                        {check.band.sampleCount} anchor points
+                      </Text>
+                    )}
+                  </View>
+                  <Text style={{ fontSize: 10, color: INK, lineHeight: 1.4 }}>
+                    {formatText(check.message)}
+                  </Text>
+                </View>
+
+                {check.band && (
+                  <View style={s.tableWrap}>
+                    <View style={s.tHead}>
+                      <Text style={{ ...s.tHC, width: '30%' }}>Source</Text>
+                      <Text style={{ ...s.tHC, width: '10%' }}>Year</Text>
+                      <Text style={{ ...s.tHC, width: '25%', textAlign: 'right' }}>{check.band.metric}</Text>
+                      <Text style={{ ...s.tHC, width: '35%' }}>Notes</Text>
+                    </View>
+                    {(() => {
+                      const rows = (PROJECT_BENCHMARKS || [])
+                        .filter(b => b.productClass === (state.productClass || state.research?.industryDomain))
+                        .slice(0, 8)
+                      return rows.map((r, i) => {
+                        const v = check.band!.metric.includes('kWh') ? r.costPerKwhGbp
+                                : check.band!.metric.includes('kW') ? r.costPerKwGbp
+                                : r.costPerUnitGbp
+                        if (v == null) return null
+                        return (
+                          <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                            <Text style={{ ...s.tC, width: '30%', fontWeight: 'bold', fontSize: 9 }}>{formatText(r.name)}</Text>
+                            <Text style={{ ...s.tC, width: '10%', fontSize: 9 }}>{r.year}</Text>
+                            <Text style={{ ...s.tC, width: '25%', textAlign: 'right', fontSize: 9 }}>{formatGBP(v)}</Text>
+                            <Text style={{ ...s.tC, width: '35%', fontSize: 8, color: MUTED }}>{formatText(r.basis || r.source)}</Text>
+                          </View>
+                        )
+                      }).filter(Boolean)
+                    })()}
+                  </View>
+                )}
+                {check.band?.notes && (
+                  <Text style={{ ...s.para, fontSize: 9, color: MUTED, marginTop: 4, fontStyle: 'italic' }}>
+                    {formatText(check.band.notes)}
+                  </Text>
+                )}
+              </>
+            )
+          })()}
 
           <Text style={s.h3}>Cost reduction paths</Text>
           <View style={s.tableWrap}>

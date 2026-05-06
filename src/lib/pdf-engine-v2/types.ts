@@ -273,10 +273,10 @@ export interface SectionScore {
 
 export interface PipelineState {
   projectId: string
-  // UX1 FIX (2026-05-06): carry the raw user-submitted brief through the
-  // pipeline so the PDF renderer can show exactly what the founder asked for,
-  // verbatim, instead of only the LLM's paraphrased Mission/Use Case.
   briefText?: string
+  // BENCH-L1 (2026-05-06): persist the product-classifier output so the PDF
+  // renderer can look up public benchmark bands without re-classifying.
+  productClass?: string
   research: ResearchResult | null
   modules: Module[]
   dimensionSheet: DimensionSheet | null
