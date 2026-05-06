@@ -31,6 +31,7 @@ import { determineFeasibility } from './feasibility-gate'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
 import type { PipelineState, StageResult } from './types'
+import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 
 export interface EngineResult {
   ok: boolean
@@ -188,6 +189,14 @@ export async function runPipeline(
     { section: 'Research', model: 'google/gemini-3.1-pro-preview', provider: 'OpenRouter' },
   )
 
+  // ── Product Specs Extraction (deterministic) ───────────────────────
+  // Per-cell qty realism (2026-05-06): pull canonical specs out of the
+  // brief + DesignBrief now that both are available. The BOM stage will
+  // use these to override LLM-guessed quantities.
+  const productSpecs = extractSpecs(briefText, state.research?.designBrief || null)
+  ;(state as any).productSpecs = productSpecs
+  console.log(`[pipeline] Product specs extracted: ${summariseSpecs(productSpecs)}`)
+
   // ── Brief Validation (post-research, now we have designBrief) ──────
   const briefValidationPost = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields)
   
@@ -269,6 +278,10 @@ export async function runPipeline(
     // Supabase internally, doubling DB load and preventing the caller from
     // providing a pre-warmed local catalogue (future Phase C work).
     grounding: groundingData ?? undefined,
+    // Per-cell qty realism (2026-05-06): pass specs + classifier output so
+    // the BOM stage can override LLM-guessed quantities deterministically.
+    productSpecs,
+    productClass: classification.productClass,
   })
   trackStage('bom_cost', bomResult)
   if (!bomResult.ok || !bomResult.data) {

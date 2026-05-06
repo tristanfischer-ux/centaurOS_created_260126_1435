@@ -1058,10 +1058,19 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
                 // B1a FIX: quantity resolution.
                 // Prefer the bomLine quantity if a matching bomLine exists
                 // (childPartId === partNumber). Falls back to 1.
-                const bomLineQty = state.bomLines?.find(
+                const bomLine = state.bomLines?.find(
                   bl => bl.childPartId === p.partNumber || bl.childPartId === p.id
-                )?.quantity
+                )
+                const bomLineQty = bomLine?.quantity
                 const qty = typeof bomLineQty === 'number' && bomLineQty > 0 ? bomLineQty : 1
+                // Per-cell qty realism (2026-05-06): if the BOM line was
+                // overridden deterministically by lib/quantity-derivation,
+                // tint the Qty cell light green so the reader sees which
+                // quantities are formula-derived vs LLM-guessed.
+                const qtyDeterministic = (bomLine as any)?.qtySource === 'deterministic'
+                const qtyCellStyle = qtyDeterministic
+                  ? { backgroundColor: '#e6f4ea' }  // light green
+                  : {}
 
                 const unitCost = p.estimatedUnitCostGbp ?? 0
                 const extCost = unitCost * qty
@@ -1073,7 +1082,7 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
                     <Text style={{ ...s.tC, width: '30%' }}>{formatText(p.name)}</Text>
                     <Text style={{ ...s.tC, width: '17%' }}>{formatText(supplierName)}</Text>
                     <Text style={{ ...s.tC, width: '5%' }}>{grade}</Text>
-                    <Text style={{ ...s.tC, width: '8%', textAlign: 'right' }}>{qty.toLocaleString()}</Text>
+                    <Text style={{ ...s.tC, width: '8%', textAlign: 'right', ...qtyCellStyle }}>{qty.toLocaleString()}</Text>
                     <Text style={{ ...s.tC, width: '10%', textAlign: 'right' }}>{formatGBP(unitCost)}</Text>
                     <Text style={{ ...s.tC, width: '12%', textAlign: 'right' }}>{formatGBP(extCost)}</Text>
                   </View>

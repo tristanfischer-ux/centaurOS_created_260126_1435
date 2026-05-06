@@ -11,6 +11,11 @@ import type { Module, Part, BomLine, CostBreakdown, StageResult, DimensionSheet 
 import { sanitiseLlmOutput } from '../sanitiser'
 import { BOM_GENERATION_SYSTEM } from '../prompts'
 import { parseJsonFromLlm } from '../lib/llm-json'
+import {
+  deriveQuantities,
+  applyOverrides,
+} from '../lib/quantity-derivation'
+import type { ProductSpecs } from '../lib/spec-extraction'
 
 // Stage 4: BOM Generation — uses BOM_GENERATION_SYSTEM from prompts.ts
 
@@ -260,6 +265,11 @@ export async function runBomCost(
     trainingDataDossier?: string
     batchSize?: number
     grounding?: GroundingData
+    // Per-cell qty realism (2026-05-06): specs + productClass let the BOM
+    // stage override LLM-guessed quantities with deterministic formulae
+    // (e.g. BESS cell count from capacity). See lib/quantity-derivation.ts.
+    productSpecs?: ProductSpecs
+    productClass?: string
   }
 ): Promise<StageResult<{ parts: Part[]; bomLines: BomLine[]; costBreakdown: CostBreakdown }>> {
   const startTime = Date.now()
@@ -468,6 +478,58 @@ ${formatProcessesForPrompt(grounding.processes)}
       quantity: Number(bl.quantity) || 1,
     }))
 
+    // ─── Per-cell quantity realism (2026-05-06) ──────────────────────────
+    // Override LLM-guessed BOM quantities with deterministic formulae
+    // derived from ProductSpecs. This is the single biggest lever on BOM
+    // cost accuracy: LLMs guess cell counts between 272 and 5,000 for the
+    // same 3.5 MWh brief. Deterministic qty locks it to ~4,880.
+    //
+    // Overrides are applied in-place to finalBomLines, stamping
+    // `qtySource: 'deterministic'` so the PDF renderer can show the
+    // override visually (green cell background).
+    let appliedBomLines = finalBomLines
+    if (options?.productSpecs && options?.productClass) {
+      const overrides = deriveQuantities(
+        options.productSpecs,
+        options.productClass,
+        finalParts,
+        finalBomLines,
+      )
+      if (overrides.length > 0) {
+        for (const ov of overrides) {
+          console.log(
+            `[bom-cost:qty] override ${ov.partNumber} qty ${ov.oldQty} → ${ov.newQty} ` +
+              `(rule: ${ov.rule}, conf: ${ov.confidence}) — ${ov.explanation}`
+          )
+        }
+        // applyOverrides returns a new array with qtySource/qtyRule stamps.
+        // Cast through unknown because BomLine shape doesn't officially
+        // include these runtime-only fields; PDF renderer reads them via
+        // (bl as any).qtySource.
+        appliedBomLines = applyOverrides(finalBomLines, overrides) as BomLine[]
+        // Also stamp priceSource on the matching parts so the BOM renderer
+        // can show "deterministic-qty" in the Gr. column if needed.
+        for (const ov of overrides) {
+          const part = finalParts.find(
+            p => p.partNumber === ov.partNumber || p.id === ov.partId
+          )
+          if (part) {
+            ;(part as any).qtyDeterministic = true
+            ;(part as any).qtyRule = ov.rule
+          }
+        }
+        console.log(
+          `[bom-cost:qty] Applied ${overrides.length} deterministic qty override(s)`
+        )
+      } else {
+        console.log('[bom-cost:qty] No deterministic overrides applied (no rules matched parts)')
+      }
+    } else {
+      console.log(
+        '[bom-cost:qty] Skipped — missing productSpecs or productClass in options'
+      )
+    }
+
     // ─── Ground each part against the catalogue ──────────────────────────
     let groundedCount = 0
     let heuristicCount = 0
@@ -535,12 +597,12 @@ ${formatProcessesForPrompt(grounding.processes)}
     })
     await Promise.all(searchPromises)
 
-    const costBreakdown = calculateCost(finalParts, finalBomLines, options?.domain || 'default', options?.ceilingGbp || null, options?.batchSize)
+    const costBreakdown = calculateCost(finalParts, appliedBomLines, options?.domain || 'default', options?.ceilingGbp || null, options?.batchSize)
 
     console.log('[bom-cost] BOM generation complete.')
     return {
       ok: true,
-      data: { parts: finalParts, bomLines: finalBomLines, costBreakdown },
+      data: { parts: finalParts, bomLines: appliedBomLines, costBreakdown },
       durationMs: Date.now() - startTime,
     }
   } catch (error: any) {
