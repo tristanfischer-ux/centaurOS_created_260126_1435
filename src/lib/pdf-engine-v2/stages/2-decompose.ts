@@ -92,54 +92,70 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
 
     console.log(`[decompose] ${model} responded: ${raw.length} chars`)
 
-    // Try multiple JSON extraction strategies
+    // A7 FIX (2026-05-06): robust JSON extraction with full-raw-dump on failure.
+    // Previous bracket-matching strategy tracked '{'/'}' depth without string
+    // awareness — a literal '{' or '}' inside a description string threw the
+    // count off and the slice became malformed. New strategy:
+    //   1. Strip markdown fences + thinking blocks
+    //   2. Try JSON.parse on the whole thing (works for well-formed responses)
+    //   3. If that fails, try the first-brace-to-last-brace slice
+    //   4. If that also fails, try the "modules" locator (last resort)
+    //   5. On final failure, dump full raw to disk so we can debug later
     let jsonStr = raw
-    
-    // Strategy 0: Strip thinking/reasoning blocks
     jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
     jsonStr = jsonStr.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '').trim()
-    
-    // Strategy 1: strip markdown code blocks (handles ```json and ```)
-    jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim()
-    
-    // Strategy 2: find JSON with 'modules' key specifically
-    const modulesIdx = jsonStr.indexOf('"modules"')
-    if (modulesIdx > 0) {
-      // Find the opening { before "modules"
-      let start = modulesIdx
-      while (start > 0 && jsonStr[start] !== '{') start--
-      // Find matching closing brace
-      let depth = 0
-      for (let i = start; i < jsonStr.length; i++) {
-        if (jsonStr[i] === '{') depth++
-        else if (jsonStr[i] === '}') depth--
-        if (depth === 0) {
-          jsonStr = jsonStr.slice(start, i + 1)
-          break
-        }
-      }
-    } else {
-      // Strategy 3: find JSON object boundaries
-      const firstBrace = jsonStr.indexOf('{')
-      const lastBrace = jsonStr.lastIndexOf('}')
-      if (firstBrace >= 0 && lastBrace > firstBrace) {
-        jsonStr = jsonStr.slice(firstBrace, lastBrace + 1)
-      }
-    }
-    
+    jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+
+    // Step 1: try parse-whole first — fastest path for well-formed JSON
     try {
       return JSON.parse(jsonStr)
-    } catch (parseError) {
-      console.error(`[decompose] ${model} JSON parsing failed. First 500 chars:`, raw.slice(0, 500))
-      throw new Error('Failed to parse JSON response from LLM')
+    } catch { /* fall through */ }
+
+    // Step 2: first-brace-to-last-brace slice (handles leading prose)
+    const firstBrace = jsonStr.indexOf('{')
+    const lastBrace = jsonStr.lastIndexOf('}')
+    if (firstBrace >= 0 && lastBrace > firstBrace) {
+      try {
+        return JSON.parse(jsonStr.slice(firstBrace, lastBrace + 1))
+      } catch { /* fall through */ }
     }
+
+    // Step 3: "modules" locator (legacy — for when the response has trailing junk)
+    const modulesIdx = jsonStr.indexOf('"modules"')
+    if (modulesIdx > 0) {
+      let start = modulesIdx
+      while (start > 0 && jsonStr[start] !== '{') start--
+      let depth = 0
+      let end = -1
+      for (let i = start; i < jsonStr.length; i++) {
+        if (jsonStr[i] === '{') depth++
+        else if (jsonStr[i] === '}') {
+          depth--
+          if (depth === 0) { end = i; break }
+        }
+      }
+      if (end > start) {
+        try {
+          return JSON.parse(jsonStr.slice(start, end + 1))
+        } catch { /* fall through */ }
+      }
+    }
+
+    // Step 4: dump full raw for later inspection, then fail.
+    try {
+      const fs = await import('fs')
+      const dumpPath = `/tmp/decompose-raw-${model.replace(/\//g, '_')}-${Date.now()}.txt`
+      fs.writeFileSync(dumpPath, raw)
+      console.error(`[decompose] ${model} JSON parse failed. Full raw dumped to ${dumpPath}. First 500: ${raw.slice(0, 500)}`)
+    } catch { /* ignore */ }
+    throw new Error('Failed to parse JSON response from LLM')
     } catch (error) {
       clearTimeout(timeout)
       console.warn(`[decompose] ${model} failed: ${(error as Error).message}. Trying next model...`)
       continue  // Try next model
     }
   }
-  
+
   throw new Error('All models failed for decompose')
 }
 

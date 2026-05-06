@@ -45,33 +45,32 @@ Rules:
 
 // ─── Stage 3: Research Synthesis ───────────────────────────────────────────
 
-export const RESEARCH_SYNTHESIS_SYSTEM = `You are a senior heat pump systems engineer. Parse the brief into a structured engineering specification.
+export const RESEARCH_SYNTHESIS_SYSTEM = `You are a senior systems engineer. Read the founder's brief and produce a structured engineering research synthesis for the product described — whatever the product is (heat pump, battery storage, vertical farm, medical device, industrial machine, etc.).
 
-Return ONLY valid JSON with these fields:
+Return ONLY valid JSON (no markdown fences, no prose before or after). Use this exact schema:
+
 {
-  "report": "500+ word engineering research summary with specific numbers, material properties, and operating parameters",
-  "industryDomain": "thermal_system",
+  "report": "500+ word engineering research summary with specific numbers, material properties, operating parameters, and market data grounded in the brief. Do NOT invent heat-pump details if the brief is not a heat pump.",
+  "industryDomain": "one of: battery_energy_storage | heat_pump | vertical_farm | aerospace | medical_device | consumer_electronics | industrial_machine | fluid_processing | generic",
   "mission": "1-2 sentence mission statement",
-  "useCase": "Specific use case with numbers",
+  "useCase": "Specific use case with numbers from the brief",
   "targetCustomers": "Named customer segments",
   "whyNow": "Market timing with specific data",
-  "sources": [{"title": "Source", "type": "industry_report", "relevance": "Why cited"}],
+  "sources": [{"title": "Source", "type": "industry_report|standard|datasheet|publication", "relevance": "Why cited"}],
   "regulatory": [{"code": "Standard", "name": "Name", "summary": "Scope", "status": "not-started", "applicability": "Where it applies to THIS product", "designImpact": "What it forces the design to do", "evidenceRequired": "What test/certification is needed", "ownerRole": "Who is responsible", "gapAction": "Next concrete step"}],
   "competitors": [{"name": "Company", "product": "Product", "technicalSpecs": "Specific specs with numbers", "pricing": "Price in GBP", "strengths": "S", "weaknesses": "W", "differentiationAngle": "D"}],
   "constraints": {"unitCostCeilingGbp": number|null, "maxMassKg": number|null, "batchSize": number|null}
 }
 
 Rules:
-- Every number must be grounded in engineering reality
-- Use specific manufacturer names (Copeland, Danfoss,SWEP, Grundfos)
-- Include specific standards with versions (BS EN 378:2016, MCS MIS 3005)
-- Market data must cite specific sources
-- EN 378 charge limits depend on room volume, occupancy, and system type — NOT a flat "150g for Category A"
-- ATEX classification is appliance-level, not component-level — do NOT require all components to be Zone-rated
-- Remove any PTFE/oil compatibility claims
-- Pressure relief setpoints must reference specific standard clauses, not generic values
-- Return ONLY the JSON object
-`
+- The brief is authoritative. Every number and every claim must come from the brief or be grounded in published engineering reality for the product category the brief describes.
+- Do NOT assume the product is a heat pump. Derive industryDomain from the brief.
+- Identify 5-10 regulatory standards that genuinely apply to the product described.
+- Identify 3-5 real competitors. If the brief is niche, cite market leaders in adjacent categories and be explicit about the adjacency.
+- Use real manufacturer and standard names with version numbers (e.g. "IEC 62619:2022", "BS EN 378-2:2016", "NFPA 855-2023"). Do not invent standards.
+- Every regulatory entry's applicability must explain WHY it applies to THIS specific product, not just restate the standard's general scope.
+- Market data must cite specific sources with names and years.
+- Return ONLY the JSON object.`
 
 // ─── Stage 4: Regulatory Extraction ────────────────────────────────────────
 
@@ -109,23 +108,26 @@ Rules:
 
 // ─── Stage 5: Module Decomposition ─────────────────────────────────────────
 
-export const MODULE_DECOMPOSITION_SYSTEM = `You are a heat pump systems engineer decomposing a 30kW R290 hydronic split system into modules.
+export const MODULE_DECOMPOSITION_SYSTEM = `You are a systems engineer decomposing a hardware product into its physical subsystems (modules). Use the product brief and research in the user message to identify the modules — do NOT assume a product category.
 
-Return ONLY valid JSON with a "modules" array. Each module must have:
-- name: specific module name (e.g. "Vapor Compression Loop", not "Compressor")
-- purpose: 1-2 sentences with specific engineering details
-- why_it_matters: why the system fails without it
-- description: 2-3 paragraphs with specific materials, methods, operating principles, and numbers
-- keyParts: 3-5 specific component names (e.g. "Copeland ZP38K5 scroll compressor", not "compressor")
-- failureModes: 2-4 specific failure mechanisms with causes
-- riskMatrix: 3-5 entries with hazard, severity (1-5), likelihood (1-5), mitigation
+Return ONLY valid JSON (no markdown fences, no commentary before or after). The object has one key, "modules", whose value is an array.
+
+Each module must have:
+- name: specific subsystem name (e.g. "Refrigerant Vapor Compression Loop", "Power Conversion System", "Fertigation Loop" — not "Compressor", not "PCS", not "Pump"). Capture the subsystem, not a single part.
+- purpose: 1-2 sentences stating what the module does, with specific engineering numbers drawn from the brief (kW, V, A, kg, mm, m², L/min, %).
+- why_it_matters: one sentence on what breaks if this module fails.
+- description: 2-3 paragraphs with concrete materials, methods, operating conditions, and numbers. Cite specific materials (e.g. "6061-T6 aluminium", "LFP prismatic cell") and specific industry-standard methods.
+- keyParts: 3-6 specific component names drawn from the product domain. Prefer real manufacturer/model strings when you know them (e.g. "Copeland ZP38K5 scroll compressor", "CATL LF280K prismatic cell", "SWEP B16 brazed-plate exchanger"). Generic categories ("compressor", "pump") are NOT acceptable.
+- failureModes: 2-4 specific failure mechanisms with a one-line cause chain each.
+- riskMatrix: 3-5 entries { hazard, severity (1-5), likelihood (1-5), mitigation }.
 
 Rules:
-- 8-12 modules for a complex product
-- Every description must include specific numbers (kW, mm, kg, GBP)
-- Every keyPart must be a real component name, not a generic category
-- Every failureMode must have a specific cause, not "overheating"
-- Return ONLY the JSON object`
+- Derive the module list from the brief. If the brief is a BESS, produce BESS subsystems (battery rack, BMS, PCS, thermal management, fire suppression, container fit-out, EMS, DC bus). If it is a heat pump, produce heat pump subsystems. If it is a vertical farm, produce farm subsystems (growing rack, lighting, fertigation, HVAC, CO2 dosing, controls).
+- 6-10 modules total. Fewer for simple products, more for complex ones.
+- Every description must include specific numbers tied to the brief.
+- Every keyPart must be a real, specific component — never a generic category.
+- Every failureMode must state a specific mechanism, not just "overheating" or "wear".
+- Return ONLY the JSON object. No prose before or after. No markdown fences.`
 
 // ─── Stage 6: BOM Generation ───────────────────────────────────────────────
 
