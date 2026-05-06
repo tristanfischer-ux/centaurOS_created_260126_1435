@@ -196,15 +196,17 @@ export async function saveThesisVersion(
 // Business-plan → thesis extraction
 // ============================================================================
 
-const THESIS_EXTRACTION_MODEL = 'gpt-5.5'
+const THESIS_EXTRACTION_MODEL = 'gpt-4.1-mini'  // cheap, low hallucination for structured extraction; GPT-5.5 hallucinates sector tags from investor-preference language
 const THESIS_EXTRACTION_MAX_TOKENS = 2048
 const THESIS_EXTRACTION_MAX_CHARS = 20_000
 
 const THESIS_EXTRACTION_SYSTEM_PROMPT = `You are an expert fundraising advisor. A founder has given you their business plan. Extract a structured investor-targeting thesis so we can match them to the right investors.
 
+CRITICAL RULE for sector_tags: describe the company's product, technology, or industry — NOT the investors' preferences. Words like "deep-tech", "cleantech", "SaaS", "fintech" used in the context of "we're looking for X investors" are investor preferences, NOT the company's sector. Ignore investor-preference language entirely when extracting sector_tags.
+
 Return ONLY a raw JSON object (no markdown, no code fences) with these fields:
 - stage_tags: array of funding stages the company is raising for. Use slugs from this list only: "pre_seed", "seed", "series_a", "series_b", "growth", "late_stage". Empty array if unclear.
-- sector_tags: array of 1-6 sector/industry labels the business sits in (e.g. ["climate", "hardware", "robotics"]). Lowercase, single-word or short-phrase.
+- sector_tags: array of 1-6 labels describing what the company makes or does — its product, technology, or industry vertical. Examples: a company making airborne wind turbines → ["clean_energy", "wind", "hardware"]; a company building battery management chips → ["energy_storage", "semiconductors", "hardware"]. Lowercase, single-word or short-phrase. Ignore investor-preference language.
 - geography: array of ISO-2 country codes where the company operates or wants investors (e.g. ["GB", "US"]). Empty array if none mentioned.
 - cheque_min_cents: minimum cheque size wanted, in GBP pence (integer). null if unknown.
 - cheque_max_cents: maximum cheque size wanted, in GBP pence (integer). null if unknown.
@@ -296,7 +298,7 @@ export async function extractThesisFromBusinessPlan(args: {
         foundryId,
         specialistId: 'fundraising-advisor',
         section: 'money',
-        model: 'opus',
+        model: 'gpt-4.1-mini',
         inputTokens: result.tokensIn,
         outputTokens: result.tokensOut,
         durationMs: Date.now() - startedAt,
