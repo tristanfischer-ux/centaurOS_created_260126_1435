@@ -1425,32 +1425,56 @@ const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
 const RisksSection = ({ state }: { state: PipelineState }) => {
   const allRisks = state.modules?.flatMap(m => (m.riskMatrix || []).map(r => ({ ...r, moduleName: m.name }))) || []
 
+  // E3 (2026-05-06): RPN now uses Severity × Occurrence (Likelihood) × Detection.
+  // Detection defaults to 5 when LLM doesn't emit it (matches the 1-10
+  // scale midpoint — honest 'unknown detectability').
+  // Sort highest-risk-first so reader sees the most important risks first.
+  const enriched = allRisks.map(r => ({
+    ...r,
+    detection: r.detection ?? 5,
+    rpn: (r.severity || 0) * (r.likelihood || 0) * (r.detection ?? 5),
+  })).sort((a, b) => b.rpn - a.rpn)
+
+  // RPN thresholds on the 1000-max S/O/D scale (1-10 × 1-10 × 1-10):
+  //   > 200 critical (red)
+  //   100-200 action required (amber)
+  //   < 100 acceptable with monitoring (green)
+  const rpnBand = (rpn: number) => rpn >= 200 ? RED : rpn >= 100 ? AMBER : GREEN
+
   return (
     <Page size="A4" style={s.page} orientation="landscape">
-      <Text style={s.h1}>6. Failure Modes & Effects Analysis (FMEA) <GradeLabel grade="D" /></Text>
+      <Text style={s.h1}>7. Failure Modes & Effects Analysis (FMEA) <GradeLabel grade="D" /></Text>
+      <Text style={{ ...s.para, color: MUTED, fontSize: 10, marginBottom: 6 }}>
+        RPN = Severity × Occurrence × Detection (each 1-10). Rows sorted highest-risk first.
+        Red ≥ 200 = design change required. Amber 100-200 = mitigation + verification required.
+        Green &lt; 100 = acceptable with monitoring.
+      </Text>
 
       <View style={s.tableWrap}>
         <View style={s.tHead}>
-          <Text style={{ ...s.tHC, width: '15%' }}>Module</Text>
-          <Text style={{ ...s.tHC, width: '20%' }}>Hazard</Text>
-          <Text style={{ ...s.tHC, width: '15%' }}>Cause</Text>
-          <Text style={{ ...s.tHC, width: '15%' }}>Effect</Text>
-          <Text style={{ ...s.tHC, width: '10%', textAlign: 'center' }}>S×L=RPN</Text>
-          <Text style={{ ...s.tHC, width: '25%' }}>Mitigation & Verification Test</Text>
+          <Text style={{ ...s.tHC, width: '12%' }}>Module</Text>
+          <Text style={{ ...s.tHC, width: '17%' }}>Hazard</Text>
+          <Text style={{ ...s.tHC, width: '13%' }}>Cause</Text>
+          <Text style={{ ...s.tHC, width: '12%' }}>Consequence</Text>
+          <Text style={{ ...s.tHC, width: '9%', textAlign: 'center' }}>S×O×D=RPN</Text>
+          <Text style={{ ...s.tHC, width: '18%' }}>Mitigation</Text>
+          <Text style={{ ...s.tHC, width: '19%' }}>Verification test</Text>
         </View>
-        {allRisks.map((r, i) => {
-          const rpn = getRPN(r.severity, r.likelihood, 1)
-          const rpnColor = rpn >= 15 ? RED : rpn >= 8 ? AMBER : GREEN
+        {enriched.map((r, i) => {
+          const color = rpnBand(r.rpn)
           return (
             <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
-              <Text style={{ ...s.tC, width: '15%', fontWeight: 'bold' }}>{formatText(r.moduleName)}</Text>
-              <Text style={{ ...s.tC, width: '20%' }}>{formatText(r.hazard)}</Text>
-              <Text style={{ ...s.tC, width: '15%' }}>{formatText(r.cause)}</Text>
-              <Text style={{ ...s.tC, width: '15%' }}>{formatText(r.consequence)}</Text>
-              <Text style={{ ...s.tC, width: '10%', textAlign: 'center', color: rpnColor, fontWeight: 'bold' }}>
-                {r.severity}×{r.likelihood}={rpn}
+              <Text style={{ ...s.tC, width: '12%', fontWeight: 'bold', fontSize: 8 }}>{formatText(r.moduleName)}</Text>
+              <Text style={{ ...s.tC, width: '17%', fontSize: 8 }}>{formatText(r.hazard)}</Text>
+              <Text style={{ ...s.tC, width: '13%', fontSize: 8 }}>{formatText(r.cause)}</Text>
+              <Text style={{ ...s.tC, width: '12%', fontSize: 8 }}>{formatText(r.consequence)}</Text>
+              <Text style={{ ...s.tC, width: '9%', textAlign: 'center', color, fontWeight: 'bold', fontSize: 9 }}>
+                {r.severity || 0}×{r.likelihood || 0}×{r.detection || 5}={r.rpn}
               </Text>
-              <Text style={{ ...s.tC, width: '25%' }}>{formatText(r.mitigation)}</Text>
+              <Text style={{ ...s.tC, width: '18%', fontSize: 8 }}>{formatText(r.mitigation)}</Text>
+              <Text style={{ ...s.tC, width: '19%', fontSize: 8, fontStyle: r.verificationTest ? 'normal' : 'italic', color: r.verificationTest ? INK : MUTED }}>
+                {r.verificationTest ? formatText(r.verificationTest) : 'No verification test specified'}
+              </Text>
             </View>
           )
         })}
@@ -1459,8 +1483,36 @@ const RisksSection = ({ state }: { state: PipelineState }) => {
         )}
       </View>
 
-      <SourceFooter sources={[{ type: 'LLM Synthesis', detail: 'FMEA Matrix Generation' }]} overallGrade="E" />
-      <PageFooter section="6. FMEA" />
+      {/* RPN histogram / summary */}
+      {enriched.length > 0 && (() => {
+        const critical = enriched.filter(r => r.rpn >= 200).length
+        const amber = enriched.filter(r => r.rpn >= 100 && r.rpn < 200).length
+        const green = enriched.filter(r => r.rpn < 100).length
+        const missingVT = enriched.filter(r => !r.verificationTest).length
+        return (
+          <View style={{ marginTop: 14, flexDirection: 'row', gap: 16 }}>
+            <View style={{ padding: 10, backgroundColor: '#fef2f2', borderLeftWidth: 3, borderLeftColor: RED, flex: 1 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: RED }}>{critical} critical</Text>
+              <Text style={{ fontSize: 9, color: INK }}>RPN ≥ 200 — design change required before production</Text>
+            </View>
+            <View style={{ padding: 10, backgroundColor: '#fffbeb', borderLeftWidth: 3, borderLeftColor: AMBER, flex: 1 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: AMBER }}>{amber} action required</Text>
+              <Text style={{ fontSize: 9, color: INK }}>RPN 100-200 — mitigation + verification test needed</Text>
+            </View>
+            <View style={{ padding: 10, backgroundColor: '#f0fdf4', borderLeftWidth: 3, borderLeftColor: GREEN, flex: 1 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: GREEN }}>{green} acceptable</Text>
+              <Text style={{ fontSize: 9, color: INK }}>RPN &lt; 100 — monitor in production</Text>
+            </View>
+            <View style={{ padding: 10, backgroundColor: BG_SOFT, borderLeftWidth: 3, borderLeftColor: MUTED, flex: 1 }}>
+              <Text style={{ fontSize: 10, fontWeight: 'bold', color: MUTED }}>{missingVT} missing VT</Text>
+              <Text style={{ fontSize: 9, color: INK }}>Rows without a specific verification test — cannot close out</Text>
+            </View>
+          </View>
+        )
+      })()}
+
+      <SourceFooter sources={[{ type: 'LLM Synthesis', detail: 'FMEA matrix generated from module decomposition' }, { type: 'Industry convention', detail: 'S × O × D RPN, 1000-max scale' }]} overallGrade="D" />
+      <PageFooter section="7. FMEA" />
     </Page>
   )
 }

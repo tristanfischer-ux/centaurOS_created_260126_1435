@@ -119,7 +119,17 @@ Each module must have:
 - description: 2-3 paragraphs with concrete materials, methods, operating conditions, and numbers. Cite specific materials (e.g. "6061-T6 aluminium", "LFP prismatic cell") and specific industry-standard methods.
 - keyParts: 3-6 specific component names drawn from the product domain. Prefer real manufacturer/model strings when you know them (e.g. "Copeland ZP38K5 scroll compressor", "CATL LF280K prismatic cell", "SWEP B16 brazed-plate exchanger"). Generic categories ("compressor", "pump") are NOT acceptable.
 - failureModes: 2-4 specific failure mechanisms with a one-line cause chain each.
-- riskMatrix: 3-5 entries { hazard, severity (1-5), likelihood (1-5), mitigation }.
+- riskMatrix: 3-5 FMEA entries per module. Each entry is an object:
+  { hazard, cause, consequence, severity (1-10), likelihood (1-10), detection (1-10), mitigation, verificationTest, owner }
+  - hazard: the specific hazardous event (e.g. "LFP cell internal short circuit propagating to adjacent cells")
+  - cause: a concrete cause chain (e.g. "separator fault → thermal runaway → venting at 180 °C")
+  - consequence: specific consequence in engineering terms (e.g. "multi-cell fire; toxic HF/CO off-gas; potential loss of container")
+  - severity 1-10: 10 = loss of life or total asset loss; 7-9 = serious injury or major damage; 4-6 = repairable damage; 1-3 = minor.
+  - likelihood 1-10: 10 = certain within design life; 7-9 = probable; 4-6 = occasional; 1-3 = remote.
+  - detection 1-10: how hard the failure is to detect BEFORE it causes harm. 10 = uncatchable in field; 1 = clear alarm reaches operator in <1 s.
+  - mitigation: concrete engineering mitigation (specific component / test / procedure), not "improve monitoring".
+  - verificationTest: the SPECIFIC test that confirms the mitigation works (e.g. "UL 9540A propagation test at accredited lab", "dielectric withstand 2.5 kV / 60 s on production samples", "HIL loop test with simulated cell fault injection"). Reference a test method, a standard clause, or a lab procedure — not a generic phrase like "testing".
+  - owner: named engineering role (e.g. "Battery Safety Engineer", "Grid Connection Engineer", "Fire Safety Lead").
 
 Rules:
 - Derive the module list from the brief. If the brief is a BESS, produce BESS subsystems (battery rack, BMS, PCS, thermal management, fire suppression, container fit-out, EMS, DC bus). If it is a heat pump, produce heat pump subsystems. If it is a vertical farm, produce farm subsystems (growing rack, lighting, fertigation, HVAC, CO2 dosing, controls).

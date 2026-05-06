@@ -115,10 +115,18 @@ export interface RiskRow {
   existingControls?: string
   severity: number
   likelihood: number
+  // E3 FIX (2026-05-06): detection rating (1-10) required for proper RPN.
+  // Some LLM outputs omit this; PDF renderer defaults to 5 when missing.
+  detection?: number
   mitigation?: string
+  // E3: verification test — the specific test / analysis / inspection that
+  // confirms the mitigation is effective. Reference-quality FMEA entries have
+  // this; without it, RPN is just a guess.
+  verificationTest?: string
   owner?: string
   residualSeverity?: number
   residualLikelihood?: number
+  residualDetection?: number
 }
 
 export interface Part {
