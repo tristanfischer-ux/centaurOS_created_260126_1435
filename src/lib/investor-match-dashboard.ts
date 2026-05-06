@@ -96,17 +96,16 @@ export function chequeFit(invMin: number | null | undefined, invMax: number | nu
 
 export interface DashboardScore {
   composite: number
-  pillars: { thesis: number; stage: number; geo: number; cheque: number; activity: number; data: number; hardware: number }
-  appliedPillars: { thesis: true; stage: boolean; geo: boolean; cheque: boolean; activity: true; data: true; hardware: boolean }
+  pillars: { thesis: number; stage: number; geography: number; cheque: number }
+  appliedPillars: { thesis: true; stage: boolean; geography: boolean; cheque: boolean }
 }
 
 /**
  * Score a single investor firm against the user query and the semantic
  * thesis similarity (from the pgvector RPC, 0-1). Returns 0-100 composite
- * and the 7 pillar breakdown aligned with forge-capital-app's weighting:
- *   thesis×20 + stage×20 + geo×15 + cheque×15 + activity×15 + data×10 + hardware×15
- *   = /110 (normalised to 0-100).
- * Missing pillars (stage/geo/cheque/hardware) are marked "not applied" and
+ * and the 4 pillar breakdown:
+ *   thesis 25% + stage 25% + geography 25% + cheque 25%
+ * Missing pillars (stage/geo/cheque) are marked "not applied" and
  * excluded from the weight divisor.
  */
 export function scoreFirmDashboard(firm: InvestorFirm, queryText: string, similarity: number | null): DashboardScore {
@@ -120,43 +119,28 @@ export function scoreFirmDashboard(firm: InvestorFirm, queryText: string, simila
   const stageRaw = stageFit(stageFocusStr, queryText)
   const geoRaw = geoFit(geoFocusStr, queryText)
   const chequeRaw = chequeFit(cheque?.min ?? null, cheque?.max ?? null, queryText)
-  const activity = (attrs.is_active_deploying as boolean | undefined) ? 80 : 50
-  const dq = typeof attrs.data_quality_score === 'number' ? attrs.data_quality_score : 0
-  const dataPillar = Math.round(Math.max(0, Math.min(100, dq * 10)))
-  // Hardware pillar: 0-10 raw → 0-100. Null when investor hasn't been scored.
-  const hwRaw = attrs.hardware_fit_score
-  const hwNorm = hwRaw != null ? Math.round(Math.min(10, Math.max(0, hwRaw)) * 10) : null
 
-  // Composite: forge-capital-app weighting (thesis×20 + stage×20 + geo×15 +
-  // cheque×15 + activity×15 + data×10 + hardware×15 = /110).
-  // Always-on: thesis, data, activity.
-  let compositeNum = thesis * 20 + dataPillar * 10 + activity * 15
-  let weight = 20 + 10 + 15
-  if (stageRaw !== null) { compositeNum += stageRaw * 20; weight += 20 }
-  if (geoRaw !== null) { compositeNum += geoRaw * 15; weight += 15 }
-  if (chequeRaw !== null) { compositeNum += chequeRaw * 15; weight += 15 }
-  if (hwNorm !== null) { compositeNum += hwNorm * 15; weight += 15 }
-  const composite = Math.round(compositeNum / weight)
+  // Composite: 25/25/25/25 equal weighting, skip missing dimensions
+  let compositeNum = thesis * 25
+  let weight = 25
+  if (stageRaw !== null) { compositeNum += stageRaw * 25; weight += 25 }
+  if (geoRaw !== null) { compositeNum += geoRaw * 25; weight += 25 }
+  if (chequeRaw !== null) { compositeNum += chequeRaw * 25; weight += 25 }
+  const composite = weight > 0 ? Math.round(compositeNum / weight) : 0
 
   return {
     composite,
     pillars: {
       thesis,
       stage: stageRaw ?? 0,
-      geo: geoRaw ?? 0,
+      geography: geoRaw ?? 0,
       cheque: chequeRaw ?? 0,
-      activity,
-      data: dataPillar,
-      hardware: hwNorm ?? 0,
     },
     appliedPillars: {
       thesis: true,
       stage: stageRaw !== null,
-      geo: geoRaw !== null,
+      geography: geoRaw !== null,
       cheque: chequeRaw !== null,
-      activity: true,
-      data: true,
-      hardware: hwNorm !== null,
     },
   }
 }

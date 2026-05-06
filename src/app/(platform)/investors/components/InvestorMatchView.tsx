@@ -62,15 +62,12 @@ interface EnrichedMatch {
   }
   matchScore: number
   topFactors: string[]
-  /** 7-pillar breakdown from calculateMatchScore — populated by SSE route. */
+  /** 4-pillar breakdown: thesis 25% / stage 25% / geography 25% / cheque 25%. */
   pillars?: {
     thesis: number
     stage: number
-    geo: number
+    geography: number
     cheque: number
-    activity: number
-    data: number
-    hardware: number
   }
   rationale: string
   partner?: {

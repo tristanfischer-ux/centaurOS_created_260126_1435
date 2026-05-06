@@ -54,21 +54,14 @@ export interface MatchBreakdown {
   productReadinessScore: number
   topFactors: string[]
   /**
-   * 7-pillar breakdown aligned with forge-capital-app's `dimAverage()`.
-   * Each pillar is 0-100. The `composite` total weights them as:
-   *   thesis×20 + stage×20 + geo×15 + cheque×15 + activity×15 + data×10 + hardware×15
-   *   = /110 (normalised to 0-100).
-   * Used by MatchPillarBars component — gives a consistent visual rationale
-   * across the table and matches views.
+   * 4-pillar breakdown: thesis 25% / stage 25% / geography 25% / cheque 25%.
+   * Each pillar is 0-100.
    */
   pillars: {
     thesis: number
     stage: number
-    geo: number
+    geography: number
     cheque: number
-    activity: number
-    data: number
-    hardware: number
   }
 }
 
@@ -288,11 +281,8 @@ export function calculateMatchScore(
     pillars: {
       thesis: Math.round(thesisPillar),
       stage: Math.round(stagePillar),
-      geo: Math.round(geoPillar),
+      geography: Math.round(geoPillar),
       cheque: Math.round(chequePillar),
-      activity: Math.round(activityPillar),
-      data: Math.round(dataPillar),
-      hardware: Math.round(hardwarePillar),
     },
   }
 }
@@ -309,16 +299,11 @@ export function calculateMatchScore(
  * always apply (they represent the core signal and profile completeness).
  */
 export function compositePillarScore(pillars: MatchBreakdown['pillars']): number {
-  // Always-on dimensions
-  let score = pillars.thesis * 20 + pillars.data * 10
-  let weight = 20 + 10
-  // Skippable dimensions — skip when 0 (no signal)
-  if (pillars.stage > 0) { score += pillars.stage * 20; weight += 20 }
-  if (pillars.geo > 0) { score += pillars.geo * 15; weight += 15 }
-  if (pillars.cheque > 0) { score += pillars.cheque * 15; weight += 15 }
-  if (pillars.activity > 0) { score += pillars.activity * 15; weight += 15 }
-  if (pillars.hardware > 0) { score += pillars.hardware * 15; weight += 15 }
-  return Math.round(score / weight)
+  // 4-pillar equal weight: thesis 25% + stage 25% + geography 25% + cheque 25%
+  const items = [pillars.thesis, pillars.stage, pillars.geography, pillars.cheque]
+  const valid = items.filter(v => v > 0)
+  if (valid.length === 0) return 0
+  return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)
 }
 
 // ---------------------------------------------------------------------------

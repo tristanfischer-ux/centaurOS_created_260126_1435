@@ -36,10 +36,10 @@ import type {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const SCORECARD_PILLARS: Array<{ key: keyof FirmMatchResult['pillars']; label: string; weight: string }> = [
-  { key: 'thesis',   label: 'Thesis',     weight: '25' },
-  { key: 'stage',    label: 'Stage',      weight: '25' },
-  { key: 'geo',      label: 'Geo',        weight: '25' },
-  { key: 'cheque',   label: 'Cheque',     weight: '25' },
+  { key: 'thesis',    label: 'Thesis',     weight: '25' },
+  { key: 'stage',     label: 'Stage',      weight: '25' },
+  { key: 'geography', label: 'Geo',        weight: '25' },
+  { key: 'cheque',    label: 'Cheque',     weight: '25' },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -324,7 +324,15 @@ export function MatchCard({
         {/* ── Chip row: stage focus · cheque range ── */}
         <ClosedChipRow attrs={attrs} firmType={firmType} />
 
-        {/* ── Score bars in compact view (same as Outreach) ── */}
+        {/* ── Thesis excerpt — WHY THEM above score bars ── */}
+        {thesis && (
+          <p className="text-xs text-muted-foreground mb-2 leading-relaxed line-clamp-2">
+            <span className="font-bold text-foreground uppercase text-[10px] tracking-wider">WHY THEM. </span>
+            {thesis}
+          </p>
+        )}
+
+        {/* ── Score bars in compact view ── */}
         {pillars && (
           <div className="flex gap-2 mb-2">
             {SCORECARD_PILLARS.map(({ key, label, weight }) => {
@@ -345,14 +353,6 @@ export function MatchCard({
               )
             })}
           </div>
-        )}
-
-        {/* ── Thesis excerpt — 2 lines max (roughly 160 chars) ── */}
-        {thesis && (
-          <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed line-clamp-2">
-            <span className="font-bold text-foreground uppercase text-[10px] tracking-wider">WHY THEM. </span>
-            {thesis}
-          </p>
         )}
 
         {/* ── Sector tags — max 3 in closed state ── */}
@@ -663,6 +663,50 @@ export function MatchCard({
                   <div className="flex flex-wrap gap-1">
                     {(attrs as { geo_focus?: string[] }).geo_focus!.map(g => (
                       <span key={g} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{g}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CollapsibleSection>
+        </div>
+      )}
+
+      {/* ── Connections & Intelligence section ── */}
+      {(attrs.connection_brief || attrs.team_expertise || attrs.value_add || (attrs.notable_portfolio?.length ?? 0) > 0 || attrs.recent_deals_summary) && (
+        <div className="mb-3" onClick={e => e.stopPropagation()}>
+          <CollapsibleSection number={3} title="Connections & Intelligence" defaultOpen={false}>
+            <div className="space-y-3">
+              {attrs.connection_brief && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">How to approach</p>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.connection_brief}</p>
+                </div>
+              )}
+              {attrs.team_expertise && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Team expertise</p>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.team_expertise}</p>
+                </div>
+              )}
+              {attrs.value_add && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Value add beyond capital</p>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.value_add}</p>
+                </div>
+              )}
+              {attrs.recent_deals_summary && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Recent deals</p>
+                  <p className="text-sm text-foreground leading-relaxed">{attrs.recent_deals_summary}</p>
+                </div>
+              )}
+              {(attrs.notable_portfolio?.length ?? 0) > 0 && (
+                <div>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1">Notable portfolio</p>
+                  <div className="flex flex-wrap gap-1">
+                    {attrs.notable_portfolio!.slice(0, 12).map(p => (
+                      <span key={p} className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground">{p}</span>
                     ))}
                   </div>
                 </div>

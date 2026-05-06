@@ -3,7 +3,7 @@
  *
  * @description Three inline fact cards at the top of the investor detail page.
  * Server component — no "use client" needed. Shows:
- *   1. Key Facts — fund size, cheque range, actively deploying status
+ *   1. Key Facts — fund size, cheque range
  *   2. Focus — stage focus, sector tags, geographic focus
  *   3. Provenance — website, LinkedIn, headquarters, last verified date
  *
@@ -27,7 +27,6 @@ interface FactStripProps {
     fund_size_gbp?: number
     aum_gbp?: number
     cheque_range_gbp?: { min: number | null; max: number | null }
-    is_active_deploying?: boolean
     stage_focus?: string[]
     sectors?: string[]
     geo_focus?: string[]
@@ -50,7 +49,7 @@ function ensureProtocol(url: string): string {
 
 export function FactStrip({ attrs, fundSizeLabel, aumLabel }: FactStripProps) {
   const hasCheque = attrs.cheque_range_gbp && (attrs.cheque_range_gbp.min != null || attrs.cheque_range_gbp.max != null)
-  const hasKeyFacts = fundSizeLabel || hasCheque || attrs.is_active_deploying !== undefined
+  const hasKeyFacts = fundSizeLabel || hasCheque
   const hasFocus = (attrs.stage_focus && attrs.stage_focus.length > 0) ||
     (Array.isArray(attrs.sectors) && attrs.sectors.length > 0) ||
     (attrs.geo_focus && attrs.geo_focus.length > 0)
@@ -87,22 +86,6 @@ export function FactStrip({ attrs, fundSizeLabel, aumLabel }: FactStripProps) {
                 <p className="text-sm font-semibold text-foreground">
                   {formatCompact(attrs.cheque_range_gbp!.min)} &mdash; {formatCompact(attrs.cheque_range_gbp!.max)}
                 </p>
-              </div>
-            )}
-
-            {attrs.is_active_deploying !== undefined && (
-              <div className="flex items-center gap-1.5 text-sm">
-                {attrs.is_active_deploying ? (
-                  <>
-                    <CheckCircle2 className="h-3.5 w-3.5 text-success" />
-                    <span className="text-success font-medium">Actively deploying</span>
-                  </>
-                ) : (
-                  <>
-                    <Circle className="h-3.5 w-3.5 text-muted-foreground" />
-                    <span className="text-muted-foreground">Not deploying</span>
-                  </>
-                )}
               </div>
             )}
           </CardContent>

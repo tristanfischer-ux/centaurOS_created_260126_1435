@@ -213,8 +213,8 @@ function generateMatchExplanation(
     else if (pillars.stage >= 50) parts.push(`They typically invest at ${stageFocus} — a different stage, but consider building the relationship for future rounds.`)
   }
 
-  if (pillars.geo >= 80) parts.push(`Their geographic focus appears to match your location.`)
-  else if (pillars.geo > 0 && pillars.geo < 50) {
+  if (pillars.geography >= 80) parts.push(`Their geographic focus appears to match your location.`)
+  else if (pillars.geography > 0 && pillars.geography < 50) {
     const geo = (attrs.geo_focus ?? []).join(', ')
     if (geo) parts.push(`Their geographic focus appears to be ${geo} — you may need to position for that market.`)
   }
@@ -230,7 +230,7 @@ function generateMatchExplanation(
     const dims: Array<{ name: string; val: number }> = [
       { name: 'thesis alignment', val: pillars.thesis },
       { name: 'stage fit',        val: pillars.stage },
-      { name: 'geographic match', val: pillars.geo },
+      { name: 'geographic match', val: pillars.geography },
       { name: 'cheque size fit',  val: pillars.cheque },
     ]
     dims.sort((a, b) => a.val - b.val)

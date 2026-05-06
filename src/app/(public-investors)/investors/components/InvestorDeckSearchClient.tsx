@@ -356,7 +356,6 @@ export function InvestorDeckSearchClient({
 
   const handleCancelSearch = useCallback(() => {
     cancelRef.current = true
-    setIsPending(false)
     toast.info('Search cancelled')
   }, [])
 
@@ -1234,11 +1233,7 @@ function ResultsBar({
   lastQuery: string
   isPending: boolean
 }) {
-  // Council audit 2026-04-26: founders flagged "Found 199 matching investors"
-  // as feeling fake/template-driven — every query came back ~200 because the
-  // RPC match_count is capped at 200. Reframed to lead with the visible count
-  // (the actual ranked subset) and demote the wider candidate-pool number to
-  // a secondary caption. Honest about what's shown and what's available.
+  // Show X of Y scored — matches Outreach display pattern.
   const shownNow = isPending ? '…' : (isFree ? Math.min(freeVisible, total) : visibleCount)
   return (
     <div className="flex flex-col gap-1 py-4 mb-0">
@@ -1246,7 +1241,7 @@ function ResultsBar({
         <div className="text-sm text-foreground">
           {lastQuery && <span className="text-muted-foreground mr-1">{lastQuery.slice(0, 40)}{lastQuery.length > 40 ? '…' : ''} ·</span>}
           <strong className="text-international-orange">
-            Top {shownNow} most relevant {isFree ? '(free preview)' : 'matches'}
+            Showing {shownNow} of {isPending ? '…' : total.toLocaleString()} scored{isFree ? ' (free preview)' : ''}
           </strong>
         </div>
         <div className="flex gap-2 flex-wrap">
@@ -1258,7 +1253,7 @@ function ResultsBar({
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
-        Ranked by thesis fit, stage, geography, and cheque size. Cards below are the top {shownNow} of {total}+ candidates surfaced from your description.
+        Ranked by thesis fit, stage, geography, and cheque size. All investors scored against your deck description.
       </div>
     </div>
   )

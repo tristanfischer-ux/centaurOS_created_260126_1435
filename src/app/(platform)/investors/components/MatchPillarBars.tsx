@@ -1,10 +1,7 @@
 /**
  * @file MatchPillarBars.tsx
  *
- * @description 7-pillar match breakdown visualisation aligned with
- * forge-capital-app's 7-dimension scoring system. Consumes the `pillars`
- * object emitted by `calculateMatchScore` so the table and the matches
- * panel always show the same reasoning.
+ * @description 4-pillar match breakdown: thesis 25% / stage 25% / geography 25% / cheque 25%.
  */
 
 'use client'
@@ -24,13 +21,10 @@ interface MatchPillarBarsProps {
 }
 
 const PILLAR_ORDER: Array<{ key: keyof MatchBreakdown['pillars']; label: string }> = [
-  { key: 'thesis', label: 'THESIS' },
-  { key: 'stage', label: 'STAGE' },
-  { key: 'geo', label: 'GEO' },
-  { key: 'cheque', label: 'CHEQUE' },
-  { key: 'activity', label: 'ACTIVITY' },
-  { key: 'data', label: 'DATA' },
-  { key: 'hardware', label: 'HARDWARE' },
+  { key: 'thesis',    label: 'THESIS' },
+  { key: 'stage',     label: 'STAGE' },
+  { key: 'geography', label: 'GEO' },
+  { key: 'cheque',    label: 'CHEQUE' },
 ]
 
 // DECISION: Use inline style colours rather than Tailwind classes. The marketing
@@ -52,7 +46,7 @@ function fillHex(value: number): string {
 export function MatchPillarBars({ pillars, compositeScore, compact = false, hideZeroValues = false, className }: MatchPillarBarsProps) {
   if (compact) {
     return (
-      <div className={cn('grid grid-cols-7 gap-1.5', className)}>
+      <div className={cn('grid grid-cols-4 gap-1.5', className)}>
         {PILLAR_ORDER.map(({ key, label }) => {
           const value = pillars[key] ?? 0
           const isNA = hideZeroValues && value === 0
@@ -87,7 +81,7 @@ export function MatchPillarBars({ pillars, compositeScore, compact = false, hide
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">match</span>
         </div>
       )}
-      <div className="grid grid-cols-4 sm:grid-cols-7 gap-x-2 gap-y-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-2 gap-y-3">
         {PILLAR_ORDER.map(({ key, label }) => {
           const value = pillars[key] ?? 0
           const isNA = hideZeroValues && value === 0
