@@ -174,6 +174,11 @@ export interface CostBreakdown {
   perModule: Array<{ moduleName: string; totalGbp: number }>
   overheadMultiplier: number
   nreTotalGbp: number
+  // E1 FIX (2026-05-06): expose the raw BOM cost (before overhead multiplier)
+  // so the cost-waterfall renderer can break down assembly labour / factory
+  // test / overheads / contingency explicitly rather than hiding them inside
+  // a single overheadMultiplier number.
+  rawBomCostGbp?: number
 }
 
 export interface SpecialistReview {

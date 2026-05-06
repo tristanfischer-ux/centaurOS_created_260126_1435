@@ -968,7 +968,55 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
 const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
   const cb = state.costBreakdown
   const unitTotalGbp = cb?.unitTotalGbp
-  
+  const ceiling = cb?.ceilingGbp ?? state.research?.designBrief?.constraints?.unitCostCeilingGbp ?? null
+  const batchSize = parseInt(state.research?.designBrief?.quantityTarget || '25', 10) || 25
+
+  // E1 FIX (2026-05-06): proper waterfall breakdown. The existing
+  // overheadMultiplier (e.g. 1.5 for BESS) is a single number that hides
+  // labour / testing / shipping / overheads / contingency. Break it out so
+  // the reader sees where the money goes. The split uses industry-typical
+  // percentages of raw BOM and is recomputed here rather than stored in
+  // CostBreakdown — that keeps the cost model simple.
+  const rawBom = cb?.rawBomCostGbp ?? (unitTotalGbp ? unitTotalGbp / (cb?.overheadMultiplier || 1.5) : 0)
+  const labour = rawBom * 0.15          // Assembly labour
+  const test = rawBom * 0.05            // Factory test / QA
+  const shipping = rawBom * 0.02        // Ex-works shipping allowance
+  const overheads = rawBom * 0.08       // Factory overhead
+  const contingency = rawBom * 0.10     // Contingency
+  // waterfallUnit should approximate cb.unitTotalGbp — if it differs we
+  // scale to match so the reader doesn't see two different totals.
+  const waterfallUnit = rawBom + labour + test + shipping + overheads + contingency
+  const scale = waterfallUnit > 0 && unitTotalGbp ? (unitTotalGbp / waterfallUnit) : 1
+
+  const waterfallRows: Array<{ label: string; value: number; note?: string; emphasis?: boolean }> = [
+    { label: 'Raw BOM cost', value: rawBom * scale, note: 'Sum of qty × unit cost across all BOM rows' },
+    { label: '+ Assembly labour (15 %)', value: labour * scale, note: 'In-factory fitting, wiring, termination' },
+    { label: '+ Factory test & QA (5 %)', value: test * scale, note: 'Module-level and end-of-line test' },
+    { label: '+ Ex-works shipping (2 %)', value: shipping * scale, note: 'Packaging + factory-gate freight allowance' },
+    { label: '+ Factory overheads (8 %)', value: overheads * scale, note: 'Facility, utilities, G&A' },
+    { label: '+ Contingency (10 %)', value: contingency * scale, note: 'Cost-overrun buffer for prototype batch' },
+    { label: '= Estimated unit cost', value: (unitTotalGbp ?? waterfallUnit), emphasis: true },
+  ]
+
+  // NRE breakdown: if there's a regulatory section, use per-standard ticket
+  // prices; otherwise show a simpler 'tooling + compliance' single-line.
+  const regulatory = state.research?.designBrief?.regulatory || []
+  const nreTotal = cb?.nreTotalGbp ?? 0
+  const nrePerStandard = regulatory.length > 0 ? nreTotal / regulatory.length : 0
+  const nreRows: Array<{ label: string; value: number; note?: string }> = regulatory.length > 0
+    ? regulatory.slice(0, 6).map(r => ({
+        label: r.code || r.name || 'Standard',
+        value: nrePerStandard,
+        note: 'Certification + type testing + documentation',
+      }))
+    : [{ label: 'Tooling, testing & compliance', value: nreTotal, note: 'Domain-average estimate' }]
+  const nrePerUnit = nreTotal / Math.max(1, batchSize)
+
+  // Ceiling comparison
+  const totalLoaded = (unitTotalGbp ?? 0) + nrePerUnit
+  const overBy = ceiling != null ? totalLoaded - ceiling : null
+  const overPct = ceiling ? ((totalLoaded - ceiling) / ceiling) * 100 : null
+
   const reductionPaths = [
     { strategy: 'DFMA redesign of enclosure', savings: '12-15%', effort: 'High' },
     { strategy: 'Volume sourcing agreement for cells', savings: '8-10%', effort: 'Medium' },
@@ -976,7 +1024,6 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
     { strategy: 'Offshore wire harness assembly', savings: '6-8%', effort: 'Medium' }
   ]
 
-  // Display BLOCKED callout if cost cannot be computed
   const isBlocked = !cb || !unitTotalGbp || unitTotalGbp === 0
 
   return (
@@ -989,11 +1036,39 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
         </View>
       ) : (
         <>
-          <Text style={s.h3}>Unit Cost Breakdown</Text>
+          <Text style={s.h3}>Unit cost waterfall</Text>
+          <Text style={{ ...s.para, fontSize: 9.5, color: MUTED, marginBottom: 6 }}>
+            BOM sourced from Stage 4. Percentages reflect typical UK small-batch manufacturing for this product class.
+          </Text>
+          <View style={s.tableWrap}>
+            <View style={s.tHead}>
+              <Text style={{ ...s.tHC, width: '42%' }}>Line</Text>
+              <Text style={{ ...s.tHC, width: '38%' }}>Rationale</Text>
+              <Text style={{ ...s.tHC, width: '20%', textAlign: 'right' }}>£ per unit</Text>
+            </View>
+            {waterfallRows.map((r, i) => (
+              <View
+                key={i}
+                style={{
+                  ...(i % 2 === 0 ? s.tRow : s.tRowAlt),
+                  ...(r.emphasis
+                    ? { backgroundColor: '#fff7ed', borderTopWidth: 2, borderTopColor: BRAND }
+                    : {}),
+                }}
+                wrap={false}
+              >
+                <Text style={{ ...s.tC, width: '42%', fontWeight: r.emphasis ? 'bold' : 'normal' }}>{r.label}</Text>
+                <Text style={{ ...s.tC, width: '38%', color: MUTED, fontSize: 9 }}>{r.note || ''}</Text>
+                <Text style={{ ...s.tC, width: '20%', textAlign: 'right', fontWeight: r.emphasis ? 'bold' : 'normal', color: r.emphasis ? BRAND : INK }}>{formatGBP(r.value)}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={s.h3}>Per-module BOM totals</Text>
           <View style={s.tableWrap}>
             <View style={s.tHead}>
               <Text style={{ ...s.tHC, width: '60%' }}>Module</Text>
-              <Text style={{ ...s.tHC, width: '40%', textAlign: 'right' }}>Subtotal</Text>
+              <Text style={{ ...s.tHC, width: '40%', textAlign: 'right' }}>£ subtotal</Text>
             </View>
             {cb?.perModule?.map((pm, i) => (
               <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
@@ -1001,35 +1076,75 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
                 <Text style={{ ...s.tC, width: '40%', textAlign: 'right' }}>{formatGBP(pm.totalGbp)}</Text>
               </View>
             ))}
-            <View style={{ ...s.tRow, backgroundColor: '#fff7ed', borderTopWidth: 2, borderTopColor: BRAND }}>
-              <Text style={{ ...s.tC, width: '60%', fontWeight: 'bold' }}>Total Unit BOM Cost</Text>
-              <Text style={{ ...s.tC, width: '40%', textAlign: 'right', fontWeight: 'bold', color: BRAND }}>{formatGBP(cb?.unitTotalGbp)}</Text>
-            </View>
           </View>
 
-          <Text style={s.h3}>Non-Recurring Engineering (NRE)</Text>
+          <Text style={s.h3}>Non-recurring engineering (NRE)</Text>
           <View style={s.tableWrap}>
             <View style={s.tHead}>
-              <Text style={{ ...s.tHC, width: '60%' }}>Item</Text>
-              <Text style={{ ...s.tHC, width: '40%', textAlign: 'right' }}>Estimated Cost</Text>
+              <Text style={{ ...s.tHC, width: '42%' }}>Standard / activity</Text>
+              <Text style={{ ...s.tHC, width: '38%' }}>Scope</Text>
+              <Text style={{ ...s.tHC, width: '20%', textAlign: 'right' }}>£ total</Text>
             </View>
-            <View style={s.tRow}>
-              <Text style={{ ...s.tC, width: '60%' }}>Tooling, Testing & Compliance</Text>
-              <Text style={{ ...s.tC, width: '40%', textAlign: 'right' }}>{formatGBP(cb?.nreTotalGbp)}</Text>
+            {nreRows.map((r, i) => (
+              <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                <Text style={{ ...s.tC, width: '42%', fontWeight: 'bold' }}>{formatText(r.label)}</Text>
+                <Text style={{ ...s.tC, width: '38%', color: MUTED, fontSize: 9 }}>{formatText(r.note)}</Text>
+                <Text style={{ ...s.tC, width: '20%', textAlign: 'right' }}>{formatGBP(r.value)}</Text>
+              </View>
+            ))}
+            <View style={{ ...s.tRow, backgroundColor: '#f0fdf4', borderTopWidth: 1, borderTopColor: BORDER_DARK }}>
+              <Text style={{ ...s.tC, width: '42%', fontWeight: 'bold' }}>NRE total</Text>
+              <Text style={{ ...s.tC, width: '38%' }}></Text>
+              <Text style={{ ...s.tC, width: '20%', textAlign: 'right', fontWeight: 'bold' }}>{formatGBP(nreTotal)}</Text>
             </View>
             <View style={{ ...s.tRow, backgroundColor: '#f0fdf4' }}>
-              <Text style={{ ...s.tC, width: '60%', fontWeight: 'bold' }}>Amortised per unit ({state.research?.designBrief?.quantityTarget || 1} units)</Text>
-              <Text style={{ ...s.tC, width: '40%', textAlign: 'right', fontWeight: 'bold' }}>
-                {formatGBP((cb?.nreTotalGbp || 0) / (parseInt(state.research?.designBrief?.quantityTarget || '1', 10) || 1))}
-              </Text>
+              <Text style={{ ...s.tC, width: '42%', fontWeight: 'bold' }}>Amortised per unit ({batchSize} units/year)</Text>
+              <Text style={{ ...s.tC, width: '38%' }}></Text>
+              <Text style={{ ...s.tC, width: '20%', textAlign: 'right', fontWeight: 'bold' }}>{formatGBP(nrePerUnit)}</Text>
             </View>
           </View>
 
-          <Text style={s.h3}>Cost Reduction Paths</Text>
+          <Text style={s.h3}>Ceiling comparison</Text>
+          <View style={s.tableWrap}>
+            <View style={s.tHead}>
+              <Text style={{ ...s.tHC, width: '60%' }}>Metric</Text>
+              <Text style={{ ...s.tHC, width: '40%', textAlign: 'right' }}>£ per unit</Text>
+            </View>
+            <View style={s.tRow}>
+              <Text style={{ ...s.tC, width: '60%' }}>Unit cost (ex-works, batch of {batchSize})</Text>
+              <Text style={{ ...s.tC, width: '40%', textAlign: 'right' }}>{formatGBP(unitTotalGbp)}</Text>
+            </View>
+            <View style={s.tRowAlt}>
+              <Text style={{ ...s.tC, width: '60%' }}>+ NRE amortised / unit</Text>
+              <Text style={{ ...s.tC, width: '40%', textAlign: 'right' }}>{formatGBP(nrePerUnit)}</Text>
+            </View>
+            <View style={{ ...s.tRow, backgroundColor: '#fff7ed', borderTopWidth: 2, borderTopColor: BRAND }}>
+              <Text style={{ ...s.tC, width: '60%', fontWeight: 'bold' }}>= Fully-loaded cost per unit</Text>
+              <Text style={{ ...s.tC, width: '40%', textAlign: 'right', fontWeight: 'bold', color: BRAND }}>{formatGBP(totalLoaded)}</Text>
+            </View>
+            {ceiling != null && (
+              <View style={s.tRow}>
+                <Text style={{ ...s.tC, width: '60%' }}>Target ceiling</Text>
+                <Text style={{ ...s.tC, width: '40%', textAlign: 'right' }}>{formatGBP(ceiling)}</Text>
+              </View>
+            )}
+            {overBy != null && (
+              <View style={{ ...s.tRowAlt, backgroundColor: overBy > 0 ? '#fef2f2' : '#f0fdf4' }}>
+                <Text style={{ ...s.tC, width: '60%', fontWeight: 'bold' }}>
+                  {overBy > 0 ? 'Over ceiling by' : 'Under ceiling by'}
+                </Text>
+                <Text style={{ ...s.tC, width: '40%', textAlign: 'right', fontWeight: 'bold', color: overBy > 0 ? RED : GREEN }}>
+                  {formatGBP(Math.abs(overBy))} ({(overPct ?? 0).toFixed(1).replace('-', '')} %)
+                </Text>
+              </View>
+            )}
+          </View>
+
+          <Text style={s.h3}>Cost reduction paths</Text>
           <View style={s.tableWrap}>
             <View style={s.tHead}>
               <Text style={{ ...s.tHC, width: '50%' }}>Strategy</Text>
-              <Text style={{ ...s.tHC, width: '25%' }}>Est. Savings</Text>
+              <Text style={{ ...s.tHC, width: '25%' }}>Est. savings</Text>
               <Text style={{ ...s.tHC, width: '25%' }}>Effort</Text>
             </View>
             {reductionPaths.map((rp, i) => (

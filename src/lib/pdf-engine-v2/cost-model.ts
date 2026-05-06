@@ -77,6 +77,7 @@ export function calculateCost(
   }
 
   let unitTotalGbp = 0;
+  let rawBomCostGbp = 0;
   const perModule: Array<{ moduleName: string; totalGbp: number }> = [];
 
   for (const [mId, moduleParts] of partsByModule.entries()) {
@@ -90,6 +91,7 @@ export function calculateCost(
 
     perModule.push({ moduleName: moduleNames.get(mId) || mId, totalGbp });
 
+    rawBomCostGbp += baseModuleCost
     unitTotalGbp += totalGbp;
   }
 
@@ -99,6 +101,7 @@ export function calculateCost(
 
   return {
     unitTotalGbp,
+    rawBomCostGbp,
     ceilingGbp,
     perModule,
     overheadMultiplier: overhead.multiplier,
