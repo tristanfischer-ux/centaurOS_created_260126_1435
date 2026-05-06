@@ -90,11 +90,41 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 ## Active increment
 
-Currently: **baseline-3 running** — captures the final state with every tonight's commit applied.
+Currently: **Layer 1 benchmark anchoring** — build benchmarks.ts with 30-50 anchor points, wire into cost-waterfall page.
 
-After baseline-3 completes I'll run a final baseline-4 (all fresh tsx processes) for clean reference, because during baseline-3 I committed B3 (supplier shortlist) after BESS/HP tsx processes had already started, so only farm in baseline-3 will include B3.
+---
 
-Budget: ~£30-35 of £40+ (increased) spent across all baselines + evidence runs.
+## Outstanding work — full list (do not lose)
+
+### Benchmarks (anchor cost output against real-world data)
+- **BENCH-L1** — hand-curated benchmarks.ts with 30-50 anchor points per domain (BESS, heat pump, vertical farm). Sources: BloombergNEF, Modo Energy, IRENA, Heat Pump Association, RenewableUK, Solar Energy UK, public company reports. `benchmarkBand(productClass, capacity)` returns `{low, typical, high, unit, sources[]}`. Wire into cost-waterfall page as a "Benchmark Comparison" panel. [IN PROGRESS]
+- **BENCH-L2** — extract benchmarks from corpus.db page_chunks (1.9M chunks) via regex + LLM classification. Grows the L1 table over time. [BACKLOG]
+- **BENCH-L3** — live search + LLM anchoring at pipeline time. When a brief targets a product type where L1+L2 have sparse data, Brave search for "cost per MW/MWh [product] UK 2024" + small LLM estimate pass. Gate engine cost output against band; flag >2× outside. [BACKLOG]
+
+### Pure engine gaps
+- **A3** defensive null rendering across all PDF sections [MEDIUM]
+- **A4** abort on critical-stage failure — partial today [MEDIUM]
+- **HP-003** verdict wording alignment on monobloc paths [LOW]
+- **CX-001** compact feasibility banner text [LOW]
+- **Per-cell qty realism** — deterministic qty derivation from brief specs (energy → cell count, power → inverter sizing, area → panels). [HIGH for cost accuracy]
+
+### Phase D — make the corpus more useful
+- **D1** reverse index: process_name → [company_ids] SQL materialised view on nightshift.db. [MEDIUM]
+- **D2** reverse index: material → [company_ids] from materials_worked arrays. [MEDIUM]
+- **D3** boilerplate strip + domain tagging of deep_website_text; 20-tag taxonomy; filter semantic search by domain. [HIGH — runs once, benefits every future run]
+
+### Phase E — remaining sections
+- **E4** datasheet-backed top-10 BOM part notes — semantic search over page_chunks corpus. [HIGH — first visible use of the 1.9M corpus]
+
+### Recently landed (done tonight)
+- A1 A2 A5 A6 A7 A8 A9 A10 A11/b/c/d A12/b
+- FARM-CLS-1/2
+- B1a/b B2/b B3
+- C1 C2
+- E1 E2 **E3**
+- UX1 CX-002
+
+Budget: ~£30-35 of £40+ spent.
 
 ---
 
