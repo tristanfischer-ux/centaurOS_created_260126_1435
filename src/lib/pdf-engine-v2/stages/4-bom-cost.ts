@@ -452,7 +452,7 @@ ${formatProcessesForPrompt(grounding.processes)}
     })
     await Promise.all(searchPromises)
 
-    const costBreakdown = calculateCost(finalParts, options?.domain || 'default', options?.ceilingGbp || null)
+    const costBreakdown = calculateCost(finalParts, finalBomLines, options?.domain || 'default', options?.ceilingGbp || null, options?.batchSize)
 
     console.log('[bom-cost] BOM generation complete.')
     return {

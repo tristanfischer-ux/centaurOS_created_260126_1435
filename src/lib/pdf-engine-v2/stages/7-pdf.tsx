@@ -373,6 +373,48 @@ const GradeLabel = ({ grade, label }: { grade: string, label?: string }) => (
   </Text>
 )
 
+// B1a FIX (2026-05-06): supplier fallback — many BOM rows have a manufacturer
+// embedded in the part name (e.g. "CATL 280Ah LFP Prismatic Storage Cell" →
+// "CATL"; "Morgan Advanced Materials Superwool Plus" → "Morgan Advanced
+// Materials"). This extracts that prefix so the Supplier column isn't "TBD"
+// everywhere when Stage 5 (Brave search) returns empty lists.
+const MANUFACTURER_STOP_WORDS = new Set([
+  'battery','cell','cells','module','rack','stack','pack','busbar','bus-bar',
+  'frame','weldment','compression','endplate','plate','panel','insert','nut','bolt','washer',
+  'bracket','gasket','seal','cable','harness','wire','conduit','pipe','hose','tube','tubing',
+  'heater','cooler','chiller','condenser','evaporator','exchanger','manifold',
+  'contactor','relay','fuse','switch','disconnect','breaker','resistor','capacitor','inductor',
+  'sensor','transducer','transmitter','detector','gauge','meter','regulator','valve','pump','fan',
+  'controller','control','board','driver','transformer','rectifier','charger','battery',
+  'mineral','fiber','fibre','foam','coating','paint','resin','epoxy','adhesive','silicone','rubber',
+  'standoff','threaded','enclosure','cabinet','housing','chassis','container','box','case',
+  'the','and','for','with','of','in','at','on','by','to','from','a','an','per','as',
+  'standard','custom','series','type','grade','class','category',
+])
+function extractManufacturerPrefix(partName: string | undefined): string | null {
+  if (!partName) return null
+  // Strip everything after the first comma, hyphen descriptor, or slash.
+  const head = partName.split(/[,/]|(?:\s-\s)/)[0].trim()
+  const tokens = head.split(/\s+/)
+  const out: string[] = []
+  for (const t of tokens) {
+    if (!t) continue
+    // Stop at first digit-starting token (e.g. "280Ah", "5kW")
+    if (/^\d/.test(t)) break
+    // Stop at first lowercase word that isn't an ampersand connector
+    if (/^[a-z]/.test(t) && t !== '&' && t.toLowerCase() !== 'and') break
+    // Stop at known part-descriptor stop words
+    if (MANUFACTURER_STOP_WORDS.has(t.toLowerCase())) break
+    out.push(t)
+    if (out.length >= 4) break  // cap at 4 tokens
+  }
+  // Must be at least one Title-Cased or ALL-CAPS token to count as manufacturer
+  if (out.length === 0) return null
+  const joined = out.join(' ').trim()
+  if (joined.length < 2) return null
+  return joined
+}
+
 const KV = ({ label, value, grade }: { label: string, value: any, grade?: string }) => (
   <View style={s.kvRow} wrap={false}>
     <Text style={s.kvLabel}>{label}</Text>
@@ -814,29 +856,70 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
             <Text style={s.h3}>Bill of Materials (BOM) <GradeLabel grade="D" /></Text>
             <View style={s.tableWrap}>
               <View style={s.tHead}>
-                <Text style={{ ...s.tHC, width: '25%' }}>Part #</Text>
-                <Text style={{ ...s.tHC, width: '35%' }}>Description</Text>
-                <Text style={{ ...s.tHC, width: '15%' }}>Supplier</Text>
-                <Text style={{ ...s.tHC, width: '10%' }}>Grade</Text>
-                <Text style={{ ...s.tHC, width: '15%', textAlign: 'right' }}>Cost</Text>
+                <Text style={{ ...s.tHC, width: '18%' }}>Part #</Text>
+                <Text style={{ ...s.tHC, width: '30%' }}>Description</Text>
+                <Text style={{ ...s.tHC, width: '17%' }}>Supplier</Text>
+                <Text style={{ ...s.tHC, width: '5%' }}>Gr.</Text>
+                <Text style={{ ...s.tHC, width: '8%', textAlign: 'right' }}>Qty</Text>
+                <Text style={{ ...s.tHC, width: '10%', textAlign: 'right' }}>Unit £</Text>
+                <Text style={{ ...s.tHC, width: '12%', textAlign: 'right' }}>Ext £</Text>
               </View>
               {modParts.map((p, i) => {
+                // B1a FIX: supplier resolution with fallback.
+                // (1) Check state.suppliers by id or name.
+                // (2) If none matched, extract manufacturer-like prefix from
+                //     the part name (e.g. "CATL 280Ah LFP Prismatic..." →
+                //     "CATL"; "Morgan Advanced Materials Superwool..." →
+                //     "Morgan Advanced Materials").
                 const supMatch = state.suppliers?.find(s => s.partId === p.id || s.partName === p.name)
-                const supplierName = supMatch?.suppliers?.[0]?.name || 'TBD'
-                const grade = p.isPurchased ? 'B' : 'D' 
+                const supplierFromStage5 = supMatch?.suppliers?.[0]?.name
+                const supplierFromName = extractManufacturerPrefix(p.name)
+                const supplierName = supplierFromStage5 || supplierFromName || 'TBD'
+                const supplierSource = supplierFromStage5 ? 'B' : (supplierFromName ? 'D' : 'E')
+
+                // B1a FIX: quantity resolution.
+                // Prefer the bomLine quantity if a matching bomLine exists
+                // (childPartId === partNumber). Falls back to 1.
+                const bomLineQty = state.bomLines?.find(
+                  bl => bl.childPartId === p.partNumber || bl.childPartId === p.id
+                )?.quantity
+                const qty = typeof bomLineQty === 'number' && bomLineQty > 0 ? bomLineQty : 1
+
+                const unitCost = p.estimatedUnitCostGbp ?? 0
+                const extCost = unitCost * qty
+
+                const grade = p.isPurchased ? 'B' : (unitCost > 0 ? 'D' : 'E')
                 return (
                   <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
-                    <Text style={{ ...s.tC, width: '25%', fontWeight: 'bold' }}>{formatText(p.partNumber)}</Text>
-                    <Text style={{ ...s.tC, width: '35%' }}>{formatText(p.name)}</Text>
-                    <Text style={{ ...s.tC, width: '15%' }}>{formatText(supplierName)}</Text>
-                    <Text style={{ ...s.tC, width: '10%' }}>{grade}</Text>
-                    <Text style={{ ...s.tC, width: '15%', textAlign: 'right' }}>{formatGBP(p.estimatedUnitCostGbp)}</Text>
+                    <Text style={{ ...s.tC, width: '18%', fontWeight: 'bold' }}>{formatText(p.partNumber)}</Text>
+                    <Text style={{ ...s.tC, width: '30%' }}>{formatText(p.name)}</Text>
+                    <Text style={{ ...s.tC, width: '17%' }}>{formatText(supplierName)}</Text>
+                    <Text style={{ ...s.tC, width: '5%' }}>{grade}</Text>
+                    <Text style={{ ...s.tC, width: '8%', textAlign: 'right' }}>{qty.toLocaleString()}</Text>
+                    <Text style={{ ...s.tC, width: '10%', textAlign: 'right' }}>{formatGBP(unitCost)}</Text>
+                    <Text style={{ ...s.tC, width: '12%', textAlign: 'right' }}>{formatGBP(extCost)}</Text>
                   </View>
                 )
               })}
               {modParts.length === 0 && (
                 <View style={s.tRow}><Text style={{ ...s.tC, width: '100%', fontStyle: 'italic', color: MUTED }}>No parts defined.</Text></View>
               )}
+              {/* Module subtotal row */}
+              {modParts.length > 0 && (() => {
+                const moduleTotal = modParts.reduce((acc, p) => {
+                  const q = state.bomLines?.find(
+                    bl => bl.childPartId === p.partNumber || bl.childPartId === p.id
+                  )?.quantity ?? 1
+                  return acc + (p.estimatedUnitCostGbp ?? 0) * q
+                }, 0)
+                return (
+                  <View style={{ ...s.tRow, borderTopWidth: 1, borderTopColor: BORDER_DARK, backgroundColor: '#f2f2f2' }} wrap={false}>
+                    <Text style={{ ...s.tC, width: '70%', fontWeight: 'bold' }}>Module subtotal ({modParts.length} parts)</Text>
+                    <Text style={{ ...s.tC, width: '18%' }}></Text>
+                    <Text style={{ ...s.tC, width: '12%', textAlign: 'right', fontWeight: 'bold' }}>{formatGBP(moduleTotal)}</Text>
+                  </View>
+                )
+              })()}
             </View>
 
             <SourceFooter sources={[{ type: 'LLM Architecture', detail: 'Decomposition Logic' }, { type: 'LLM BOM', detail: 'Parts expansion' }]} overallGrade="D" />

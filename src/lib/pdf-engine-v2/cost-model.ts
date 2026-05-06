@@ -1,31 +1,67 @@
-import { Part, CostBreakdown, DOMAIN_OVERHEAD } from './types';
+import { Part, BomLine, CostBreakdown, DOMAIN_OVERHEAD } from './types';
 
-/**
- * Sum all parts in a module
- * @param parts Array of parts
- * @param moduleId The module ID to sum
- * @returns Total cost of parts in the module
- */
-export function moduleCost(parts: Part[], moduleId: string): number {
-  return parts
-    .filter(p => p.sourceModuleId === moduleId)
-    .reduce((sum, p) => sum + (p.estimatedUnitCostGbp ?? 0), 0);
+// B1b FIX (2026-05-06): base NRE per module by product domain. Previous
+// 5000/module default was absurdly low (8 modules × 0.15 × £5,000 = £6,000
+// total for a BESS, whereas the reference report breaks down £355k of NRE:
+// UL 9540A £100k + G99 £60k + IEC 62619 £40k + firmware £35k + tooling £25k).
+// These values are still approximations but at least put the headline in the
+// right order of magnitude pending the proper regulatory-cost E2 work.
+const BASE_NRE_PER_MODULE_GBP: Record<string, number> = {
+  battery_energy_storage: 20000, // heavy regulatory: UL 9540A, G99, IEC 62619
+  heat_pump: 8000,               // EN 378 + PED + MCS
+  vertical_farm: 3000,           // lighter regulatory
+  aerospace: 40000,              // AS9100 + DO-160 etc.
+  medical: 30000,                // MDR / 510(k)
+  vehicle: 25000,                // ECE regulations + crash
+  default: 5000,
 }
 
 /**
- * Calculate cost breakdown from BOM parts
- * @param parts Array of all parts in the BOM
- * @param domain The domain of the product
- * @param ceilingGbp The target cost ceiling, if any
- * @returns CostBreakdown
+ * Sum all parts in a module, counting BOM line quantities. Returns the
+ * rolled cost (qty × unit cost) for parts whose sourceModuleId matches.
+ */
+export function moduleCost(
+  parts: Part[],
+  bomLines: BomLine[] | undefined,
+  moduleId: string,
+): number {
+  return parts
+    .filter(p => p.sourceModuleId === moduleId)
+    .reduce((sum, p) => {
+      const qty = resolveQuantity(p, bomLines)
+      return sum + (p.estimatedUnitCostGbp ?? 0) * qty
+    }, 0);
+}
+
+/**
+ * Look up the quantity of a part from the BOM lines. Falls back to 1 when
+ * no bomLine references the part. This is the single source of truth for
+ * part quantity across cost rollup, module subtotal, and PDF rendering.
+ */
+export function resolveQuantity(part: Part, bomLines: BomLine[] | undefined): number {
+  if (!bomLines || bomLines.length === 0) return 1
+  let total = 0
+  for (const bl of bomLines) {
+    if (bl.childPartId === part.partNumber || bl.childPartId === part.id) {
+      total += bl.quantity || 0
+    }
+  }
+  return total > 0 ? total : 1
+}
+
+/**
+ * Calculate cost breakdown from BOM parts + BOM lines (for quantities).
  */
 export function calculateCost(
   parts: Part[],
+  bomLines: BomLine[] | undefined,
   domain: string,
-  ceilingGbp: number | null
+  ceilingGbp: number | null,
+  batchSize: number = 25,
 ): CostBreakdown {
   const domainKey = DOMAIN_OVERHEAD[domain] ? domain : 'default';
   const overhead = DOMAIN_OVERHEAD[domainKey] || DOMAIN_OVERHEAD.default;
+  const baseNre = BASE_NRE_PER_MODULE_GBP[domainKey] || BASE_NRE_PER_MODULE_GBP.default;
 
   // Group parts by sourceModuleId
   const partsByModule = new Map<string, Part[]>();
@@ -44,22 +80,23 @@ export function calculateCost(
   const perModule: Array<{ moduleName: string; totalGbp: number }> = [];
 
   for (const [mId, moduleParts] of partsByModule.entries()) {
-    // 1. sum each module's parts
-    const baseModuleCost = moduleParts.reduce((sum, p) => sum + (p.estimatedUnitCostGbp ?? 0), 0);
-    // 3. apply multiplier to each module total
+    // Sum each module's parts counting BOM quantity.
+    const baseModuleCost = moduleParts.reduce((sum, p) => {
+      const qty = resolveQuantity(p, bomLines)
+      return sum + (p.estimatedUnitCostGbp ?? 0) * qty
+    }, 0);
+    // Apply overhead multiplier (labour, assembly, test, factory cost)
     const totalGbp = baseModuleCost * overhead.multiplier;
-    
+
     perModule.push({ moduleName: moduleNames.get(mId) || mId, totalGbp });
-    
-    // 5. unit total = sum of all module totals
+
     unitTotalGbp += totalGbp;
   }
 
-  // 4. Calculate NRE
+  // NRE: domain-aware base per module, amortised over the batch.
   const moduleCount = partsByModule.size;
-  const nreTotalGbp = moduleCount * overhead.nreRate * 5000;
+  const nreTotalGbp = moduleCount * baseNre;
 
-  // 6. Return CostBreakdown
   return {
     unitTotalGbp,
     ceilingGbp,

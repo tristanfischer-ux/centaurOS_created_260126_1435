@@ -1,5 +1,5 @@
 import { calculateCost, moduleCost, checkCostCeiling, formatGbp } from './cost-model';
-import type { Part, CostBreakdown } from './types';
+import type { Part, BomLine, CostBreakdown } from './types';
 
 describe('Cost Model', () => {
   const mockParts: Part[] = [
@@ -8,46 +8,69 @@ describe('Cost Model', () => {
     { partNumber: 'MOD2-001', name: 'Sensor', sourceModuleId: 'mod2', estimatedUnitCostGbp: 20, massKg: 0.1 },
   ];
 
+  // BomLines left empty = every part treated as qty=1 (legacy behaviour).
+  const noLines: BomLine[] = []
+
   describe('moduleCost', () => {
     it('sums parts correctly for a given moduleId', () => {
-      const cost = moduleCost(mockParts, 'mod1');
+      const cost = moduleCost(mockParts, noLines, 'mod1');
       expect(cost).toBe(150); // 100 + 50
     });
 
     it('returns 0 when no parts match the moduleId', () => {
-      const cost = moduleCost(mockParts, 'non_existent_mod');
+      const cost = moduleCost(mockParts, noLines, 'non_existent_mod');
       expect(cost).toBe(0);
+    });
+
+    it('multiplies by BOM-line quantity when lines are provided', () => {
+      const withQty: BomLine[] = [
+        { childPartId: 'MOD1-001', quantity: 3 },
+        { childPartId: 'MOD1-002', quantity: 2 },
+      ];
+      const cost = moduleCost(mockParts, withQty, 'mod1');
+      expect(cost).toBe(100 * 3 + 50 * 2); // 400
     });
   });
 
   describe('calculateCost', () => {
+    // Default domain 'hardware' isn't in DOMAIN_OVERHEAD so uses 'default':
+    // multiplier=1.5, baseNre=5000 (after B1b change).
     it('groups parts by module, applies multiplier, calculates NRE', () => {
-      // 'hardware' is not in DOMAIN_OVERHEAD, so uses 'default': multiplier=1.5, nreRate=0.12
-      const result = calculateCost(mockParts, 'hardware', 1000);
-      
+      const result = calculateCost(mockParts, noLines, 'hardware', 1000);
+
       expect(result.perModule.length).toBe(2);
       expect(result.perModule.find(m => m.moduleName === 'Module mod1')?.totalGbp).toBe(150 * 1.5); // 225
       expect(result.perModule.find(m => m.moduleName === 'Module mod2')?.totalGbp).toBe(20 * 1.5); // 30
-      
+
       expect(result.unitTotalGbp).toBe(255); // 225 + 30
-      expect(result.nreTotalGbp).toBe(2 * 0.12 * 5000); // 2 modules * 0.12 * 5000 = 1200
+      // 2 modules × £5,000 default NRE per module (B1b: was 2 × 0.12 × 5000)
+      expect(result.nreTotalGbp).toBe(10000);
     });
 
     it('uses "default" multiplier for unknown domains', () => {
-      const result = calculateCost(mockParts, 'unknown_domain_xyz', null);
-      
-      // Default multiplier is 1.5, nreRate is 0.12
+      const result = calculateCost(mockParts, noLines, 'unknown_domain_xyz', null);
+
       expect(result.overheadMultiplier).toBe(1.5);
       expect(result.unitTotalGbp).toBe((150 + 20) * 1.5); // 255
-      expect(result.nreTotalGbp).toBe(2 * 0.12 * 5000); // 1200
+      expect(result.nreTotalGbp).toBe(10000); // 2 × £5,000
     });
 
     it('handles empty parts array gracefully', () => {
-      const result = calculateCost([], 'hardware', null);
-      
+      const result = calculateCost([], noLines, 'hardware', null);
+
       expect(result.perModule.length).toBe(0);
       expect(result.unitTotalGbp).toBe(0);
       expect(result.nreTotalGbp).toBe(0);
+    });
+
+    it('uses BOM-line quantities in unit cost roll-up', () => {
+      const withQty: BomLine[] = [
+        { childPartId: 'MOD1-001', quantity: 10 },
+      ];
+      const result = calculateCost(mockParts, withQty, 'unknown_domain_xyz', null);
+      // mod1: (10 × 100) + (1 × 50) = 1050; × 1.5 = 1575
+      // mod2: 1 × 20 × 1.5 = 30
+      expect(result.unitTotalGbp).toBe(1575 + 30);
     });
   });
 
