@@ -146,6 +146,17 @@ function solveSizing(
     const conflicts: string[] = [];
     const recommendations: string[] = [];
 
+    // A11d diagnostic: log per-module classification so we can see why the
+    // heat_pump sizing keeps firing INFEASIBLE even after A11b/A11c.
+    console.log(`[size-layout:hp] matched=${matchedCount}/${modules.length}`)
+    console.log(`[size-layout:hp] outdoor=${outdoorArea.toFixed(3)}m² / ${outdoorEnv.interior_floor_m2}m² budget`)
+    console.log(`[size-layout:hp] indoor=${indoorArea.toFixed(3)}m² / ${indoorEnv.interior_floor_m2}m² budget`)
+    console.log(`[size-layout:hp] outdoorMass=${outdoorMass.toFixed(1)}kg (250kg limit)`)
+    for (const mod of modules) {
+      const d = module_dimensions[mod.id]
+      console.log(`[size-layout:hp]   ${mod.name}: ${d.w_mm}×${d.d_mm} ${d.floor_m2.toFixed(3)}m² ${d.mount} (${d.scaled_by})`)
+    }
+
     // A11+A11c FIX (2026-05-06): defer sizing if less than half the modules
     // matched the lookup. Even with A11b's expanded keyword set, some briefs
     // will produce module names that escape it. When more than half are
