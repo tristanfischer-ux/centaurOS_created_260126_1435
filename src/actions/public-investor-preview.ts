@@ -49,8 +49,8 @@ export type AnonymizedInvestorResult = {
   placeholder: string
   /** 0-100 dashboard composite score. */
   composite: number
-  /** Four pillar values (0-100 each) — thesis 25% / stage 25% / geography 25% / cheque 25%. */
-  pillars: { thesis: number; stage: number; geography: number; cheque: number }
+  /** Four pillar values (0-100 each) — thesis 25% / stage 25% / geography 25% / cheque 25%. null = no data. */
+  pillars: { thesis: number; stage: number | null; geography: number | null; cheque: number | null }
   subcategory: string
   firm_type: string | null
   /** Country-level only — never specific city/address. */

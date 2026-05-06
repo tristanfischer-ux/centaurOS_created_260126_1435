@@ -55,13 +55,13 @@ export interface MatchBreakdown {
   topFactors: string[]
   /**
    * 4-pillar breakdown: thesis 25% / stage 25% / geography 25% / cheque 25%.
-   * Each pillar is 0-100.
+   * Each pillar is 0-100. null means the firm has no data for that dimension.
    */
   pillars: {
     thesis: number
-    stage: number
-    geography: number
-    cheque: number
+    stage: number | null
+    geography: number | null
+    cheque: number | null
   }
 }
 
@@ -300,8 +300,9 @@ export function calculateMatchScore(
  */
 export function compositePillarScore(pillars: MatchBreakdown['pillars']): number {
   // 4-pillar equal weight: thesis 25% + stage 25% + geography 25% + cheque 25%
+  // Skip null pillars (no data) — renormalise remaining
   const items = [pillars.thesis, pillars.stage, pillars.geography, pillars.cheque]
-  const valid = items.filter(v => v > 0)
+  const valid = items.filter((v): v is number => v !== null && v !== undefined && v > 0)
   if (valid.length === 0) return 0
   return Math.round(valid.reduce((a, b) => a + b, 0) / valid.length)
 }

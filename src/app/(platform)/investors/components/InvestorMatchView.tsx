@@ -62,12 +62,12 @@ interface EnrichedMatch {
   }
   matchScore: number
   topFactors: string[]
-  /** 4-pillar breakdown: thesis 25% / stage 25% / geography 25% / cheque 25%. */
+  /** 4-pillar breakdown: thesis 25% / stage 25% / geography 25% / cheque 25%. null = no data. */
   pillars?: {
     thesis: number
-    stage: number
-    geography: number
-    cheque: number
+    stage: number | null
+    geography: number | null
+    cheque: number | null
   }
   rationale: string
   partner?: {

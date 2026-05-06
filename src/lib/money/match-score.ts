@@ -340,27 +340,43 @@ export function scoreListing(
   }
 
   // ---- 4. Geo focus ------------------------------------------------------
-  let geoScore = 2 // 0-5, default neutral (no data)
+  let geoScore = 2 // 0-5, default neutral (no thesis geo preference)
+  let hasGeoData = false // whether the firm has ANY geo signal at all
   {
     const thesisGeo = (thesis.geography ?? []).map((g) => g.toLowerCase().trim())
     const firmGeo = attrs.geo_focus.map((g) => g.toLowerCase())
     const listingCountry = listing.country?.toLowerCase() ?? ''
     const listingIso = listing.country_iso?.toLowerCase() ?? ''
+    // HQ city as last-resort geo signal — if we know where the firm is based,
+    // we can assume it invests in its own country.
+    const hqCity = (attrs.hq_city ?? attrs.location ?? '').toLowerCase()
+
+    // Firm has geo data if: geo_focus populated, OR country set, OR hq_city set
+    hasGeoData = firmGeo.length > 0 || !!listingCountry || !!hqCity
 
     if (thesisGeo.length > 0) {
-      // Check firm geo_focus, country, and country_iso — any overlap counts.
+      // Check firm geo_focus, country, country_iso, AND hq-derived country
       const hit =
         firmGeo.some((fg) => thesisGeo.some((tg) => fg.includes(tg) || tg.includes(fg))) ||
         (listingCountry && thesisGeo.some((tg) => listingCountry.includes(tg) || tg.includes(listingCountry))) ||
-        (listingIso && thesisGeo.some((tg) => tg === listingIso || tg.includes(listingIso)))
+        (listingIso && thesisGeo.some((tg) => tg === listingIso || tg.includes(listingIso))) ||
+        // HQ city fallback: if thesis wants "united kingdom" and firm is HQ'd in "london", match
+        (hqCity && thesisGeo.some((tg) => {
+          if (hqCity.includes(tg) || tg.includes(hqCity)) return true
+          // Common city→country mapping
+          if (tg === 'united kingdom' && (hqCity.includes('london') || hqCity.includes('uk') || hqCity.includes('britain'))) return true
+          if (tg === 'united states' && (hqCity.includes('new york') || hqCity.includes('san francisco') || hqCity.includes('boston') || hqCity.includes('usa'))) return true
+          if (tg === 'europe' && (hqCity.includes('berlin') || hqCity.includes('paris') || hqCity.includes('amsterdam') || hqCity.includes('stockholm') || hqCity.includes('helsinki') || hqCity.includes('zurich') || hqCity.includes('london'))) return true
+          return false
+        }))
       if (hit) {
         geoScore = 5
         reasons.push('Geography match')
       } else {
-        geoScore = 0
+        geoScore = 0 // Explicit mismatch
       }
-    } else if (firmGeo.length > 0 || listingCountry) {
-      geoScore = 3 // Firm has data, thesis doesn't — slight credit.
+    } else if (hasGeoData) {
+      geoScore = 3 // Firm has geo data, thesis doesn't specify — slight credit
     }
   }
 
@@ -373,9 +389,10 @@ export function scoreListing(
 
   // ---- Composite --------------------------------------------------------
   // thesis 25% / stage 25% / geography 25% / cheque 25%
-  // Missing-pillar renormalisation: if a pillar has no
-  // signal (zero and its input was empty), drop it + renormalise.
-  // All four pillars start at 0. Each present pillar contributes its 25%.
+  // Missing-pillar renormalisation: if the firm has NO DATA for a pillar
+  // (e.g. no geo_focus, no country, no hq_city, no cheque_range), drop it
+  // and renormalise. But if the firm HAS data and the score is 0 (mismatch),
+  // include it — a mismatch is a real signal, not missing data.
   let composite = 0
   let weight = 0
 
@@ -383,27 +400,35 @@ export function scoreListing(
   composite += thesisPillar * 0.25
   weight += 0.25
 
-  if (stagePillar > 0) {
+  // Stage: has data if firm has stage_focus
+  const hasStageData = attrs.stage_focus.length > 0
+  if (hasStageData) {
     composite += stagePillar * 0.25
     weight += 0.25
   }
-  if (geoPillar > 0) {
+
+  // Geography: has data if firm has geo_focus, country, or hq_city
+  if (hasGeoData) {
     composite += geoPillar * 0.25
     weight += 0.25
   }
-  if (chequePillar > 0) {
+
+  // Cheque: has data if firm has cheque_range_gbp with min or max
+  const hasChequeData = attrs.cheque_range_gbp?.min != null || attrs.cheque_range_gbp?.max != null
+  if (hasChequeData) {
     composite += chequePillar * 0.25
     weight += 0.25
   }
-  const total = weight > 0 ? Math.round(Math.max(0, Math.min(100, composite / weight))) : 0
+
+  const result = weight > 0 ? Math.round(Math.max(0, Math.min(100, composite / weight))) : 0
 
   return {
-    total,
+    total: result,
     pillars: {
       thesis: thesisPillar,
-      geography: geoPillar,
-      stage: stagePillar,
-      cheque: chequePillar,
+      geography: hasGeoData ? geoPillar : null,
+      stage: hasStageData ? stagePillar : null,
+      cheque: hasChequeData ? chequePillar : null,
     },
     reasons: reasons.slice(0, 3),
   }

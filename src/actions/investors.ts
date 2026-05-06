@@ -118,6 +118,12 @@ export type InvestorFirm = {
   // Contact availability status (aggregated from vc_pe_contacts). Attached
   // post-rowToFirm via attachContactStatuses.
   contact_status?: 'verified' | 'inferred' | 'none'
+  /** Primary contact/partner from vc_pe_contacts — attached by attachContactStatuses. */
+  primary_partner?: {
+    id: string
+    name: string
+    title: string | null
+  } | null
 }
 
 /**
@@ -977,7 +983,9 @@ async function searchInvestorsCore(
       // replace this with Reciprocal Rank Fusion. The point of FTS here:
       // catches exact-string needles ("ISO 13485", "G99 EREC", postcodes)
       // the structured-fields embedding misses.
-      const [pageResults, ftsResult] = await Promise.all([
+      // Also query the total Finance investor pool size for display.
+      // This is the full count, not just the 200 returned per page.
+      const [pageResults, ftsResult, poolCountResult] = await Promise.all([
         Promise.all(
           Array.from({ length: PAGES }, (_, i) =>
             supabase.rpc('match_marketplace_listings_v2', {
@@ -1017,6 +1025,8 @@ async function searchInvestorsCore(
           p_category: 'Finance',
           p_limit: 200,
         }),
+        // Total count of Finance investors in the database
+        supabase.from('marketplace_listings').select('id', { count: 'exact', head: true }).eq('category', 'Finance'),
       ])
       const firstError = pageResults.find(r => r.error)?.error
       if (firstError) throw firstError
@@ -1228,7 +1238,8 @@ async function searchInvestorsCore(
       })
       firms.sort((a, b) => (b.attributes._fcComposite ?? 0) - (a.attributes._fcComposite ?? 0))
 
-      const total = firms.length
+      // Use the full Finance pool count for display, not just the returned firms
+      const total = poolCountResult.count ?? firms.length
       const paginatedFirms = await attachContactStatuses(firms.slice(from, from + safePageSize))
       const hasMore = from + paginatedFirms.length < total
 
@@ -2387,36 +2398,55 @@ export async function getContactStatuses(
 
 async function attachContactStatuses(firms: InvestorFirm[]): Promise<InvestorFirm[]> {
   if (firms.length === 0) return firms
-  const statuses = await getContactStatuses(firms.map(f => f.id))
-  return firms.map(f => ({ ...f, contact_status: statuses[f.id] ?? 'none' }))
+  const [statuses, partners] = await Promise.all([
+    getContactStatuses(firms.map(f => f.id)),
+    getPrimaryPartners(firms.map(f => f.id)),
+  ])
+  return firms.map(f => ({
+    ...f,
+    contact_status: statuses[f.id] ?? 'none',
+    primary_partner: partners[f.id] ?? null,
+  }))
 }
 
 /**
- * Batch-fetch contact counts per investor listing.
- * Used by InvestorTableView to show the "Contacts" column.
+ * Batch-fetch the primary partner (first decision-maker or first contact) per listing.
  */
-export async function getContactCounts(
+async function getPrimaryPartners(
   listingIds: string[]
-): Promise<Record<string, number>> {
+): Promise<Record<string, { id: string; name: string; title: string | null } | null>> {
   if (listingIds.length === 0) return {}
   const safeIds = listingIds.filter(id => UUID_RE.test(id)).slice(0, 200)
   if (safeIds.length === 0) return {}
 
   const supabase = await createClient()
-  // INTENT: Single query to count contacts per listing, avoiding N+1
-  const { data, error } = await supabase
+  // Fetch contacts ordered by decision-maker first, then pick first per listing
+  const { data: allContacts } = await supabase
     .from('vc_pe_contacts')
-    .select('listing_id')
+    .select('id, full_name, title, is_decision_maker, listing_id')
     .in('listing_id', safeIds)
+    .order('is_decision_maker', { ascending: false })
 
-  if (error || !data) return {}
-
-  const counts: Record<string, number> = {}
-  for (const row of data) {
-    const lid = (row as Record<string, unknown>).listing_id as string
-    counts[lid] = (counts[lid] ?? 0) + 1
+  const partners: Record<string, { id: string; name: string; title: string | null } | null> = {}
+  if (allContacts) {
+    const seen = new Set<string>()
+    for (const c of allContacts) {
+      const lid = (c as Record<string, unknown>).listing_id as string
+      if (seen.has(lid)) continue
+      seen.add(lid)
+      partners[lid] = {
+        id: (c as Record<string, unknown>).id as string,
+        name: (c as Record<string, unknown>).full_name as string,
+        title: (c as Record<string, unknown>).title as string | null,
+      }
+    }
   }
-  return counts
+
+  // Ensure every listing ID has an entry (even if null)
+  for (const id of safeIds) {
+    if (!(id in partners)) partners[id] = null
+  }
+  return partners
 }
 
 // ---------------------------------------------------------------------------

@@ -37,9 +37,9 @@ export type MatchBreakdown = {
   total: number
   pillars: {
     thesis: number
-    geography: number
-    stage: number
-    cheque: number
+    geography: number | null  // null = firm has no geo data at all
+    stage: number | null      // null = firm has no stage data
+    cheque: number | null     // null = firm has no cheque range
   }
   /** Top 3 human-readable reasons for the score. */
   reasons: string[]

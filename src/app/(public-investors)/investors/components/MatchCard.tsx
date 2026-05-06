@@ -140,6 +140,7 @@ export function MatchCard({
     ? normaliseFirmType(attrs.firm_type)
     : firm.subcategory ?? 'VC'
   const city = attrs.hq_city ?? attrs.location ?? null
+  const primaryPartner = firm.primary_partner
 
   // Meta line: {geo} · {cheque-range} · {stage}
   const chequeMin  = attrs.cheque_range_gbp?.min
@@ -285,9 +286,15 @@ export function MatchCard({
                 {firmType}
               </span>
             </div>
-            {/* Meta line: geo · cheque · stage */}
+            {/* Meta line: geo · cheque · stage · partner */}
             <div className="text-xs text-muted-foreground mt-0.5">
               {[city, chequeStr, stageStr].filter(Boolean).join(' · ') || ' '}
+              {primaryPartner && (
+                <span className="ml-1">
+                  · <span className="text-foreground font-medium">{primaryPartner.name}</span>
+                  {primaryPartner.title && <span className="text-muted-foreground"> · {primaryPartner.title}</span>}
+                </span>
+              )}
             </div>
           </div>
 
@@ -324,9 +331,9 @@ export function MatchCard({
         {/* ── Chip row: stage focus · cheque range ── */}
         <ClosedChipRow attrs={attrs} firmType={firmType} />
 
-        {/* ── Thesis excerpt — WHY THEM above score bars ── */}
+        {/* ── Thesis excerpt — full text, no truncation ── */}
         {thesis && (
-          <p className="text-xs text-muted-foreground mb-2 leading-relaxed line-clamp-2">
+          <p className="text-xs text-muted-foreground mb-2 leading-relaxed">
             <span className="font-bold text-foreground uppercase text-[10px] tracking-wider">WHY THEM. </span>
             {thesis}
           </p>
@@ -396,9 +403,15 @@ export function MatchCard({
               {firmType}
             </span>
           </div>
-          {/* Meta line: geo · cheque · stage */}
+          {/* Meta line: geo · cheque · stage · partner */}
           <div className="text-xs text-muted-foreground mt-0.5">
             {[city, chequeStr, stageStr].filter(Boolean).join(' · ') || ' '}
+            {primaryPartner && (
+              <span className="ml-1">
+                · <span className="text-foreground font-medium">{primaryPartner.name}</span>
+                {primaryPartner.title && <span className="text-muted-foreground"> · {primaryPartner.title}</span>}
+              </span>
+            )}
           </div>
         </div>
 

@@ -206,15 +206,15 @@ function generateMatchExplanation(
   if (queryStageIdx === null && /\bseed\b/.test(q)) queryStageIdx = 1
 
   const stageFocus = (attrs.stage_focus ?? []).join(', ')
-  if (queryStageIdx !== null && stageFocus) {
+  if (queryStageIdx !== null && stageFocus && pillars.stage != null) {
     const queryStgLabel = STAGE_NAMES[queryStageIdx].replace(/\b\w/g, c => c.toUpperCase())
     if (pillars.stage >= 90) parts.push(`They appear to invest at ${queryStgLabel} stage — an exact match.`)
     else if (pillars.stage >= 70) parts.push(`Their stage focus (${stageFocus}) appears close to ${queryStgLabel} — adjacent and potentially reachable.`)
     else if (pillars.stage >= 50) parts.push(`They typically invest at ${stageFocus} — a different stage, but consider building the relationship for future rounds.`)
   }
 
-  if (pillars.geography >= 80) parts.push(`Their geographic focus appears to match your location.`)
-  else if (pillars.geography > 0 && pillars.geography < 50) {
+  if (pillars.geography != null && pillars.geography >= 80) parts.push(`Their geographic focus appears to match your location.`)
+  else if (pillars.geography != null && pillars.geography > 0 && pillars.geography < 50) {
     const geo = (attrs.geo_focus ?? []).join(', ')
     if (geo) parts.push(`Their geographic focus appears to be ${geo} — you may need to position for that market.`)
   }
@@ -222,19 +222,19 @@ function generateMatchExplanation(
   const cmin = attrs.cheque_range_gbp?.min
   const cmax = attrs.cheque_range_gbp?.max
   if (cmin && cmax) {
-    if (pillars.cheque >= 80) parts.push(`Their typical cheque (${formatFundSize(cmin)}–${formatFundSize(cmax)}) appears to fit your raise.`)
-    else if (pillars.cheque > 0 && pillars.cheque < 40) parts.push(`Their cheque range (${formatFundSize(cmin)}–${formatFundSize(cmax)}) may not align with your current raise.`)
+    if (pillars.cheque != null && pillars.cheque >= 80) parts.push(`Their typical cheque (${formatFundSize(cmin)}–${formatFundSize(cmax)}) appears to fit your raise.`)
+    else if (pillars.cheque != null && pillars.cheque > 0 && pillars.cheque < 40) parts.push(`Their cheque range (${formatFundSize(cmin)}–${formatFundSize(cmax)}) may not align with your current raise.`)
   }
 
   if (parts.length > 0 && composite < 85) {
     const dims: Array<{ name: string; val: number }> = [
       { name: 'thesis alignment', val: pillars.thesis },
-      { name: 'stage fit',        val: pillars.stage },
-      { name: 'geographic match', val: pillars.geography },
-      { name: 'cheque size fit',  val: pillars.cheque },
+      ...(pillars.stage != null ? [{ name: 'stage fit', val: pillars.stage }] : []),
+      ...(pillars.geography != null ? [{ name: 'geographic match', val: pillars.geography }] : []),
+      ...(pillars.cheque != null ? [{ name: 'cheque size fit', val: pillars.cheque }] : []),
     ]
     dims.sort((a, b) => a.val - b.val)
-    if (dims[0].val < 60) parts.push(`The main gap appears to be ${dims[0].name} (${dims[0].val}%).`)
+    if (dims.length > 0 && dims[0].val < 60) parts.push(`The main gap appears to be ${dims[0].name} (${dims[0].val}%).`)
   }
 
   return parts.join(' ')
