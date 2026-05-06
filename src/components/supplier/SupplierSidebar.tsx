@@ -16,6 +16,7 @@ import {
 } from "lucide-react"
 import { NotificationCenter } from "@/components/NotificationCenter"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
+import { signOut } from "@/actions/auth"
 
 /**
  * Determines if a navigation item should be marked as active
@@ -136,7 +137,7 @@ export function SupplierSidebar({ userName, userEmail }: SupplierSidebarProps) {
 
       {/* Footer */}
       <div className="p-4 mt-auto space-y-3">
-        <form action="/auth/signout" method="post">
+        <form action={signOut}>
           <button
             type="submit"
             className="w-full flex items-center justify-center gap-2 px-3 py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-muted rounded-md transition-colors"
