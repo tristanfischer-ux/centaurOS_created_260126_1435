@@ -122,11 +122,18 @@ function solveSizing(
       const m2 = (dim.w * dim.d) / 1_000_000;
       const isIndoor = n.includes('hydrobox') || n.includes('pump') || n.includes('hmi') || n.includes('indoor') || n.includes('control');
 
+      // A12b FIX (2026-05-06): the enclosure/chassis/container module IS the
+      // outer shell of the unit; it doesn't take internal floor space. Count
+      // it as 0 m² footprint (just mass for handling check). Without this the
+      // acoustic enclosure's 0.45 m² trivially busts a 0.55 m² budget.
+      const isOuterShell = /enclosure|chassis|container|housing|structural.*envelope/.test(n)
+      const effectiveM2 = isOuterShell ? 0 : m2
+
       if (isIndoor) {
-        indoorArea += m2;
+        indoorArea += effectiveM2;
         indoorMass += dim.mass;
       } else {
-        outdoorArea += m2;
+        outdoorArea += effectiveM2;
         outdoorMass += dim.mass;
       }
 
@@ -134,9 +141,9 @@ function solveSizing(
         w_mm: dim.w,
         d_mm: dim.d,
         h_mm: dim.h,
-        floor_m2: m2,
+        floor_m2: effectiveM2,
         mount: isIndoor ? 'indoor_wall' : 'outdoor_pad',
-        scaled_by: matched ? 'lookup' : 'default'
+        scaled_by: matched ? (isOuterShell ? 'outer_shell' : 'lookup') : 'default'
       };
     }
 
