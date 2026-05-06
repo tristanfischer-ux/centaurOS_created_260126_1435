@@ -29,8 +29,8 @@ export type MatchThesis = {
 }
 
 /**
- * 5-pillar breakdown.
- * Composite weights: thesis 30% / geography 20% / stage 20% / cheque 15% / confidence 15%.
+ * 4-pillar breakdown.
+ * Composite weights: thesis 25% / stage 25% / geography 25% / cheque 25%.
  */
 export type MatchBreakdown = {
   /** 0-100 composite */
@@ -40,7 +40,6 @@ export type MatchBreakdown = {
     geography: number
     stage: number
     cheque: number
-    confidence: number
   }
   /** Top 3 human-readable reasons for the score. */
   reasons: string[]

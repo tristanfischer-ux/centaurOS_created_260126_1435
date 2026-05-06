@@ -364,14 +364,7 @@ export function scoreListing(
     }
   }
 
-  // ---- 4. Geo focus ------------------------------------------------------
-  // Data quality is stored top-level (data_quality_score 0-10) and also in
-  // attributes.data_quality_score on legacy rows. Prefer top-level.
-  const dq =
-    typeof listing.data_quality_score === 'number'
-      ? listing.data_quality_score
-      : attrs.data_quality_score ?? 0
-  const confidencePillar = Math.max(0, Math.min(100, dq * 10))
+  // ---- 4. Geo focus (removed: confidence was here) ------------------------
 
   // ---- Pillar translation (legacy parity) --------------------------------
   const stagePillar = Math.round((stageScore / 25) * 100)
@@ -379,22 +372,28 @@ export function scoreListing(
   const chequePillar = Math.round((chequeScore / 15) * 100)
 
   // ---- Composite --------------------------------------------------------
-  // thesis 30% / geography 20% / stage 20% / cheque 15% / confidence 15%
-  // Missing-pillar renormalisation (same as legacy): if a pillar has no
+  // thesis 25% / stage 25% / geography 25% / cheque 25%
+  // Missing-pillar renormalisation: if a pillar has no
   // signal (zero and its input was empty), drop it + renormalise.
-  let composite = thesisPillar * 0.30 + confidencePillar * 0.15
-  let weight = 0.30 + 0.15
-  if (geoPillar > 0) {
-    composite += geoPillar * 0.20
-    weight += 0.20
-  }
+  // All four pillars start at 0. Each present pillar contributes its 25%.
+  let composite = 0
+  let weight = 0
+
+  // Thesis is always present (even if 0)
+  composite += thesisPillar * 0.25
+  weight += 0.25
+
   if (stagePillar > 0) {
-    composite += stagePillar * 0.20
-    weight += 0.20
+    composite += stagePillar * 0.25
+    weight += 0.25
+  }
+  if (geoPillar > 0) {
+    composite += geoPillar * 0.25
+    weight += 0.25
   }
   if (chequePillar > 0) {
-    composite += chequePillar * 0.15
-    weight += 0.15
+    composite += chequePillar * 0.25
+    weight += 0.25
   }
   const total = weight > 0 ? Math.round(Math.max(0, Math.min(100, composite / weight))) : 0
 
@@ -405,7 +404,6 @@ export function scoreListing(
       geography: geoPillar,
       stage: stagePillar,
       cheque: chequePillar,
-      confidence: Math.round(confidencePillar),
     },
     reasons: reasons.slice(0, 3),
   }

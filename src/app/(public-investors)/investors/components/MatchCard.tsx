@@ -23,7 +23,7 @@
 
 'use client'
 
-import { useCallback, useState, useTransition } from 'react'
+import { useCallback, useEffect, useState, useTransition } from 'react'
 import { Loader2 } from 'lucide-react'
 import { CollapsibleSection } from '@/app/(platform)/investors/[id]/components/CollapsibleSection'
 import { FactStrip } from '@/app/(platform)/investors/[id]/components/FactStrip'
@@ -36,12 +36,10 @@ import type {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 const SCORECARD_PILLARS: Array<{ key: keyof FirmMatchResult['pillars']; label: string; weight: string }> = [
-  { key: 'thesis',   label: 'Thesis',     weight: '20' },
-  { key: 'stage',    label: 'Stage',      weight: '20' },
-  { key: 'geo',      label: 'Geo',        weight: '15' },
-  { key: 'cheque',   label: 'Cheque',     weight: '15' },
-  { key: 'activity', label: 'Activity',   weight: '15' },
-  { key: 'data',     label: 'Confidence', weight: '10' },
+  { key: 'thesis',   label: 'Thesis',     weight: '25' },
+  { key: 'stage',    label: 'Stage',      weight: '25' },
+  { key: 'geo',      label: 'Geo',        weight: '25' },
+  { key: 'cheque',   label: 'Cheque',     weight: '25' },
 ]
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -159,7 +157,7 @@ export function MatchCard({
   const sectors = attrs.sectors ?? []
 
   // Why-fit / how-to-pitch — expand state (used in medium + full card states)
-  const [whyFitExpanded, setWhyFitExpanded] = useState(false)
+  const [whyFitExpanded, setWhyFitExpanded] = useState(true)
   const [isEnriching, startEnrichTransition] = useTransition()
   const [enrichFailed, setEnrichFailed] = useState(false)
 
@@ -180,6 +178,19 @@ export function MatchCard({
       setWhyFitExpanded(prev => !prev)
     }
   }
+
+  // Auto-trigger enrichment on mount when card starts expanded
+  useEffect(() => {
+    if (whyFitExpanded && !matchOutput && !isEnriching && !enrichFailed && isPaid && onRevealWhyFit) {
+      startEnrichTransition(async () => {
+        try {
+          await onRevealWhyFit()
+        } catch {
+          setEnrichFailed(true)
+        }
+      })
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -214,24 +225,6 @@ export function MatchCard({
   const fundSizeLabel = fmtCurrency((attrs as { fund_size_gbp?: number }).fund_size_gbp)
   const aumLabel      = fmtCurrency((attrs as { aum_gbp?: number }).aum_gbp)
 
-  // Hardware fit score badge (shared between states)
-  const hwScoreBadge = (() => {
-    const hwScore = (firm.attributes as { hardware_fit_score?: number }).hardware_fit_score ??
-                    (firm as unknown as { hardware_fit_score?: number }).hardware_fit_score
-    if (typeof hwScore === 'number' && hwScore >= 0 && hwScore <= 10) {
-      let badgeColor = 'bg-muted text-muted-foreground'
-      if (hwScore >= 7.0) badgeColor = 'bg-international-orange/10 text-international-orange'
-      else if (hwScore >= 4.0) badgeColor = 'bg-muted text-muted-foreground'
-
-      return (
-        <div className={`mt-1 text-[10px] px-2 py-0.5 rounded-full inline-flex items-center ${badgeColor}`}>
-          Hardware fit {hwScore.toFixed(1)}/10
-        </div>
-      )
-    }
-    return null
-  })()
-
   // ── Locked card variant ──────────────────────────────────────────────────
   if (isLocked) {
     return (
@@ -261,7 +254,6 @@ export function MatchCard({
             ) : (
               <div className="text-sm text-muted-foreground">—</div>
             )}
-            {hwScoreBadge}
           </div>
         </div>
         {thesis && (
@@ -312,7 +304,6 @@ export function MatchCard({
             ) : (
               <div className="text-sm text-muted-foreground">—</div>
             )}
-            {hwScoreBadge}
 
             {/* Save button */}
             {onSave && (
@@ -400,7 +391,6 @@ export function MatchCard({
           ) : (
             <div className="text-sm text-muted-foreground">—</div>
           )}
-          {hwScoreBadge}
 
           {/* Save button */}
           {onSave && (
@@ -480,7 +470,7 @@ export function MatchCard({
       {/* ── Formula key ── */}
       {pillars && matchScore !== undefined && (
         <p className="text-[10px] text-muted-foreground mb-2 leading-snug">
-          Composite {Math.round(matchScore)}% = thesis x 55% + geo x 15% + stage x 10% + cheque x 10% + activity x 3% + confidence x 2% (missing dimensions excluded and weights renormalised)
+          Composite {Math.round(matchScore)}% = thesis x 25% + stage x 25% + geo x 25% + cheque x 25% (missing dimensions excluded and weights renormalised)
         </p>
       )}
 

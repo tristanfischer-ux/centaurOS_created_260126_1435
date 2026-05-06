@@ -1258,7 +1258,7 @@ function ResultsBar({
         </div>
       </div>
       <div className="text-xs text-muted-foreground">
-        Ranked by thesis fit, stage, geography, cheque size, and recent activity. Cards below are the top {shownNow} of {total}+ candidates surfaced from your description.
+        Ranked by thesis fit, stage, geography, and cheque size. Cards below are the top {shownNow} of {total}+ candidates surfaced from your description.
       </div>
     </div>
   )
