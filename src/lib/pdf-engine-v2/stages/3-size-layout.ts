@@ -1,5 +1,19 @@
 import type { Module, DimensionSheet, StageResult, Envelope, ModuleDimensions } from '../types'
 
+// A5 FIX (2026-05-06): The research stage produces industryDomain values from
+// the LLM (e.g. "thermal_system", "energy_storage", "bess") while the sizing
+// solver hard-codes "battery_energy_storage", "heat_pump", "vertical_farm".
+// Mismatch means every real brief fell through to the tiny generic envelope
+// and returned INFEASIBLE in 0-1 ms, blocking every downstream stage.
+function normaliseDomain(raw: string | undefined): string {
+  if (!raw) return 'generic'
+  const d = raw.toLowerCase().replace(/[\s-]+/g, '_')
+  if (/battery|bess|energy.?storage|lfp|lithium|cell/.test(d)) return 'battery_energy_storage'
+  if (/heat.?pump|thermal|refriger|hvac|chiller|boiler/.test(d)) return 'heat_pump'
+  if (/farm|vertical|greenhouse|agricul|horticul|indoor.?grow/.test(d)) return 'vertical_farm'
+  return 'generic'
+}
+
 const HEAT_PUMP_ENVELOPES = {
   outdoor_unit: {
     kind: 'outdoor_unit',
@@ -229,21 +243,13 @@ export async function runSizeLayout(
   const start = Date.now()
   try {
     const rawDomain = options?.domain || 'unknown'
-    // Map research domain names to sizing domain names
-    const domainMap: Record<string, string> = {
-      'hvac_and_refrigeration': 'heat_pump',
-      'hvac': 'heat_pump',
-      'heating': 'heat_pump',
-      'refrigeration': 'heat_pump',
-      'battery_energy_storage': 'battery_energy_storage',
-      'energy_storage': 'battery_energy_storage',
-      'bess': 'battery_energy_storage',
-      'vertical_farm': 'vertical_farm',
-      'agriculture': 'vertical_farm',
-      'horticulture': 'vertical_farm',
-      'heat_pump': 'heat_pump',
-    }
-    const domain = domainMap[rawDomain] || rawDomain
+    // A5 FIX (2026-05-06): regex normalise is tolerant of the free-form
+    // industryDomain strings the research LLM produces (e.g. "Battery Energy
+    // Storage System", "hvac/refrigeration", "grid-scale BESS"). Previously
+    // an exact-match dict meant almost every real brief fell through to the
+    // generic 5×5 m envelope and returned INFEASIBLE in 0-1 ms.
+    const domain = normaliseDomain(rawDomain)
+    console.log(`[size-layout] raw domain "${rawDomain}" → normalised "${domain}"`)
     const targets = options?.targets || {}
     
     const dimensionSheet = solveSizing(modules, domain, targets)
