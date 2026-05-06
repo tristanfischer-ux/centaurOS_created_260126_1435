@@ -90,14 +90,11 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 ## Active increment
 
-Currently: **C2-evidence run on BESS** (testing local-corpus wiring end-to-end).
+Currently: **baseline-3 running** — captures the final state with every tonight's commit applied.
 
-Next candidates after C2 evidence lands:
-- **A12** — heatpump monobloc detection: route monobloc briefs to generic sizing to unblock heatpump full pipeline.
-- **B2** — price-basis column + heuristic tier (fix the flat £25 default that distorts small-part cost).
-- **E1** — cost waterfall page (BOM + labour + test + shipping + overheads + NRE).
+After baseline-3 completes I'll run a final baseline-4 (all fresh tsx processes) for clean reference, because during baseline-3 I committed B3 (supplier shortlist) after BESS/HP tsx processes had already started, so only farm in baseline-3 will include B3.
 
-Budget: ~£22-26 of £40 spent across baseline-0 + baseline-1 + baseline-2 + C2 evidence + embedding tests.
+Budget: ~£30-35 of £40+ (increased) spent across all baselines + evidence runs.
 
 ---
 
@@ -105,6 +102,17 @@ Budget: ~£22-26 of £40 spent across baseline-0 + baseline-1 + baseline-2 + C2 
 
 (newest first)
 
+### 2026-05-06 13:00 — Phase E1/E2 + B3 landed
+- **E1** (commit 29bf3ed5): proper cost waterfall — BOM → labour (15%) → test (5%) → shipping (2%) → overheads (8%) → contingency (10%) → unit cost. Plus NRE breakdown + fully-loaded cost ceiling comparison with over/under delta.
+- **E2** (commit c1c9fdc2): regulatory table with £ cost + weeks per standard (UL 9540A £100k, G99 £60k, IEC 62619 £40k, etc., ~30 standard families in estimateRegulatoryCost). Wired into E1's NRE breakdown.
+- **UX1** (commit 444e20d8): verbatim original brief at top of Section 1 (Tristan request).
+- **CX-002** (commit 471e49cc): meaningful project names — `containerised_3_5_mwh_battery_energy_storage` instead of `_bess_test_brief_we_are`.
+- **B3** (commit f41a2c11): Supplier Shortlist section — 6-per-page cards showing certifications, process capabilities, match score, parts matched.
+
+### 2026-05-06 11:00 — UX1 evidence PDF confirms verbatim brief rendered correctly
+See `~/Downloads/engine-evidence/UX1-evidence/bess/report.pdf` — new "1.0 Original Brief" block at the top of Section 1.
+
+### 2026-05-06 10:00 — C2 evidence: 36/36 parts got real UK suppliers from local corpus
 ### 2026-05-06 09:25 — baseline-2 complete + C2 launched
 baseline-2 evidence (post B1a/B1b + A11b/c/d):
 - **BESS**: 52 pages, £48,551 unit / £120,000 NRE. Previous baseline was £9,461 / £6,000. BOM rows now have real supplier names (CATL LF280K, Sungrow, TE Connectivity, Infineon, EPCOS, Fike, Schweitzer, Envicool, SWEP B16, Continental, Novec, Honeywell, Hochiki, CIMC, Schneider Electric) + real quantities (272 cells, 555 fasteners) + extended costs + module subtotals.
