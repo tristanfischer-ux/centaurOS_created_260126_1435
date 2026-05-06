@@ -39,13 +39,17 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 |---|---|---|---|---|
 | Setup | S1 engine-evidence.sh wrapper | **done** | scripts/ | committed 5caf6914 |
 | Setup | S2 test briefs (bess, heatpump, farm) | **done** | briefs/ | committed 5caf6914 |
-| Setup | S3 baseline run × 3 briefs | in progress | baseline-0/ | awaiting post-A1+A5 rerun |
-| Setup | S4 BASELINE-AUDIT.md | todo | baseline-0/ | |
-| A | A1 feasibility-gate scope fix | **done** | baseline-PRE-A1-CRASH + baseline-0 | commit defa15a0 — gateResults hoisted to function scope |
-| A | A5 sizing domain normalise (emergency blocker) | **done** | baseline-PRE-A5/ | commit 13c1b583 — regex normaliser replaces exact-match dict |
-| A | A2 pass grounding into Stage 4 | todo | A2-grounding-wired/ | BOM rows show real material codes + per-part cost breakdown |
-| A | A3 defensive rendering (no null crashes) | todo | A3-defensive/ | 10 runs in a row all produce valid PDFs |
-| A | A4 abort on critical-stage failure | todo | A4-abort-on-fail/ | When decompose/sizing fails, short error PDF instead of garbage |
+| Setup | S3 baseline run × 3 briefs | **in progress** | baseline-0/ | BESS in Polish stage; hp+farm queued |
+| Setup | S4 BASELINE-AUDIT.md | todo | baseline-0/ | Will write after all 3 baselines land |
+| A | A1 `gateResults` scope fix | **done** | baseline-PRE-A1-CRASH + baseline-0 | commit defa15a0 — unblocks every non-RED, non-INFEASIBLE run |
+| A | A5 sizing domain regex normalise | **done** | baseline-PRE-A5/ | commit 13c1b583 — unblocks Stage 3 for every brief |
+| A | A6+A7 product-agnostic prompts + robust decompose JSON | **done** | (implicit via A10 run) | commit d0b636d5 — research/decompose no longer hallucinate heat pumps |
+| A | A8 sizing tolerates missing module-mass | **done** | (implicit via A10 run) | commit 1de66980 — unblocks Stage 4 even when decompose doesn't set mass |
+| A | A9 centralised lib/llm-json.ts, wire into BOM | **done** | (implicit via A10 run) | commit 7b8bc927 — string-aware brace balancing + raw dump on failure |
+| A | A10 BOM uses Gemini + json_object + model fallback | **done** | baseline-0/ (in progress) | commit 8bf529fd — GLM-5.1 replaced; BOM parses reliably |
+| A | A2 pass pre-loaded grounding into Stage 4 | **coded, not committed** | A2-grounding-wired/ | Hold until baseline finishes to keep baseline code consistent |
+| A | A3 defensive rendering / null safety | todo | A3-defensive/ | 10 runs in a row all produce valid PDFs |
+| A | A4 abort on critical-stage failure | todo | A4-abort-on-fail/ | Short error PDF when decompose/sizing fails |
 | B | B1 render source grades inline | todo | B1-grades/ | Every section header + BOM row shows A–E grade |
 | B | B2 render priceBreakdown column | todo | B2-cost-basis/ | BOM has "Cost basis" column; appendix shows each breakdown |
 | B | B3 feasibility dashboard page | todo | B3-dashboard/ | New page 4: 7-row PASS/WARN/FAIL gate table |
@@ -75,7 +79,9 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 ## Active increment
 
-Currently: **S3 — running baselines post-A1+A5**
+Currently: **S3 — waiting for 3 baselines to finish (BESS in Polish stage; hp+farm queued)**
+
+Budget note: ~£4-6 of £40 spent. 7 commits shipped tonight. A2 is coded and waiting for clean baselines.
 
 ---
 
@@ -83,19 +89,26 @@ Currently: **S3 — running baselines post-A1+A5**
 
 (newest first)
 
-### 2026-05-06 00:30 — A5 sizing domain normalise (commit 13c1b583)
-Second blocker discovered during baseline runs. Research LLM produces free-form industryDomain
-strings; sizing solver had exact-match dict so every real brief missed → INFEASIBLE in 0-1 ms
-→ BOM/suppliers/review all skipped. Replaced with regex normaliser. Baselines will rerun.
+### 2026-05-06 06:12 — BESS baseline post-A10 reached Polish stage
+First full pipeline run that got past all LLM stages. Review OK (332s), Council 6.2/10 avg, rubric 96/100. Concrete council criticisms surfaced (placeholder BOM fields, unrealistic cost ceiling, process mismatches) — these become the first BASELINE-AUDIT observations.
 
-Evidence:
-- Pre-A5 baselines saved to `baseline-PRE-A5/{bess,heatpump}`
-- Post-A5 baselines will be `baseline-0/{bess,heatpump,farm}`
+### 2026-05-06 05:40 — A10 BOM model swap (commit 8bf529fd)
+GLM-5.1 returned 10KB of prose reasoning + numbered list instead of JSON despite "Return ONLY JSON" instruction. Switched primary to Gemini 3.1 Pro + response_format:json_object. Fallback chain Gemini → Claude → GPT-4.1-mini. Every model gets 300s timeout.
+
+### 2026-05-06 05:20 — A9 centralised JSON parser (commit 7b8bc927)
+Created lib/llm-json.ts with string-aware brace balancing (ignores `{`/`}` inside string values), markdown strip, thinking-block strip, and /tmp raw dump on final failure. Wired into BOM stage. Decompose still uses its own inline version — can converge later.
+
+### 2026-05-06 05:00 — A8 sizing tolerates missing mass (commit 1de66980)
+Decompose doesn't populate estimatedMassKg so the `|| 1000` × 0.01 heuristic gave 10 m² per module — any multi-module brief blew past the envelope budget and INFEASIBLE was auto-returned. Now: if ALL modules lack mass, mark feasible-with-warning instead of blocking the pipeline, and use domain-appropriate fallback multipliers (BESS 0.0002, heat pump 0.001).
+
+### 2026-05-06 04:30 — A6+A7 de-heat-pump research + decompose (commit d0b636d5)
+RESEARCH_SYNTHESIS_SYSTEM and MODULE_DECOMPOSITION_SYSTEM both hardcoded "You are a heat pump engineer" / "30kW R290 hydronic split system". Result: BESS briefs produced heat-pump modules. Rewrote both to be product-agnostic. Also made decompose JSON parsing robust — multi-strategy extraction with raw dump on failure.
+
+### 2026-05-06 00:30 — A5 sizing domain regex normalise (commit 13c1b583)
+Research LLM produces free-form industryDomain strings. Solver had exact-match dict. Every brief fell through to generic 5×5m envelope and returned INFEASIBLE in 0-1 ms. Replaced with regex normaliser covering BESS-ish, heat-pump-ish, farm-ish strings.
 
 ### 2026-05-06 00:15 — A1 gateResults scope fix (commit defa15a0)
-Pipeline crashed at PDF stage with "gateResults is not defined" on every happy path because
-variable was declared in a nested else but referenced at the outer return. Hoisted to
-function scope. Before: baseline-PRE-A1-CRASH/ (no PDF produced after 428s). After: baseline-0.
+Pipeline crashed at PDF stage with "gateResults is not defined" on every happy path because variable was declared in a nested else but referenced at the outer return. Hoisted to function scope.
 
 ### 2026-05-06 00:00 — session start
 Plan agreed. Setup + Phase A begin. Budget £40/night.

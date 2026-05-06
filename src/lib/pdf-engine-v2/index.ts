@@ -237,6 +237,11 @@ export async function runPipeline(
     domain: options?.domain || state.research.industryDomain,
     ceilingGbp: options?.ceilingGbp,
     trainingDataDossier: trainingDossier || options?.trainingDataDossier,
+    // A2 FIX (2026-05-06): pass the grounding data that index.ts already
+    // loaded at the top of the pipeline. Previously runBomCost re-queried
+    // Supabase internally, doubling DB load and preventing the caller from
+    // providing a pre-warmed local catalogue (future Phase C work).
+    grounding: groundingData ?? undefined,
   })
   trackStage('bom_cost', bomResult)
   if (!bomResult.ok || !bomResult.data) {
