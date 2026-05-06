@@ -595,12 +595,40 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
 // Section 3: Brief Section
 const BriefPages = ({ state }: { state: PipelineState }) => {
   const b = state.research?.designBrief
+  // UX1 (2026-05-06): show the raw user-submitted brief verbatim so the
+  // reader sees the exact prompt that produced this report. Kept alongside
+  // the LLM-synthesised Mission / Use Case / Market Context so both are
+  // visible: what was asked vs how the engine interpreted it.
+  const rawBrief = state.briefText?.trim()
 
   return (
     <>
       <Page size="A4" style={s.page}>
         <Text style={s.h1}>1. Brief & Requirements <GradeLabel grade="A" /></Text>
-        
+
+        {rawBrief && (
+          <>
+            <Text style={s.h2}>1.0 Original Brief <GradeLabel grade="A" label="founder input" /></Text>
+            <Text style={{ ...s.para, fontSize: 9.5, color: MUTED, marginBottom: 4 }}>
+              The verbatim text supplied by the founder. Everything in the rest of the report is
+              derived from this prompt.
+            </Text>
+            <View
+              style={{
+                padding: 12,
+                backgroundColor: '#f6f7f8',
+                borderLeftWidth: 3,
+                borderLeftColor: BRAND,
+                marginBottom: 8,
+              }}
+            >
+              <Text style={{ fontSize: 10, lineHeight: 1.5, fontFamily: 'Helvetica', color: INK }}>
+                {formatText(rawBrief)}
+              </Text>
+            </View>
+          </>
+        )}
+
         <Text style={s.h2}>1.1 Mission & Use Case <GradeLabel grade="A" /></Text>
         <View style={s.calloutNeutral}>
           <Text style={s.h4}>Mission</Text>
@@ -610,7 +638,7 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
           <Text style={s.h4}>Use Case</Text>
           <Text style={s.paraLarge}>{formatText(b?.useCase)}</Text>
         </View>
-        
+
         <Text style={s.h2}>1.2 Market Context & Timing <GradeLabel grade="B" /></Text>
         <Text style={s.para}>{formatText(b?.whyNow)}</Text>
         <Text style={s.para}>{formatText(b?.targetCustomers)}</Text>

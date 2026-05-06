@@ -157,7 +157,7 @@ export function MatchCard({
   const sectors = attrs.sectors ?? []
 
   // Why-fit / how-to-pitch — expand state (used in medium + full card states)
-  const [whyFitExpanded, setWhyFitExpanded] = useState(true)
+  const [whyFitExpanded, setWhyFitExpanded] = useState(false)
   const [isEnriching, startEnrichTransition] = useTransition()
   const [enrichFailed, setEnrichFailed] = useState(false)
 
@@ -165,7 +165,21 @@ export function MatchCard({
     e.stopPropagation()
     if (!isPaid) return
     if (!whyFitExpanded) onTrackClick?.('expand')
+    setWhyFitExpanded(prev => !prev)
     if (!whyFitExpanded && !matchOutput && onRevealWhyFit) {
+      startEnrichTransition(async () => {
+        try {
+          await onRevealWhyFit()
+        } catch {
+          setEnrichFailed(true)
+        }
+      })
+    }
+  }
+
+  // Auto-trigger enrichment when card enters medium/full state
+  useEffect(() => {
+    if (cardState !== 'closed' && !matchOutput && !isEnriching && !enrichFailed && isPaid && onRevealWhyFit) {
       setWhyFitExpanded(true)
       startEnrichTransition(async () => {
         try {
@@ -174,23 +188,8 @@ export function MatchCard({
           setEnrichFailed(true)
         }
       })
-    } else {
-      setWhyFitExpanded(prev => !prev)
     }
-  }
-
-  // Auto-trigger enrichment on mount when card starts expanded
-  useEffect(() => {
-    if (whyFitExpanded && !matchOutput && !isEnriching && !enrichFailed && isPaid && onRevealWhyFit) {
-      startEnrichTransition(async () => {
-        try {
-          await onRevealWhyFit()
-        } catch {
-          setEnrichFailed(true)
-        }
-      })
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cardState]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSaveClick = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -322,12 +321,36 @@ export function MatchCard({
           </div>
         </div>
 
-        {/* ── Chip row: stage focus · cheque range · active deploying ── */}
+        {/* ── Chip row: stage focus · cheque range ── */}
         <ClosedChipRow attrs={attrs} firmType={firmType} />
+
+        {/* ── Score bars in compact view (same as Outreach) ── */}
+        {pillars && (
+          <div className="flex gap-2 mb-2">
+            {SCORECARD_PILLARS.map(({ key, label, weight }) => {
+              const v = pillars[key as keyof typeof pillars]
+              if (v === undefined || v === null) return null
+              const pct = Math.round(v)
+              const barColor = pct >= 80 ? 'bg-green-500' : pct >= 50 ? 'bg-yellow-500' : 'bg-red-500'
+              return (
+                <div key={key} className="flex-1 min-w-[60px]">
+                  <div className="flex items-center justify-between mb-0.5">
+                    <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{label}</span>
+                    <span className="text-[9px] font-bold text-foreground">{pct === 0 ? 'N/A' : pct}</span>
+                  </div>
+                  <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                    <div className={`h-full rounded-full ${barColor} transition-all`} style={{ width: `${pct}%` }} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
 
         {/* ── Thesis excerpt — 2 lines max (roughly 160 chars) ── */}
         {thesis && (
           <p className="text-xs text-muted-foreground mb-1.5 leading-relaxed line-clamp-2">
+            <span className="font-bold text-foreground uppercase text-[10px] tracking-wider">WHY THEM. </span>
             {thesis}
           </p>
         )}
@@ -477,6 +500,7 @@ export function MatchCard({
       {/* ── Full thesis text ── */}
       {thesis && (
         <p className="text-xs text-muted-foreground mb-2.5 leading-relaxed">
+          <span className="font-bold text-foreground uppercase text-[10px] tracking-wider">WHY THEM. </span>
           {thesis}
         </p>
       )}
@@ -694,11 +718,9 @@ function ClosedChipRow({
   }
 
   const stageFocusChips = (attrs.stage_focus ?? []).slice(0, 3)
-  const isActiveDeploying: boolean | null =
-    typeof attrs.is_active_deploying === 'boolean' ? attrs.is_active_deploying : null
   const firmTypeChip = attrs.firm_type ? normaliseFirmType(attrs.firm_type) : null
 
-  const hasAnyChip = firmTypeChip || stageFocusChips.length > 0 || chequeChip || isActiveDeploying !== null
+  const hasAnyChip = firmTypeChip || stageFocusChips.length > 0 || chequeChip
   if (!hasAnyChip) return null
 
   return (
@@ -719,16 +741,6 @@ function ClosedChipRow({
       {chequeChip && (
         <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-foreground uppercase tracking-wide">
           {chequeChip}
-        </span>
-      )}
-      {isActiveDeploying === true && (
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-semibold">
-          ✓ Active
-        </span>
-      )}
-      {isActiveDeploying === false && (
-        <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground italic">
-          Not actively deploying
         </span>
       )}
     </div>

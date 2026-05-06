@@ -73,6 +73,9 @@ export async function runPipeline(
 
   const state: PipelineState = {
     projectId: options?.projectId || projectName,
+    // UX1: store the raw user-submitted brief so the PDF renderer can show
+    // the exact prompt verbatim in Section 1.
+    briefText,
     research: null,
     modules: [],
     dimensionSheet: null,
