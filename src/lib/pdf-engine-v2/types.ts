@@ -231,6 +231,9 @@ export interface SupplierMatch {
     reason: string
     score: number
     country?: string
+    // C2 FIX (2026-05-06): added fields to carry local-corpus enrichment
+    certifications?: string[]
+    processes?: string[]
   }>
 }
 

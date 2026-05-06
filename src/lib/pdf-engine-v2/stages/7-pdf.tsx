@@ -867,12 +867,17 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
               {modParts.map((p, i) => {
                 // B1a FIX: supplier resolution with fallback.
                 // (1) Check state.suppliers by id or name.
+                //     C2 (2026-05-06): local-corpus matches carry country +
+                //     certifications. Show "Name (GB)" in the supplier cell.
                 // (2) If none matched, extract manufacturer-like prefix from
                 //     the part name (e.g. "CATL 280Ah LFP Prismatic..." →
                 //     "CATL"; "Morgan Advanced Materials Superwool..." →
                 //     "Morgan Advanced Materials").
                 const supMatch = state.suppliers?.find(s => s.partId === p.id || s.partName === p.name)
-                const supplierFromStage5 = supMatch?.suppliers?.[0]?.name
+                const topLocal = supMatch?.suppliers?.[0]
+                const supplierFromStage5 = topLocal
+                  ? (topLocal.country ? `${topLocal.name} (${topLocal.country})` : topLocal.name)
+                  : undefined
                 const supplierFromName = extractManufacturerPrefix(p.name)
                 const supplierName = supplierFromStage5 || supplierFromName || 'TBD'
                 const supplierSource = supplierFromStage5 ? 'B' : (supplierFromName ? 'D' : 'E')
