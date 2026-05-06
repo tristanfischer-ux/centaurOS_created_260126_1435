@@ -123,6 +123,11 @@ export type InvestorFirm = {
     id: string
     name: string
     title: string | null
+    email: string | null
+    email_verified: boolean | null
+    linkedin_url: string | null
+    deep_bio: string | null
+    is_decision_maker: boolean | null
   } | null
 }
 
@@ -2414,20 +2419,19 @@ async function attachContactStatuses(firms: InvestorFirm[]): Promise<InvestorFir
  */
 async function getPrimaryPartners(
   listingIds: string[]
-): Promise<Record<string, { id: string; name: string; title: string | null } | null>> {
+): Promise<Record<string, { id: string; name: string; title: string | null; email: string | null; email_verified: boolean | null; linkedin_url: string | null; deep_bio: string | null; is_decision_maker: boolean | null } | null>> {
   if (listingIds.length === 0) return {}
   const safeIds = listingIds.filter(id => UUID_RE.test(id)).slice(0, 200)
   if (safeIds.length === 0) return {}
 
   const supabase = await createClient()
-  // Fetch contacts ordered by decision-maker first, then pick first per listing
   const { data: allContacts } = await supabase
     .from('vc_pe_contacts')
-    .select('id, full_name, title, is_decision_maker, listing_id')
+    .select('id, full_name, title, email, email_verified, linkedin_url, deep_bio, is_decision_maker, listing_id')
     .in('listing_id', safeIds)
     .order('is_decision_maker', { ascending: false })
 
-  const partners: Record<string, { id: string; name: string; title: string | null } | null> = {}
+  const partners: Record<string, { id: string; name: string; title: string | null; email: string | null; email_verified: boolean | null; linkedin_url: string | null; deep_bio: string | null; is_decision_maker: boolean | null } | null> = {}
   if (allContacts) {
     const seen = new Set<string>()
     for (const c of allContacts) {
@@ -2438,11 +2442,15 @@ async function getPrimaryPartners(
         id: (c as Record<string, unknown>).id as string,
         name: (c as Record<string, unknown>).full_name as string,
         title: (c as Record<string, unknown>).title as string | null,
+        email: (c as Record<string, unknown>).email as string | null,
+        email_verified: (c as Record<string, unknown>).email_verified as boolean | null,
+        linkedin_url: (c as Record<string, unknown>).linkedin_url as string | null,
+        deep_bio: (c as Record<string, unknown>).deep_bio as string | null,
+        is_decision_maker: (c as Record<string, unknown>).is_decision_maker as boolean | null,
       }
     }
   }
 
-  // Ensure every listing ID has an entry (even if null)
   for (const id of safeIds) {
     if (!(id in partners)) partners[id] = null
   }
