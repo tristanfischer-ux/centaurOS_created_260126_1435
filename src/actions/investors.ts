@@ -3332,7 +3332,8 @@ export async function getContactById(contactId: string): Promise<ContactDetail |
  * un-enriched state and shows an honest fallback.
  */
 export async function enrichInvestorMatchOnDemand(
-  investorListingId: string
+  investorListingId: string,
+  overrideDeckText?: string
 ): Promise<InvestorMatchOutputView | null> {
   if (!UUID_RE.test(investorListingId)) return null
 
@@ -3357,6 +3358,7 @@ export async function enrichInvestorMatchOnDemand(
       foundryId,
       userId: user.id,
       investorListingId,
+      overrideDeckText,
     })
     return {
       whyFit: result.whyFit,

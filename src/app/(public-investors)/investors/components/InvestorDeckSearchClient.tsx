@@ -192,6 +192,8 @@ export function InvestorDeckSearchClient({
   const [lastQuery, setLastQuery] = useState('')
   const [extractedProfile, setExtractedProfile] = useState<ExtractedProfile | null>(null)
   const [searchFailureMessage, setSearchFailureMessage] = useState<string | null>(null)
+  // Deck text from free-text search — used for on-demand insight generation
+  const [deckTextForInsights, setDeckTextForInsights] = useState<string | undefined>(undefined)
   const [isPending, startTransition] = useTransition()
   const cancelRef = useRef(false)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -250,9 +252,12 @@ export function InvestorDeckSearchClient({
         // Only extract thesis if it's a substantive query, not just a keyword search
         if (trimmed.length > 30) {
           const extResult = await extractThesisFromText(trimmed);
-          if ('success' in extResult) {
+          if ('thesis' in extResult) {
             overrideThesis = extResult.thesis;
           }
+          setDeckTextForInsights(trimmed);
+        } else {
+          setDeckTextForInsights(undefined);
         }
 
         const result = await searchInvestors({
@@ -388,13 +393,13 @@ export function InvestorDeckSearchClient({
 
   const handleRevealWhyFit = useCallback(async (firmId: string) => {
     if (matchOutputs[firmId]) return
-    const output = await enrichInvestorMatchOnDemand(firmId)
+    const output = await enrichInvestorMatchOnDemand(firmId, deckTextForInsights)
     if (output) {
       setMatchOutputs(prev => ({ ...prev, [firmId]: output }))
     } else {
       toast.error('Could not load the insight — please try again.')
     }
-  }, [matchOutputs])
+  }, [matchOutputs, deckTextForInsights])
 
   // ── Visible cards logic ───────────────────────────────────────────────────
 
