@@ -37,11 +37,12 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 | Phase | Increment | Status | Evidence folder | PDF change claim |
 |---|---|---|---|---|
-| Setup | S1 engine-evidence.sh wrapper | todo | n/a | |
-| Setup | S2 test briefs (bess, heatpump, farm) | todo | briefs/ | |
-| Setup | S3 baseline run × 3 briefs | todo | baseline-0/ | |
+| Setup | S1 engine-evidence.sh wrapper | **done** | scripts/ | committed 5caf6914 |
+| Setup | S2 test briefs (bess, heatpump, farm) | **done** | briefs/ | committed 5caf6914 |
+| Setup | S3 baseline run × 3 briefs | in progress | baseline-0/ | awaiting post-A1+A5 rerun |
 | Setup | S4 BASELINE-AUDIT.md | todo | baseline-0/ | |
-| A | A1 feasibility-gate scope fix | todo | A1-feasibility-gate/ | Infeasible briefs return a short "blocked" report, not 30 pages of zeros |
+| A | A1 feasibility-gate scope fix | **done** | baseline-PRE-A1-CRASH + baseline-0 | commit defa15a0 — gateResults hoisted to function scope |
+| A | A5 sizing domain normalise (emergency blocker) | **done** | baseline-PRE-A5/ | commit 13c1b583 — regex normaliser replaces exact-match dict |
 | A | A2 pass grounding into Stage 4 | todo | A2-grounding-wired/ | BOM rows show real material codes + per-part cost breakdown |
 | A | A3 defensive rendering (no null crashes) | todo | A3-defensive/ | 10 runs in a row all produce valid PDFs |
 | A | A4 abort on critical-stage failure | todo | A4-abort-on-fail/ | When decompose/sizing fails, short error PDF instead of garbage |
@@ -74,7 +75,7 @@ Each increment folder has a `NOTES.md` that cites page numbers in the baseline i
 
 ## Active increment
 
-Currently: **S1 — build evidence wrapper**
+Currently: **S3 — running baselines post-A1+A5**
 
 ---
 
@@ -82,5 +83,19 @@ Currently: **S1 — build evidence wrapper**
 
 (newest first)
 
-### 2026-05-06 — session start
-- Plan agreed. Starting setup phase. No code changes to engine itself in setup — just evidence infrastructure + test briefs + baseline capture.
+### 2026-05-06 00:30 — A5 sizing domain normalise (commit 13c1b583)
+Second blocker discovered during baseline runs. Research LLM produces free-form industryDomain
+strings; sizing solver had exact-match dict so every real brief missed → INFEASIBLE in 0-1 ms
+→ BOM/suppliers/review all skipped. Replaced with regex normaliser. Baselines will rerun.
+
+Evidence:
+- Pre-A5 baselines saved to `baseline-PRE-A5/{bess,heatpump}`
+- Post-A5 baselines will be `baseline-0/{bess,heatpump,farm}`
+
+### 2026-05-06 00:15 — A1 gateResults scope fix (commit defa15a0)
+Pipeline crashed at PDF stage with "gateResults is not defined" on every happy path because
+variable was declared in a nested else but referenced at the outer return. Hoisted to
+function scope. Before: baseline-PRE-A1-CRASH/ (no PDF produced after 428s). After: baseline-0.
+
+### 2026-05-06 00:00 — session start
+Plan agreed. Setup + Phase A begin. Budget £40/night.
