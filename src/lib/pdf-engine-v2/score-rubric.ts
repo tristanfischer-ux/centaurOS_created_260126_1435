@@ -167,9 +167,14 @@ export function scoreReport(state: any): ScoringResult {
   sourceGradingScore = Math.min(100, sourceGradingScore);
 
   // Overall
+  // SCORE-003 (2026-05-07): reweighted. BOM + Cost are the two sections the
+  // council consistently finds most broken, but previously they were only
+  // 30% of the rubric combined. Bumped to 25% + 20% so a poor BOM/Cost is
+  // reflected in the headline. sourceGradingScore dropped to 5% — it's an
+  // integrity check, not a quality signal.
   const overallScore = Math.round(
-    (briefScore * 0.20 + regulatoryScore * 0.10 + modulesScore * 0.20 +
-     bomScore * 0.15 + costScore * 0.15 + risksScore * 0.10 + sourceGradingScore * 0.10)
+    (briefScore * 0.15 + regulatoryScore * 0.10 + modulesScore * 0.15 +
+     bomScore * 0.25 + costScore * 0.20 + risksScore * 0.10 + sourceGradingScore * 0.05)
   );
 
   return {
@@ -183,4 +188,59 @@ export function scoreReport(state: any): ScoringResult {
     overallScore: Math.min(100, overallScore),
     details,
   };
+}
+
+/**
+ * SCORE-001 (2026-05-07): compound headline score combining the rubric
+ * (structural completeness, 0-100) with the council quality average
+ * (1-10 across sections that actually scored). The rubric alone was
+ * misleading — it showed 95/100 for reports where the council flagged
+ * BOM / Cost content quality at 3-4/10.
+ *
+ * Weighting: 40% rubric (completeness is necessary), 60% council (quality
+ * is what the founder actually reads).
+ *
+ * Council sections with score === -1 (failed to score) are EXCLUDED from
+ * the average so a flaky OpenRouter round doesn't distort the compound
+ * number.
+ *
+ * @param rubricOverall 0-100 score from scoreReport()
+ * @param councilScores array of {section, score} from council-scorer
+ * @returns 0-100 compound score that reflects both shape and substance
+ */
+export function computeCompoundScore(
+  rubricOverall: number,
+  councilScores: Array<{ section: string; score: number }>,
+): {
+  compound: number
+  rubric: number
+  councilAvg: number | null
+  councilScored: number
+  councilFailed: number
+} {
+  const scored = councilScores.filter(s => s.score >= 0)
+  const failed = councilScores.length - scored.length
+  const councilAvg = scored.length > 0
+    ? scored.reduce((sum, s) => sum + s.score, 0) / scored.length
+    : null
+
+  if (councilAvg === null) {
+    // No council signal — compound falls back to the rubric alone.
+    return {
+      compound: Math.round(rubricOverall),
+      rubric: rubricOverall,
+      councilAvg: null,
+      councilScored: 0,
+      councilFailed: failed,
+    }
+  }
+
+  const compound = Math.round(rubricOverall * 0.4 + councilAvg * 10 * 0.6)
+  return {
+    compound,
+    rubric: rubricOverall,
+    councilAvg,
+    councilScored: scored.length,
+    councilFailed: failed,
+  }
 }

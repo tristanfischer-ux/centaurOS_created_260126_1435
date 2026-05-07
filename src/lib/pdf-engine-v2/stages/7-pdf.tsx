@@ -608,6 +608,42 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
           </View>
         </View>
 
+        {/* SCORE-001 (2026-05-07): compound score tile. Shows the headline
+            number that combines rubric completeness (40%) with council
+            quality average (60%). Replaces the misleading "95/100" reading
+            of rubric alone. */}
+        {(() => {
+          const compound = (state as any).compoundScore as {
+            compound: number
+            rubric: number
+            councilAvg: number | null
+            councilScored: number
+            councilFailed: number
+          } | undefined
+          if (!compound) return null
+          const tileColour = compound.compound >= 70 ? GREEN
+            : compound.compound >= 50 ? AMBER : RED
+          const councilLabel = compound.councilAvg === null
+            ? `rubric only, ${compound.councilFailed} sections unscored`
+            : `rubric ${compound.rubric}/100 + council ${compound.councilAvg.toFixed(1)}/10${compound.councilFailed > 0 ? ` (${compound.councilFailed} unscored)` : ''}`
+          return (
+            <View style={s.statRow}>
+              <View style={s.stat}>
+                <Text style={s.statLabel}>Compound quality score</Text>
+                <Text style={{ ...s.statValue, color: tileColour }}>{compound.compound}/100</Text>
+                <Text style={{ fontSize: 7.5, color: MUTED, marginTop: 2 }}>
+                  {councilLabel}
+                </Text>
+              </View>
+              <View style={s.stat}>
+                <Text style={s.statLabel}>Council sections scored</Text>
+                <Text style={s.statValue}>{compound.councilScored}/{compound.councilScored + compound.councilFailed}</Text>
+                <GradeLabel grade="B" label="Multi-LLM judges" />
+              </View>
+            </View>
+          )
+        })()}
+
         <View style={s.statRow}>
           <View style={s.stat}>
             <Text style={s.statLabel}>Subsystem Modules</Text>
@@ -2007,7 +2043,12 @@ interface ScorecardProps {
 }
 
 function SectionScorecard({ sectionName, score, dimensions, recommendations }: ScorecardProps) {
-  const scoreColor = score >= 70 ? GREEN : score >= 50 ? AMBER : RED
+  // SCORE-002 (2026-05-07): score of -1 is the sentinel for "failed to
+  // score". Previously rendered as 5/100 mid-amber which was
+  // indistinguishable from a genuine mid-quality score. Now shows "—"
+  // in grey with an explicit "failed to score" label.
+  const failedToScore = score < 0
+  const scoreColor = failedToScore ? MUTED : (score >= 70 ? GREEN : score >= 50 ? AMBER : RED)
 
   return (
     <View style={{ marginTop: 16, padding: 16, backgroundColor: BG_SOFT, borderRadius: 6, borderWidth: 1, borderColor: BORDER }}>
@@ -2017,7 +2058,7 @@ function SectionScorecard({ sectionName, score, dimensions, recommendations }: S
         </Text>
         <View style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: scoreColor, borderRadius: 4 }}>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#fff' }}>
-            {score}/100
+            {failedToScore ? '— not scored' : `${score}/100`}
           </Text>
         </View>
       </View>
@@ -2080,11 +2121,16 @@ export default function PdfRenderer({ state }: { state: PipelineState }) {
           score: 50,
           reason: r
         }))
+        // SCORE-002 (2026-05-07): convert the 1-10 council score into the
+        // 0-100 scale the scorecard renders in, but preserve the -1
+        // "failed to score" sentinel so the renderer shows "— not scored".
+        const rawScore = sc.score ?? -1
+        const displayScore = rawScore < 0 ? -1 : Math.round((rawScore / 10) * 100)
         return (
           <Page key={`score-${i}`} size="A4" style={s.page}>
             <SectionScorecard
               sectionName={sc.section || 'Unknown'}
-              score={sc.score || 0}
+              score={displayScore}
               dimensions={dims}
               recommendations={(sc.suggestions || []).filter(Boolean)}
             />

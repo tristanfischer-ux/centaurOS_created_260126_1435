@@ -129,14 +129,18 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
         console.log(`[council-scorer] ${section}: ${councilScore.score}/10 (council)`)
       } catch (err) {
         console.error(`[council-scorer] ${section} council scoring failed:`, (err as Error).message)
+        // SCORE-002 (2026-05-07): emit score=-1 sentinel when the council
+        // couldn't score a section. Renderer shows "—" and the average
+        // calc excludes it. Previous default of 5 was indistinguishable
+        // from a genuine mid-quality score and masked real failures.
         scores.push({
           section,
-          score: 5,
+          score: -1,
           criteria_scores: [],
-          overall_reasons: ['Council scoring failed — defaulting to 5'],
-          code_change_recommendations: [],
+          overall_reasons: [`Council scoring failed: ${(err as Error).message}`],
+          code_change_recommendations: ['Re-run the council for this section once OpenRouter credit + judge availability are restored.'],
           source_attributions: [],
-        })
+        } as any)
       }
     } else {
       // Deterministic scoring for lower-impact sections
@@ -146,7 +150,18 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
     }
   }
 
-  console.log(`[council-scorer] Complete. Average: ${(scores.reduce((s, c) => s + c.score, 0) / scores.length).toFixed(1)}/10`)
+  // SCORE-002 (2026-05-07): compute the average only over scored sections.
+  // Sections with score === -1 (council failure) are excluded so a flaky
+  // OpenRouter round doesn't drag the average down via synthetic 5s.
+  const scored = scores.filter(s => s.score >= 0)
+  const failed = scores.length - scored.length
+  const avg = scored.length > 0
+    ? scored.reduce((s, c) => s + c.score, 0) / scored.length
+    : 0
+  console.log(
+    `[council-scorer] Complete. Average: ${avg.toFixed(1)}/10 ` +
+    `(${scored.length} scored, ${failed} failed-to-score${failed > 0 ? ' — see logs' : ''})`
+  )
 
   return {
     ok: true,

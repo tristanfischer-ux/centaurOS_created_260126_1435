@@ -22,7 +22,7 @@ import React from 'react'
 import { runAllGates } from './validators'
 import { scoreAllSections } from './scorer'
 import { runCouncilScoring } from './council-scorer'
-import { scoreReport } from './score-rubric'
+import { scoreReport, computeCompoundScore } from './score-rubric'
 import { validateR290Safety } from './lib/r290-safety'
 import { validateCosts } from './lib/cost-constraints'
 import { classifyProduct, getRequiredFields } from './product-classifier'
@@ -497,9 +497,31 @@ export async function runPipeline(
   console.log('\n[pipeline] === Reference Report Scoring ===')
   try {
     const rubricResult = scoreReport(state)
-    console.log(`[pipeline] Overall score: ${rubricResult.overallScore}/100`)
+    console.log(`[pipeline] Rubric (completeness) score: ${rubricResult.overallScore}/100`)
     console.log(`[pipeline] Brief: ${rubricResult.briefScore}, Regulatory: ${rubricResult.regulatoryScore}, Modules: ${rubricResult.modulesScore}, BOM: ${rubricResult.bomScore}, Cost: ${rubricResult.costScore}, Risks: ${rubricResult.risksScore}`)
     ;(state as any).rubricResult = rubricResult
+
+    // SCORE-001 (2026-05-07): compound headline score combining rubric
+    // (completeness) with council quality average. This is the number to
+    // report — rubric alone was misleading (95/100 for BOMs the council
+    // found at 4/10).
+    const councilScoresForCompound = (state.sectionScores || []).map(s => ({
+      section: s.section,
+      score: s.score,
+    }))
+    const compound = computeCompoundScore(rubricResult.overallScore, councilScoresForCompound)
+    ;(state as any).compoundScore = compound
+    if (compound.councilAvg !== null) {
+      console.log(
+        `[pipeline] COMPOUND score: ${compound.compound}/100 ` +
+        `(rubric ${compound.rubric}/100 × 0.4 + council ${compound.councilAvg.toFixed(1)}/10 × 0.6) ` +
+        `— ${compound.councilScored} sections scored, ${compound.councilFailed} failed`
+      )
+    } else {
+      console.log(
+        `[pipeline] COMPOUND score: ${compound.compound}/100 (rubric only — no council signal; ${compound.councilFailed} sections failed to score)`
+      )
+    }
   } catch (err) {
     console.log('[pipeline] Reference scoring failed:', (err as Error).message)
   }
