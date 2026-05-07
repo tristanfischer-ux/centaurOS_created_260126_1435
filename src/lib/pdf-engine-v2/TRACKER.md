@@ -38,14 +38,14 @@ Council sequenced this to avoid calibrating against a broken score. Targets for 
 |---|---|---|---|---|
 | 1 | **F7** compound reweight (rubric 0.4→0.15, council 0.6→0.85) | 30 min | **done — should have been @coder** | Honest scores visible everywhere |
 | 2 | **F12** retire placebo deterministic scorer | 1 hr | **@coder** (Gemini 3.1 Pro) — bounded refactor of `scorer.ts` | Modules / Risks / Suppliers stop auto-8/10 |
-| 3 | **F13** audit judge criteria vs engine output | 1 hr | **@council** (6 models) diagnose → **@coder** apply — **IN PROGRESS** | Judges score what we actually produce |
+| 3 | **F13** audit judge criteria vs engine output | 1 hr | ✅ DONE `afd1d854` | Judges score what we actually produce |
 | 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | **@coder** (rules + tests) — ✅ DONE | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
 | 5 | **G2** relax `getRequiredFields()` | 15 min | **@coder-2** (MiMo) — ✅ DONE | Pairs with G1 — Round 1 → 9-10/10 pass rate |
 | 6 | **B6** required-parts manifest per product class | 2 hr | **@coder** (needs domain-knowledge rule authoring) | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
 | 7 | **H2** Stage 5 regime router | 45 min | **@coder** (Stage 5 dispatcher + types) | Distributor APIs called for `buy_electronic` parts |
 | 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | **@coder** (React-PDF layout + 3 new sections) | Make/Buy/Services visible per part |
 | 9 | **J1a** pipeline emits status for failed runs | 45 min | **@coder-2** (MiMo) — small error-handler additions | Dashboard shows all 20 runs, not just 5 |
-| 10 | **F9** exclude engine-lineage from judges | 30 min | **@coder-2** — **IN PROGRESS** | Gemini stops grading Gemini |
+| 10 | **F9** exclude engine-lineage from judges | 30 min | ✅ DONE `afd1d854` | Gemini stops grading Gemini |
 
 **Total ~9 hours, ~£15-25 OpenRouter for evidence runs at the end of the day.**
 
@@ -186,13 +186,13 @@ Status is verified from git log + grep + code audit, not memory.
 | F4 | Cross-run `scoring-history.jsonl` archive | ✅ | `b8156209` |
 | F5 | Suppliers + Risks promoted to council tier | ✅ | `b8156209` |
 | F6 | Auto-refreshing HTML dashboard | ✅ | `b8156209` |
-| **F7** | **Compound-formula reweight — cut rubric contribution to 15% so a 5.4/10 council content doesn't read as 71/100 honestly** | ❌ planned | New 2026-05-07 — Tristan-flagged: compound is misleadingly high |
+| **F7** | **Compound-formula reweight — cut rubric contribution to 15% so a 5.4/10 council content doesn't read as 71/100 honestly** | ✅ | `1ed47f53` |
 | **F8** | **Per-judge score breakdown visible on scorecard + dashboard card** | ❌ planned | New 2026-05-07 |
-| **F9** | **Exclude engine-lineage models from judge council (no Gemini grading its own work)** | ❌ planned | New 2026-05-07 — Tristan-flagged conflict of interest |
+| **F9** | **Exclude engine-lineage models from judge council (no Gemini grading its own work)** | ✅ | `afd1d854` — Grok+MiMo+GLM replace Gemini+DeepSeek |
 | **F10** | **Golden-reference calibration (Tristan to score vertical farm sections 1-10, compare to council)** | ❌ planned — **defer until AFTER G1+G2+B6+H2+C8 land AND one full evidence run has been captured.** Calibrating a moving scoring system wastes Tristan's time; calibrate once the system has stabilised. | Tristan 2026-05-07 — "F10 might have to happen once there has been more done. Not clear to me whether that is the right order." Agreed. |
-| **F11** | **Formula-version stamp on every scoring-history record so old/new records are distinguishable after F7** | ❌ planned | New 2026-05-07 |
-| **F12** | **Retire deterministic scorer as quality signal — rewrite to grade named-entity density + unit coherence OR require council for every section with explicit "— not scored" on failure** | ❌ planned | New 2026-05-07 — current deterministic is keyword-count placebo |
-| **F13** | **Audit every judge criterion against what the engine actually emits — close gaps or soften criteria** | ❌ planned | New 2026-05-07 |
+| **F11** | **Formula-version stamp on every scoring-history record so old/new records are distinguishable after F7** | ✅ | `1ed47f53` |
+| **F12** | **Retire deterministic scorer as quality signal — rewrite to grade named-entity density + unit coherence OR require council for every section with explicit "— not scored" on failure** | ✅ | `c7d6ccb4` |
+| **F13** | **Audit every judge criterion against what the engine actually emits — close gaps or soften criteria** | ✅ | `afd1d854` — R290-specific criteria genericised |
 
 ### Phase G — Brief handling
 
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**62 ✅ done · 44 ❌ planned · 2 ⏸ deferred**
+**66 ✅ done · 40 ❌ planned · 2 ⏸ deferred**
 
 ---
 
@@ -368,6 +368,14 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 ## Log
 
 (newest first — historical entries retained for SHA traceability)
+
+### 2026-05-07 11:30 — F9 + F13 shipped (judge lineage + criteria audit)
+
+F9: Replaced engine-lineage judges (Gemini, DeepSeek) with Grok 4.3 + MiMo V2.5-Pro + GLM 5.1. Zero overlap with content generators. 3 lineages: US xAI, China Xiaomi, China Zhipu.
+
+F13: Genericised R290-specific criteria in Risks, Suppliers, Regulatory sections. Drone/AUV/BESS/bioreactor briefs no longer penalised for missing propane refrigerant requirements. Criteria now say "product-class-specific" with examples.
+
+Count: 66 ✅ / 40 ❌ / 2 ⏸.
 
 ### 2026-05-07 11:15 — G1 + G2 shipped (classifier widening + validator relaxation)
 
