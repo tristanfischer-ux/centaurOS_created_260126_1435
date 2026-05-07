@@ -197,12 +197,22 @@ export function scoreReport(state: any): ScoringResult {
  * misleading — it showed 95/100 for reports where the council flagged
  * BOM / Cost content quality at 3-4/10.
  *
- * Weighting: 40% rubric (completeness is necessary), 60% council (quality
- * is what the founder actually reads).
+ * F7 reweight (2026-05-07 09:30, Tristan-flagged): rubric was dominating
+ * the compound. At rubric ≈ 97 (always near-ceiling once the pipeline
+ * completes) and council avg ≈ 5.4, the old 40/60 split yielded 71/100
+ * for content that was genuinely 5.4/10 quality. Now 15/85 — rubric is
+ * a small completeness premium but council quality is the headline.
+ *
+ * New BESS example under F7 weights:
+ *   rubric 97 × 0.15 + council 5.4 × 10 × 0.85 = 14.6 + 45.9 = 60
+ * Previously read as 71/100. Now reads 60/100 — honest.
  *
  * Council sections with score === -1 (failed to score) are EXCLUDED from
  * the average so a flaky OpenRouter round doesn't distort the compound
  * number.
+ *
+ * formulaVersion is stamped onto the scoring-history record so pre-F7
+ * and post-F7 records are distinguishable in the dashboard trend (F11).
  *
  * @param rubricOverall 0-100 score from scoreReport()
  * @param councilScores array of {section, score} from council-scorer
@@ -217,6 +227,7 @@ export function computeCompoundScore(
   councilAvg: number | null
   councilScored: number
   councilFailed: number
+  formulaVersion: string
 } {
   const scored = councilScores.filter(s => s.score >= 0)
   const failed = councilScores.length - scored.length
@@ -232,15 +243,19 @@ export function computeCompoundScore(
       councilAvg: null,
       councilScored: 0,
       councilFailed: failed,
+      formulaVersion: 'f7',
     }
   }
 
-  const compound = Math.round(rubricOverall * 0.4 + councilAvg * 10 * 0.6)
+  // F7 (2026-05-07): rubric 15%, council 85%. Council × 10 to normalise
+  // the 1-10 score onto the 0-100 scale before weighting.
+  const compound = Math.round(rubricOverall * 0.15 + councilAvg * 10 * 0.85)
   return {
     compound,
     rubric: rubricOverall,
     councilAvg,
     councilScored: scored.length,
     councilFailed: failed,
+    formulaVersion: 'f7',
   }
 }

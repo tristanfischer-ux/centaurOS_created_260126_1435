@@ -39,6 +39,13 @@ export interface ScoringRecord {
   councilScored: number
   councilFailed: number
   sections: Array<{ section: string; score: number }>
+  /**
+   * F11 (2026-05-07): stamp which compound formula produced this record.
+   * 'pre-f7' = old 40/60 split, 'f7' = current 15/85 split.
+   * Lets the dashboard render pre-F7 records greyed / labelled differently
+   * so trend sparklines aren't misleading.
+   */
+  formulaVersion?: string
 }
 
 /**

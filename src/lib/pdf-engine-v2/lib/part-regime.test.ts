@@ -2,14 +2,15 @@ import { classifyRegime, classifyAllRegimes } from './part-regime'
 import type { Part } from '../types'
 
 function p(overrides: Partial<Part> & { name: string }): Part {
+  const { name, partNumber, isPurchased, process, material, sourceModuleId, ...rest } = overrides
   return {
-    partNumber: overrides.partNumber || 'PN-TEST-001',
-    name: overrides.name,
-    isPurchased: overrides.isPurchased ?? true,
-    process: overrides.process || '',
-    material: overrides.material || '',
-    sourceModuleId: overrides.sourceModuleId || 'mod-1',
-    ...overrides,
+    partNumber: partNumber || 'PN-TEST-001',
+    name,
+    isPurchased: isPurchased ?? true,
+    process: process || '',
+    material: material || '',
+    sourceModuleId: sourceModuleId || 'mod-1',
+    ...rest,
   } as Part
 }
 

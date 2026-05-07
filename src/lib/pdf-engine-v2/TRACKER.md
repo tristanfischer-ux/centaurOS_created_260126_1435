@@ -1,8 +1,55 @@
 # PDF Engine v2 — Work Tracker
 
 **Owner:** OpenCode (Sonnet)
-**Latest:** 2026-05-07 07:00
-**Goal:** Every project type generates a report scored ≥8/10 on every section.
+**Latest:** 2026-05-07 09:30
+**Mission:** Every one of the 10 baseline project types (CGM, drone, edge AI, heat pump, EV charger, bioreactor, farm, AUV, BESS, HAPS) generates a PDF where **every section scores ≥8/10** on council judging AND **minimal briefs pass the pipeline** (not rejected at the validator cliff).
+
+---
+
+## Where we are (2026-05-07 09:30)
+
+### Working end-to-end
+- Full pipeline generates ~100-130 page PDFs for 5/10 project types
+- Per-cell deterministic quantity derivation (B5) — BESS cell count, heat pump fan count, farm LED count all computed from brief specs
+- Reverse indexes (D1, D2) — 35k process keys + 14k material keys built in 266 ms
+- Supplier Shortlist with process-match validation (C3 + C4)
+- Compound score + dashboard live — 17+ runs archived, auto-refreshing HTML
+- **Distributor APIs live today:** Mouser + Farnell returning live UK prices + stock (H1a, H1c, H1d shipped this morning)
+- Part-regime classifier (C5) — BOM lines routed to the right lookup
+
+### Honest quality state (from compound scores, before F7 reweight)
+- Round 1 detailed briefs: **5/10 pass** (69-73/100 compound, but compound is inflated by rubric)
+- Round 2 minimal briefs: **0/10 pass** (all rejected at `validateBrief`)
+- BOM sections score **4/10** on council (missing expansion tank, PRV, insulation — real engineering gaps)
+- Cost sections score **4/10** on council (£18 default on capital parts, NRE underestimated by 10×)
+- Brief section scores **2-5/10** across all briefs (extraction drops required fields)
+- Safety section only fires for heat pumps
+
+### Today's detour was valuable
+Morning was spent building the Buy-side of the Make/Buy split — distributor API adapters (H1a, H1b, H1c, H1d) + part-regime classifier (C5). That unblocks the entire electronics-BOM coverage problem and is foundational for H2 + C8 later today.
+
+---
+
+## Today's ordered queue (full day)
+
+Council sequenced this to avoid calibrating against a broken score. Targets for today in priority order:
+
+| # | ID | Est | Target section impact |
+|---|---|---|---|
+| 1 | **F7** compound reweight (rubric 0.4→0.15, council 0.6→0.85) | 30 min | Honest scores visible everywhere |
+| 2 | **F12** retire placebo deterministic scorer | 1 hr | Modules / Risks / Suppliers stop auto-8/10 |
+| 3 | **F13** audit judge criteria vs engine output | 1 hr | Judges score what we actually produce |
+| 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
+| 5 | **G2** relax `getRequiredFields()` | 15 min | Pairs with G1 — Round 1 → 9-10/10 pass rate |
+| 6 | **B6** required-parts manifest per product class | 2 hr | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
+| 7 | **H2** Stage 5 regime router | 45 min | Distributor APIs called for `buy_electronic` parts |
+| 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | Make/Buy/Services visible per part |
+| 9 | **J1a** pipeline emits status for failed runs | 45 min | Dashboard shows all 20 runs, not just 5 |
+| 10 | **F9** exclude engine-lineage from judges | 30 min | Gemini stops grading Gemini |
+
+**Total ~9 hours, ~£15-25 OpenRouter for evidence runs at the end of the day.**
+
+At end of day: re-run all 10 baseline briefs × both rounds (20 runs) and compare compound scores against this morning's snapshot. Target delta: Round 2 from 0/10 to 9-10/10 passing; Round 1 average compound from 71/100 (inflated) to genuinely honest 70/100+ (means content actually improved).
 
 ---
 
@@ -106,6 +153,7 @@ Status is verified from git log + grep + code audit, not memory.
 | E6 | CX-002 meaningful project names from brief | ✅ | `471e49cc` |
 | **E7** | **Judges for Feasibility Gate + Proofreader findings + Audit Log** | ❌ planned | New 2026-05-07 |
 | **E8** | **Cover / Executive Summary judge** | ❌ planned | New 2026-05-07 |
+| **E9** | **Strip Market Sizing + Competitor Landscape from the current PDF.** Current report answers 'can this be built, how, at what risk, at what price'. Market/competitor analysis belongs in a separate commercial report (X2). Changes: drop `marketSizing` rendering from BriefPages, drop `competitors` table, remove TAM tile from cover, adjust rubric to stop scoring market/competitor completeness, leave `designBrief.marketSizing` + `competitors` fields in state for X2 to consume later. | ❌ planned | Tristan 2026-05-07 — "this document should really be focused on what the product is: Can it be made, how, risks, pricing" |
 
 ### Phase F — Scoring system
 
@@ -141,7 +189,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
 | **H1a** | **Mouser Search API integration** — free tier 1k/day, UK pricing + UK stock + datasheet URL + MPN lookup. Adapter in `lib/distributors/mouser.ts`. Reads key from `~/.claude/secrets/distributor-apis.env`. | ✅ | `80b1d5f2` — key live, 5/6 parts resolved |
-| **H1b** | **Digi-Key API v4 integration** — OAuth 2.0 client credentials, free tier. `lib/distributors/digikey.ts` + token refresh. | ⚠️ credentials pending | Adapter shipped `8fb6e142`; app created but returning 401 `Invalid clientId` — credentials may be truncated or app needs propagation |
+| **H1b** | **Digi-Key API v4 integration** — OAuth 2.0 client credentials, free tier. `lib/distributors/digikey.ts` + token refresh. | ✅ | `8fb6e142` — all 3 APIs live, every test MPN resolves |
 | **H1c** | **Farnell / Element14 Product Search API** — free tier, UK-native, XML response (regex-parsed). `lib/distributors/farnell.ts`. | ✅ | `fb9e2785` — key live, 5/6 parts resolved |
 | **H1d** | **Distributor aggregator** — `lib/distributors/index.ts` function `findSkuForPart(part)` fans out in parallel, sorts by stock-first + qty-1-price, returns `{ best, alternates, misses, qty1GBP }`. | ✅ | `8fb6e142` — aggregator shipped with all 3 adapters |
 | **H1e** (optional) | Octopart subscription as aggregator upgrade — only if H1d orchestration becomes unwieldy. Leaning against. | ❌ backlog | New 2026-05-07 |
@@ -212,17 +260,18 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | HP-003 | Verdict wording on monobloc paths | ✅ | `8198c940` |
 | BASELINE-10 | 10 projects × 2 rounds (detailed + minimal briefs) | ✅ | `083ef489` — findings in `BASELINE-10-ANALYSIS.md` |
 
-### Phase X — Deferred
+### Phase X — Deferred / future reports
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
 | X1 | NEW-001 brief-feasibility advisor (full universal-physics version) | ⏸ deferred | Stub at `stages/1.5-feasibility-advisor.ts`, plan at `PLAN-NEW-001.md`. **Note:** G3 brief-expand is a narrower, higher-leverage win that partially addresses the same problem |
+| **X2** | **Commercial report — separate PDF (not this engineering report).** Contents: Total Addressable Market + Serviceable Market sizing, competitor landscape (3-5 named UK/EU competitors with pricing / differentiation / strengths / weaknesses), CAGR + growth drivers, and a **10-investor shortlist** where each entry has: investor name + fund, why they're a plausible fit for this product class and stage, website URL, relevant partner's name + title + LinkedIn, contact email. Generates from the same brief but is a commercial rather than engineering artefact — the founder hands the engineering PDF to their tech + ops teams, the commercial PDF to their board + investor pipeline. | ⏸ deferred until engineering PDF is ≥8/10 across all sections | Tristan 2026-05-07 — "I think this is going to add more complexity to something which is already too complicated. Once everything else is working, we can do that." |
 
 ---
 
 ## Tally
 
-**57 ✅ done · 44 ❌ planned · 1 ⏸ deferred**
+**58 ✅ done · 46 ❌ planned · 2 ⏸ deferred**
 
 ---
 

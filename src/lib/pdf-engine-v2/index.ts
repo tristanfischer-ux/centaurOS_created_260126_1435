@@ -539,6 +539,7 @@ export async function runPipeline(
         councilScored: compound.councilScored,
         councilFailed: compound.councilFailed,
         sections: councilScoresForCompound,
+        formulaVersion: compound.formulaVersion,
       })
       console.log(`[pipeline] scoring history updated — dashboard at ~/Downloads/engine-evidence/scoring-dashboard.html`)
     } catch (err) {
