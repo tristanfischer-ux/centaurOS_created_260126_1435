@@ -136,7 +136,7 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
   // (string | null, often null → council scores 1 on empty data) and AuditLog
   // data lives on EngineResult, not PipelineState (extraction is dead code).
   // Both fall through to the deterministic scorer via the full `sections` list.
-  const councilSections = ['ExecutiveSummary', 'Brief', 'Feasibility', 'BOM', 'Cost', 'Suppliers', 'Risks']
+  const councilSections = ['ExecutiveSummary', 'Brief', 'Feasibility', 'BOM', 'Cost', 'Suppliers', 'Risks', 'Regulatory', 'Sizing', 'Modules', 'Research']
 
   for (const section of sections) {
     const data = sectionData[section]
@@ -510,13 +510,18 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   ).join('\n')
 
   // Feasibility
-  const feas = (state as any).feasibility || (state as any).gates
-  if (feas) {
-    sections['Feasibility'] = [
-      `Verdict: ${feas.verdict || feas.status || 'unknown'}`,
-      `Constraints Evaluated: ${Array.isArray(feas.constraints) ? feas.constraints.join(', ') : JSON.stringify(feas.constraints || 'none')}`,
-      `Alternatives: ${Array.isArray(feas.alternatives) ? feas.alternatives.join(', ') : JSON.stringify(feas.alternatives || 'none')}`,
-    ].join('\n')
+  const feas = (state as any).feasibility
+  const dsFeas = state.dimensionSheet
+  const briefFeas = state.research?.designBrief
+  const feasText = [
+    feas ? `Verdict: ${feas.status || feas.verdict || 'unknown'}` : '',
+    feas?.blockers?.length ? `Blockers: ${feas.blockers.join(', ')}` : '',
+    feas?.reason ? `Reason: ${feas.reason}` : '',
+    dsFeas ? `Sizing feasible: ${dsFeas.feasible}` : '',
+    briefFeas?.constraints ? `Constraints: ${JSON.stringify(briefFeas.constraints)}` : '',
+  ].filter(Boolean).join('\n')
+  if (feasText.length >= 10) {
+    sections['Feasibility'] = feasText
   }
 
   // Proofreader
@@ -536,12 +541,18 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   // Research
   const r = state.research
   if (r) {
-    sections['Research'] = [
+    const researchText = [
       `Report length: ${(r.report || '').length} chars`,
+      `Training Dossier length: ${(r.trainingDataDossier || '').length} chars`,
       `Sources: ${r.sources?.length || 0} (${r.sources?.map(s => s.title).join(', ') || 'none'})`,
       `Standards: ${r.standardCodes?.join(', ') || 'none'}`,
       `Domain: ${r.industryDomain || 'unknown'}`,
-    ].join('\n')
+      `Market Sizing TAM: ${r.designBrief?.marketSizing?.tamMUsd || 'unknown'} M USD`,
+      `Competitors: ${r.designBrief?.competitors?.length || 0}`
+    ].filter(Boolean).join('\n')
+    if (researchText.length >= 10) {
+      sections['Research'] = researchText
+    }
   }
 
   return sections
