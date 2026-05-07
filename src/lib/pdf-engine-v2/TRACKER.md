@@ -68,7 +68,7 @@ Every ID that exists in this tracker, every `pdf-engine-v2` commit, and every co
 | **Evening 2026-05-06** | | | |
 | Per-cell qty realism | `spec-extraction` + `quantity-derivation` + 47 tests | ✅ | `6b1e9cf4` |
 | isBessCell-BMS tighten | Exclude BMS/monitor/slave from cell rule | ✅ | `d22a3413` |
-| NEW-001 | **Brief-feasibility feedback loop** — when target is impossible, surface what in the brief to relax. | ⏸ deferred | Per Tristan 2026-05-06: "resolve later, not now" |
+| NEW-001 | **Brief-feasibility feedback loop** — when target is impossible, surface what in the brief to relax. | ⏸ deferred | Per Tristan 2026-05-06: "resolve later, not now". Full v4 plan at `PLAN-NEW-001.md`, stub module at `stages/1.5-feasibility-advisor.ts`. 6-model council review complete. |
 
 **Tally: 44 ✅ · 0 ❌ · 1 ⏸ deferred.**
 
@@ -76,7 +76,12 @@ Every ID that exists in this tracker, every `pdf-engine-v2` commit, and every co
 
 ## Deferred items (outside scope this session)
 
-1. **NEW-001** — Brief-feasibility feedback loop. When the engine determines a target is physically impossible (e.g. 10 MWh battery in a briefcase envelope), it should suggest which brief constraint to relax (capacity, envelope, mass, cost ceiling) and produce a modified brief the founder can accept/decline. Needs a new sub-stage between research and decompose. Non-trivial. Tristan explicitly deferred.
+1. **NEW-001 — Brief-Feasibility Feedback Loop.** Full scope, council reviews (v1→v4), and delivery estimates captured in:
+   - `PLAN-NEW-001.md` — detailed plan history + verbatim council findings
+   - `stages/1.5-feasibility-advisor.ts` — stub module with locked type signatures, throws on call with pointer to plan doc
+
+   Summary: 6-model council review (Grok + GPT-5.4/5.5 + MiMo V2.5-Pro + GLM-5.1 + DeepSeek V4-Pro + Kimi K2.6) surfaced 11 BLOCKER findings against v3. v4 design addresses all 11. Full delivery: 15-20 hrs across 4-5 sessions; narrow v4-MVP: 5-7 hrs. Tristan deferred 2026-05-06: "resolve later, not now."
+
 2. **BENCH-L2 overnight run** — the miner script (`scripts/mine-benchmark-chunks.ts`) exists and is tested; running it against the full 1.9M corpus is a ~30-min + ~£1-3 OpenRouter job that should happen in a dedicated overnight session.
 
 ---
