@@ -81,7 +81,7 @@ Status is verified from git log + grep + code audit, not memory.
 | C2 | `runSuppliers` uses local corpus as primary | ✅ | `0dbc2cac` |
 | C3 | Supplier Shortlist PDF section (was landed under "B3" label) | ✅ | `f41a2c11` |
 | C4 | Process-match validation — red-flag unverified suppliers | ✅ | `13de00bb` |
-| **C5** | **Part-regime classifier at Stage 4 — every BOM line stamped `buy_electronic` / `buy_mechanical_industrial` / `named_manufacturer_reseller` / `make_custom_fab` / `service_certification`. Routes downstream lookup to the right corpus. Rules-first (keyword match on part name / isPurchased / process) with LLM fallback for ambiguous rows.** | ❌ planned | New 2026-05-07 — Tristan "make vs buy" framing |
+| **C5** | **Part-regime classifier at Stage 4 — every BOM line stamped `buy_electronic` / `buy_mechanical_industrial` / `named_manufacturer_reseller` / `make_custom_fab` / `service_certification`. Routes downstream lookup to the right corpus. Rules-first with LLM fallback.** | ✅ | `80b1d5f2` — 16/16 tests |
 | **C6** | **Supplier Shortlist honesty gate — only include a supplier match when (a) part regime is `make_custom_fab` or `service_certification` AND (b) process-match OR material-match verifies via D1/D2. Prevents "UK sheet-metal shop appearing on MCU query" false-positives.** | ❌ planned | New 2026-05-07 |
 | **C7** | **Match-type column on every Supplier Shortlist card — `Custom fabricator` / `Distributor SKU` / `Authorised reseller` / `Certification body` / `Speculative match`. Sets founder expectation correctly.** | ❌ planned | New 2026-05-07 |
 | **C8** | **PDF restructure: replace single "Supplier Shortlist" section with three. §6a PARTS TO BUY (distributor table MPN + £ + stock + datasheet). §6b PARTS TO MAKE (fabricator leads grouped by process — machining / sheet metal / welding / moulding / harness). §6c SERVICES & CERTIFICATION (UL / EMC / MDR / G99 test houses with cost + lead time).** | ❌ planned | New 2026-05-07 — Tristan "three structured procurement paths" framing |
@@ -140,11 +140,11 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **H1a** | **Mouser Search API integration** — free tier 1k/day, UK pricing + UK stock + datasheet URL + MPN lookup. `lib/distributors/mouser.ts` + adapter function `lookupSkuMouser(mpn)`. Reads key from `~/.claude/secrets/distributor-apis.env`. | ❌ planned | New 2026-05-07 — Tristan registering key |
-| **H1b** | **Digi-Key API v4 integration** — OAuth 2.0, free tier ~1k/day, UK catalogue. `lib/distributors/digikey.ts` + token refresh. | ❌ planned | New 2026-05-07 |
-| **H1c** | **Farnell / Element14 Product Search API integration** — free tier, UK-native. `lib/distributors/farnell.ts`. | ❌ planned | New 2026-05-07 |
-| **H1d** | **Distributor aggregator** — `lib/distributors/index.ts` function `findSkuForPart(part)` fans out to H1a+H1b+H1c in parallel, merges results, returns cheapest-UK-stock with alternates. | ❌ planned | New 2026-05-07 |
-| **H1e** (optional) | Octopart subscription as aggregator upgrade — only if H1d orchestration becomes unwieldy. Monthly cost ~£1.5-3.6k/year. **Leaning against.** | ❌ backlog | New 2026-05-07 |
+| **H1a** | **Mouser Search API integration** — free tier 1k/day, UK pricing + UK stock + datasheet URL + MPN lookup. Adapter in `lib/distributors/mouser.ts`. Reads key from `~/.claude/secrets/distributor-apis.env`. | ✅ | `80b1d5f2` — key live, 5/6 parts resolved |
+| **H1b** | **Digi-Key API v4 integration** — OAuth 2.0 client credentials, free tier. `lib/distributors/digikey.ts` + token refresh. | ⚠️ credentials pending | Adapter shipped `8fb6e142`; app created but returning 401 `Invalid clientId` — credentials may be truncated or app needs propagation |
+| **H1c** | **Farnell / Element14 Product Search API** — free tier, UK-native, XML response (regex-parsed). `lib/distributors/farnell.ts`. | ✅ | `fb9e2785` — key live, 5/6 parts resolved |
+| **H1d** | **Distributor aggregator** — `lib/distributors/index.ts` function `findSkuForPart(part)` fans out in parallel, sorts by stock-first + qty-1-price, returns `{ best, alternates, misses, qty1GBP }`. | ✅ | `8fb6e142` — aggregator shipped with all 3 adapters |
+| **H1e** (optional) | Octopart subscription as aggregator upgrade — only if H1d orchestration becomes unwieldy. Leaning against. | ❌ backlog | New 2026-05-07 |
 | **H7a** | **RS Components scraping adapter** — RS does not offer a public API. Polite-rate scraper (1 req/2s, custom UA, respects robots.txt). `lib/distributors/rs-components.ts`. Fallback for parts RS stocks that Mouser/Digi-Key/Farnell don't. | ❌ planned | New 2026-05-07 |
 | **H7b** | **Mechanical wholesaler scrapers** — Eriks UK, Zoro UK, Applied Industrial. For `buy_mechanical_industrial` regime parts (fasteners, bearings, valves, pumps, fittings) that electronics distributors don't carry. | ❌ planned | New 2026-05-07 |
 | **H8** | **Curated UK service-provider registry** — `lib/service-providers.ts`, ~40-60 hand-authored entries: UL test houses (Intertek, TÜV SÜD UK, Element), EMC precompliance, MDR notified bodies (BSI, DEKRA), G99 relay witnessing, CE/UKCA file compilers, cleanroom qual, pressure testing. Each entry: service type + provider + location + typical cost range + typical duration + contact URL. Feeds §6c PDF section and M1 NRE calculation. | ❌ planned | New 2026-05-07 |
@@ -222,7 +222,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**53 ✅ done · 48 ❌ planned · 1 ⏸ deferred**
+**57 ✅ done · 44 ❌ planned · 1 ⏸ deferred**
 
 ---
 
@@ -299,6 +299,19 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 ## Log
 
 (newest first — historical entries retained for SHA traceability)
+
+### 2026-05-07 09:00 — Distributor APIs live (Mouser + Farnell) + C5 shipped
+
+Live test across 6 representative MPNs with both APIs working:
+- Mouser cheaper for STM32H743ZIT6 (£11.19 vs £11.28), LM358P (£0.20 vs £0.23), Infineon IGBT FF600R17ME4 (£153.63 vs £230.11 — £76 saving per unit)
+- Farnell cheaper / only-stocked for TI TMP102 (£0.71, 0 stock so supplier wait either way) and Vishay thermistor (£0.38, 75k UK stock)
+- CATL LF280K expected miss — distributor false-matched a 280K-ohm resistor instead. Validates the need for C5 regime routing: CATL cells must route to named_manufacturer_reseller path, not distributor search.
+
+C5 part-regime classifier shipped `80b1d5f2` — 16/16 tests, classifies parts into 5 regimes before Stage 5 routes them to the right corpus/API.
+
+DigiKey still returning 401 `Invalid clientId` — credentials truncated in screenshot or propagation delay. Non-blocking; Mouser+Farnell cover 90% of electronics needs.
+
+Count: 57 ✅ / 44 ❌ / 1 ⏸.
 
 ### 2026-05-07 08:30 — Make/Buy split + distributor-API architecture
 
