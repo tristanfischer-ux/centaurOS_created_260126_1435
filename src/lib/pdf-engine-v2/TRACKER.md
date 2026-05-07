@@ -273,6 +273,36 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 |---|---|---|---|
 | **N1** | **Margin + thermal-rejection statements on Sizing page — floor-budget used/spare, heat rejection required vs cooling capacity provided** | ❌ planned | SIZE-Q1 (was) |
 
+### Phase P — Platform integration (engine ↔ ForgeOS app)
+
+The supplier work in Phases C / D / H lives under `src/lib/pdf-engine-v2/lib/`. The app's 5+ supplier surfaces (`(platform)/suppliers`, `(platform)/suppliers/search`, `(platform)/suppliers/[id]`, `(platform)/the-forge-v2/projects/[id]/suppliers`, `(ops)/supplier-corrections`, `api/suppliers`) **do not import any of it** — confirmed via grep 2026-05-07. They're running on old Supabase queries against the wrong table (`marketplace_listings` is investors, not suppliers). Phase P bridges the gap.
+
+| ID | Description | Status | Model | Commit / ref |
+|---|---|---|---|---|
+| **P1** | **Extract `lib/suppliers/*` shared module** — move 6 files out of `pdf-engine-v2/lib/` → `src/lib/suppliers/` (nightshift-corpus, distributors/, regime, reverse-indexes, domain-tags, page-chunks). Update engine imports. Engine end-to-end unchanged. | ❌ planned | **@coder** (Gemini 3.1 Pro) | New 2026-05-07 |
+| **P2** | **Wire `(platform)/suppliers` page to `lib/suppliers/*`** — replace Supabase-direct query with nightshift corpus + distributor aggregator. Make / Buy / Services view matching PDF §6a/§6b/§6c shape. | ❌ planned | **@coder** (Gemini 3.1 Pro) | New 2026-05-07 |
+| **P3** | **Wire `(platform)/the-forge-v2/projects/[id]/suppliers` to `lib/suppliers/*`** — per-project shortlist driven by project's BOM via C5 part-regime routing. | ❌ planned | **@coder** (Gemini 3.1 Pro) | New 2026-05-07 |
+| **P4** | **Wire `(platform)/suppliers/search` to `lib/suppliers/*`** — free-text search → semantic + reverse-index + distributor hybrid. | ❌ planned | **@coder-2** (MiMo V2.5-Pro) | New 2026-05-07 |
+| **P5** | Audit `api/suppliers` + `(ops)/supplier-corrections` to confirm they read from the shared module, not direct Supabase. | ❌ planned | **@coder-2** (MiMo V2.5-Pro) | New 2026-05-07 |
+| **P6** | Drop dead code — any old in-app supplier-matching logic superseded by P2-P5. | ❌ planned | **@coder-2** (MiMo V2.5-Pro) | New 2026-05-07 |
+
+**Dependency:** P1 must land first. P2-P5 can parallelise. Phase P slots **after** engine reaches ≥8/10 target — no point sharing broken logic.
+
+### Phase S — Security agents (cross-cutting, audit-on-trigger not per-ticket)
+
+Tristan-flagged 2026-05-07: three security-oriented agents are missing. Unlike code / product agents, these are **audit agents** that fire automatically on specific triggers (commit touches auth, new API key added, new Supabase migration, new public endpoint). Not a task queue item-by-item — a capability to build once then let run continuously.
+
+| ID | Description | Status | Model for agent work | Notes |
+|---|---|---|---|---|
+| **S1** | **`@security-code` agent — app-security audit:** SQL injection, XSS, RCE, auth-bypass, insecure deserialisation, dependency CVEs, `dangerouslySetInnerHTML`, unsanitised Brave / LLM output flowing into DOM, missing CSRF tokens, SSRF via URL fetches. **Triggers:** any commit touching `(public-*)`, `api/`, `auth/`, `middleware.ts`, `lib/supabase/*`. **Blocks commit** when Critical findings. | ❌ planned | Council tier (Grok 4.3 + GLM-5.1 + Kimi K2.6 — high non-hallucination, tool-use strong) | Security findings must be corroborated by 2+ lineages per coding-council doc |
+| **S2** | **`@security-finance` agent — secret-hygiene + payment audit:** Stripe key exposure in code / logs / commits, OpenRouter + Mouser + Digi-Key + Farnell API keys in env files going to wrong location, secrets in commit history, `.env` accidentally committed, webhook signing-secret validation, idempotency keys on payment flows, Stripe retry / refund integrity, negative-amount guards. **Triggers:** any Stripe-related code change, any `.env` edit, any commit referencing `secrets/`, any new webhook route. | ❌ planned | Council tier (Grok 4.3 + GLM-5.1 + DeepSeek V4-Pro — schema + adversarial + structured) | |
+| **S3** | **`@security-customer` agent — account-isolation + privacy audit:** Supabase RLS policy coverage on every multi-tenant table (`foundry_id`, `profile_id`), PII exposure in logs, session-fixation, cross-tenant data leakage (founder A seeing founder B's BOM), GDPR / UK DPA data-subject-access-request readiness, email-address leakage, login-bypass cookies. **Triggers:** any Supabase migration, any change to `withAuth()` / `createAdminClient()`, any new PII-holding column, any change to RLS policies. | ❌ planned | Council tier (GLM-5.1 + DeepSeek V4-Pro + Kimi K2.6 — schema + structured + scientific) | |
+| **S4** | **Wire the 3 security agents into `@reviewer` pre-commit path** so they fire automatically on matching file touches, not only when asked. File-pattern triggers defined in S1/S2/S3. | ❌ planned | @coder (Gemini 3.1 Pro) | Blocker-level — should exist before app is shared with real customers |
+| **S5** | **Secret-scanning pre-commit hook** (gitleaks or trufflehog) that blocks commits containing live-looking keys. Runs locally before any agent sees the diff. Complements S2. | ❌ planned | @coder-2 (MiMo V2.5-Pro) | Blocker-level |
+| **S6** | **Agent-design spec** — fully author the 3 new security agents in `~/.claude/docs/agent-taxonomy.md`: system prompt, required inputs, output JSON schema, cost envelope, model assignment rationale, auto-trigger conditions. Paired with the @writer / @researcher / @classifier / @redteam / @experiment additions flagged earlier today. | ❌ planned | @council (6-model, then @writer to formalise) | Foundation for S1-S5 |
+
+**Priority:** S4 + S5 are blocker-level — defensive infrastructure before real customers. S1-S3 are ongoing audit capability. None on today's critical path but all belong on the durable tracker. S6 (the agent-design spec) is where the design work lives — see `~/.claude/docs/agent-taxonomy.md`.
+
 ### Cross-cutting completed
 
 | ID | Description | Status | Commit / ref |
@@ -292,7 +322,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**83 ✅ done · 23 ❌ planned · 2 ⏸ deferred**
+**60 ✅ done · 58 ❌ planned · 2 ⏸ deferred** (prior tally 83/23 was a bookkeeping error — will be re-audited from commits in next session)
 
 ---
 
