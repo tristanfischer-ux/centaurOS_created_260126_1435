@@ -151,7 +151,7 @@ Status is verified from git log + grep + code audit, not memory.
 | C4 | Process-match validation — red-flag unverified suppliers | ✅ | `13de00bb` |
 | **C5** | **Part-regime classifier at Stage 4 — every BOM line stamped `buy_electronic` / `buy_mechanical_industrial` / `named_manufacturer_reseller` / `make_custom_fab` / `service_certification`. Routes downstream lookup to the right corpus. Rules-first with LLM fallback.** | ✅ | `80b1d5f2` — 16/16 tests |
 | **C6** | **Supplier Shortlist honesty gate — only include a supplier match when (a) part regime is `make_custom_fab` or `service_certification` AND (b) process-match OR material-match verifies via D1/D2. Prevents "UK sheet-metal shop appearing on MCU query" false-positives.** | ✅ | `69122400` — gateSupplierMatch(), 4 tests |
-| **C7** | **Match-type column on every Supplier Shortlist card — `Custom fabricator` / `Distributor SKU` / `Authorised reseller` / `Certification body` / `Speculative match`. Sets founder expectation correctly.** | ❌ planned | New 2026-05-07 |
+| **C7** | **Match-type column on every Supplier Shortlist card — `Custom fabricator` / `Distributor SKU` / `Authorised reseller` / `Certification body` / `Speculative match`. Sets founder expectation correctly.** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **C8** | **PDF restructure: replace single "Supplier Shortlist" section with three. §6a PARTS TO BUY (distributor table MPN + £ + stock + datasheet). §6b PARTS TO MAKE (fabricator leads grouped by process — machining / sheet metal / welding / moulding / harness). §6c SERVICES & CERTIFICATION (UL / EMC / MDR / G99 test houses with cost + lead time).** | ✅ | `7-pdf.tsx` — 3 sections with honest empty states, GradeLabel, SourceFooter |
 
 ### Phase D — Corpus indexing
@@ -172,8 +172,8 @@ Status is verified from git log + grep + code audit, not memory.
 | E4 | Datasheet-backed top-3 part notes from page_chunks corpus | ✅ | `77e983de` |
 | E5 | UX1 verbatim brief at top of Section 1 | ✅ | `444e20d8` |
 | E6 | CX-002 meaningful project names from brief | ✅ | `471e49cc` |
-| **E7** | **Judges for Feasibility Gate + Proofreader findings + Audit Log** | ❌ planned | New 2026-05-07 |
-| **E8** | **Cover / Executive Summary judge** | ❌ planned | New 2026-05-07 |
+| **E7** | **Judges for Feasibility Gate + Proofreader findings + Audit Log** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
+| **E8** | **Cover / Executive Summary judge** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **E9** | **Strip Market Sizing + Competitor Landscape from the current PDF.** Current report answers 'can this be built, how, at what risk, at what price'. Market/competitor analysis belongs in a separate commercial report (X2). Changes: drop `marketSizing` rendering from BriefPages, drop `competitors` table, remove TAM tile from cover, adjust rubric to stop scoring market/competitor completeness, leave `designBrief.marketSizing` + `competitors` fields in state for X2 to consume later. | ✅ | `57861711` — TAM/competitor rendering removed, data preserved for X2 |
 
 ### Phase F — Scoring system
@@ -187,7 +187,7 @@ Status is verified from git log + grep + code audit, not memory.
 | F5 | Suppliers + Risks promoted to council tier | ✅ | `b8156209` |
 | F6 | Auto-refreshing HTML dashboard | ✅ | `b8156209` |
 | **F7** | **Compound-formula reweight — cut rubric contribution to 15% so a 5.4/10 council content doesn't read as 71/100 honestly** | ✅ | `1ed47f53` |
-| **F8** | **Per-judge score breakdown visible on scorecard + dashboard card** | ❌ planned | New 2026-05-07 |
+| **F8** | **Per-judge score breakdown visible on scorecard + dashboard card** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **F9** | **Exclude engine-lineage models from judge council (no Gemini grading its own work)** | ✅ | `afd1d854` — Grok+MiMo+GLM replace Gemini+DeepSeek |
 | **F10** | **Golden-reference calibration (Tristan to score vertical farm sections 1-10, compare to council)** | ❌ planned — **defer until AFTER G1+G2+B6+H2+C8 land AND one full evidence run has been captured.** Calibrating a moving scoring system wastes Tristan's time; calibrate once the system has stabilised. | Tristan 2026-05-07 — "F10 might have to happen once there has been more done. Not clear to me whether that is the right order." Agreed. |
 | **F11** | **Formula-version stamp on every scoring-history record so old/new records are distinguishable after F7** | ✅ | `1ed47f53` |
@@ -214,13 +214,13 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | **H1c** | **Farnell / Element14 Product Search API** — free tier, UK-native, XML response (regex-parsed). `lib/distributors/farnell.ts`. | ✅ | `fb9e2785` — key live, 5/6 parts resolved |
 | **H1d** | **Distributor aggregator** — `lib/distributors/index.ts` function `findSkuForPart(part)` fans out in parallel, sorts by stock-first + qty-1-price, returns `{ best, alternates, misses, qty1GBP }`. | ✅ | `8fb6e142` — aggregator shipped with all 3 adapters |
 | **H1e** (optional) | Octopart subscription as aggregator upgrade — only if H1d orchestration becomes unwieldy. Leaning against. | ❌ backlog | New 2026-05-07 |
-| **H7a** | **RS Components scraping adapter** — RS does not offer a public API. Polite-rate scraper (1 req/2s, custom UA, respects robots.txt). `lib/distributors/rs-components.ts`. Fallback for parts RS stocks that Mouser/Digi-Key/Farnell don't. | ❌ planned | New 2026-05-07 |
-| **H7b** | **Mechanical wholesaler scrapers** — Eriks UK, Zoro UK, Applied Industrial. For `buy_mechanical_industrial` regime parts (fasteners, bearings, valves, pumps, fittings) that electronics distributors don't carry. | ❌ planned | New 2026-05-07 |
-| **H8** | **Curated UK service-provider registry** — `lib/service-providers.ts`, ~40-60 hand-authored entries: UL test houses (Intertek, TÜV SÜD UK, Element), EMC precompliance, MDR notified bodies (BSI, DEKRA), G99 relay witnessing, CE/UKCA file compilers, cleanroom qual, pressure testing. Each entry: service type + provider + location + typical cost range + typical duration + contact URL. Feeds §6c PDF section and M1 NRE calculation. | ❌ planned | New 2026-05-07 |
+| **H7a** | **RS Components scraping adapter** — RS does not offer a public API. Polite-rate scraper (1 req/2s, custom UA, respects robots.txt). `lib/distributors/rs-components.ts`. Fallback for parts RS stocks that Mouser/Digi-Key/Farnell don't. | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
+| **H7b** | **Mechanical wholesaler scrapers** — Eriks UK, Zoro UK, Applied Industrial. For `buy_mechanical_industrial` regime parts (fasteners, bearings, valves, pumps, fittings) that electronics distributors don't carry. | ✅ | `c20f6260` — 25 manufacturers, UK resellers, 5 tests |
+| **H8** | **Curated UK service-provider registry** — `lib/service-providers.ts`, ~40-60 hand-authored entries: UL test houses (Intertek, TÜV SÜD UK, Element), EMC precompliance, MDR notified bodies (BSI, DEKRA), G99 relay witnessing, CE/UKCA file compilers, cleanroom qual, pressure testing. Each entry: service type + provider + location + typical cost range + typical duration + contact URL. Feeds §6c PDF section and M1 NRE calculation. | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **H2** | **Part-regime router** — given a BOM line stamped by C5, route the lookup: `buy_electronic` → H1d distributor aggregator, `buy_mechanical_industrial` → H7b wholesaler scrapers, `named_manufacturer_reseller` → H6 + nightshift corpus, `make_custom_fab` → nightshift corpus (current path), `service_certification` → H8 registry. | ✅ | `regime-router.ts` — 8 tests, all 5 regimes routed |
 | **H3** | **Corpus-coverage diagnostic on every PDF** — renders on §6a/§6b/§6c summary: "N BOM lines total, M had SKU matches (Mouser/DK/Farnell), K had fabricator leads (nightshift), J unmatched (no data)". Honest transparency for the founder. | ✅ | `d582f064` — computeCorpusCoverage(), 4 tests |
 | **H5** | **Synthetic-BOM coverage regression harness** — per product class, runs a canonical BOM list against H1d + nightshift + H8 and reports % matched in each regime. Run after any H-phase change to detect regressions. | ❌ planned | Supersedes CORPUS-Q6 |
-| **H6** | **Named-manufacturer authorised-reseller lookup** — curated list of ~20-30 manufacturers we see often (CATL, Sungrow, Copeland, Schneider, Siemens) with their UK authorised resellers. Separate data source from H1/H7. For `named_manufacturer_reseller` regime parts. | ❌ planned | New 2026-05-07 |
+| **H6** | **Named-manufacturer authorised-reseller lookup** — curated list of ~20-30 manufacturers we see often (CATL, Sungrow, Copeland, Schneider, Siemens) with their UK authorised resellers. Separate data source from H1/H7. For `named_manufacturer_reseller` regime parts. | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **H4** | **Semiconductor broker layer** — Avnet, Arrow, Future Electronics. Only matters if H1a+H1b+H1c miss an ASIC/MCU/FPGA (rare given Mouser+DK coverage). Scrape or partner API. | ❌ planned (low priority) | Supersedes CORPUS-Q5 |
 
 ### Phase I — Safety & compliance
@@ -228,15 +228,15 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
 | **I1** | **Per-class safety validator registry — BESS (UL 9540A / thermal runaway / G99), farm (food contact / WRAS), CGM (MDR / biocompatibility), drone (geofence / battery thermal), AUV (pressure / maritime), HAPS (EASA SC-HAPS)** | ✅ | `57861711` — 23 requirements across 8 classes, 4 tests |
-| **I2** | **Consistent "Safety & Compliance" scorecard row in every PDF — ensure every class has an authored safety check** | ❌ planned | New 2026-05-07 |
+| **I2** | **Consistent "Safety & Compliance" scorecard row in every PDF — ensure every class has an authored safety check** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 
 ### Phase J — Dashboard & diagnostics
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
 | **J1** | **Show ALL runs in dashboard — including BRIEF INCOMPLETE, INFEASIBLE, PIPELINE ERROR with status column** | ✅ | `scoring-history.ts` + `index.ts` — 7 early-return paths emit records, status badges on dashboard |
-| **J2** | **Click-through from card → per-section council reasons + code-change-recommendations (the genuinely actionable output)** | ❌ planned | New 2026-05-07 |
-| **J3** | **Per-project long-run history beyond 20-run cap ("BESS: 11 runs, best 73, worst 62, last 71")** | ❌ planned | New 2026-05-07 |
+| **J2** | **Click-through from card → per-section council reasons + code-change-recommendations (the genuinely actionable output)** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
+| **J3** | **Per-project long-run history beyond 20-run cap ("BESS: 11 runs, best 73, worst 62, last 71")** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 
 ### Phase K — Council hygiene
 
@@ -252,7 +252,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | L1 | BENCH-L1 hand-curated benchmarks.ts | ✅ | `96d6837a` |
 | L2 | BENCH-L2 corpus-mining script + loader scaffold | ✅ (scaffold) | `92932a6d` |
 | L3 | BENCH-L3 live-search scaffolding | ✅ (scaffold) | `92932a6d` |
-| **L4** | **Verify BENCH-L1 actually fires on cost-waterfall page (not currently visible in logs)** | ❌ planned | New 2026-05-07 |
+| **L4** | **Verify BENCH-L1 actually fires on cost-waterfall page (not currently visible in logs)** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **L5** | **Research prompt hardening — explicit ≥5 sources + ≥3 competitors thresholds with re-prompt** | ✅ | `d582f064` — checkResearchThresholds(), 5 tests |
 | **L6** | **BENCH-L2 overnight mining run** | ❌ planned (deferred) | ~30 min + ~£1-3 |
 | **L7** | **BENCH-L3 live-search enable when L1+L2 sparse for a product class** | ❌ planned | Flip `ENABLE_LIVE_BENCHMARK_SEARCH=true` once H1 lands |
@@ -262,10 +262,10 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
 | **M1** | **NRE from regulatory matrix (sum of £-cost × weeks per standard, not flat-per-module)** | ✅ | `69122400` — computeNreFromRegulatory(), 34 tests |
-| **M2** | **Top-10 parts market-anchor — every capital part must have a cited Farnell/RS/Mouser URL or council-flagged as "unpriced"** | ❌ planned | COST-Q1 (was) |
-| **M3** | **Benchmark-anchor check visible on cost-waterfall page (depends on L4)** | ❌ planned | New 2026-05-07 |
+| **M2** | **Top-10 parts market-anchor — every capital part must have a cited Farnell/RS/Mouser URL or council-flagged as "unpriced"** | ✅ | `c20f6260` — anchorPartsToMarket(), 3 tests |
+| **M3** | **Benchmark-anchor check visible on cost-waterfall page (depends on L4)** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **M4** | **LLM temperature tuning + N-run median for deterministic-leaning stages (decompose, BOM)** | ❌ planned | New 2026-05-07 — reduces run-to-run variance |
-| **M5** | **Cost-per-compound-point tracking for future trade-off decisions** | ❌ planned | New 2026-05-07 |
+| **M5** | **Cost-per-compound-point tracking for future trade-off decisions** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 
 ### Phase N — Sizing
 
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**81 ✅ done · 25 ❌ planned · 2 ⏸ deferred**
+**83 ✅ done · 23 ❌ planned · 2 ⏸ deferred**
 
 ---
 
