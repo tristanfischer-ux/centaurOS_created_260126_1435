@@ -189,7 +189,7 @@ Status is verified from git log + grep + code audit, not memory.
 | **F7** | **Compound-formula reweight — cut rubric contribution to 15% so a 5.4/10 council content doesn't read as 71/100 honestly** | ❌ planned | New 2026-05-07 — Tristan-flagged: compound is misleadingly high |
 | **F8** | **Per-judge score breakdown visible on scorecard + dashboard card** | ❌ planned | New 2026-05-07 |
 | **F9** | **Exclude engine-lineage models from judge council (no Gemini grading its own work)** | ❌ planned | New 2026-05-07 — Tristan-flagged conflict of interest |
-| **F10** | **Golden-reference calibration (Tristan to score vertical farm sections 1-10, compare to council)** | ❌ planned | New 2026-05-07 — Tristan offered to do this for vertical farm |
+| **F10** | **Golden-reference calibration (Tristan to score vertical farm sections 1-10, compare to council)** | ❌ planned — **defer until AFTER G1+G2+B6+H2+C8 land AND one full evidence run has been captured.** Calibrating a moving scoring system wastes Tristan's time; calibrate once the system has stabilised. | Tristan 2026-05-07 — "F10 might have to happen once there has been more done. Not clear to me whether that is the right order." Agreed. |
 | **F11** | **Formula-version stamp on every scoring-history record so old/new records are distinguishable after F7** | ❌ planned | New 2026-05-07 |
 | **F12** | **Retire deterministic scorer as quality signal — rewrite to grade named-entity density + unit coherence OR require council for every section with explicit "— not scored" on failure** | ❌ planned | New 2026-05-07 — current deterministic is keyword-count placebo |
 | **F13** | **Audit every judge criterion against what the engine actually emits — close gaps or soften criteria** | ❌ planned | New 2026-05-07 |
