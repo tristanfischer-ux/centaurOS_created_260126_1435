@@ -1487,7 +1487,10 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
               etc. Surfaces when our output is silently drifting high/low. */}
           {(() => {
             const productClass = state.productClass || state.research?.industryDomain
-            if (!productClass || !unitTotalGbp) return null
+            if (!productClass || !unitTotalGbp) {
+              console.log(`[BENCH-L1] skipped — productClass=${productClass ?? 'undefined'}, unitTotal=${unitTotalGbp ?? 'undefined'}`)
+              return null
+            }
             // Derive capacity from brief constraints when present.
             const brief = state.research?.designBrief
             const spec = {
@@ -1495,6 +1498,8 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
               powerKw: extractPowerKw(brief),
             }
             const check = benchmarkCheck(productClass, unitTotalGbp, spec)
+            // L4: log when BENCH-L1 fires so it's visible in pipeline/Vercel logs.
+            console.log(`[BENCH-L1] fired — productClass=${productClass}, unitTotal=${unitTotalGbp} GBP, capacityKwh=${spec.capacityKwh ?? 'n/a'}, powerKw=${spec.powerKw ?? 'n/a'}, status=${check?.status ?? 'null'}, metric=${check?.band?.metric ?? 'n/a'}, band=${check?.band ? `${check.band.low}-${check.band.typical}-${check.band.high}` : 'none'}`)
             if (!check) return null
 
             const statusColor = check.status === 'within' ? GREEN
@@ -1932,9 +1937,11 @@ interface ScorecardProps {
   score: number
   dimensions: Array<{ name: string; score: number; reason: string }>
   recommendations: string[]
+  // F8: per-judge breakdown from the council scorer
+  judgeBreakdown?: Array<{ model: string; score: number; criteria_scores: Array<{ criterion: string; score: number }> }>
 }
 
-function SectionScorecard({ sectionName, score, dimensions, recommendations }: ScorecardProps) {
+function SectionScorecard({ sectionName, score, dimensions, recommendations, judgeBreakdown }: ScorecardProps) {
   // SCORE-002 (2026-05-07): score of -1 is the sentinel for "failed to
   // score". Previously rendered as 5/100 mid-amber which was
   // indistinguishable from a genuine mid-quality score. Now shows "—"
@@ -1945,9 +1952,17 @@ function SectionScorecard({ sectionName, score, dimensions, recommendations }: S
   return (
     <View style={{ marginTop: 16, padding: 16, backgroundColor: BG_SOFT, borderRadius: 6, borderWidth: 1, borderColor: BORDER }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-        <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK_DARK }}>
-          Section Evaluation: {sectionName}
-        </Text>
+        <View style={{ flexGrow: 1 }}>
+          <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: INK_DARK }}>
+            Section Evaluation: {sectionName}
+          </Text>
+          {/* F8: show per-judge spread when the council breakdown is available */}
+          {judgeBreakdown && judgeBreakdown.length > 0 && !failedToScore && (
+            <Text style={{ fontSize: 8, color: MUTED, marginTop: 2 }}>
+              Judges: {judgeBreakdown.map(j => j.score).join(', ')} (spread {Math.max(...judgeBreakdown.map(j => j.score)) - Math.min(...judgeBreakdown.map(j => j.score))})
+            </Text>
+          )}
+        </View>
         <View style={{ paddingHorizontal: 10, paddingVertical: 4, backgroundColor: scoreColor, borderRadius: 4 }}>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: '#fff' }}>
             {failedToScore ? '— not scored' : `${score}/100`}
@@ -2009,29 +2024,39 @@ export default function PdfRenderer({ state }: { state: PipelineState }) {
       <SafeSection name="Source Attribution"><SourceAttributionSection state={safe} /></SafeSection>
       <SafeSection name="Audit Log"><AuditLogSection state={safe} /></SafeSection>
       {/* Scorecard pages at the end */}
-      {safe.sectionScores.filter((sc: any) => sc && sc.section).map((sc: any, i: number) => {
-        const dims = (sc.reasons || []).filter(Boolean).map((r: string) => ({
-          name: r.length > 60 ? r.slice(0, 60) + '...' : r,
-          score: 50,
-          reason: r
-        }))
-        // SCORE-002 (2026-05-07): convert the 1-10 council score into the
-        // 0-100 scale the scorecard renders in, but preserve the -1
-        // "failed to score" sentinel so the renderer shows "— not scored".
-        const rawScore = sc.score ?? -1
-        const displayScore = rawScore < 0 ? -1 : Math.round((rawScore / 10) * 100)
-        return (
-          <Page key={`score-${i}`} size="A4" style={s.page}>
-            <SectionScorecard
-              sectionName={sc.section || 'Unknown'}
-              score={displayScore}
-              dimensions={dims}
-              recommendations={(sc.suggestions || []).filter(Boolean)}
-            />
-            <Footer section={`${sc.section || 'Section'} — Scorecard`} />
-          </Page>
-        )
-      })}
+      {/* F8: look up council scores on state to access per-judge breakdown */}
+      {(() => {
+        const councilScores = (safe as any).councilScores as Array<{
+          section: string
+          judgeBreakdown?: Array<{ model: string; score: number; criteria_scores: Array<{ criterion: string; score: number }> }>
+        }> | undefined
+        return safe.sectionScores.filter((sc: any) => sc && sc.section).map((sc: any, i: number) => {
+          const dims = (sc.reasons || []).filter(Boolean).map((r: string) => ({
+            name: r.length > 60 ? r.slice(0, 60) + '...' : r,
+            score: 50,
+            reason: r
+          }))
+          // SCORE-002 (2026-05-07): convert the 1-10 council score into the
+          // 0-100 scale the scorecard renders in, but preserve the -1
+          // "failed to score" sentinel so the renderer shows "— not scored".
+          const rawScore = sc.score ?? -1
+          const displayScore = rawScore < 0 ? -1 : Math.round((rawScore / 10) * 100)
+          // F8: find matching council score for the judge breakdown
+          const councilMatch = councilScores?.find(cs => cs.section === sc.section)
+          return (
+            <Page key={`score-${i}`} size="A4" style={s.page}>
+              <SectionScorecard
+                sectionName={sc.section || 'Unknown'}
+                score={displayScore}
+                dimensions={dims}
+                recommendations={(sc.suggestions || []).filter(Boolean)}
+                judgeBreakdown={councilMatch?.judgeBreakdown}
+              />
+              <Footer section={`${sc.section || 'Section'} — Scorecard`} />
+            </Page>
+          )
+        })
+      })()}
     </Document>
   )
 }

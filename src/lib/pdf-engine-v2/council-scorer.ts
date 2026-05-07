@@ -22,6 +22,8 @@ export interface CouncilScore {
   overall_reasons: string[]
   code_change_recommendations: string[]
   source_attributions: SourceAttribution[]
+  // F8: per-judge breakdown so the scorecard shows score spread, not just the average.
+  judgeBreakdown?: Array<{ model: string; score: number; criteria_scores: Array<{ criterion: string; score: number }> }>
 }
 
 // ─── Judging Criteria Per Section ──────────────────────────────────────────
@@ -229,7 +231,9 @@ Return ONLY valid JSON:
     'z-ai/glm-5.1',           // schema enforcer, 74% non-hallucination
   ]
 
-  const votes: CouncilScore[] = []
+  // F8: track which model produced each vote so we can build a per-judge breakdown.
+  type JudgeVote = CouncilScore & { model: string }
+  const votes: JudgeVote[] = []
 
   const judgePromises = judges.map(async (model) => {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -237,13 +241,14 @@ Return ONLY valid JSON:
         const result = await callJudge(model, prompt)
         if (result && result.overall_score) {
           return {
+            model,
             section,
             score: result.overall_score,
             criteria_scores: result.criteria_scores || [],
             overall_reasons: result.overall_reasons || [],
             code_change_recommendations: result.code_change_recommendations || [],
             source_attributions: result.source_attributions || [],
-          } as CouncilScore
+          } as JudgeVote
         }
       } catch (err) {
         if (attempt === 0) {
@@ -290,6 +295,13 @@ Return ONLY valid JSON:
     (v, i, a) => a.findIndex(t => t.detail === v.detail && t.sourceType === v.sourceType) === i
   )
 
+  // F8: build per-judge breakdown so the scorecard shows score spread.
+  const judgeBreakdown = votes.map(v => ({
+    model: v.model,
+    score: v.score,
+    criteria_scores: v.criteria_scores.map(cs => ({ criterion: cs.criterion, score: cs.score })),
+  }))
+
   return {
     section,
     score: avgScore,
@@ -297,6 +309,7 @@ Return ONLY valid JSON:
     overall_reasons: allReasons.slice(0, 5),
     code_change_recommendations: allRecommendations.slice(0, 5),
     source_attributions: uniqueAttributions,
+    judgeBreakdown,
   }
 }
 
