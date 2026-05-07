@@ -374,7 +374,7 @@ ${formatProcessesForPrompt(grounding.processes)}
         // Navigation / DVL
         { pattern: /dvl|doppler velocity log/i, minPrice: 25000, label: 'DVL' },
         { pattern: /phins|ixblue|exail/i, minPrice: 45000, label: 'FOG INS' },
-        { pattern: /ins|inertial navigation|fog/i, minPrice: 40000, label: 'INS' },
+        { pattern: /\bins\b|inertial navigation/i, minPrice: 40000, label: 'INS' },
         // Acoustic comms
         { pattern: /acoustic modem|underwater.*comm/i, minPrice: 5000, label: 'Acoustic modem' },
         // Pressure / subsea
