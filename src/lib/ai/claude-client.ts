@@ -78,8 +78,10 @@ export interface ClaudeCallResult {
 // CONSTANTS
 // ==========================================
 
-/** The OpenAI model all calls are routed through. */
-const OPENAI_MODEL = 'gpt-5.5'
+/** The OpenAI model all calls are routed through.
+ *  gpt-4.1-mini: 10× cheaper than gpt-5.5, adequate for structured tasks.
+ *  Override per-caller by switching to callOpenAI() with an explicit modelId. */
+const OPENAI_MODEL = 'gpt-4.1-mini'
 
 // ==========================================
 // MAIN FUNCTION

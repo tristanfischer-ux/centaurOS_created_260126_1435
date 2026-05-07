@@ -88,9 +88,9 @@ const COUNCIL_MODEL_MAP: Record<string, string> = {
     // Best strategic reasoner. Kept from prior mapping (no regression risk).
     "strategist":          "google/gemini-3.1-pro-preview",
 
-    // US Anthropic — Opus 4.7: Fiona's +0.21 composite benchmark win confirmed
-    // 2026-04-25. Best fundraising synthesis. Cleanest win in the benchmark suite.
-    "fundraising-advisor": "anthropic/claude-opus-4.7",
+    // DeepSeek V4-Pro via OpenRouter: structured reasoning at £0.005/call vs Opus £0.090.
+    // Fiona's fundraising synthesis works well with structured JSON output — no need for frontier model.
+    "fundraising-advisor": "deepseek/deepseek-v4-pro",
 
     // China Moonshot — Kimi K2.6: Intelligence 54, different RLHF lineage from
     // DeepSeek/Alibaba/Xiaomi. $1.70/M. Reasoning model — uses `reasoning` field;

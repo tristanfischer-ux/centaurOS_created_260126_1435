@@ -645,21 +645,24 @@ export async function callDeepSeek(
   maxTokens: number = 8192,
   timeoutMs: number = 120_000,
 ): Promise<{ text: string; tokensIn: number; tokensOut: number }> {
-  const apiKey = process.env.DEEPSEEK_API_KEY?.trim()?.replace(/\\n$/, "")
-  if (!apiKey) throw new Error("DEEPSEEK_API_KEY not configured")
+  // Route through OpenRouter for consolidation — same keys, same billing, same failover
+  const openRouterKey = process.env.OPENROUTER_API_KEY?.trim()
+  if (!openRouterKey) throw new Error("OPENROUTER_API_KEY not configured")
 
+  // Map bare model names to OpenRouter IDs: "deepseek-chat" → "deepseek/deepseek-chat"
+  const orModelId = modelId.startsWith('deepseek/') ? modelId : `deepseek/${modelId}`
   const cappedMaxTokens = Math.min(maxTokens, 8192) // DeepSeek hard cap
 
   const response = await fetchWithTimeout(
-    "https://api.deepseek.com/v1/chat/completions",
+    "https://openrouter.ai/api/v1/chat/completions",
     {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${openRouterKey}`,
       },
       body: JSON.stringify({
-        model: modelId,
+        model: orModelId,
         max_tokens: cappedMaxTokens,
         temperature: 0.2,
         messages: [
@@ -673,12 +676,10 @@ export async function callDeepSeek(
 
   if (!response.ok) {
     const errText = await response.text()
-    throw new Error(`DeepSeek API error (${response.status}): ${errText.slice(0, 300)}`)
+    throw new Error(`OpenRouter/DeepSeek error (${response.status}): ${errText.slice(0, 300)}`)
   }
 
   const data = await response.json()
-  // DeepSeek reasoning models put output in `reasoning_content` field —
-  // normaliseOpenRouterResponse handles both fields centrally.
   const text: string = normaliseOpenRouterResponse(data)
 
   return {
