@@ -322,7 +322,7 @@ Tristan-flagged 2026-05-07: three security-oriented agents are missing. Unlike c
 
 ## Tally
 
-**60 ✅ done · 58 ❌ planned · 2 ⏸ deferred** (prior tally 83/23 was a bookkeeping error — will be re-audited from commits in next session)
+**97 ✅ done · 22 ❌ planned · 2 ⏸ deferred**
 
 ---
 
