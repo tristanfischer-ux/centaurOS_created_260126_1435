@@ -1605,41 +1605,96 @@ const SupplierBuySection = ({ state }: { state: PipelineState }) => {
   const parts = state.parts || []
   const electronicParts = parts.filter(p => (p.regime || classifyRegime(p).regime) === 'buy_electronic')
   const partsWithDistributor = electronicParts.filter(p => p.regimeRouterResult?.source === 'distributor')
+  // C8 FIX (2026-05-07): corpus-fallback electronic parts were excluded
+  // from §6a entirely. When distributor APIs are down or keys are missing,
+  // ALL electronic parts fall through to corpus and NONE appeared here.
+  // Now shown in a separate "Corpus fallback" sub-section with a lower
+  // confidence annotation.
+const corpusFallbackParts = electronicParts.filter(
+  p => p.regimeRouterResult?.source === 'corpus'
+    || p.regimeRouterResult?.source === 'none'
+    || p.regimeRouterResult === undefined
+)
 
   return (
     <Page size="A4" style={s.page}>
       <Text style={s.h1}>6a. Supplier Shortlist: Parts to Buy <GradeLabel grade="A" label="distributor APIs" /></Text>
       
-      {partsWithDistributor.length === 0 ? (
+      {partsWithDistributor.length === 0 && corpusFallbackParts.length === 0 ? (
         <View style={s.calloutAmber}>
           <Text style={s.para}>No distributor matches found — electronic parts may need manual sourcing.</Text>
         </View>
       ) : (
-        <View style={s.tableWrap}>
-          <View style={s.tHead}>
-            <Text style={{ ...s.tHC, width: '25%' }}>Part Name</Text>
-            <Text style={{ ...s.tHC, width: '15%' }}>MPN</Text>
-            <Text style={{ ...s.tHC, width: '15%' }}>Supplier</Text>
-            <Text style={{ ...s.tHC, width: '15%', textAlign: 'right' }}>Price (£)</Text>
-            <Text style={{ ...s.tHC, width: '15%', textAlign: 'right' }}>Stock</Text>
-            <Text style={{ ...s.tHC, width: '15%' }}>Datasheet</Text>
-          </View>
-          {partsWithDistributor.map((p, i) => {
-            const rr = p.regimeRouterResult!
-            return (
-              <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
-                <Text style={{ ...s.tC, width: '25%', fontWeight: 'bold' }}>{formatText(p.name)}</Text>
-                <Text style={{ ...s.tC, width: '15%' }}>{formatText(rr.sku)}</Text>
-                <Text style={{ ...s.tC, width: '15%' }}>{formatText(rr.supplier)}</Text>
-                <Text style={{ ...s.tC, width: '15%', textAlign: 'right' }}>{formatGBP(rr.priceGbp)}</Text>
-                <Text style={{ ...s.tC, width: '15%', textAlign: 'right' }}>{formatNumber(rr.stockQty)}</Text>
-                <Text style={{ ...s.tC, width: '15%' }}>{rr.datasheetUrl ? 'Available' : 'N/A'}</Text>
+        <>
+          <Text style={s.h3}>Distributor matches</Text>
+          {partsWithDistributor.length === 0 ? (
+            <View style={s.calloutAmber}>
+              <Text style={s.para}>No distributor API matches. All electronic parts fell through to corpus fallback below.</Text>
+            </View>
+          ) : (
+            <View style={s.tableWrap}>
+              <View style={s.tHead}>
+                <Text style={{ ...s.tHC, width: '25%' }}>Part Name</Text>
+                <Text style={{ ...s.tHC, width: '15%' }}>MPN</Text>
+                <Text style={{ ...s.tHC, width: '15%' }}>Supplier</Text>
+                <Text style={{ ...s.tHC, width: '15%', textAlign: 'right' }}>Price (£)</Text>
+                <Text style={{ ...s.tHC, width: '15%', textAlign: 'right' }}>Stock</Text>
+                <Text style={{ ...s.tHC, width: '15%' }}>Datasheet</Text>
               </View>
-            )
-          })}
-        </View>
+              {partsWithDistributor.map((p, i) => {
+                const rr = p.regimeRouterResult!
+                return (
+                  <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                    <Text style={{ ...s.tC, width: '25%', fontWeight: 'bold' }}>{formatText(p.name)}</Text>
+                    <Text style={{ ...s.tC, width: '15%' }}>{formatText(rr.sku)}</Text>
+                    <Text style={{ ...s.tC, width: '15%' }}>{formatText(rr.supplier)}</Text>
+                    <Text style={{ ...s.tC, width: '15%', textAlign: 'right' }}>{formatGBP(rr.priceGbp)}</Text>
+                    <Text style={{ ...s.tC, width: '15%', textAlign: 'right' }}>{formatNumber(rr.stockQty)}</Text>
+                    <Text style={{ ...s.tC, width: '15%' }}>{rr.datasheetUrl ? 'Available' : 'N/A'}</Text>
+                  </View>
+                )
+              })}
+            </View>
+          )}
+
+          {corpusFallbackParts.length > 0 && (
+            <>
+              <Text style={s.h3}>Corpus fallback</Text>
+              <View style={s.calloutAmber}>
+                <Text style={{ fontSize: 9, marginBottom: 4 }}>
+                  Corpus match — verify supplier independently. These parts were matched from the local supplier
+                  corpus rather than live distributor APIs. Confidence is lower; cross-check pricing and availability.
+                </Text>
+              </View>
+              <View style={s.tableWrap}>
+                <View style={s.tHead}>
+                  <Text style={{ ...s.tHC, width: '30%' }}>Part Name</Text>
+                  <Text style={{ ...s.tHC, width: '25%' }}>Matched Supplier</Text>
+                  <Text style={{ ...s.tHC, width: '20%', textAlign: 'right' }}>Price (£)</Text>
+                  <Text style={{ ...s.tHC, width: '25%' }}>Confidence</Text>
+                </View>
+                {corpusFallbackParts.map((p, i) => {
+                  const rr = p.regimeRouterResult
+                  const supMatch = state.suppliers?.find(s => s.partId === p.id || s.partName === p.name)
+                  const topSupplier = supMatch?.suppliers?.[0]
+                  const supplierLabel = rr?.supplier || topSupplier?.name || 'TBD'
+                  const price = rr?.priceGbp ?? p.estimatedUnitCostGbp
+                  const confidence = rr?.confidence || 'LOW'
+                  return (
+                    <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                      <Text style={{ ...s.tC, width: '30%', fontWeight: 'bold' }}>{formatText(p.name)}</Text>
+                      <Text style={{ ...s.tC, width: '25%' }}>{formatText(supplierLabel)}</Text>
+                      <Text style={{ ...s.tC, width: '20%', textAlign: 'right' }}>{formatGBP(price)}</Text>
+                      <Text style={{ ...s.tC, width: '25%', color: AMBER }}>{confidence} — corpus match</Text>
+                    </View>
+                  )
+                })}
+              </View>
+            </>
+          )}
+        </>
       )}
-      <SourceFooter sources={[{ type: 'API', detail: 'Distributor API Aggregator (H1d)' }]} overallGrade="A" />
+      <SourceFooter sources={[{ type: 'API', detail: 'Distributor API Aggregator (H1d)' }, { type: 'Local corpus', detail: 'Nightshift supplier database — lower confidence' }]} overallGrade="A" />
       <PageFooter section="6a. Parts to Buy" />
     </Page>
   )
@@ -1731,6 +1786,79 @@ const SupplierServiceSection = ({ state }: { state: PipelineState }) => {
       )}
       <SourceFooter sources={[{ type: 'Static', detail: 'UK test house registry (H8 placeholder)' }]} overallGrade="D" />
       <PageFooter section="6c. Services & Certification" />
+    </Page>
+  )
+}
+
+// C8 FIX (2026-05-07): §6d catch-all for regimes not rendered by §6a/§6b/§6c.
+// Parts classified as buy_mechanical_industrial or named_manufacturer_reseller
+// were silently vanishing from the supplier shortlist with no empty-state message.
+const SupplierOtherSection = ({ state }: { state: PipelineState }) => {
+  const parts = state.parts || []
+  const otherRegimes = ['buy_mechanical_industrial', 'named_manufacturer_reseller'] as const
+  const otherParts = parts.filter(p => {
+    const regime = p.regime || classifyRegime(p).regime
+    return (otherRegimes as readonly string[]).includes(regime)
+  })
+
+  // Group by regime
+  const byRegime = new Map<string, Part[]>()
+  for (const p of otherParts) {
+    const regime = p.regime || classifyRegime(p).regime
+    if (!byRegime.has(regime)) byRegime.set(regime, [])
+    byRegime.get(regime)!.push(p)
+  }
+
+  const regimeLabels: Record<string, string> = {
+    buy_mechanical_industrial: 'Mechanical & Industrial Parts',
+    named_manufacturer_reseller: 'Named Manufacturer / Reseller Parts',
+  }
+
+  const suppliers = state.suppliers || []
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Text style={s.h1}>6d. Supplier Shortlist: Other Parts <GradeLabel grade="D" label="mixed sources" /></Text>
+
+      {otherParts.length === 0 ? (
+        <Text style={s.para}>No mechanical, industrial, or named-manufacturer parts identified in this design.</Text>
+      ) : (
+        Array.from(byRegime.entries()).map(([regime, regimeParts], idx) => (
+          <View key={idx} style={{ marginBottom: 16 }} wrap={false}>
+            <Text style={s.h2}>{formatText(regimeLabels[regime] || regime)}</Text>
+            <View style={s.tableWrap}>
+              <View style={s.tHead}>
+                <Text style={{ ...s.tHC, width: '30%' }}>Part Name</Text>
+                <Text style={{ ...s.tHC, width: '20%' }}>Process</Text>
+                <Text style={{ ...s.tHC, width: '25%' }}>Matched Supplier</Text>
+                <Text style={{ ...s.tHC, width: '25%' }}>Notes</Text>
+              </View>
+              {regimeParts.map((p, i) => {
+                const supMatch = suppliers.find(s => s.partId === p.id || s.partName === p.name)
+                const topSupplier = supMatch?.suppliers?.[0]
+                const supplierName = topSupplier?.name
+                  || extractManufacturerPrefix(p.name)
+                  || null
+                const hasSupplierData = !!topSupplier
+                return (
+                  <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                    <Text style={{ ...s.tC, width: '30%', fontWeight: 'bold' }}>{formatText(p.name)}</Text>
+                    <Text style={{ ...s.tC, width: '20%' }}>{formatText(p.process) || '—'}</Text>
+                    <Text style={{ ...s.tC, width: '25%', color: hasSupplierData ? INK : AMBER }}>
+                      {supplierName || 'No supplier data available for this procurement route — manual sourcing required.'}
+                    </Text>
+                    <Text style={{ ...s.tC, width: '25%', color: MUTED, fontSize: 8 }}>
+                      {hasSupplierData ? `Score: ${topSupplier.score}` : 'Manual sourcing required'}
+                    </Text>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        ))
+      )}
+      <SourceFooter sources={[{ type: 'Mixed', detail: 'Corpus + manufacturer lookup + heuristic' }]} overallGrade="D" />
+      <PageFooter section="6d. Other Parts" />
     </Page>
   )
 }
@@ -2020,6 +2148,7 @@ export default function PdfRenderer({ state }: { state: PipelineState }) {
       <SafeSection name="Supplier Shortlist: Parts to Buy"><SupplierBuySection state={safe} /></SafeSection>
       <SafeSection name="Supplier Shortlist: Parts to Make"><SupplierMakeSection state={safe} /></SafeSection>
       <SafeSection name="Supplier Shortlist: Services"><SupplierServiceSection state={safe} /></SafeSection>
+      <SafeSection name="Supplier Shortlist: Other Parts"><SupplierOtherSection state={safe} /></SafeSection>
       <SafeSection name="Risks"><RisksSection state={safe} /></SafeSection>
       <SafeSection name="Source Attribution"><SourceAttributionSection state={safe} /></SafeSection>
       <SafeSection name="Audit Log"><AuditLogSection state={safe} /></SafeSection>

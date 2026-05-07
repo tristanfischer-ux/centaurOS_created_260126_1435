@@ -239,7 +239,7 @@ Return ONLY valid JSON:
     for (let attempt = 0; attempt < 2; attempt++) {
       try {
         const result = await callJudge(model, prompt)
-        if (result && result.overall_score) {
+        if (result && Number.isFinite(result.overall_score)) {
           return {
             model,
             section,
