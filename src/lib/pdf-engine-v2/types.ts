@@ -305,6 +305,13 @@ export interface SectionScore {
   suggestions: string[]
 }
 
+export interface ResearchConstraints {
+  benchmarkPrices: Array<{ product: string; price: number; source: string }>
+  materialCosts: Array<{ material: string; costPerKg: number; source: string }>
+  regulatoryCosts: Array<{ standard: string; costGbp: number; weeks: number }>
+  competitorSpecs: Array<{ name: string; mass?: number; cost?: number; keySpecs: string[] }>
+}
+
 export interface PipelineState {
   projectId: string
   briefText?: string
@@ -315,13 +322,7 @@ export interface PipelineState {
     assumptions: string[]
     canProceed: boolean
   }
-  // BENCH-L1 (2026-05-06): persist the product-classifier output so the PDF
-  // renderer can look up public benchmark bands without re-classifying.
   productClass?: string
-  // A4 (2026-05-06): when a critical stage fails (research / decompose /
-  // BOM / critical-gate), the orchestrator sets this so the PDF renderer
-  // can show a prominent "Pipeline halted at stage X" notice instead of
-  // silently producing a partial report.
   pipelineError?: {
     stage: string
     message: string
@@ -329,6 +330,7 @@ export interface PipelineState {
     recoverable: boolean
   }
   research: ResearchResult | null
+  researchConstraints?: ResearchConstraints
   modules: Module[]
   dimensionSheet: DimensionSheet | null
   parts: Part[]

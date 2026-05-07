@@ -1,4 +1,4 @@
-import type { ResearchResult, StageResult } from '../types'
+import type { ResearchResult, StageResult, ResearchConstraints } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { RESEARCH_SYNTHESIS_SYSTEM } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
@@ -6,26 +6,59 @@ import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 // Stage 1: Research — uses RESEARCH_SYNTHESIS_SYSTEM from prompts.ts
 // The prompt is defined in prompts.ts and imported above.
 
-async function callOpenRouter(systemPrompt: string, userContent: string): Promise<any> {
+export async function extractResearchConstraints(reportText: string, designBriefText: string): Promise<ResearchConstraints> {
+  console.log('[research] Extracting quantitative constraints from report...')
+  const systemPrompt = `Extract quantitative constraints from the following research report and design brief.
+Return ONLY valid JSON matching this schema:
+{
+  "benchmarkPrices": [{ "product": "string", "price": number, "source": "string" }],
+  "materialCosts": [{ "material": "string", "costPerKg": number, "source": "string" }],
+  "regulatoryCosts": [{ "standard": "string", "costGbp": number, "weeks": number }],
+  "competitorSpecs": [{ "name": "string", "mass": number, "cost": number, "keySpecs": ["string"] }]
+}
+If a value is not found, omit the object or use null/0 where appropriate, but try to extract as much as possible.`
+
+  const userContent = `Text to analyze:\n${reportText}\n\nBrief:\n${designBriefText}`
+  
+  try {
+    const json = await callOpenRouter(systemPrompt, userContent, true)
+    return {
+      benchmarkPrices: Array.isArray(json.benchmarkPrices) ? json.benchmarkPrices : [],
+      materialCosts: Array.isArray(json.materialCosts) ? json.materialCosts : [],
+      regulatoryCosts: Array.isArray(json.regulatoryCosts) ? json.regulatoryCosts : [],
+      competitorSpecs: Array.isArray(json.competitorSpecs) ? json.competitorSpecs : []
+    }
+  } catch (err) {
+    console.error('[research] Failed to extract research constraints:', err)
+    return { benchmarkPrices: [], materialCosts: [], regulatoryCosts: [], competitorSpecs: [] }
+  }
+}
+
+async function callOpenRouter(systemPrompt: string, userContent: string, jsonFormat = false): Promise<any> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 300_000)
 
   try {
+    const body: any = {
+      model: 'xiaomi/mimo-v2.5-pro',
+      temperature: STAGE_TEMPERATURES.research,
+      max_tokens: 16384,
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userContent },
+      ],
+    }
+    if (jsonFormat) {
+      body.response_format = { type: 'json_object' }
+    }
+
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        model: 'xiaomi/mimo-v2.5-pro',
-        temperature: STAGE_TEMPERATURES.research,
-        max_tokens: 16384,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userContent },
-        ],
-      }),
+      body: JSON.stringify(body),
       signal: controller.signal
     })
 

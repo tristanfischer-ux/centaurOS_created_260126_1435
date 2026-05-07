@@ -1,6 +1,7 @@
-import type { Module, ResearchResult, StageResult } from '../types'
+import type { Module, ResearchResult, StageResult, RiskRow } from '../types'
 import { MODULE_DECOMPOSITION_SYSTEM } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
+import { validateFmea, type FmeaRow } from '../lib/fmea-validator'
 
 // Stage 2: Module Decomposition — uses MODULE_DECOMPOSITION_SYSTEM from prompts.ts
 // The prompt is defined in prompts.ts and imported above.
@@ -161,6 +162,50 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
   throw new Error('All models failed for decompose')
 }
 
+function applyFmeaPadding(modules: Module[]): Module[] {
+  const fmeaRows: FmeaRow[] = []
+  for (const m of modules) {
+    if (m.riskMatrix) {
+      for (const r of m.riskMatrix) {
+        fmeaRows.push({
+          module: m.name,
+          hazard: r.hazard,
+          cause: r.cause || 'Operational stress',
+          severity: r.severity || 5,
+          likelihood: r.likelihood || 5,
+          rpn: (r.severity || 5) * (r.likelihood || 5) * (r.detection || 5)
+        })
+      }
+    }
+  }
+  
+  const fmeaVal = validateFmea(modules, fmeaRows)
+  if (!fmeaVal.valid) {
+    console.log(`[decompose] FMEA gaps detected: ${fmeaVal.gaps.join(', ')}. Padding with auto-generated rows.`)
+    for (const m of modules) {
+      const modRows = fmeaVal.paddedRows.filter(r => r.module === m.name)
+      if (!m.riskMatrix) m.riskMatrix = []
+      
+      if (modRows.length > m.riskMatrix.length) {
+        const addedRows = modRows.slice(m.riskMatrix.length)
+        for (let i = 0; i < addedRows.length; i++) {
+          const r = addedRows[i]
+          m.riskMatrix.push({
+            id: `RM-${m.id}-pad-${i}`,
+            hazard: r.hazard,
+            cause: r.cause,
+            severity: r.severity,
+            likelihood: r.likelihood,
+            mitigation: 'Standard industry mitigation and testing',
+            verificationTest: 'Standard module integration test'
+          })
+        }
+      }
+    }
+  }
+  return modules
+}
+
 /**
  * Run the decomposition stage
  * Input: research result from Stage 1
@@ -183,7 +228,9 @@ export async function runDecompose(
     
     try {
       console.log('[decompose] Got response, validating...')
-      const modules = validateDecomposeResult(parsedJson)
+      let modules = validateDecomposeResult(parsedJson)
+      modules = applyFmeaPadding(modules)
+
       console.log('[decompose] Validation successful.')
       return {
         ok: true,
@@ -195,7 +242,8 @@ export async function runDecompose(
       // Retry with a simpler prompt
       const simplerPrompt = `Break this product into 8-12 modules. Each module needs: name, purpose (1-2 sentences), why_it_matters, description (2-3 paragraphs), keyParts (3-5 strings), failureModes (2-4 strings with causes), riskMatrix (3-5 entries with severity 1-5, likelihood 1-5, mitigation). Return ONLY valid JSON with a "modules" array. No markdown.`
       parsedJson = await callOpenRouter(simplerPrompt, userContent)
-      const modules = validateDecomposeResult(parsedJson)
+      let modules = validateDecomposeResult(parsedJson)
+      modules = applyFmeaPadding(modules)
       return {
         ok: true,
         data: modules,

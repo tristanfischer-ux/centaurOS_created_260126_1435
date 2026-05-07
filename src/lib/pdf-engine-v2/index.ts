@@ -10,7 +10,7 @@ import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
 import { runBriefExpansion, shouldExpandBrief } from './stages/0.5-brief-expansion'
-import { runResearch } from './stages/1-research'
+import { runResearch, extractResearchConstraints } from './stages/1-research'
 import { runDecompose } from './stages/2-decompose'
 import { runSizeLayout } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
@@ -269,6 +269,14 @@ export async function runPipeline(
     return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.research = researchResult.data
+  
+  // Extract constraints for downstream stages
+  const constraintsResult = await extractResearchConstraints(
+    state.research.report, 
+    JSON.stringify(state.research.designBrief || {})
+  )
+  state.researchConstraints = constraintsResult
+  console.log(`[pipeline] Extracted research constraints: ${constraintsResult.benchmarkPrices.length} benchmarks, ${constraintsResult.materialCosts.length} materials, ${constraintsResult.regulatoryCosts.length} regs, ${constraintsResult.competitorSpecs.length} competitors`)
   
   state.sourceAttributions.push(
     { section: 'Research', source: 'llm', detail: 'Gemini 3.1 Pro via OpenRouter' },
