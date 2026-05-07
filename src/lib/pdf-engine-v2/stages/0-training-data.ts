@@ -3,7 +3,7 @@ import { sanitiseLlmOutput } from '../sanitiser';
 
 const STAGE_0_MODELS = [
     { id: "x-ai/grok-4.3", name: "Grok 4.3", lineage: "xai" },
-    { id: "anthropic/claude-sonnet-4-6", name: "Claude Sonnet 4.6", lineage: "anthropic" },
+    { id: "xiaomi/mimo-v2.5-pro", name: "MiMo V2.5-Pro", lineage: "xiaomi" },
     { id: "google/gemini-3.1-pro-preview", name: "Gemini 3.1 Pro", lineage: "google" },
 ];
 

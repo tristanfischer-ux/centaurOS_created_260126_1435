@@ -39,7 +39,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
   // force the shape. Fallback to Claude then GPT if Gemini errors.
   const models = [
     'google/gemini-3.1-pro-preview',
-    'anthropic/claude-sonnet-4-6',
+    'xiaomi/mimo-v2.5-pro',
     'openai/gpt-4.1-mini',
   ]
   let lastErr: any = null

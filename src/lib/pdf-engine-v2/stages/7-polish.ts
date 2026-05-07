@@ -57,7 +57,7 @@ export async function runPolish(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-6',
+        model: 'xiaomi/mimo-v2.5-pro',
         max_tokens: 16384,
         messages: [
           { role: 'system', content: POLISH_SYSTEM_PROMPT },

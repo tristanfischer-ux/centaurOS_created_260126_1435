@@ -50,7 +50,7 @@ function validateDecomposeResult(data: any): Module[] {
  */
 async function callOpenRouter(systemPrompt: string, userContent: string): Promise<any> {
   // Try multiple models with fallback
-  const models = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3', 'anthropic/claude-sonnet-4-6']
+  const models = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3', 'xiaomi/mimo-v2.5-pro']
   
   for (const model of models) {
     const controller = new AbortController()

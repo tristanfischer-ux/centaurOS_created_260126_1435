@@ -18,7 +18,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'anthropic/claude-sonnet-4-6',
+        model: 'xiaomi/mimo-v2.5-pro',
         temperature: STAGE_TEMPERATURES.research,
         max_tokens: 16384,
         messages: [
