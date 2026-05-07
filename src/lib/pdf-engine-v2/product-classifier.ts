@@ -10,26 +10,49 @@ export interface ProductClassification {
 export function classifyProduct(briefText: string): ProductClassification {
   const lower = briefText.toLowerCase()
 
-  // FARM-CLS-1 + FARM-CLS-2 FIX (2026-05-06): order matters. Evaluate the
-  // classes that can be verified with multi-signal evidence BEFORE falling
-  // into the single-token cascade. This avoids the regression where a BESS
-  // brief mentioning "thermal management" was classified as thermal_system
-  // because that branch ran first in the cascade.
   let productClass = 'unknown'
 
+  // --- Single-keyword specific classes (checked FIRST) ---
+  // These product types are specific enough that a single keyword is sufficient.
+  // They MUST come before multi-signal energy_storage because products like
+  // drones, HAPS, and EV chargers all contain batteries but are not BESS.
+  if (productClass === 'unknown') {
+    if (lower.match(/\bhaps\b|high[- ]altitude pseudo[- ]satellite|stratospheric.*aircraft|solar.*stratospher/)) {
+      productClass = 'haps'
+    } else if (lower.match(/\bauv\b|\brov\b|autonomous underwater|unmanned underwater|underwater vehicle|subsea vehicle/)) {
+      productClass = 'auv'
+    } else if (lower.match(/\bdrone\b|\buav\b|unmanned aerial|quadcopter|multirotor/)) {
+      productClass = 'drone'
+    } else if (lower.match(/ev charger|dc fast.?charger|electric vehicle.*charger|charging station|\bccs2?\b.*charger|\bocpp\b/)) {
+      productClass = 'ev_charger'
+    } else if (lower.match(/bioreactor|fermenter|fermentation.*(?:vessel|tank|process)|bioprocess|cell culture/)) {
+      productClass = 'bioreactor'
+    } else if (lower.match(/edge.?ai|gpu server|1u.*server|rack.?mount.*server|datacentre|\btpu\b|\bnpu\b|compute server|inference.*server|inference.*appliance/)) {
+      productClass = 'edge_ai_server'
+    } else if (lower.match(/wearable.*medical|\bcgm\b|continuous glucose|blood sugar|biosensor.*patch|on.body.*sensor|skin.worn|diabet/)) {
+      productClass = 'wearable_medical'
+    } else if (lower.match(/\bpcba\b|\bsmt\b.*assembly|surface mount.*assembly|bga.*reflow|solder paste|pcb.*assembly/)) {
+      productClass = 'pcb_assembly'
+    }
+  }
+
+  // --- Multi-signal classes (require 2+ signals to avoid false-positives) ---
+
   // Energy storage — two distinct signals required.
-  const storageSignals = [
-    /\bbess\b/,
-    /battery energy storage/,
-    /lithium[- ]?ion|li[- ]?ion|lfp|nmc|lmfp|sodium[- ]ion/,
-    /prismatic|pouch|cylindrical (?:cell|can)/,
-    /kwh\b.*(?:capacity|usable|storage|pack|cell|system)/,
-    /\b(?:pcs|power conversion system|g99)\b/,
-    /cycle life/,
-    /c[- ]rate/,
-  ]
-  const storageHits = storageSignals.filter(r => r.test(lower)).length
-  if (storageHits >= 2) productClass = 'energy_storage'
+  if (productClass === 'unknown') {
+    const storageSignals = [
+      /\bbess\b/,
+      /battery energy storage/,
+      /lithium[- ]?ion pack|li[- ]?ion (?:pack|module|system)|lfp (?:cell|pack|module)|nmc (?:cell|pack|module)|lmfp|sodium[- ]ion (?:cell|pack|module)/,
+      /prismatic (?:cell|module)|pouch cell|cylindrical (?:cell|can)/,
+      /kwh (?:capacity|usable|storage|pack|cell|system|battery)/,
+      /\b(?:pcs|power conversion system)\b/,
+      /cycle life.*(?:6000|8000|10000)/,
+      /c[- ]rate/,
+    ]
+    const storageHits = storageSignals.filter(r => r.test(lower)).length
+    if (storageHits >= 2) productClass = 'energy_storage'
+  }
 
   // Vertical farm — at least one specific farm signal.
   if (productClass === 'unknown' && lower.match(/vertical farm|indoor farm|hydroponic|aeroponic|fertigation|growing (?:tray|rack|tier)|horticultur|agricultural lighting|leafy greens|indoor grow/)) {
@@ -54,8 +77,9 @@ export function classifyProduct(briefText: string): ProductClassification {
     if (thermalHits >= 2) productClass = 'thermal_system'
   }
 
-  // Fallthrough cascade for the remaining classes — single-keyword OK since
-  // their keywords are specific enough (satellite, cubesat, etc.).
+  // --- Generic fallthrough (single-keyword, broad) ---
+  // These are checked AFTER specific classes. "autonomous" appears in both
+  // AUV ("autonomous underwater") and robotics — AUV is caught above.
   if (productClass === 'unknown') {
     if (lower.match(/satellite|cubesat|orbit|payload|launch/)) {
       productClass = 'aerospace'
@@ -63,7 +87,7 @@ export function classifyProduct(briefText: string): ProductClassification {
       productClass = 'robotics'
     } else if (lower.match(/vehicle|car|drivetrain|crash|homologation/)) {
       productClass = 'vehicle'
-    } else if (lower.match(/phone|tablet|wearable|display|pcb/)) {
+    } else if (lower.match(/phone|tablet|display|pcb/)) {
       productClass = 'consumer_electronics'
     } else if (lower.match(/machine|press|mill|conveyor|industrial/)) {
       productClass = 'industrial_machine'
@@ -146,20 +170,54 @@ export function classifyProduct(briefText: string): ProductClassification {
   }
 }
 
+const COMMON_REQUIRED = ['product_type', 'target_cost', 'production_volume', 'jurisdiction']
+
+const SPECIFIC_FIELDS: Record<string, string[]> = {
+  thermal_system: ['thermal_capacity_kw', 'cop_target', 'refrigerant_type', 'acoustic_target_dba', 'architecture_type'],
+  energy_storage: ['energy_kwh', 'power_kw', 'voltage', 'chemistry', 'cycle_life'],
+  vertical_farm: ['growing_footprint', 'target_yield', 'lighting_ppfd', 'water_use', 'energy_use'],
+  aerospace: ['mass_budget_kg', 'power_budget_w', 'orbit_type', 'payload_mass', 'launch_vehicle'],
+  vehicle: ['powertrain_type', 'range_km', 'top_speed', 'crash_rating', 'kerb_mass'],
+  consumer_electronics: ['battery_capacity_wh', 'display_size', 'ip_rating', 'drop_test_standard'],
+  medical_device: ['device_class', 'intended_use', 'biocompatibility', 'sterilisation'],
+  fluid_processing: ['flow_rate', 'pressure_rating', 'fluid_type', 'materials_compatibility'],
+  drone: ['flight_time_min', 'payload_kg', 'range_km', 'regulatory_class'],
+  auv: ['depth_rating_m', 'mission_duration_h', 'payload_sensors', 'navigation_type'],
+  haps: ['wingspan_m', 'altitude_m', 'endurance_days', 'solar_array_area_m2'],
+  ev_charger: ['power_kw', 'connector_type', 'grid_connection', 'outdoor_rating'],
+  edge_ai_server: ['compute_tdp_w', 'rack_units', 'gpu_count', 'network_interface'],
+  pcb_assembly: ['board_count', 'layer_count', 'component_count', 'assembly_type'],
+  wearable_medical: ['device_class', 'battery_life_days', 'sensor_type', 'skin_contact_area'],
+  bioreactor: ['volume_litres', 'vessel_type', 'sterilisation_method', 'cell_type'],
+}
+
+const RECOMMENDED_UNKNOWN = ['target_cost', 'production_volume', 'jurisdiction', 'max_mass']
+
+/**
+ * Returns the fields that MUST be present for the pipeline to proceed.
+ *
+ * Known product classes (in the SPECIFIC_FIELDS map) keep the full common +
+ * specific list for backward compatibility. Unknown or unrecognised classes
+ * only require `product_type` — a naive founder saying "I want to build a
+ * drone" should get a useful report, not a validation error.
+ */
 export function getRequiredFields(productClass: string): string[] {
-  const common = ['product_type', 'target_cost', 'production_volume', 'jurisdiction']
-  const recommended = ['max_mass']
-  
-  const specific: Record<string, string[]> = {
-    thermal_system: ['thermal_capacity_kw', 'cop_target', 'refrigerant_type', 'acoustic_target_dba', 'architecture_type'],
-    energy_storage: ['energy_kwh', 'power_kw', 'voltage', 'chemistry', 'cycle_life'],
-    vertical_farm: ['growing_footprint', 'target_yield', 'lighting_ppfd', 'water_use', 'energy_use'],
-    aerospace: ['mass_budget_kg', 'power_budget_w', 'orbit_type', 'payload_mass', 'launch_vehicle'],
-    vehicle: ['powertrain_type', 'range_km', 'top_speed', 'crash_rating', 'kerb_mass'],
-    consumer_electronics: ['battery_capacity_wh', 'display_size', 'ip_rating', 'drop_test_standard'],
-    medical_device: ['device_class', 'intended_use', 'biocompatibility', 'sterilisation'],
-    fluid_processing: ['flow_rate', 'pressure_rating', 'fluid_type', 'materials_compatibility'],
+  if (productClass !== 'unknown' && productClass in SPECIFIC_FIELDS) {
+    return [...COMMON_REQUIRED, ...SPECIFIC_FIELDS[productClass]]
   }
-  
-  return [...common, ...(specific[productClass] || [])]
+  return ['product_type']
+}
+
+/**
+ * Returns fields that are nice-to-have but should NOT block the pipeline.
+ * The validator can surface these as warnings to encourage richer briefs
+ * without rejecting minimal ones.
+ */
+export function getRecommendedFields(productClass: string): string[] {
+  if (productClass === 'unknown' || !(productClass in SPECIFIC_FIELDS)) {
+    return [...RECOMMENDED_UNKNOWN]
+  }
+  // Known classes already have all common fields in required — only max_mass
+  // is a genuine recommendation.
+  return ['max_mass']
 }

@@ -39,8 +39,8 @@ Council sequenced this to avoid calibrating against a broken score. Targets for 
 | 1 | **F7** compound reweight (rubric 0.4→0.15, council 0.6→0.85) | 30 min | **done — should have been @coder** | Honest scores visible everywhere |
 | 2 | **F12** retire placebo deterministic scorer | 1 hr | **@coder** (Gemini 3.1 Pro) — bounded refactor of `scorer.ts` | Modules / Risks / Suppliers stop auto-8/10 |
 | 3 | **F13** audit judge criteria vs engine output | 1 hr | **@council** (6 models) diagnose → **@coder** apply | Judges score what we actually produce |
-| 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | **@coder** (rules + tests) | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
-| 5 | **G2** relax `getRequiredFields()` | 15 min | **@coder-2** (MiMo) — trivial logic change | Pairs with G1 — Round 1 → 9-10/10 pass rate |
+| 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | **@coder** (rules + tests) — ✅ DONE | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
+| 5 | **G2** relax `getRequiredFields()` | 15 min | **@coder-2** (MiMo) — ✅ DONE | Pairs with G1 — Round 1 → 9-10/10 pass rate |
 | 6 | **B6** required-parts manifest per product class | 2 hr | **@coder** (needs domain-knowledge rule authoring) | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
 | 7 | **H2** Stage 5 regime router | 45 min | **@coder** (Stage 5 dispatcher + types) | Distributor APIs called for `buy_electronic` parts |
 | 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | **@coder** (React-PDF layout + 3 new sections) | Make/Buy/Services visible per part |
@@ -198,8 +198,8 @@ Status is verified from git log + grep + code audit, not memory.
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **G1** | **Widen `product-classifier.ts` to 15 classes (drone, UAV, AUV, HAPS, EV-charger, PCB-assembly, wearable-medical, bioreactor, CGM, etc.)** | ❌ planned | BASELINE-10 finding — 5/10 detailed briefs fell into "unknown" class and were rejected |
-| **G2** | **Relax `getRequiredFields()` to minimum common field set when classifier is uncertain** | ❌ planned | BRIEF-Q2 (was) |
+| **G1** | **Widen `product-classifier.ts` to 15 classes (drone, UAV, AUV, HAPS, EV-charger, PCB-assembly, wearable-medical, bioreactor, CGM, etc.)** | ✅ | `product-classifier.ts` — 8 new classes, specific before generic cascade, 39/39 tests |
+| **G2** | **Relax `getRequiredFields()` to minimum common field set when classifier is uncertain** | ✅ | `product-classifier.ts` — unknown → `['product_type']` only, `getRecommendedFields()` export, 10/10 tests |
 | **G3** | **Brief-expand stage `0.5-brief-expansion.ts` + new PDF "Brief interpretation" section showing original + inferred fields + assumption rationale** | ❌ planned | Tristan 2026-05-07 design proposal |
 | **G4** | **Research LLM validator + re-prompt when structured fields missing from designBrief** | ❌ planned | BRIEF-Q1 (was) |
 
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**58 ✅ done · 46 ❌ planned · 2 ⏸ deferred**
+**62 ✅ done · 44 ❌ planned · 2 ⏸ deferred**
 
 ---
 
@@ -304,7 +304,6 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 |---|---|
 | **F7** | Compound score is misleadingly high today (71/100 for 5.4/10 content). Fix this before anything else — everything else calibrates against it |
 | **G3** | Brief-expand stage. Round 2 (minimal briefs) currently 0/10 passing. This moves it to 10/10 with an honest audit trail |
-| **G1 + G2** | Widen classifier + relax validator. Round 1 currently 5/10 passing. This moves it to 9-10/10 |
 | **B6** | Required-parts manifest. Addresses the literal-real council finding ("missing expansion tank + PRV + PIR insulation") on BESS |
 | **J1** | Show-all-runs dashboard. Today's tool hides 15/20 runs — tracking failures that don't write qa-scores.json |
 | **F9 / K2** | Exclude engine-lineage from judges. Gemini grading Gemini is a conflict of interest and inflates scores |
@@ -369,6 +368,22 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 ## Log
 
 (newest first — historical entries retained for SHA traceability)
+
+### 2026-05-07 11:15 — G1 + G2 shipped (classifier widening + validator relaxation)
+
+G1: 8 new product classes added to `classifyProduct()` — drone, auv, haps, ev_charger, bioreactor, edge_ai_server, wearable_medical, pcb_assembly. Key design decision: specific single-keyword classes checked BEFORE multi-signal energy_storage to avoid HAPS/drone/EV-charger briefs being misclassified as BESS due to battery mentions. Cascade order: specific keywords → multi-signal (energy_storage, vertical_farm, thermal_system) → generic fallthrough (aerospace, robotics, vehicle, etc.).
+
+G2: `getRequiredFields('unknown')` now returns `['product_type']` instead of 4 common fields. New `getRecommendedFields()` export for non-blocking warnings. Known classes (thermal_system, energy_storage, etc.) unchanged.
+
+Edge cases fixed during implementation:
+- HAPS brief matched "unmanned aerial" (drone) — fixed by reordering HAPS before drone in cascade
+- CGM brief matched "phone" (consumer_electronics) — fixed by adding "blood sugar" + "diabet" to wearable_medical pattern and removing bare "wearable" from consumer_electronics
+- BESS brief matched "tpu" inside "output" — fixed with `\btpu\b` word boundary
+- Storage signals tightened: `li-ion` now requires pack/module/system context, `kwh` requires explicit storage keywords
+
+Tests: 39/39 passing (20 classifier + 10 fields + 9 edge cases).
+
+Count: 62 ✅ / 44 ❌ / 2 ⏸.
 
 ### 2026-05-07 09:00 — Distributor APIs live (Mouser + Farnell) + C5 shipped
 

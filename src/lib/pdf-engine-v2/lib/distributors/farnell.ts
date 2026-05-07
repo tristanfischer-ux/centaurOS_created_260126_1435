@@ -61,7 +61,7 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
     if (productBlocks.length === 0) return null
 
     const upperMpn = mpn.toUpperCase()
-    let block = productBlocks.find(b => {
+    const block = productBlocks.find(b => {
       const m = b.match(/<ns1:translatedManufacturerPartNumber>([^<]+)<\/ns1:translatedManufacturerPartNumber>/)
       return m && m[1].toUpperCase() === upperMpn
     }) || productBlocks[0]
