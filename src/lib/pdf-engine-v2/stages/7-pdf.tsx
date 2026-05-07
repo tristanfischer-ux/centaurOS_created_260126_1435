@@ -644,6 +644,39 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
   return (
     <Page size="A4" style={s.page}>
       <Text style={s.h1}>Feasibility Gate Assessment <GradeLabel grade="A" /></Text>
+
+      {/* A4 (2026-05-06): prominent pipeline-error banner. Shown at the
+          top of the feasibility page whenever a critical stage failed.
+          Founder sees exactly which stage broke and why, without
+          chasing logs. */}
+      {state.pipelineError && (
+        <View style={{
+          marginBottom: 12,
+          padding: 14,
+          borderWidth: 2,
+          borderColor: RED,
+          backgroundColor: '#fef2f2',
+          borderRadius: 4,
+        }}>
+          <Text style={{
+            fontSize: 12,
+            fontFamily: 'Helvetica-Bold',
+            color: RED,
+            marginBottom: 6,
+          }}>
+            ⚠ Pipeline halted at stage: {state.pipelineError.stage}
+          </Text>
+          <Text style={{ fontSize: 10, color: INK_DARK, marginBottom: 4 }}>
+            {state.pipelineError.message}
+          </Text>
+          <Text style={{ fontSize: 8, color: MUTED, fontStyle: 'italic' }}>
+            Error occurred {state.pipelineError.occurredAt}. {state.pipelineError.recoverable
+              ? 'The sections above this stage completed successfully; sections below are incomplete or missing.'
+              : 'No downstream sections could be generated. The brief + regulatory sections (if present) remain valid.'}
+          </Text>
+        </View>
+      )}
+
       <Text style={s.paraLarge}>The following automated checks verify the integrity and completeness of the engineering specification before detailed analysis.</Text>
 
       <View style={s.tableWrap}>

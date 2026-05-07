@@ -44,6 +44,67 @@ export interface EngineResult {
 }
 
 /**
+ * A4 (2026-05-06): produce an honest error PDF when a critical stage
+ * fails. Called from the stage-failure branches in runPipeline instead of
+ * the old `return { ok: false, ...}` which silently dropped the PDF.
+ *
+ * The main PdfRenderer tolerates partial state (A3 normaliseState layer);
+ * it picks up `state.pipelineError` and renders a prominent banner on the
+ * feasibility gate page so the founder sees exactly which stage failed
+ * and why. Sections whose data didn't survive the failure render "—" or
+ * "Section unavailable" instead of blank pages.
+ */
+async function generateErrorPdf(
+  state: PipelineState,
+  stages: EngineResult['stages'],
+  llmCalls: number,
+  startTime: number,
+  gateResults?: EngineResult['gateResults'],
+): Promise<EngineResult> {
+  const pdfStart = Date.now()
+  try {
+    const doc = React.createElement(PdfRenderer, { state }) as any
+    const blob = await pdf(doc).toBlob()
+    const buffer = Buffer.from(await blob.arrayBuffer())
+    const base64 = buffer.toString('base64')
+    const pdfMs = Date.now() - pdfStart
+    stages.push({ name: 'pdf', ok: true, durationMs: pdfMs })
+    console.log(`[pipeline] pdf (error path): OK (${pdfMs}ms, ${Math.round(buffer.length / 1024)}KB)`)
+
+    return {
+      ok: false,  // Pipeline didn't complete successfully.
+      state,
+      stages,
+      gateResults,
+      pdf: {
+        filename: `engineering-report-${state.projectId}-ERROR.pdf`,
+        base64,
+        sizeBytes: buffer.length,
+      },
+      totalDurationMs: Date.now() - startTime,
+      totalLlmCalls: llmCalls,
+    }
+  } catch (pdfError) {
+    const pdfMs = Date.now() - pdfStart
+    stages.push({
+      name: 'pdf',
+      ok: false,
+      durationMs: pdfMs,
+      error: (pdfError as Error).message,
+    })
+    console.error(`[pipeline] Error PDF generation FAILED: ${(pdfError as Error).message}`)
+    return {
+      ok: false,
+      state,
+      stages,
+      gateResults,
+      totalDurationMs: Date.now() - startTime,
+      totalLlmCalls: llmCalls,
+    }
+  }
+}
+
+/**
  * Run the complete PDF engine pipeline.
  *
  * @param briefText - The founder's product brief (subject string from cad_lab_projects)
@@ -176,7 +237,17 @@ export async function runPipeline(
   })
   trackStage('research', researchResult)
   if (!researchResult.ok || !researchResult.data) {
-    return { ok: false, state, stages, totalDurationMs: Date.now() - startTime, totalLlmCalls: llmCalls }
+    // A4 (2026-05-06): do not silently drop the PDF when a critical stage
+    // fails. Set pipelineError and fall through — the renderer produces a
+    // short error report with the brief echoed and the stage that failed.
+    state.pipelineError = {
+      stage: 'research',
+      message: researchResult.error || 'Research stage returned no data',
+      occurredAt: new Date().toISOString(),
+      recoverable: false,
+    }
+    console.error(`[pipeline] Research failed: ${researchResult.error}. Producing error PDF.`)
+    return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.research = researchResult.data
   
@@ -240,7 +311,16 @@ export async function runPipeline(
   })
   trackStage('decompose', decomposeResult)
   if (!decomposeResult.ok || !decomposeResult.data) {
-    return { ok: false, state, stages, totalDurationMs: Date.now() - startTime, totalLlmCalls: llmCalls }
+    // A4: decompose is critical — without modules we can't make a BOM or
+    // cost. Record the failure and produce an honest error PDF.
+    state.pipelineError = {
+      stage: 'decompose',
+      message: decomposeResult.error || 'Decompose stage returned no modules',
+      occurredAt: new Date().toISOString(),
+      recoverable: false,
+    }
+    console.error(`[pipeline] Decompose failed: ${decomposeResult.error}. Producing error PDF.`)
+    return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.modules = decomposeResult.data
   
@@ -285,7 +365,16 @@ export async function runPipeline(
   })
   trackStage('bom_cost', bomResult)
   if (!bomResult.ok || !bomResult.data) {
-    return { ok: false, state, stages, totalDurationMs: Date.now() - startTime, totalLlmCalls: llmCalls }
+    // A4: BOM failure — critical for cost section. Produce error PDF with
+    // whatever state we already have (research + modules + sizing).
+    state.pipelineError = {
+      stage: 'bom_cost',
+      message: bomResult.error || 'BOM stage returned no data',
+      occurredAt: new Date().toISOString(),
+      recoverable: true,  // Research + modules survive; cost & suppliers drop.
+    }
+    console.error(`[pipeline] BOM failed: ${bomResult.error}. Producing error PDF with partial state.`)
+    return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.parts = bomResult.data.parts
   state.bomLines = bomResult.data.bomLines
@@ -324,8 +413,16 @@ export async function runPipeline(
   }
   const criticalFail = gateResults.find(g => !g.passed && g.gate !== 'Feasibility')
   if (criticalFail) {
-    console.log(`[pipeline] Critical gate failure: ${criticalFail.gate}. Aborting.`)
-    return { ok: false, state, stages, gateResults, totalDurationMs: Date.now() - startTime, totalLlmCalls: llmCalls }
+    // A4: critical gate failure — still produce a PDF so the founder
+    // sees what failed and why, rather than silently dropping the report.
+    state.pipelineError = {
+      stage: 'gate_' + criticalFail.gate.toLowerCase().replace(/\s+/g, '_'),
+      message: `Gate "${criticalFail.gate}" failed: ${criticalFail.findings.join('; ')}`,
+      occurredAt: new Date().toISOString(),
+      recoverable: true,
+    }
+    console.log(`[pipeline] Critical gate failure: ${criticalFail.gate}. Producing error PDF with partial state.`)
+    return await generateErrorPdf(state, stages, llmCalls, startTime, gateResults)
   }
 
   // ── Stage 5: Suppliers ─────────────────────────────────────────────
