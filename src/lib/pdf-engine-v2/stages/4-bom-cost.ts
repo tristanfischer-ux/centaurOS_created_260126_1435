@@ -12,6 +12,10 @@ import { sanitiseLlmOutput } from '../sanitiser'
 import { BOM_GENERATION_SYSTEM } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { parseJsonFromLlm } from '../lib/llm-json'
+import { REQUIRED_PARTS } from '../lib/required-parts-manifest'
+import { classifyRegime } from '../lib/part-regime'
+import { routePartLookup } from '../lib/regime-router'
+import { buildDeterministicPhase, deduplicateBom } from '../lib/bom-builder'
 import {
   deriveQuantities,
   applyOverrides,
@@ -287,6 +291,13 @@ export async function runBomCost(
 
     const batchSize = options?.batchSize ?? DEFAULT_BATCH_SIZE
 
+    // Phase 1 + 2: Corpus-first / deterministic-first BOM parts
+    const { deterministicParts, deterministicBomLines } = await buildDeterministicPhase(
+      options?.productClass,
+      modules
+    )
+    console.log(`[bom-cost] Built ${deterministicParts.length} deterministic parts via phase 1/2`)
+
     // Build the modules description for the LLM
     const moduleDescriptions = modules.map((m) => {
       return `## Module: ${m.name} (id: ${m.id})
@@ -315,7 +326,14 @@ ${formatProcessesForPrompt(grounding.processes)}
       ? `\n\n## Training data dossier\n${options.trainingDataDossier.slice(0, 4000)}`
       : ""
 
-    const userPrompt = `Generate a BOM for the modules below. Use the grounding catalogues when naming materials and processes.\n\n${moduleDescriptions}\n${groundingBlock}${context}`
+    // Build deterministic parts exclusion text
+    let deterministicExclusion = ""
+    if (deterministicParts.length > 0) {
+      const names = deterministicParts.map(p => p.name).join(", ")
+      deterministicExclusion = `\n\nCRITICAL RULE: The following parts are already sourced and priced — do NOT regenerate them: ${names}. Generate ONLY additional parts needed for this product that are NOT in the above list.`
+    }
+
+    const userPrompt = `Generate a BOM for the modules below. Use the grounding catalogues when naming materials and processes.${deterministicExclusion}\n\n${moduleDescriptions}\n${groundingBlock}${context}`
 
     console.log('[bom-cost] Generating BOM via OpenRouter (grounded with catalogues)...')
     const skeletonRes = await callOpenRouter(BOM_GENERATION_SYSTEM, userPrompt)
@@ -480,6 +498,17 @@ ${formatProcessesForPrompt(grounding.processes)}
       quantity: Number(bl.quantity) || 1,
     }))
 
+    // ─── Phase 4: Merge + Deduplicate (Deterministic + LLM) ──────────────
+    const merged = deduplicateBom(
+      deterministicParts,
+      deterministicBomLines,
+      finalParts,
+      finalBomLines,
+      options?.productClass
+    )
+    const mergedParts = merged.finalParts
+    let appliedBomLines = merged.finalBomLines
+
     // ─── Per-cell quantity realism (2026-05-06) ──────────────────────────
     // Override LLM-guessed BOM quantities with deterministic formulae
     // derived from ProductSpecs. This is the single biggest lever on BOM
@@ -489,13 +518,12 @@ ${formatProcessesForPrompt(grounding.processes)}
     // Overrides are applied in-place to finalBomLines, stamping
     // `qtySource: 'deterministic'` so the PDF renderer can show the
     // override visually (green cell background).
-    let appliedBomLines = finalBomLines
     if (options?.productSpecs && options?.productClass) {
       const overrides = deriveQuantities(
         options.productSpecs,
         options.productClass,
-        finalParts,
-        finalBomLines,
+        mergedParts,
+        appliedBomLines,
       )
       if (overrides.length > 0) {
         for (const ov of overrides) {
@@ -508,11 +536,11 @@ ${formatProcessesForPrompt(grounding.processes)}
         // Cast through unknown because BomLine shape doesn't officially
         // include these runtime-only fields; PDF renderer reads them via
         // (bl as any).qtySource.
-        appliedBomLines = applyOverrides(finalBomLines, overrides) as BomLine[]
+        appliedBomLines = applyOverrides(appliedBomLines, overrides) as BomLine[]
         // Also stamp priceSource on the matching parts so the BOM renderer
         // can show "deterministic-qty" in the Gr. column if needed.
         for (const ov of overrides) {
-          const part = finalParts.find(
+          const part = mergedParts.find(
             p => p.partNumber === ov.partNumber || p.id === ov.partId
           )
           if (part) {
@@ -537,7 +565,13 @@ ${formatProcessesForPrompt(grounding.processes)}
     let heuristicCount = 0
     let llmCount = 0
 
-    for (const part of finalParts) {
+    for (const part of mergedParts) {
+      // If it's already priced by the deterministic phase, skip grounding lookup
+      if ((part as any).priceSource === 'distributor') {
+        groundedCount++
+        continue
+      }
+
       const material = findMaterial(part.material, grounding.materials)
       const process = findProcess(part.process, grounding.processes)
 
@@ -577,18 +611,21 @@ ${formatProcessesForPrompt(grounding.processes)}
     }
 
     console.log(
-      `[bom-cost] Grounded cost sources: ${groundedCount} database, ${llmCount} LLM, ${heuristicCount} heuristic (of ${finalParts.length} total)`
+      `[bom-cost] Grounded cost sources: ${groundedCount} database/distributor, ${llmCount} LLM, ${heuristicCount} heuristic (of ${mergedParts.length} total)`
     )
 
     // ─── Top-N web price lookup for the most expensive parts ──────────────
     console.log('[bom-cost] Searching Brave for real prices on top 10 most expensive parts...')
-    const sortedIndices = finalParts
+    const sortedIndices = mergedParts
       .map((p, i) => ({ i, cost: p.estimatedUnitCostGbp ?? 0 }))
       .sort((a, b) => b.cost - a.cost)
       .slice(0, 10)
 
     const searchPromises = sortedIndices.map(async ({ i }) => {
-      const part = finalParts[i]
+      const part = mergedParts[i]
+      // Skip if already found via deterministic distributor
+      if ((part as any).priceSource === 'distributor') return
+
       const realPrice = await searchRealPrice(part.name, part.material || '')
       if (realPrice !== null) {
         part.estimatedUnitCostGbp = realPrice
@@ -599,12 +636,12 @@ ${formatProcessesForPrompt(grounding.processes)}
     })
     await Promise.all(searchPromises)
 
-    const costBreakdown = calculateCost(finalParts, appliedBomLines, options?.domain || 'default', options?.ceilingGbp || null, options?.batchSize)
+    const costBreakdown = calculateCost(mergedParts, appliedBomLines, options?.domain || 'default', options?.ceilingGbp || null, options?.batchSize)
 
     console.log('[bom-cost] BOM generation complete.')
     return {
       ok: true,
-      data: { parts: finalParts, bomLines: appliedBomLines, costBreakdown },
+      data: { parts: mergedParts, bomLines: appliedBomLines, costBreakdown },
       durationMs: Date.now() - startTime,
     }
   } catch (error: any) {
