@@ -76,8 +76,14 @@ Every ID that exists in this tracker, every `pdf-engine-v2` commit, and every co
 | SCORE-004 | Cross-run `scoring-history.jsonl` archive | ✅ | `b8156209` |
 | SCORE-005 | Suppliers + Risks promoted to council tier with deterministic fallback | ✅ | `b8156209` |
 | SCORE-006 | Auto-refreshing HTML dashboard at `~/Downloads/engine-evidence/scoring-dashboard.html` | ✅ | `b8156209` |
+| **Morning 2026-05-07 — baseline experiment** | | | |
+| BASELINE-10 | 10 projects × 2 rounds (detailed + minimal briefs). Full findings in `BASELINE-10-ANALYSIS.md` | ✅ | evidence at `~/Downloads/engine-evidence/baseline-experiment/` |
+| **Pending — from baseline findings** | | | |
+| BRIEF-Q1..Q3 + SIZE-Q1 + COST-Q1..Q2 + BOM-Q1..Q3 + RES-Q1 + COUNCIL-Q1 | Quality-to-≥8/10 prescriptive plan | 📋 planned | `HANDOVER-quality-8-out-of-10.md` |
+| BRIEF-Q2 (new) | Widen `product-classifier.ts` coverage; relax `getRequiredFields()` to lift Round-1 pass rate from 5/10 | 📋 planned | From baseline finding #1 |
+| CORPUS-Q1..Q6 | Import distributor catalogues, tag parts by regime, widen classifier, expose coverage | 📋 planned | `BASELINE-10-ANALYSIS.md` |
 
-**Tally: 50 ✅ · 0 ❌ · 1 ⏸ deferred.**
+**Tally: 51 ✅ · 16 📋 planned · 1 ⏸ deferred.**
 
 ---
 
