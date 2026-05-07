@@ -150,7 +150,7 @@ Status is verified from git log + grep + code audit, not memory.
 | C3 | Supplier Shortlist PDF section (was landed under "B3" label) | ✅ | `f41a2c11` |
 | C4 | Process-match validation — red-flag unverified suppliers | ✅ | `13de00bb` |
 | **C5** | **Part-regime classifier at Stage 4 — every BOM line stamped `buy_electronic` / `buy_mechanical_industrial` / `named_manufacturer_reseller` / `make_custom_fab` / `service_certification`. Routes downstream lookup to the right corpus. Rules-first with LLM fallback.** | ✅ | `80b1d5f2` — 16/16 tests |
-| **C6** | **Supplier Shortlist honesty gate — only include a supplier match when (a) part regime is `make_custom_fab` or `service_certification` AND (b) process-match OR material-match verifies via D1/D2. Prevents "UK sheet-metal shop appearing on MCU query" false-positives.** | ❌ planned | New 2026-05-07 |
+| **C6** | **Supplier Shortlist honesty gate — only include a supplier match when (a) part regime is `make_custom_fab` or `service_certification` AND (b) process-match OR material-match verifies via D1/D2. Prevents "UK sheet-metal shop appearing on MCU query" false-positives.** | ✅ | `69122400` — gateSupplierMatch(), 4 tests |
 | **C7** | **Match-type column on every Supplier Shortlist card — `Custom fabricator` / `Distributor SKU` / `Authorised reseller` / `Certification body` / `Speculative match`. Sets founder expectation correctly.** | ❌ planned | New 2026-05-07 |
 | **C8** | **PDF restructure: replace single "Supplier Shortlist" section with three. §6a PARTS TO BUY (distributor table MPN + £ + stock + datasheet). §6b PARTS TO MAKE (fabricator leads grouped by process — machining / sheet metal / welding / moulding / harness). §6c SERVICES & CERTIFICATION (UL / EMC / MDR / G99 test houses with cost + lead time).** | ✅ | `7-pdf.tsx` — 3 sections with honest empty states, GradeLabel, SourceFooter |
 
@@ -261,7 +261,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **M1** | **NRE from regulatory matrix (sum of £-cost × weeks per standard, not flat-per-module)** | ❌ planned | COST-Q2 (was) — BESS should move from £140k NRE to £260k-£500k via regulatory sum |
+| **M1** | **NRE from regulatory matrix (sum of £-cost × weeks per standard, not flat-per-module)** | ✅ | `69122400` — computeNreFromRegulatory(), 34 tests |
 | **M2** | **Top-10 parts market-anchor — every capital part must have a cited Farnell/RS/Mouser URL or council-flagged as "unpriced"** | ❌ planned | COST-Q1 (was) |
 | **M3** | **Benchmark-anchor check visible on cost-waterfall page (depends on L4)** | ❌ planned | New 2026-05-07 |
 | **M4** | **LLM temperature tuning + N-run median for deterministic-leaning stages (decompose, BOM)** | ❌ planned | New 2026-05-07 — reduces run-to-run variance |
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**78 ✅ done · 28 ❌ planned · 2 ⏸ deferred**
+**81 ✅ done · 25 ❌ planned · 2 ⏸ deferred**
 
 ---
 
