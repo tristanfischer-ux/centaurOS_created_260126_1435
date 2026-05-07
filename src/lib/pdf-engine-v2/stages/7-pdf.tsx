@@ -1144,7 +1144,25 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
                 const unitCost = p.estimatedUnitCostGbp ?? 0
                 const extCost = unitCost * qty
 
-                const grade = p.isPurchased ? 'B' : (unitCost > 0 ? 'D' : 'E')
+                // B2 (2026-05-06, plan): Cost basis compact indicator.
+                // Replaces the plain A-E grade with a source-aware letter:
+                //   A = brief constraint    (grade A)
+                //   B = local corpus / database match
+                //   C = catalogued process + material (grounded)
+                //   D = LLM estimate
+                //   E = heuristic / default
+                // Also sets a tooltip-equivalent second line: the priceSource
+                // attached by the BOM stage (database / llm / search / heuristic).
+                const priceSource = (p as any).priceSource as string | undefined
+                const basis = (() => {
+                  if (priceSource === 'database' || priceSource === 'search') return 'C'
+                  if (priceSource === 'llm') return 'D'
+                  if (priceSource === 'heuristic') return 'E'
+                  // If the part is COTS with an inferred unit cost: B.
+                  return p.isPurchased ? 'B' : (unitCost > 0 ? 'D' : 'E')
+                })()
+                const grade = basis
+
                 return (
                   <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
                     <Text style={{ ...s.tC, width: '18%', fontWeight: 'bold' }}>{formatText(p.partNumber)}</Text>
@@ -1177,6 +1195,42 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
                 )
               })()}
             </View>
+
+            {/* B2 (2026-05-06, plan): Cost-basis appendix. Shows the
+                priceBreakdown string attached by the BOM stage (material
+                cost + process cost breakdown) for parts where we have
+                it. Only parts with database/grounded cost get a breakdown;
+                LLM/heuristic parts just show the basis label. */}
+            {(() => {
+              const rowsWithBreakdown = modParts
+                .map(p => ({
+                  part: p,
+                  source: (p as any).priceSource as string | undefined,
+                  breakdown: (p as any).priceBreakdown as string | undefined,
+                }))
+                .filter(r => r.breakdown && r.breakdown.length > 5)
+                .slice(0, 8) // avoid page overflow
+
+              if (rowsWithBreakdown.length === 0) return null
+
+              return (
+                <View style={{ marginTop: 6, padding: 6, backgroundColor: '#fbfbfb', borderWidth: 0.5, borderColor: BORDER }} wrap={false}>
+                  <Text style={{ fontSize: 8.5, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 3 }}>
+                    Cost basis — how each unit £ was calculated
+                  </Text>
+                  {rowsWithBreakdown.map((r, i) => (
+                    <View key={i} style={{ flexDirection: 'row', marginBottom: 1 }}>
+                      <Text style={{ fontSize: 7.5, width: '25%', color: MUTED }}>
+                        {formatText(r.part.partNumber)} ({r.source})
+                      </Text>
+                      <Text style={{ fontSize: 7.5, width: '75%', color: INK, fontFamily: 'Courier' }}>
+                        {r.breakdown}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )
+            })()}
 
             {/* E4 (2026-05-06): datasheet-backed evidence for top-3 parts
                 in this module by extended cost. Pulls from page_chunks
