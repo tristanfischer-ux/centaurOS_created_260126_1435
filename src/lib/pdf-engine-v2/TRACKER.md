@@ -38,14 +38,14 @@ Council sequenced this to avoid calibrating against a broken score. Targets for 
 |---|---|---|---|---|
 | 1 | **F7** compound reweight (rubric 0.4→0.15, council 0.6→0.85) | 30 min | **done — should have been @coder** | Honest scores visible everywhere |
 | 2 | **F12** retire placebo deterministic scorer | 1 hr | **@coder** (Gemini 3.1 Pro) — bounded refactor of `scorer.ts` | Modules / Risks / Suppliers stop auto-8/10 |
-| 3 | **F13** audit judge criteria vs engine output | 1 hr | **@council** (6 models) diagnose → **@coder** apply | Judges score what we actually produce |
+| 3 | **F13** audit judge criteria vs engine output | 1 hr | **@council** (6 models) diagnose → **@coder** apply — **IN PROGRESS** | Judges score what we actually produce |
 | 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | **@coder** (rules + tests) — ✅ DONE | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
 | 5 | **G2** relax `getRequiredFields()` | 15 min | **@coder-2** (MiMo) — ✅ DONE | Pairs with G1 — Round 1 → 9-10/10 pass rate |
 | 6 | **B6** required-parts manifest per product class | 2 hr | **@coder** (needs domain-knowledge rule authoring) | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
 | 7 | **H2** Stage 5 regime router | 45 min | **@coder** (Stage 5 dispatcher + types) | Distributor APIs called for `buy_electronic` parts |
 | 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | **@coder** (React-PDF layout + 3 new sections) | Make/Buy/Services visible per part |
 | 9 | **J1a** pipeline emits status for failed runs | 45 min | **@coder-2** (MiMo) — small error-handler additions | Dashboard shows all 20 runs, not just 5 |
-| 10 | **F9** exclude engine-lineage from judges | 30 min | **@coder-2** — one-line filter + test | Gemini stops grading Gemini |
+| 10 | **F9** exclude engine-lineage from judges | 30 min | **@coder-2** — **IN PROGRESS** | Gemini stops grading Gemini |
 
 **Total ~9 hours, ~£15-25 OpenRouter for evidence runs at the end of the day.**
 

@@ -42,7 +42,7 @@ const SECTION_ENGINEERING_CRITERIA: Record<string, string[]> = {
   ],
   'Regulatory': [
     'Standard Applicability — are the cited standards actually required for this product?',
-    'Safety Gap Analysis — are R290/A3 flammable refrigerant requirements addressed?',
+    'Safety Gap Analysis — are product-class-specific safety requirements addressed (flammable refrigerants, battery thermal runaway, pressure systems, biocompatibility, etc.)?',
     'Certification Path — is the sequence of certifications realistic and complete?',
   ],
   'Sizing': [
@@ -67,14 +67,14 @@ const SECTION_ENGINEERING_CRITERIA: Record<string, string[]> = {
     'Ceiling Compliance — does the cost meet the stated target?',
   ],
   'Risks': [
-    'R290-Specific Hazards — are propane-specific failure modes covered?',
+    'Domain-Specific Hazards — are product-class-specific failure modes covered (e.g. R290 for heat pumps, lithium thermal runaway for BESS, pressure hull integrity for AUV)?',
     'Severity Calibration — are ratings calibrated to real consequences?',
     'Mitigation Specificity — are mitigations actionable and verifiable?',
   ],
   'Suppliers': [
     'Supplier Capability — do the suppliers actually make these components?',
     'Geographic Viability — are suppliers accessible from the UK?',
-    'R290 Experience — do suppliers have experience with flammable refrigerants?',
+    'Domain Experience — do suppliers have experience with the specific materials and processes required for this product class?',
   ],
   'Research': [
     'Technical Depth — does the research demonstrate understanding of the product?',
@@ -220,10 +220,13 @@ Return ONLY valid JSON:
   ]
 }`
 
+  // SCORE-F9 (2026-05-07): exclude engine-lineage models from judge council
+  // to prevent self-evaluation. Previously Gemini (Chase) and DeepSeek (Max,
+  // Jian, Priya, Finn) were both judges and content generators.
   const judges = [
-    'google/gemini-3.1-pro-preview',
-    'xiaomi/mimo-v2.5-pro',
-    'deepseek/deepseek-v4-pro',
+    'x-ai/grok-4.3',          // honest adversary, 98% tool-use, 75% non-hallucination
+    'xiaomi/mimo-v2.5-pro',   // honest generalist, 75% non-hallucination
+    'z-ai/glm-5.1',           // schema enforcer, 74% non-hallucination
   ]
 
   const votes: CouncilScore[] = []
