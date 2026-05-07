@@ -81,6 +81,10 @@ Status is verified from git log + grep + code audit, not memory.
 | C2 | `runSuppliers` uses local corpus as primary | ✅ | `0dbc2cac` |
 | C3 | Supplier Shortlist PDF section (was landed under "B3" label) | ✅ | `f41a2c11` |
 | C4 | Process-match validation — red-flag unverified suppliers | ✅ | `13de00bb` |
+| **C5** | **Part-regime classifier at Stage 4 — every BOM line stamped `buy_electronic` / `buy_mechanical_industrial` / `named_manufacturer_reseller` / `make_custom_fab` / `service_certification`. Routes downstream lookup to the right corpus. Rules-first (keyword match on part name / isPurchased / process) with LLM fallback for ambiguous rows.** | ❌ planned | New 2026-05-07 — Tristan "make vs buy" framing |
+| **C6** | **Supplier Shortlist honesty gate — only include a supplier match when (a) part regime is `make_custom_fab` or `service_certification` AND (b) process-match OR material-match verifies via D1/D2. Prevents "UK sheet-metal shop appearing on MCU query" false-positives.** | ❌ planned | New 2026-05-07 |
+| **C7** | **Match-type column on every Supplier Shortlist card — `Custom fabricator` / `Distributor SKU` / `Authorised reseller` / `Certification body` / `Speculative match`. Sets founder expectation correctly.** | ❌ planned | New 2026-05-07 |
+| **C8** | **PDF restructure: replace single "Supplier Shortlist" section with three. §6a PARTS TO BUY (distributor table MPN + £ + stock + datasheet). §6b PARTS TO MAKE (fabricator leads grouped by process — machining / sheet metal / welding / moulding / harness). §6c SERVICES & CERTIFICATION (UL / EMC / MDR / G99 test houses with cost + lead time).** | ❌ planned | New 2026-05-07 — Tristan "three structured procurement paths" framing |
 
 ### Phase D — Corpus indexing
 
@@ -130,15 +134,25 @@ Status is verified from git log + grep + code audit, not memory.
 | **G3** | **Brief-expand stage `0.5-brief-expansion.ts` + new PDF "Brief interpretation" section showing original + inferred fields + assumption rationale** | ❌ planned | Tristan 2026-05-07 design proposal |
 | **G4** | **Research LLM validator + re-prompt when structured fields missing from designBrief** | ❌ planned | BRIEF-Q1 (was) |
 
-### Phase H — Corpus expansion
+### Phase H — Corpus expansion (Buy-side catalogues)
+
+The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies). Phase H builds the **Buy** side: live distributor APIs and curated service providers so the engine can produce real SKUs + UK prices for purchased parts and real leads for certification services.
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **H1** | **Import Farnell / RS / Mouser / Digikey UK distributor catalogues to sibling `~/.forge-capital/distributor-catalogue.db` — SKU-level data with current UK prices. Biggest single lever on electronics-dominant BOMs.** | ❌ planned | CORPUS-Q1 (was) — 1-2 session job |
-| **H2** | **Tag BOM parts by regime (electronic / mechanical / biotech) at generation; route to the right corpus** | ❌ planned | CORPUS-Q2 (was) |
-| **H3** | **Corpus-coverage diagnostic on Supplier Shortlist page — "N parts total, M matched local corpus, K required external search, J unmatched"** | ❌ planned | CORPUS-Q4 (was) |
-| **H4** | **Semiconductor brokers (Avnet / Arrow / Mouser stocking) for ASIC / MCU / FPGA — fourth catalogue layer** | ❌ planned | CORPUS-Q5 (was) |
-| **H5** | **Synthetic-BOM coverage regression harness — pre-flight check per project class showing % of typical parts that would match the corpus** | ❌ planned | CORPUS-Q6 (was) |
+| **H1a** | **Mouser Search API integration** — free tier 1k/day, UK pricing + UK stock + datasheet URL + MPN lookup. `lib/distributors/mouser.ts` + adapter function `lookupSkuMouser(mpn)`. Reads key from `~/.claude/secrets/distributor-apis.env`. | ❌ planned | New 2026-05-07 — Tristan registering key |
+| **H1b** | **Digi-Key API v4 integration** — OAuth 2.0, free tier ~1k/day, UK catalogue. `lib/distributors/digikey.ts` + token refresh. | ❌ planned | New 2026-05-07 |
+| **H1c** | **Farnell / Element14 Product Search API integration** — free tier, UK-native. `lib/distributors/farnell.ts`. | ❌ planned | New 2026-05-07 |
+| **H1d** | **Distributor aggregator** — `lib/distributors/index.ts` function `findSkuForPart(part)` fans out to H1a+H1b+H1c in parallel, merges results, returns cheapest-UK-stock with alternates. | ❌ planned | New 2026-05-07 |
+| **H1e** (optional) | Octopart subscription as aggregator upgrade — only if H1d orchestration becomes unwieldy. Monthly cost ~£1.5-3.6k/year. **Leaning against.** | ❌ backlog | New 2026-05-07 |
+| **H7a** | **RS Components scraping adapter** — RS does not offer a public API. Polite-rate scraper (1 req/2s, custom UA, respects robots.txt). `lib/distributors/rs-components.ts`. Fallback for parts RS stocks that Mouser/Digi-Key/Farnell don't. | ❌ planned | New 2026-05-07 |
+| **H7b** | **Mechanical wholesaler scrapers** — Eriks UK, Zoro UK, Applied Industrial. For `buy_mechanical_industrial` regime parts (fasteners, bearings, valves, pumps, fittings) that electronics distributors don't carry. | ❌ planned | New 2026-05-07 |
+| **H8** | **Curated UK service-provider registry** — `lib/service-providers.ts`, ~40-60 hand-authored entries: UL test houses (Intertek, TÜV SÜD UK, Element), EMC precompliance, MDR notified bodies (BSI, DEKRA), G99 relay witnessing, CE/UKCA file compilers, cleanroom qual, pressure testing. Each entry: service type + provider + location + typical cost range + typical duration + contact URL. Feeds §6c PDF section and M1 NRE calculation. | ❌ planned | New 2026-05-07 |
+| **H2** | **Part-regime router** — given a BOM line stamped by C5, route the lookup: `buy_electronic` → H1d distributor aggregator, `buy_mechanical_industrial` → H7b wholesaler scrapers, `named_manufacturer_reseller` → H6 + nightshift corpus, `make_custom_fab` → nightshift corpus (current path), `service_certification` → H8 registry. | ❌ planned | New 2026-05-07 — ties C5 to H1+H7+H8 |
+| **H3** | **Corpus-coverage diagnostic on every PDF** — renders on §6a/§6b/§6c summary: "N BOM lines total, M had SKU matches (Mouser/DK/Farnell), K had fabricator leads (nightshift), J unmatched (no data)". Honest transparency for the founder. | ❌ planned | Supersedes CORPUS-Q4 |
+| **H5** | **Synthetic-BOM coverage regression harness** — per product class, runs a canonical BOM list against H1d + nightshift + H8 and reports % matched in each regime. Run after any H-phase change to detect regressions. | ❌ planned | Supersedes CORPUS-Q6 |
+| **H6** | **Named-manufacturer authorised-reseller lookup** — curated list of ~20-30 manufacturers we see often (CATL, Sungrow, Copeland, Schneider, Siemens) with their UK authorised resellers. Separate data source from H1/H7. For `named_manufacturer_reseller` regime parts. | ❌ planned | New 2026-05-07 |
+| **H4** | **Semiconductor broker layer** — Avnet, Arrow, Future Electronics. Only matters if H1a+H1b+H1c miss an ASIC/MCU/FPGA (rare given Mouser+DK coverage). Scrape or partner API. | ❌ planned (low priority) | Supersedes CORPUS-Q5 |
 
 ### Phase I — Safety & compliance
 
@@ -208,7 +222,7 @@ Status is verified from git log + grep + code audit, not memory.
 
 ## Tally
 
-**53 ✅ done · 35 ❌ planned · 1 ⏸ deferred**
+**53 ✅ done · 48 ❌ planned · 1 ⏸ deferred**
 
 ---
 
@@ -285,6 +299,23 @@ Status is verified from git log + grep + code audit, not memory.
 ## Log
 
 (newest first — historical entries retained for SHA traceability)
+
+### 2026-05-07 08:30 — Make/Buy split + distributor-API architecture
+
+Tristan flagged: "certain things you just buy off the shelf, certain things have to be made." Reframed H-phase around the split.
+
+- **Make** = nightshift corpus (18k UK fabricators — already built)
+- **Buy** = distributor APIs (Mouser + Digi-Key + Farnell free tiers, 1k/day each) + H7 mechanical wholesalers + H6 named-manufacturer resellers
+- **Services** = H8 curated UK test-house + notified-body registry
+
+C-phase gained C5+C6+C7+C8 (part-regime classifier, honesty gate, match-type column, §6a/§6b/§6c PDF restructure).
+H-phase restructured: H1→H1a+H1b+H1c+H1d+H1e (per-API adapters + aggregator). H2 repurposed as regime-router. H6 H7 H8 new. H3 H5 renumbered.
+
+Live test confirmed: Farnell search page returns 94-byte stub (bot protection). Mouser returns captcha page. Digi-Key / Octopart return Cloudflare challenge. **Direct scraping is unviable for all major distributors. Free API keys are the only reliable path.**
+
+Tristan registering keys now. Adapter scaffolding in next commit.
+
+Count: 53 ✅ / 48 ❌ / 1 ⏸.
 
 ### 2026-05-07 07:00 — Tracker restructure + BOM-architecture honesty
 
