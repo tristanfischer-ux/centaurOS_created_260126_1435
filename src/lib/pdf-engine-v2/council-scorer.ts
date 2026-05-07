@@ -105,7 +105,12 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
 
   // Score each section — council for ALL sections
   const sections = Object.keys(JUDGING_CRITERIA)
-  const councilSections = ['Brief', 'BOM', 'Cost']  // Top 3 for council, rest deterministic
+  // SCORE-005 (2026-05-07): promote Suppliers + Risks into the council tier.
+  // They were always-deterministic before (scored 8/10 if the section
+  // existed), which isn't quality signal. Council judges now evaluate
+  // supplier relevance + risk-matrix completeness + severity distribution.
+  // If the council fails, the deterministic score is the fallback.
+  const councilSections = ['Brief', 'BOM', 'Cost', 'Suppliers', 'Risks']
 
   for (const section of sections) {
     const data = sectionData[section]
@@ -129,18 +134,34 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
         console.log(`[council-scorer] ${section}: ${councilScore.score}/10 (council)`)
       } catch (err) {
         console.error(`[council-scorer] ${section} council scoring failed:`, (err as Error).message)
-        // SCORE-002 (2026-05-07): emit score=-1 sentinel when the council
-        // couldn't score a section. Renderer shows "—" and the average
-        // calc excludes it. Previous default of 5 was indistinguishable
-        // from a genuine mid-quality score and masked real failures.
-        scores.push({
-          section,
-          score: -1,
-          criteria_scores: [],
-          overall_reasons: [`Council scoring failed: ${(err as Error).message}`],
-          code_change_recommendations: ['Re-run the council for this section once OpenRouter credit + judge availability are restored.'],
-          source_attributions: [],
-        } as any)
+        // SCORE-005 (2026-05-07): Suppliers + Risks have a reliable
+        // deterministic scorer — fall back to it when council fails.
+        // Brief / BOM / Cost have no meaningful deterministic fallback
+        // (content-quality can't be keyword-counted), so they get the
+        // SCORE-002 "failed to score" sentinel instead.
+        if (section === 'Suppliers' || section === 'Risks') {
+          const detScore = deterministicScore(section, data)
+          scores.push({
+            ...detScore,
+            overall_reasons: [
+              `Council failed: ${(err as Error).message}`,
+              ...(detScore.overall_reasons || []),
+            ],
+          })
+          console.log(`[council-scorer] ${section}: ${detScore.score}/10 (deterministic fallback after council failure)`)
+        } else {
+          // SCORE-002: emit score=-1 sentinel when the council couldn't
+          // score a section. Renderer shows "—" and the average calc
+          // excludes it.
+          scores.push({
+            section,
+            score: -1,
+            criteria_scores: [],
+            overall_reasons: [`Council scoring failed: ${(err as Error).message}`],
+            code_change_recommendations: ['Re-run the council for this section once OpenRouter credit + judge availability are restored.'],
+            source_attributions: [],
+          } as any)
+        }
       }
     } else {
       // Deterministic scoring for lower-impact sections

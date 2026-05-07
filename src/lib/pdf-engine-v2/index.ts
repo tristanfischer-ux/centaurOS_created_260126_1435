@@ -23,6 +23,7 @@ import { runAllGates } from './validators'
 import { scoreAllSections } from './scorer'
 import { runCouncilScoring } from './council-scorer'
 import { scoreReport, computeCompoundScore } from './score-rubric'
+import { recordScoringRun, deriveBriefLabel } from './lib/scoring-history'
 import { validateR290Safety } from './lib/r290-safety'
 import { validateCosts } from './lib/cost-constraints'
 import { classifyProduct, getRequiredFields } from './product-classifier'
@@ -521,6 +522,27 @@ export async function runPipeline(
       console.log(
         `[pipeline] COMPOUND score: ${compound.compound}/100 (rubric only — no council signal; ${compound.councilFailed} sections failed to score)`
       )
+    }
+
+    // SCORE-004 (2026-05-07): append this run to the cross-run history
+    // file + regenerate the auto-refreshing HTML dashboard. Zero-cost,
+    // local only. Lets Tristan see trends across N runs without re-running
+    // the engine manually per brief.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: compound.compound,
+        rubric: compound.rubric,
+        councilAvg: compound.councilAvg,
+        councilScored: compound.councilScored,
+        councilFailed: compound.councilFailed,
+        sections: councilScoresForCompound,
+      })
+      console.log(`[pipeline] scoring history updated — dashboard at ~/Downloads/engine-evidence/scoring-dashboard.html`)
+    } catch (err) {
+      console.warn(`[pipeline] scoring history write failed: ${(err as Error).message}`)
     }
   } catch (err) {
     console.log('[pipeline] Reference scoring failed:', (err as Error).message)
