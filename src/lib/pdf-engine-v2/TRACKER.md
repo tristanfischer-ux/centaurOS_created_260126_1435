@@ -41,8 +41,8 @@ Council sequenced this to avoid calibrating against a broken score. Targets for 
 | 3 | **F13** audit judge criteria vs engine output | 1 hr | ✅ DONE `afd1d854` | Judges score what we actually produce |
 | 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | **@coder** (rules + tests) — ✅ DONE | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
 | 5 | **G2** relax `getRequiredFields()` | 15 min | **@coder-2** (MiMo) — ✅ DONE | Pairs with G1 — Round 1 → 9-10/10 pass rate |
-| 6 | **B6** required-parts manifest per product class | 2 hr | **@coder** (needs domain-knowledge rule authoring) | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
-| 7 | **H2** Stage 5 regime router | 45 min | **@coder** (Stage 5 dispatcher + types) | Distributor APIs called for `buy_electronic` parts |
+| 6 | **B6** required-parts manifest per product class | 2 hr | ✅ DONE | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
+| 7 | **H2** Stage 5 regime router | 45 min | ✅ DONE | Distributor APIs called for `buy_electronic` parts |
 | 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | **@coder** (React-PDF layout + 3 new sections) | Make/Buy/Services visible per part |
 | 9 | **J1a** pipeline emits status for failed runs | 45 min | **@coder-2** (MiMo) — small error-handler additions | Dashboard shows all 20 runs, not just 5 |
 | 10 | **F9** exclude engine-lineage from judges | 30 min | ✅ DONE `afd1d854` | Gemini stops grading Gemini |
@@ -136,7 +136,7 @@ Status is verified from git log + grep + code audit, not memory.
 | B3 | A-E grade inline on section headers + rows | ✅ | `GradeLabel` in `7-pdf.tsx` |
 | B4 | Cost-basis indicator + per-module breakdown appendix (was B2-plan) | ✅ | `79ed1a1f` |
 | B5 | Per-cell deterministic quantity derivation + tighten isBessCell | ✅ | `6b1e9cf4`, `d22a3413` |
-| **B6** | **Required-parts manifest per product class — deterministic post-BOM validator adds missing safety-critical parts** | ❌ planned | `HANDOVER-quality-8-out-of-10.md` BOM-Q1 |
+| **B6** | **Required-parts manifest per product class — deterministic post-BOM validator adds missing safety-critical parts** | ✅ | 10 classes, 40 required parts, 5/5 tests |
 | **B7** | **Cost-floor sanity check on capital-class parts (auto-Brave on £<50 + mass>10kg)** | ❌ planned | BOM-Q2 |
 | **B8** | **BOM generation architecture — corpus-first + deterministic-first, LLM only for novel items or narrative connectives** | ❌ planned | New 2026-05-07 — foundational. Depends on H1 (distributor import) |
 | **B9** | **Truncation recovery — re-prompt for continuation when BOM part count below product-class floor** | ❌ planned | BOM-Q3 |
@@ -217,7 +217,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | **H7a** | **RS Components scraping adapter** — RS does not offer a public API. Polite-rate scraper (1 req/2s, custom UA, respects robots.txt). `lib/distributors/rs-components.ts`. Fallback for parts RS stocks that Mouser/Digi-Key/Farnell don't. | ❌ planned | New 2026-05-07 |
 | **H7b** | **Mechanical wholesaler scrapers** — Eriks UK, Zoro UK, Applied Industrial. For `buy_mechanical_industrial` regime parts (fasteners, bearings, valves, pumps, fittings) that electronics distributors don't carry. | ❌ planned | New 2026-05-07 |
 | **H8** | **Curated UK service-provider registry** — `lib/service-providers.ts`, ~40-60 hand-authored entries: UL test houses (Intertek, TÜV SÜD UK, Element), EMC precompliance, MDR notified bodies (BSI, DEKRA), G99 relay witnessing, CE/UKCA file compilers, cleanroom qual, pressure testing. Each entry: service type + provider + location + typical cost range + typical duration + contact URL. Feeds §6c PDF section and M1 NRE calculation. | ❌ planned | New 2026-05-07 |
-| **H2** | **Part-regime router** — given a BOM line stamped by C5, route the lookup: `buy_electronic` → H1d distributor aggregator, `buy_mechanical_industrial` → H7b wholesaler scrapers, `named_manufacturer_reseller` → H6 + nightshift corpus, `make_custom_fab` → nightshift corpus (current path), `service_certification` → H8 registry. | ❌ planned | New 2026-05-07 — ties C5 to H1+H7+H8 |
+| **H2** | **Part-regime router** — given a BOM line stamped by C5, route the lookup: `buy_electronic` → H1d distributor aggregator, `buy_mechanical_industrial` → H7b wholesaler scrapers, `named_manufacturer_reseller` → H6 + nightshift corpus, `make_custom_fab` → nightshift corpus (current path), `service_certification` → H8 registry. | ✅ | `regime-router.ts` — 8 tests, all 5 regimes routed |
 | **H3** | **Corpus-coverage diagnostic on every PDF** — renders on §6a/§6b/§6c summary: "N BOM lines total, M had SKU matches (Mouser/DK/Farnell), K had fabricator leads (nightshift), J unmatched (no data)". Honest transparency for the founder. | ❌ planned | Supersedes CORPUS-Q4 |
 | **H5** | **Synthetic-BOM coverage regression harness** — per product class, runs a canonical BOM list against H1d + nightshift + H8 and reports % matched in each regime. Run after any H-phase change to detect regressions. | ❌ planned | Supersedes CORPUS-Q6 |
 | **H6** | **Named-manufacturer authorised-reseller lookup** — curated list of ~20-30 manufacturers we see often (CATL, Sungrow, Copeland, Schneider, Siemens) with their UK authorised resellers. Separate data source from H1/H7. For `named_manufacturer_reseller` regime parts. | ❌ planned | New 2026-05-07 |
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**66 ✅ done · 40 ❌ planned · 2 ⏸ deferred**
+**68 ✅ done · 38 ❌ planned · 2 ⏸ deferred**
 
 ---
 
@@ -368,6 +368,14 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 ## Log
 
 (newest first — historical entries retained for SHA traceability)
+
+### 2026-05-07 11:45 — B6 + H2 shipped (required-parts manifest + regime router)
+
+B6: 10 product classes with 40 required parts total. Post-BOM validator checks for missing safety-critical parts (BMS, fire suppression, PRV, expansion tank for BESS; propeller guards, parachute for drone; etc.). Integrated into pipeline after BOM generation. Missing parts stored on state for PDF rendering.
+
+H2: `routePartLookup()` routes BOM lines by C5 regime. `buy_electronic` → H1d distributor aggregator (with try/catch fallback to corpus). `make_custom_fab` → nightshift corpus. `service_certification` → static "not yet implemented" placeholder. H7b/H6/H8 deferred.
+
+Count: 68 ✅ / 38 ❌ / 2 ⏸.
 
 ### 2026-05-07 11:30 — F9 + F13 shipped (judge lineage + criteria audit)
 

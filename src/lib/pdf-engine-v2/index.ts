@@ -249,6 +249,22 @@ export async function runPipeline(
       recoverable: false,
     }
     console.error(`[pipeline] Research failed: ${researchResult.error}. Producing error PDF.`)
+    // J1a: emit scoring record so the dashboard shows this run as failed.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: -1,
+        rubric: -1,
+        councilAvg: null,
+        councilScored: 0,
+        councilFailed: 0,
+        sections: [],
+        formulaVersion: 'f7',
+        status: 'PIPELINE_ERROR',
+      })
+    } catch { /* scoring history is non-critical */ }
     return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.research = researchResult.data
@@ -276,6 +292,22 @@ export async function runPipeline(
   if (!briefValidationPost.isValid) {
     console.log('[pipeline] BRIEF INCOMPLETE — generating short blocked report')
     console.log(`[pipeline] Missing fields: ${briefValidationPost.missingRequired.join(', ')}`)
+    // J1a: emit scoring record so the dashboard shows this run as failed.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: -1,
+        rubric: -1,
+        councilAvg: null,
+        councilScored: 0,
+        councilFailed: 0,
+        sections: [],
+        formulaVersion: 'f7',
+        status: 'BRIEF_INCOMPLETE',
+      })
+    } catch { /* scoring history is non-critical */ }
     // Skip all stages, go straight to PDF
   } else {
   // ── Feasibility Gate ───────────────────────────────────────────────
@@ -301,7 +333,22 @@ export async function runPipeline(
   if (feasibility.status === 'RED') {
     console.log('[pipeline] FEASIBILITY RED — generating short blocked report')
     console.log(`[pipeline] Blocked reasons: ${feasibility.blockers.join('; ')}`)
-    
+    // J1a: emit scoring record so the dashboard shows this run as failed.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: -1,
+        rubric: -1,
+        councilAvg: null,
+        councilScored: 0,
+        councilFailed: 0,
+        sections: [],
+        formulaVersion: 'f7',
+        status: 'INFEASIBLE',
+      })
+    } catch { /* scoring history is non-critical */ }
     // Skip: decompose, sizing, BOM, cost, suppliers, review
     // Go straight to PDF with decision page
   } else {
@@ -322,6 +369,22 @@ export async function runPipeline(
       recoverable: false,
     }
     console.error(`[pipeline] Decompose failed: ${decomposeResult.error}. Producing error PDF.`)
+    // J1a: emit scoring record so the dashboard shows this run as failed.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: -1,
+        rubric: -1,
+        councilAvg: null,
+        councilScored: 0,
+        councilFailed: 0,
+        sections: [],
+        formulaVersion: 'f7',
+        status: 'PIPELINE_ERROR',
+      })
+    } catch { /* scoring history is non-critical */ }
     return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.modules = decomposeResult.data
@@ -347,6 +410,22 @@ export async function runPipeline(
   const isInfeasible = sizeResult.ok && sizeResult.data && !sizeResult.data.feasible
   if (isInfeasible) {
     console.log('[pipeline] Sizing INFEASIBLE — skipping all downstream stages')
+    // J1a: emit scoring record so the dashboard shows this run as failed.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: -1,
+        rubric: -1,
+        councilAvg: null,
+        councilScored: 0,
+        councilFailed: 0,
+        sections: [],
+        formulaVersion: 'f7',
+        status: 'INFEASIBLE',
+      })
+    } catch { /* scoring history is non-critical */ }
     // Skip to PDF generation directly (skips BOM, cost, suppliers, review, polish)
   } else {
     // ── Stage 4: BOM + Cost ────────────────────────────────────────────
@@ -376,6 +455,22 @@ export async function runPipeline(
       recoverable: true,  // Research + modules survive; cost & suppliers drop.
     }
     console.error(`[pipeline] BOM failed: ${bomResult.error}. Producing error PDF with partial state.`)
+    // J1a: emit scoring record so the dashboard shows this run as failed.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: -1,
+        rubric: -1,
+        councilAvg: null,
+        councilScored: 0,
+        councilFailed: 0,
+        sections: [],
+        formulaVersion: 'f7',
+        status: 'PIPELINE_ERROR',
+      })
+    } catch { /* scoring history is non-critical */ }
     return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.parts = bomResult.data.parts
@@ -432,6 +527,22 @@ export async function runPipeline(
       recoverable: true,
     }
     console.log(`[pipeline] Critical gate failure: ${criticalFail.gate}. Producing error PDF with partial state.`)
+    // J1a: emit scoring record so the dashboard shows this run as failed.
+    try {
+      recordScoringRun({
+        timestamp: new Date().toISOString(),
+        projectId: state.projectId,
+        briefLabel: deriveBriefLabel(state.projectId),
+        compound: -1,
+        rubric: -1,
+        councilAvg: null,
+        councilScored: 0,
+        councilFailed: 0,
+        sections: [],
+        formulaVersion: 'f7',
+        status: 'PIPELINE_ERROR',
+      })
+    } catch { /* scoring history is non-critical */ }
     return await generateErrorPdf(state, stages, llmCalls, startTime, gateResults)
   }
 

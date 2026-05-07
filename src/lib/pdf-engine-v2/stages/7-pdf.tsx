@@ -1,6 +1,7 @@
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { benchmarkCheck, PROJECT_BENCHMARKS } from '../benchmarks'
+import { classifyRegime } from '../lib/part-regime'
 import { normaliseState } from '../lib/safe-state'
 import type { 
   PipelineState, 
@@ -1642,199 +1643,138 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
   )
 }
 
-// B3 FIX (2026-05-06): Supplier Shortlist — one-page-per-chunk summary of
-// every unique supplier the pipeline matched, pulled from state.suppliers
-// (populated by the local Nightshift corpus in Stage 5). Shows the richer
-// enrichment data (certifications, process capabilities, country/city) that
-// doesn't fit in the BOM's narrow supplier column.
-const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
-  const rawSuppliers = state.suppliers || []
-  if (rawSuppliers.length === 0) {
-    return (
-      <Page size="A4" style={s.page}>
-        <Text style={s.h1}>6. Supplier Shortlist <GradeLabel grade="D" /></Text>
-        <Text style={s.para}>No supplier matches produced by Stage 5.</Text>
-        <PageFooter section="6. Suppliers" />
-      </Page>
-    )
-  }
-
-  // Dedupe suppliers across parts by name — each supplier often matched
-  // several parts. Keep the best-matching part cite per supplier.
-  type RolledSupplier = {
-    name: string
-    country?: string
-    url?: string
-    certifications?: string[]
-    processes?: string[]
-    reason?: string
-    partsMatched: string[]
-    bestScore: number
-    // C4 (2026-05-06): strongest process-match verification across all
-    // parts this supplier was matched to.
-    processMatch?: 'process+material' | 'process' | 'material' | 'unverified'
-  }
-  const seen = new Map<string, RolledSupplier>()
-  const matchRank: Record<string, number> = {
-    'process+material': 3, 'process': 2, 'material': 1, 'unverified': 0,
-  }
-  for (const sm of rawSuppliers) {
-    for (const sup of sm.suppliers || []) {
-      const key = sup.name
-      const existing = seen.get(key)
-      const supMatch = (sup as any).processMatch as RolledSupplier['processMatch']
-      if (existing) {
-        existing.partsMatched.push(sm.partName)
-        if (sup.score > existing.bestScore) existing.bestScore = sup.score
-        // Keep the strongest match verification.
-        if (supMatch && (matchRank[supMatch] ?? 0) > (matchRank[existing.processMatch || 'unverified'] ?? 0)) {
-          existing.processMatch = supMatch
-        }
-      } else {
-        seen.set(key, {
-          name: sup.name,
-          country: sup.country,
-          url: sup.url,
-          certifications: sup.certifications,
-          processes: sup.processes,
-          reason: sup.reason,
-          partsMatched: [sm.partName],
-          bestScore: sup.score,
-          processMatch: supMatch,
-        })
-      }
-    }
-  }
-  const rolled = Array.from(seen.values()).sort((a, b) => b.bestScore - a.bestScore)
-
-  // Chunk into pages of 6 suppliers to avoid overflow.
-  const PAGE_SIZE = 6
-  const pages: RolledSupplier[][] = []
-  for (let i = 0; i < rolled.length; i += PAGE_SIZE) {
-    pages.push(rolled.slice(i, i + PAGE_SIZE))
-  }
+// §6a PARTS TO BUY
+const SupplierBuySection = ({ state }: { state: PipelineState }) => {
+  const parts = state.parts || []
+  const electronicParts = parts.filter(p => (p.regime || classifyRegime(p).regime) === 'buy_electronic')
+  const partsWithDistributor = electronicParts.filter(p => p.regimeRouterResult?.source === 'distributor')
 
   return (
-    <>
-      {pages.map((page, pageIdx) => (
-        <Page key={pageIdx} size="A4" style={s.page}>
-          {pageIdx === 0 && (
-            <>
-              <Text style={s.h1}>6. Supplier Shortlist <GradeLabel grade="B" label="local corpus" /></Text>
-              <Text style={{ ...s.para, color: MUTED, fontSize: 10, marginBottom: 8 }}>
-                {rolled.length} unique UK/EU suppliers matched against {rawSuppliers.length} BOM parts
-                via semantic search over the local Nightshift corpus
-                (13,771 embedded suppliers, OpenAI text-embedding-3-small 1536-dim).
-                Sorted by best-match similarity score descending.
-              </Text>
-            </>
-          )}
-          {pageIdx > 0 && (
-            <Text style={s.h2}>Supplier Shortlist — page {pageIdx + 1}</Text>
-          )}
-
-          {page.map((sup, i) => {
-            // C4 (2026-05-06): unverified supplier gets a red border and
-            // a 'not-verified' tag. Verified-process+material gets a
-            // green 'verified' tag. Amber for one-of-two.
-            const matchLabel = {
-              'process+material': { text: 'verified', colour: GREEN },
-              'process':          { text: 'process-only', colour: AMBER },
-              'material':         { text: 'material-only', colour: AMBER },
-              'unverified':       { text: 'unverified', colour: RED },
-            }[sup.processMatch || 'unverified']
-
-            // Override the left-border colour when unverified so the
-            // reader sees the red strip regardless of similarity score.
-            const leftBorderColour = sup.processMatch === 'unverified'
-              ? RED
-              : (sup.bestScore >= 0.6 ? GREEN : sup.bestScore >= 0.4 ? AMBER : BORDER_DARK)
-
+    <Page size="A4" style={s.page}>
+      <Text style={s.h1}>6a. Supplier Shortlist: Parts to Buy <GradeLabel grade="A" label="distributor APIs" /></Text>
+      
+      {partsWithDistributor.length === 0 ? (
+        <View style={s.calloutAmber}>
+          <Text style={s.para}>No distributor matches found — electronic parts may need manual sourcing.</Text>
+        </View>
+      ) : (
+        <View style={s.tableWrap}>
+          <View style={s.tHead}>
+            <Text style={{ ...s.tHC, width: '25%' }}>Part Name</Text>
+            <Text style={{ ...s.tHC, width: '15%' }}>MPN</Text>
+            <Text style={{ ...s.tHC, width: '15%' }}>Supplier</Text>
+            <Text style={{ ...s.tHC, width: '15%', textAlign: 'right' }}>Price (£)</Text>
+            <Text style={{ ...s.tHC, width: '15%', textAlign: 'right' }}>Stock</Text>
+            <Text style={{ ...s.tHC, width: '15%' }}>Datasheet</Text>
+          </View>
+          {partsWithDistributor.map((p, i) => {
+            const rr = p.regimeRouterResult!
             return (
-            <View
-              key={i}
-              style={{
-                marginBottom: 10,
-                padding: 10,
-                backgroundColor: i % 2 === 0 ? '#fafafa' : '#ffffff',
-                borderLeftWidth: 2,
-                borderLeftColor: leftBorderColour,
-              }}
-              wrap={false}
-            >
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
-                <Text style={{ fontSize: 12, fontWeight: 'bold', color: INK_DARK, flexGrow: 1 }}>
-                  {formatText(sup.name)}
-                  {sup.country ? <Text style={{ fontSize: 10, color: MUTED, fontWeight: 'normal' }}>  ({sup.country})</Text> : null}
-                </Text>
-                <View style={{
-                  paddingHorizontal: 6,
-                  paddingVertical: 2,
-                  borderRadius: 2,
-                  backgroundColor: matchLabel.colour,
-                  marginRight: 6,
-                }}>
-                  <Text style={{ fontSize: 8, color: '#fff', fontFamily: 'Helvetica-Bold' }}>
-                    {matchLabel.text}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 9, color: MUTED }}>
-                  sim {sup.bestScore.toFixed(2)} · {sup.partsMatched.length} part{sup.partsMatched.length > 1 ? 's' : ''}
-                </Text>
+              <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                <Text style={{ ...s.tC, width: '25%', fontWeight: 'bold' }}>{formatText(p.name)}</Text>
+                <Text style={{ ...s.tC, width: '15%' }}>{formatText(rr.sku)}</Text>
+                <Text style={{ ...s.tC, width: '15%' }}>{formatText(rr.supplier)}</Text>
+                <Text style={{ ...s.tC, width: '15%', textAlign: 'right' }}>{formatGBP(rr.priceGbp)}</Text>
+                <Text style={{ ...s.tC, width: '15%', textAlign: 'right' }}>{formatNumber(rr.stockQty)}</Text>
+                <Text style={{ ...s.tC, width: '15%' }}>{rr.datasheetUrl ? 'Available' : 'N/A'}</Text>
               </View>
-
-              {(sup.certifications && sup.certifications.length > 0) && (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 3 }}>
-                  <Text style={{ fontSize: 9, color: MUTED, marginRight: 4 }}>Certs:</Text>
-                  {sup.certifications.slice(0, 6).map((c, ci) => (
-                    <View key={ci} style={{ backgroundColor: '#eef2ff', paddingHorizontal: 4, paddingVertical: 1, marginRight: 4, marginBottom: 2 }}>
-                      <Text style={{ fontSize: 8, color: '#3730a3' }}>{formatText(c).slice(0, 40)}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {(sup.processes && sup.processes.length > 0) && (
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginBottom: 3 }}>
-                  <Text style={{ fontSize: 9, color: MUTED, marginRight: 4 }}>Capabilities:</Text>
-                  {sup.processes.slice(0, 5).map((p, pi) => (
-                    <View key={pi} style={{ backgroundColor: '#ecfdf5', paddingHorizontal: 4, paddingVertical: 1, marginRight: 4, marginBottom: 2 }}>
-                      <Text style={{ fontSize: 8, color: '#065f46' }}>{formatText(p).slice(0, 40)}</Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-              {sup.reason && (
-                <Text style={{ fontSize: 9, color: INK, marginTop: 2, lineHeight: 1.3 }}>
-                  {formatText(sup.reason).slice(0, 280)}
-                </Text>
-              )}
-
-              <Text style={{ fontSize: 8, color: MUTED, marginTop: 3 }}>
-                Matched to: {sup.partsMatched.slice(0, 3).map(x => formatText(x).slice(0, 40)).join(' · ')}
-                {sup.partsMatched.length > 3 ? ` + ${sup.partsMatched.length - 3} more` : ''}
-              </Text>
-              {sup.url && (
-                <Text style={{ fontSize: 8, color: BLUE, marginTop: 2 }}>{sup.url}</Text>
-              )}
-            </View>
             )
           })}
+        </View>
+      )}
+      <SourceFooter sources={[{ type: 'API', detail: 'Distributor API Aggregator (H1d)' }]} overallGrade="A" />
+      <PageFooter section="6a. Parts to Buy" />
+    </Page>
+  )
+}
 
-          {pageIdx === pages.length - 1 && (
-            <SourceFooter
-              sources={[
-                { type: 'Local corpus', detail: 'Nightshift supplier database (13,771 embedded companies)' },
-                { type: 'Semantic search', detail: 'OpenAI text-embedding-3-small, cosine min 0.30' },
-              ]}
-              overallGrade="B"
-            />
-          )}
-          <PageFooter section={`6. Suppliers — page ${pageIdx + 1}`} />
-        </Page>
-      ))}
-    </>
+// §6b PARTS TO MAKE
+const SupplierMakeSection = ({ state }: { state: PipelineState }) => {
+  const parts = state.parts || []
+  const makeParts = parts.filter(p => (p.regime || classifyRegime(p).regime) === 'make_custom_fab')
+
+  const byProcess = new Map<string, Part[]>()
+  for (const p of makeParts) {
+    const proc = p.process || 'Unspecified Process'
+    if (!byProcess.has(proc)) byProcess.set(proc, [])
+    byProcess.get(proc)!.push(p)
+  }
+
+  const suppliers = state.suppliers || []
+  
+  return (
+    <Page size="A4" style={s.page}>
+      <Text style={s.h1}>6b. Supplier Shortlist: Parts to Make <GradeLabel grade="B" label="local corpus" /></Text>
+
+      {makeParts.length === 0 ? (
+        <Text style={s.para}>No fabricated parts identified in this design.</Text>
+      ) : (
+        Array.from(byProcess.entries()).map(([process, processParts], idx) => (
+          <View key={idx} style={{ marginBottom: 16 }} wrap={false}>
+            <Text style={s.h2}>{formatText(process)}</Text>
+            {processParts.map((p, pIdx) => {
+              const supMatch = suppliers.find(s => s.partId === p.id || s.partName === p.name)
+              const topSupplier = supMatch?.suppliers?.[0]
+
+              return (
+                <View key={pIdx} style={{ marginBottom: 8 }}>
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: INK_DARK }}>{formatText(p.name)}</Text>
+                  {topSupplier ? (
+                    <Text style={{ fontSize: 9, color: MUTED }}>
+                      Supplier: {formatText(topSupplier.name)} (sim {topSupplier.score.toFixed(2)})
+                    </Text>
+                  ) : (
+                    <Text style={{ fontSize: 9, color: RED }}>No fabricator matches found in local corpus.</Text>
+                  )}
+                </View>
+              )
+            })}
+          </View>
+        ))
+      )}
+      <SourceFooter sources={[{ type: 'Local corpus', detail: 'Nightshift supplier database' }, { type: 'Semantic search', detail: 'OpenAI embeddings' }]} overallGrade="B" />
+      <PageFooter section="6b. Parts to Make" />
+    </Page>
+  )
+}
+
+// §6c SERVICES & CERTIFICATION
+const SupplierServiceSection = ({ state }: { state: PipelineState }) => {
+  const parts = state.parts || []
+  const serviceParts = parts.filter(p => (p.regime || classifyRegime(p).regime) === 'service_certification')
+
+  const suppliers = state.suppliers || []
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Text style={s.h1}>6c. Supplier Shortlist: Services &amp; Certification <GradeLabel grade="D" label="registry" /></Text>
+
+      {serviceParts.length === 0 ? (
+        <Text style={s.para}>No services or certification testing identified in this design.</Text>
+      ) : (
+        <View style={s.tableWrap}>
+          <View style={s.tHead}>
+            <Text style={{ ...s.tHC, width: '40%' }}>Service Type</Text>
+            <Text style={{ ...s.tHC, width: '60%' }}>Provider</Text>
+          </View>
+          {serviceParts.map((p, i) => {
+            const supMatch = suppliers.find(s => s.partId === p.id || s.partName === p.name)
+            const topSupplier = supMatch?.suppliers?.[0]
+            
+            return (
+              <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                <Text style={{ ...s.tC, width: '40%', fontWeight: 'bold' }}>{formatText(p.name)}</Text>
+                <Text style={{ ...s.tC, width: '60%', color: topSupplier ? INK : AMBER }}>
+                  {topSupplier ? formatText(topSupplier.name) : 'Service provider registry not yet implemented — use manual lookup for UL, EMC, MDR, G99 test houses.'}
+                </Text>
+              </View>
+            )
+          })}
+        </View>
+      )}
+      <SourceFooter sources={[{ type: 'Static', detail: 'UK test house registry (H8 placeholder)' }]} overallGrade="D" />
+      <PageFooter section="6c. Services & Certification" />
+    </Page>
   )
 }
 
@@ -2110,7 +2050,9 @@ export default function PdfRenderer({ state }: { state: PipelineState }) {
       <SafeSection name="Sizing"><SizingSection state={safe} /></SafeSection>
       <SafeSection name="Modules"><ModulesSection state={safe} /></SafeSection>
       <SafeSection name="Cost Waterfall"><CostWaterfallSection state={safe} /></SafeSection>
-      <SafeSection name="Supplier Shortlist"><SupplierShortlistSection state={safe} /></SafeSection>
+      <SafeSection name="Supplier Shortlist: Parts to Buy"><SupplierBuySection state={safe} /></SafeSection>
+      <SafeSection name="Supplier Shortlist: Parts to Make"><SupplierMakeSection state={safe} /></SafeSection>
+      <SafeSection name="Supplier Shortlist: Services"><SupplierServiceSection state={safe} /></SafeSection>
       <SafeSection name="Risks"><RisksSection state={safe} /></SafeSection>
       <SafeSection name="Source Attribution"><SourceAttributionSection state={safe} /></SafeSection>
       <SafeSection name="Audit Log"><AuditLogSection state={safe} /></SafeSection>

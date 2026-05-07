@@ -29,6 +29,8 @@ import { homedir } from 'os'
 const HISTORY_PATH = join(homedir(), 'Downloads/engine-evidence/scoring-history.jsonl')
 const DASHBOARD_PATH = join(homedir(), 'Downloads/engine-evidence/scoring-dashboard.html')
 
+export type PipelineStatus = 'COMPLETED' | 'BRIEF_INCOMPLETE' | 'INFEASIBLE' | 'PIPELINE_ERROR'
+
 export interface ScoringRecord {
   timestamp: string
   projectId: string
@@ -46,6 +48,12 @@ export interface ScoringRecord {
    * so trend sparklines aren't misleading.
    */
   formulaVersion?: string
+  /**
+   * J1a (2026-05-07): pipeline outcome status. 'COMPLETED' (or absent) means
+   * the full pipeline ran. Failed statuses indicate the pipeline short-circuited
+   * and the record carries sentinel scores (compound/rubric = -1).
+   */
+  status?: PipelineStatus
 }
 
 /**
@@ -98,24 +106,38 @@ function regenerateDashboard(): void {
 
   const briefCards = Array.from(byBrief.entries()).map(([label, runs]) => {
     const latest = runs[runs.length - 1]
-    const tileColour = latest.compound >= 70 ? '#16a34a' :
-      latest.compound >= 50 ? '#ea580c' : '#dc2626'
+    const isFailed = !!latest.status && latest.status !== 'COMPLETED'
+    const tileColour = isFailed
+      ? (latest.status === 'INFEASIBLE' ? '#ea580c' : '#dc2626')
+      : latest.compound >= 70 ? '#16a34a' :
+        latest.compound >= 50 ? '#ea580c' : '#dc2626'
+    const statusLabel = isFailed
+      ? latest.status!.replace(/_/g, ' ')
+      : null
 
-    // sparkline of the last N compound scores
+    // sparkline of the last N compound scores (skip sentinel -1 values)
     const w = 200
     const h = 40
-    const scoresArr = runs.map(r => r.compound)
-    const min = Math.min(...scoresArr)
-    const max = Math.max(...scoresArr)
-    const range = Math.max(1, max - min)
-    const points = scoresArr.map((s, i) => {
-      const x = (i / Math.max(1, scoresArr.length - 1)) * w
-      const y = h - ((s - min) / range) * h
-      return `${x.toFixed(1)},${y.toFixed(1)}`
-    }).join(' ')
+    const completedRuns = runs.filter(r => !r.status || r.status === 'COMPLETED')
+    const scoresArr = completedRuns.map(r => r.compound).filter(s => s >= 0)
+    const sparklineSvg = scoresArr.length >= 2
+      ? (() => {
+          const min = Math.min(...scoresArr)
+          const max = Math.max(...scoresArr)
+          const range = Math.max(1, max - min)
+          const points = scoresArr.map((s, i) => {
+            const x = (i / Math.max(1, scoresArr.length - 1)) * w
+            const y = h - ((s - min) / range) * h
+            return `${x.toFixed(1)},${y.toFixed(1)}`
+          }).join(' ')
+          return `<svg class="sparkline" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
+            <polyline fill="none" stroke="${isFailed ? '#a1a1aa' : tileColour}" stroke-width="2" points="${points}" />
+          </svg>`
+        })()
+      : `<div class="meta" style="margin:8px 0">Insufficient completed runs for trend</div>`
 
-    // section bar chart (latest run)
-    const sectionRows = (latest.sections || []).slice(0, 12).map(s => {
+    // section bar chart (latest run — empty for failed runs)
+    const sectionRows = isFailed ? '' : (latest.sections || []).slice(0, 12).map(s => {
       const pct = s.score < 0 ? 0 : (s.score / 10) * 100
       const colour = s.score < 0 ? '#a1a1aa' :
         s.score >= 7 ? '#16a34a' : s.score >= 5 ? '#ea580c' : '#dc2626'
@@ -129,26 +151,31 @@ function regenerateDashboard(): void {
       </div>`
     }).join('')
 
-    const trend = runs.length >= 2
-      ? (runs[runs.length - 1].compound - runs[0].compound)
+    const trend = completedRuns.length >= 2
+      ? (completedRuns[completedRuns.length - 1].compound - completedRuns[0].compound)
       : 0
-    const trendLabel = runs.length >= 2
-      ? `${trend >= 0 ? '+' : ''}${trend} vs ${runs.length} runs ago`
+    const trendLabel = completedRuns.length >= 2
+      ? `${trend >= 0 ? '+' : ''}${trend} vs ${completedRuns.length} runs ago`
       : 'first run'
+
+    const scoreDisplay = isFailed
+      ? `<div class="status-badge" style="background:${tileColour}">${escapeHtml(statusLabel!)}</div>`
+      : `<div class="big-score" style="background:${tileColour}">${latest.compound}/100</div>`
+    const metaLine = isFailed
+      ? `Pipeline status: <strong>${escapeHtml(statusLabel!)}</strong> · ${runs.length} total run${runs.length === 1 ? '' : 's'}`
+      : `Rubric ${latest.rubric} / 100 · Council ${latest.councilAvg === null ? '—' : latest.councilAvg.toFixed(1) + '/10'}`
+        + ` · ${latest.councilScored} scored, ${latest.councilFailed} failed`
+        + ` · ${trendLabel}`
 
     return `<div class="card">
       <div class="card-header">
         <h2>${escapeHtml(label)}</h2>
-        <div class="big-score" style="background:${tileColour}">${latest.compound}/100</div>
+        ${scoreDisplay}
       </div>
       <div class="meta">
-        Rubric ${latest.rubric} / 100 · Council ${latest.councilAvg === null ? '—' : latest.councilAvg.toFixed(1) + '/10'}
-        · ${latest.councilScored} scored, ${latest.councilFailed} failed
-        · ${trendLabel}
+        ${metaLine}
       </div>
-      <svg class="sparkline" viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg">
-        <polyline fill="none" stroke="${tileColour}" stroke-width="2" points="${points}" />
-      </svg>
+      ${sparklineSvg}
       <div class="sections">${sectionRows}</div>
       <div class="meta">Last run: ${escapeHtml(latest.timestamp)} · project ${escapeHtml(latest.projectId)}</div>
     </div>`
@@ -178,6 +205,7 @@ function regenerateDashboard(): void {
   .section-bar { height: 10px; transition: width 0.3s; }
   .section-score { text-align: right; font-weight: 600; font-size: 11px; }
   .refresh-pill { position: fixed; top: 16px; right: 24px; background: #ffedd5; color: #9a3412; font-size: 11px; padding: 4px 10px; border-radius: 12px; }
+  .status-badge { color: #fff; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 4px; letter-spacing: 0.02em; text-transform: uppercase; }
 </style>
 </head>
 <body>

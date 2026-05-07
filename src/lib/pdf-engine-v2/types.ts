@@ -146,6 +146,19 @@ export interface Part {
   envelopeZMm?: number
   estimatedUnitCostGbp?: number
   isPurchased?: boolean
+  regime?: 'buy_electronic' | 'buy_mechanical_industrial' | 'named_manufacturer_reseller' | 'make_custom_fab' | 'service_certification'
+  regimeRouterResult?: {
+    regime: string
+    source: 'distributor' | 'corpus' | 'registry' | 'none'
+    sku?: string
+    priceGbp?: number
+    supplier?: string
+    datasheetUrl?: string
+    stockQty?: number
+    leadTimeWeeks?: number
+    confidence: 'HIGH' | 'MEDIUM' | 'LOW'
+    notes: string
+  }
 }
 
 export interface BomLine {
