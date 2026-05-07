@@ -546,6 +546,15 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
 
   const verdict = (!targetCost || !unitCost) ? 'PENDING' : overTarget ? 'FEASIBLE BUT OVER BUDGET' : 'FEASIBLE'
 
+  // CX-001 (2026-05-06): pull the compactBanner computed by the
+  // feasibility gate and render it across the top of the cover. Gives
+  // the founder a one-line answer before they read anything else.
+  const feasibility = (state as any).feasibility as { status?: string; compactBanner?: string } | undefined
+  const bannerText = feasibility?.compactBanner
+  const bannerColour = feasibility?.status === 'RED' ? RED
+    : feasibility?.status === 'AMBER' ? AMBER
+    : GREEN
+
   return (
     <Page size="A4" style={s.coverPage}>
       <View style={s.coverBanner}>
@@ -553,6 +562,18 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
         <Text style={s.coverSubtitle}>Fractional Forge — Project {formatText(state.projectId)}</Text>
         <Text style={s.coverDate}>Generated: {new Date().toISOString().split('T')[0]}</Text>
       </View>
+      {bannerText && (
+        <View style={{
+          paddingVertical: 8,
+          paddingHorizontal: 16,
+          backgroundColor: bannerColour,
+          marginTop: -1,
+        }}>
+          <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: '#ffffff' }}>
+            {bannerText}
+          </Text>
+        </View>
+      )}
       <View style={s.coverContent}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 32 }}>
           <Text style={{ fontSize: 18, fontWeight: 'bold', color: INK_DARK }}>Economics Dashboard</Text>

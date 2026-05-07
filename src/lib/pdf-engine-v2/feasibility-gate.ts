@@ -14,6 +14,10 @@ export interface FeasibilityResult {
     engineeringWarning: string
     nextActions: string[]
   }
+  // CX-001 (2026-05-06): compact one-line banner for the cover + running
+  // header. Derived from status + the most material blocker / warning.
+  // Renderer shows it as a colour-coded pill.
+  compactBanner: string
 }
 
 export interface BriefValidationState {
@@ -53,7 +57,21 @@ export function determineFeasibility(
   
   // Sizing feasibility
   if (sizingResult.feasible === false) {
-    blockers.push('Sizing solver returned INFEASIBLE — modules do not fit in envelope')
+    // HP-003 (2026-05-06): upgrade the blocker wording so the founder sees
+    // what the solver actually tried, not just a generic 'INFEASIBLE'. For
+    // heat-pump/thermal_system paths A12 attempts monobloc before split;
+    // when both fail, the stale wording 'modules do not fit in envelope'
+    // understates the problem.
+    const pc = (productClass || '').toLowerCase()
+    if (pc.includes('heat_pump') || pc.includes('thermal')) {
+      blockers.push('Sizing returned INFEASIBLE on all heat-pump paths (monobloc + split + generic) — envelope cannot accommodate a 30 kW R290 circuit at the stated constraints')
+    } else if (pc.includes('battery') || pc.includes('energy_storage')) {
+      blockers.push('Sizing returned INFEASIBLE — rack/PCS/thermal modules do not fit in the stated container envelope')
+    } else if (pc.includes('farm') || pc.includes('vertical')) {
+      blockers.push('Sizing returned INFEASIBLE — growing rack + fertigation + climate modules exceed the stated footprint')
+    } else {
+      blockers.push('Sizing solver returned INFEASIBLE — modules do not fit in envelope')
+    }
   }
   
   // Cost reality check
@@ -133,6 +151,20 @@ export function determineFeasibility(
   } else if (warnings.length > 0) {
     reason = warnings.join('; ')
   }
+
+  // CX-001 (2026-05-06): build a concise status banner — one line, fits
+  // in a narrow header / cover pill. Most material issue wins the label.
+  const compactBanner = (() => {
+    if (status === 'RED') {
+      const first = blockers[0] || 'Brief incomplete'
+      return `INFEASIBLE — ${first.length > 80 ? first.slice(0, 77) + '...' : first}`
+    }
+    if (status === 'AMBER') {
+      const issue = warnings[0] || 'multiple warnings'
+      return `FEASIBLE WITH WARNINGS — ${issue.length > 60 ? issue.slice(0, 57) + '...' : issue}`
+    }
+    return 'FEASIBLE — all gates pass'
+  })()
   
   return {
     status,
@@ -150,5 +182,6 @@ export function determineFeasibility(
       engineeringWarning,
       nextActions,
     },
+    compactBanner,
   }
 }
