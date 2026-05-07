@@ -366,6 +366,35 @@ ${formatProcessesForPrompt(grounding.processes)}
     function heuristicCotsCost(name: string): number {
       const n = name.toLowerCase()
 
+      // ─── Known-expensive components (floor prices) ────────────────────
+      // Catch components that routinely cost $30k-80k but were landing at
+      // the £18 default. These are MINIMUM prices — the search/LLM pass
+      // that follows can still raise them.
+      const KNOWN_EXPENSIVE: Array<{ pattern: RegExp; minPrice: number; label: string }> = [
+        // Navigation / DVL
+        { pattern: /dvl|doppler velocity log/i, minPrice: 25000, label: 'DVL' },
+        { pattern: /phins|ixblue|exail/i, minPrice: 45000, label: 'FOG INS' },
+        { pattern: /ins|inertial navigation|fog/i, minPrice: 40000, label: 'INS' },
+        // Acoustic comms
+        { pattern: /acoustic modem|underwater.*comm/i, minPrice: 5000, label: 'Acoustic modem' },
+        // Pressure / subsea
+        { pattern: /syntactic foam/i, minPrice: 500, label: 'Syntactic foam' },
+        { pattern: /subconn|underwater.*connector/i, minPrice: 150, label: 'Subsea connector' },
+        // Semiconductors
+        { pattern: /fpga|xilinx|altera/i, minPrice: 50, label: 'FPGA' },
+        { pattern: /ambarella|qualcomm.*soc|nvidia.*jetson/i, minPrice: 100, label: 'SoC' },
+        // Sensors
+        { pattern: /sony.*imx|cmos.*sensor/i, minPrice: 50, label: 'Image sensor' },
+        // Batteries (large)
+        { pattern: /battery.*kwh|kwh.*battery/i, minPrice: 200, label: 'Large battery' },
+      ]
+      for (const { pattern, minPrice, label } of KNOWN_EXPENSIVE) {
+        if (pattern.test(n)) {
+          console.log(`[bom-cost:heuristic] Known-expensive match: "${name}" → ${label} (floor £${minPrice})`)
+          return minPrice
+        }
+      }
+
       // ─── Battery / BESS-specific ───────────────────────────────────────
       if (/prismatic|lfp|lithium|li-?ion/.test(n) && /cell/.test(n)) return 42   // CATL 280 Ah cell ~£42
       if (/battery module|cell module/.test(n)) return 250

@@ -355,12 +355,33 @@ const formatNumber = (num?: number | null, suffix = '') => {
 
 const formatGBP = (num?: number | null) => {
   if (isNullOrUndefined(num) || isNaN(num as number)) return 'Not computed'
-  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2 }).format(num as number)
+  const rounded = Math.round((num as number) * 100) / 100
+  return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(rounded)
 }
 
 const getRPN = (sev?: number, lik?: number, det?: number) => {
   if (!sev || !lik) return 0
   return sev * lik * (det || 1)
+}
+
+function extractBatchSizeFromBrief(text: string): number | undefined {
+  if (!text) return undefined
+  const match = text.match(/([\d,]+)\s*(?:\/year|per year|units|pcs|pieces)/i)
+  if (match) {
+    const v = parseInt(match[1].replace(/,/g, ''), 10)
+    if (!isNaN(v) && v > 0) return v
+  }
+  const match2 = text.match(/batch(?: size)?\s*(?:of)?\s*([\d,]+)/i)
+  if (match2) {
+    const v = parseInt(match2[1].replace(/,/g, ''), 10)
+    if (!isNaN(v) && v > 0) return v
+  }
+  const match3 = text.match(/^[\s\D]*([\d,]+)/)
+  if (match3) {
+    const v = parseInt(match3[1].replace(/,/g, ''), 10)
+    if (!isNaN(v) && v > 0) return v
+  }
+  return undefined
 }
 
 // ─── Components ────────────────────────────────────────────────────────────
@@ -1394,7 +1415,13 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
   const cb = state.costBreakdown
   const unitTotalGbp = cb?.unitTotalGbp
   const ceiling = cb?.ceilingGbp ?? state.research?.designBrief?.constraints?.unitCostCeilingGbp ?? null
-  const batchSize = parseInt(state.research?.designBrief?.quantityTarget || '25', 10) || 25
+  
+  const _brief = state.research?.designBrief
+  const batchSize = _brief?.constraints?.batchSize 
+    || extractBatchSizeFromBrief(_brief?.quantityTarget || '') 
+    || extractBatchSizeFromBrief(_brief?.mission || '') 
+    || extractBatchSizeFromBrief(_brief?.useCase || '') 
+    || 25
 
   // E1 FIX (2026-05-06): proper waterfall breakdown. The existing
   // overheadMultiplier (e.g. 1.5 for BESS) is a single number that hides
