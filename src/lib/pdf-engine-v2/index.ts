@@ -429,6 +429,9 @@ export async function runPipeline(
   console.log('\n[pipeline] === Stage 5: Suppliers ===')
   const supplierResult = await runSuppliers(state.parts, {
     domain: options?.domain || state.research.industryDomain,
+    // D3 (2026-05-06): product class drives domain-tag filtering so the
+    // corpus re-rank demotes obviously-wrong suppliers.
+    productClass: classification.productClass,
   })
   trackStage('suppliers', supplierResult)
   if (supplierResult.ok && supplierResult.data) {

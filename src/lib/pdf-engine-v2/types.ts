@@ -250,6 +250,10 @@ export interface SupplierMatch {
     // E4 (2026-05-06): companyId lets the PDF renderer fetch a datasheet-
     // backed snippet from the page_chunks corpus for top-10 BOM parts.
     companyId?: string
+    // D3 (2026-05-06): 20-tag domain taxonomy computed from the supplier's
+    // description. Stage 5 uses it to re-rank matches; PDF renderer can
+    // surface it for debug / audit.
+    domainTags?: string[]
     // E4: 1-2 sentence excerpt from this supplier's pages mentioning the
     // part. Populated inline by Stage 5 so the PDF renderer doesn't hit
     // the corpus on its own (keeps the renderer pure / local-only).

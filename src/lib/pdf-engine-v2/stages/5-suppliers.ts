@@ -9,6 +9,12 @@ import {
   partKeywords,
   isPageChunksAvailable,
 } from '../lib/page-chunks'
+import {
+  classifyDomain,
+  productClassToDomainTags,
+  tagIntersectionBoost,
+  type DomainTag,
+} from '../lib/domain-tags'
 
 const DELAY_MS = 500
 const BATCH_SIZE = 5
@@ -27,9 +33,16 @@ const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
  */
 export async function runSuppliers(
   parts: Part[],
-  options?: { domain?: string }
+  options?: { domain?: string; productClass?: string }
 ): Promise<StageResult<SupplierMatch[]>> {
   const start = Date.now()
+
+  // D3 (2026-05-06): compute required domain tags once per run so every
+  // semantic-hit supplier can be boosted / demoted by tag intersection.
+  const requiredTags = productClassToDomainTags(options?.productClass || options?.domain)
+  if (requiredTags.length > 0) {
+    console.log(`[suppliers] Required domain tags: ${requiredTags.join(', ')}`)
+  }
 
   try {
     const matches: SupplierMatch[] = []
@@ -51,11 +64,25 @@ export async function runSuppliers(
       if (embeddings && embeddings.length === parts.length) {
         for (let i = 0; i < parts.length; i++) {
           const part = parts[i]
-          const localHits = semanticSupplierSearch(embeddings[i], 5, 0.30)
+          const localHits = semanticSupplierSearch(embeddings[i], 8, 0.25)
           if (localHits && localHits.length > 0) {
-            matches.push(toSupplierMatch(part, localHits))
+            // D3: re-rank by tag intersection with the required product tags.
+            // Semantic similarity remains primary; tags break ties and demote
+            // obviously-wrong matches (aerospace shop hitting a BESS query).
+            const reranked = localHits
+              .map(h => ({
+                hit: h,
+                tags: classifyDomain(h.description),
+              }))
+              .map(({ hit, tags }) => ({
+                hit,
+                tags,
+                adjusted: hit.similarity * tagIntersectionBoost(tags, requiredTags),
+              }))
+              .sort((a, b) => b.adjusted - a.adjusted)
+              .slice(0, 5)
+            matches.push(toSupplierMatch(part, reranked.map(r => r.hit), reranked.map(r => r.tags)))
           } else {
-            // No strong local hit — fall back to Brave for this one part
             try {
               matches.push(await findSuppliersForPartViaBrave(part))
             } catch {
@@ -116,7 +143,11 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
     .map(d => d.embedding)
 }
 
-function toSupplierMatch(part: Part, hits: LocalSupplier[]): SupplierMatch {
+function toSupplierMatch(
+  part: Part,
+  hits: LocalSupplier[],
+  tagsByHit?: DomainTag[][],
+): SupplierMatch {
   // E4 (2026-05-06): attempt a datasheet-backed snippet from page_chunks
   // for the top supplier only (keeps corpus reads cheap — 1 per part × 200
   // row lookup × ~60 parts = ~12k rows total per run).
@@ -139,6 +170,9 @@ function toSupplierMatch(part: Part, hits: LocalSupplier[]): SupplierMatch {
         certifications: h.certifications,
         processes: h.processCapabilities.map(p => p.processName).filter(Boolean),
         companyId: h.companyId,
+        // D3 (2026-05-06): attach computed tags so future audit / debug
+        // passes can show which tags drove the re-rank.
+        domainTags: tagsByHit?.[idx] ?? [],
         datasheetSnippet: snippet
           ? {
               text: snippet.text,
