@@ -247,6 +247,17 @@ export interface SupplierMatch {
     // C2 FIX (2026-05-06): added fields to carry local-corpus enrichment
     certifications?: string[]
     processes?: string[]
+    // E4 (2026-05-06): companyId lets the PDF renderer fetch a datasheet-
+    // backed snippet from the page_chunks corpus for top-10 BOM parts.
+    companyId?: string
+    // E4: 1-2 sentence excerpt from this supplier's pages mentioning the
+    // part. Populated inline by Stage 5 so the PDF renderer doesn't hit
+    // the corpus on its own (keeps the renderer pure / local-only).
+    datasheetSnippet?: {
+      text: string
+      sourceUrl: string
+      relevance: number
+    }
   }>
 }
 

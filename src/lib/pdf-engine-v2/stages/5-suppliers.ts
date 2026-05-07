@@ -4,6 +4,11 @@ import {
   isLocalCorpusAvailable,
   type LocalSupplier,
 } from '../lib/local-corpus'
+import {
+  getPartSnippetFromSupplier,
+  partKeywords,
+  isPageChunksAvailable,
+} from '../lib/page-chunks'
 
 const DELAY_MS = 500
 const BATCH_SIZE = 5
@@ -112,19 +117,37 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 }
 
 function toSupplierMatch(part: Part, hits: LocalSupplier[]): SupplierMatch {
+  // E4 (2026-05-06): attempt a datasheet-backed snippet from page_chunks
+  // for the top supplier only (keeps corpus reads cheap — 1 per part × 200
+  // row lookup × ~60 parts = ~12k rows total per run).
+  const snippetEnabled = isPageChunksAvailable()
+  const keywords = partKeywords(part)
+
   return {
     partId: part.id || '',
     partName: part.name,
-    suppliers: hits.map(h => ({
-      name: h.name,
-      url: h.website || '',
-      reason: buildReason(h),
-      score: h.similarity,
-      country: h.country || undefined,
-      // B1a: pass certifications through so the renderer can show them
-      certifications: h.certifications,
-      processes: h.processCapabilities.map(p => p.processName).filter(Boolean),
-    })) as SupplierMatch['suppliers'],
+    suppliers: hits.map((h, idx) => {
+      const snippet = (snippetEnabled && idx === 0 && h.companyId)
+        ? getPartSnippetFromSupplier(h.companyId, keywords)
+        : null
+      return {
+        name: h.name,
+        url: h.website || '',
+        reason: buildReason(h),
+        score: h.similarity,
+        country: h.country || undefined,
+        certifications: h.certifications,
+        processes: h.processCapabilities.map(p => p.processName).filter(Boolean),
+        companyId: h.companyId,
+        datasheetSnippet: snippet
+          ? {
+              text: snippet.text,
+              sourceUrl: snippet.sourceUrl,
+              relevance: snippet.relevance,
+            }
+          : undefined,
+      }
+    }) as SupplierMatch['suppliers'],
   }
 }
 

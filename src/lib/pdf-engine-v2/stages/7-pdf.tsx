@@ -1178,6 +1178,55 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
               })()}
             </View>
 
+            {/* E4 (2026-05-06): datasheet-backed evidence for top-3 parts
+                in this module by extended cost. Pulls from page_chunks
+                corpus (1.9M entries) via the top supplier's page_url.
+                Shows only when a snippet actually exists. */}
+            {(() => {
+              const topParts = [...modParts]
+                .map(p => {
+                  const q = state.bomLines?.find(
+                    bl => bl.childPartId === p.partNumber || bl.childPartId === p.id
+                  )?.quantity ?? 1
+                  return { part: p, ext: (p.estimatedUnitCostGbp ?? 0) * q }
+                })
+                .sort((a, b) => b.ext - a.ext)
+                .slice(0, 3)
+                .map(({ part }) => {
+                  const sup = state.suppliers?.find(
+                    s => s.partId === part.id || s.partName === part.name
+                  )
+                  const topSupplier = sup?.suppliers?.[0] as any
+                  const snippet = topSupplier?.datasheetSnippet
+                  if (!snippet?.text) return null
+                  return { part, supplier: topSupplier, snippet }
+                })
+                .filter((x): x is { part: typeof modParts[number]; supplier: any; snippet: any } => x !== null)
+
+              if (topParts.length === 0) return null
+
+              return (
+                <View style={{ marginTop: 8, padding: 8, backgroundColor: '#fafafa', borderLeftWidth: 2, borderLeftColor: BRAND, borderRadius: 2 }} wrap={false}>
+                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+                    Datasheet evidence (top {topParts.length} by extended cost)
+                  </Text>
+                  {topParts.map((tp, i) => (
+                    <View key={i} style={{ marginBottom: 4 }}>
+                      <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: BRAND }}>
+                        {formatText(tp.part.name)} — {formatText(tp.supplier.name)}
+                      </Text>
+                      <Text style={{ fontSize: 8, color: INK, fontStyle: 'italic' }}>
+                        "{tp.snippet.text}"
+                      </Text>
+                      <Text style={{ fontSize: 7, color: MUTED }}>
+                        Source: {tp.snippet.sourceUrl}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )
+            })()}
+
             <SourceFooter sources={[{ type: 'LLM Architecture', detail: 'Decomposition Logic' }, { type: 'LLM BOM', detail: 'Parts expansion' }]} overallGrade="D" />
             <PageFooter section={`4.${idx + 1} ${m.name}`} />
           </Page>
