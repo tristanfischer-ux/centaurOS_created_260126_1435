@@ -47,15 +47,9 @@ export function scoreReport(state: any): ScoringResult {
     const constraints = brief.constraints;
     if (constraints) {
       if (constraints.unitCostCeilingGbp && constraints.unitCostCeilingGbp > 0) { briefScore += 10; }
-      if (constraints.maxMassKg && constraints.maxMassKg > 0) { briefScore += 5; }
-      if (constraints.batchSize && constraints.batchSize > 0) { briefScore += 5; }
+      if (constraints.maxMassKg && constraints.maxMassKg > 0) { briefScore += 10; }
+      if (constraints.batchSize && constraints.batchSize > 0) { briefScore += 10; }
     }
-    
-    // Competitors
-    const competitors = brief.competitors || [];
-    if (competitors.length >= 3) { briefScore += 10; details['brief_competitors'] = [`${competitors.length} competitors — comprehensive`]; }
-    else if (competitors.length > 0) { briefScore += Math.floor((competitors.length / 3) * 10); }
-    else { details['brief_competitors'] = ['No competitors identified']; }
   } else {
     details['brief_structured'] = ['No structured designBrief found — report text only'];
   }

@@ -542,8 +542,6 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
   const moduleCount = state.modules?.length || 0
   const bomRows = state.parts?.length || 0
   const nreTotal = state.costBreakdown?.nreTotalGbp
-  const tam = state.research?.designBrief?.marketSizing?.tamMUsd
-  const cagr = state.research?.designBrief?.marketSizing?.cagrPct
 
   const verdict = (!targetCost || !unitCost) ? 'PENDING' : overTarget ? 'FEASIBLE BUT OVER BUDGET' : 'FEASIBLE'
 
@@ -603,9 +601,9 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
             <GradeLabel grade="D" label="Modelled" />
           </View>
           <View style={s.stat}>
-            <Text style={s.statLabel}>Total Addressable Market</Text>
-            <Text style={s.statValue}>{formatNumber(tam, 'M USD')}</Text>
-            <GradeLabel grade="B" label="Research" />
+            <Text style={s.statLabel}>Spatial Allocation</Text>
+            <Text style={s.statValue}>{state.dimensionSheet?.feasible ? 'Feasible' : 'Infeasible'}</Text>
+            <GradeLabel grade="D" label="Solver verification" />
           </View>
         </View>
 
@@ -657,19 +655,6 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
             <GradeLabel grade="D" label="Parts Generated" />
           </View>
         </View>
-        
-        <View style={s.statRow}>
-          <View style={s.stat}>
-            <Text style={s.statLabel}>Market CAGR</Text>
-            <Text style={s.statValue}>{formatNumber(cagr, '%')}</Text>
-            <GradeLabel grade="C" label="Analyst consensus" />
-          </View>
-          <View style={s.stat}>
-            <Text style={s.statLabel}>Spatial Allocation</Text>
-            <Text style={s.statValue}>{state.dimensionSheet?.feasible ? 'Feasible' : 'Infeasible'}</Text>
-            <GradeLabel grade="D" label="Solver verification" />
-          </View>
-        </View>
 
         <View style={{ marginTop: 24 }}>
           <Text style={s.h4}>Source Grading Key</Text>
@@ -690,13 +675,12 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
 const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
   const brief = state.research?.designBrief
   const checks = [
-    { name: '1. Market TAM/SAM/SOM Defined', status: brief?.marketSizing?.tamMUsd ? 'PASS' : 'FAIL', reason: brief?.marketSizing?.tamMUsd ? 'TAM quantified' : 'Missing market data', evidence: formatNumber(brief?.marketSizing?.tamMUsd, 'M USD') },
-    { name: '2. Regulatory Standards Identified', status: brief?.regulatory && brief.regulatory.length > 0 ? 'PASS' : 'FAIL', reason: brief?.regulatory?.length ? 'Standards found' : 'No regulations listed', evidence: `${brief?.regulatory?.length || 0} standards` },
-    { name: '3. Cost Ceiling Specified', status: brief?.constraints?.unitCostCeilingGbp ? 'PASS' : 'WARN', reason: brief?.constraints?.unitCostCeilingGbp ? 'Target provided' : 'Unconstrained economics', evidence: formatGBP(brief?.constraints?.unitCostCeilingGbp) },
-    { name: '4. Spatial Envelope Provided', status: state.dimensionSheet?.envelope?.interior_volume_m3 ? 'PASS' : 'WARN', reason: state.dimensionSheet?.envelope?.interior_volume_m3 ? 'Volume established' : 'No dimensions', evidence: formatNumber(state.dimensionSheet?.envelope?.interior_volume_m3, ' m³') },
-    { name: '5. Modules Decomposed', status: state.modules && state.modules.length > 0 ? 'PASS' : 'FAIL', reason: state.modules?.length ? 'System architecture built' : 'Decomposition failed', evidence: `${state.modules?.length || 0} modules` },
-    { name: '6. BOM Cost Within Ceiling', status: (state.costBreakdown?.unitTotalGbp || 0) <= (brief?.constraints?.unitCostCeilingGbp || Infinity) ? 'PASS' : 'WARN', reason: 'Compared unit cost to ceiling', evidence: formatGBP(state.costBreakdown?.unitTotalGbp) },
-    { name: '7. Risk Matrix Saturated', status: state.modules?.some(m => m.riskMatrix?.length) ? 'PASS' : 'FAIL', reason: 'FMEA rows generated', evidence: 'Risks exist' }
+    { name: '1. Regulatory Standards Identified', status: brief?.regulatory && brief.regulatory.length > 0 ? 'PASS' : 'FAIL', reason: brief?.regulatory?.length ? 'Standards found' : 'No regulations listed', evidence: `${brief?.regulatory?.length || 0} standards` },
+    { name: '2. Cost Ceiling Specified', status: brief?.constraints?.unitCostCeilingGbp ? 'PASS' : 'WARN', reason: brief?.constraints?.unitCostCeilingGbp ? 'Target provided' : 'Unconstrained economics', evidence: formatGBP(brief?.constraints?.unitCostCeilingGbp) },
+    { name: '3. Spatial Envelope Provided', status: state.dimensionSheet?.envelope?.interior_volume_m3 ? 'PASS' : 'WARN', reason: state.dimensionSheet?.envelope?.interior_volume_m3 ? 'Volume established' : 'No dimensions', evidence: formatNumber(state.dimensionSheet?.envelope?.interior_volume_m3, ' m³') },
+    { name: '4. Modules Decomposed', status: state.modules && state.modules.length > 0 ? 'PASS' : 'FAIL', reason: state.modules?.length ? 'System architecture built' : 'Decomposition failed', evidence: `${state.modules?.length || 0} modules` },
+    { name: '5. BOM Cost Within Ceiling', status: (state.costBreakdown?.unitTotalGbp || 0) <= (brief?.constraints?.unitCostCeilingGbp || Infinity) ? 'PASS' : 'WARN', reason: 'Compared unit cost to ceiling', evidence: formatGBP(state.costBreakdown?.unitTotalGbp) },
+    { name: '6. Risk Matrix Saturated', status: state.modules?.some(m => m.riskMatrix?.length) ? 'PASS' : 'FAIL', reason: 'FMEA rows generated', evidence: 'Risks exist' }
   ]
 
   return (
@@ -823,39 +807,7 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
       </Page>
 
       <Page size="A4" style={s.page}>
-        <Text style={s.h2}>1.3 Competitor Landscape <GradeLabel grade="C" /></Text>
-        {b?.competitors?.length ? b.competitors.map((comp, i) => (
-          <View key={i} style={{ marginBottom: 16, padding: 12, borderWidth: 1, borderColor: BORDER, borderRadius: 4 }} wrap={false}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-              <Text style={{ fontSize: 12, fontWeight: 'bold', color: INK_DARK }}>{formatText(comp.name)}</Text>
-              {comp.countryIso && <View style={s.pillMuted}><Text>{comp.countryIso}</Text></View>}
-            </View>
-            <KV label="Product" value={comp.product} />
-            <KV label="Pricing" value={comp.pricing} />
-            <KV label="Tech Specs" value={comp.technicalSpecs} />
-            <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
-              <View style={{ flex: 1 }}>
-                <Text style={s.h5}>Strengths</Text>
-                <Text style={{ fontSize: 9 }}>{formatText(comp.strengths)}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={s.h5}>Weaknesses</Text>
-                <Text style={{ fontSize: 9 }}>{formatText(comp.weaknesses)}</Text>
-              </View>
-            </View>
-            <View style={{ marginTop: 8, paddingTop: 8, borderTopWidth: 1, borderTopColor: BORDER }}>
-              <Text style={s.h5}>Differentiation Angle</Text>
-              <Text style={{ fontSize: 10, color: BRAND, fontWeight: 'bold' }}>{formatText(comp.differentiationAngle)}</Text>
-            </View>
-          </View>
-        )) : <Text style={s.para}>No competitors defined.</Text>}
-        
-        <SourceFooter sources={[{ type: 'LLM Search', detail: 'Aggregated competitor data via LLM' }]} overallGrade="D" />
-        <PageFooter section="1. Brief — Competitors" />
-      </Page>
-
-      <Page size="A4" style={s.page}>
-        <Text style={s.h2}>1.4 Constraints & Targets <GradeLabel grade="A" /></Text>
+        <Text style={s.h2}>1.3 Constraints & Targets <GradeLabel grade="A" /></Text>
         <View style={{ borderTopWidth: 1, borderTopColor: BORDER_DARK }}>
           <KV label="Target Material" value={b?.targetMaterial} />
           <KV label="Target Process" value={b?.targetProcess} />
