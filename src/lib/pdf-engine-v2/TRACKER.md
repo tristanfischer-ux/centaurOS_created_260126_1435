@@ -213,7 +213,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | **H1b** | **Digi-Key API v4 integration** — OAuth 2.0 client credentials, free tier. `lib/distributors/digikey.ts` + token refresh. | ✅ | `8fb6e142` — all 3 APIs live, every test MPN resolves |
 | **H1c** | **Farnell / Element14 Product Search API** — free tier, UK-native, XML response (regex-parsed). `lib/distributors/farnell.ts`. | ✅ | `fb9e2785` — key live, 5/6 parts resolved |
 | **H1d** | **Distributor aggregator** — `lib/distributors/index.ts` function `findSkuForPart(part)` fans out in parallel, sorts by stock-first + qty-1-price, returns `{ best, alternates, misses, qty1GBP }`. | ✅ | `8fb6e142` — aggregator shipped with all 3 adapters |
-| **H1e** (optional) | Octopart subscription as aggregator upgrade — only if H1d orchestration becomes unwieldy. Leaning against. | ❌ backlog | New 2026-05-07 |
+| **H1e** (optional) | Octopart subscription as aggregator upgrade — only if H1d orchestration becomes unwieldy. Leaning against. | ⏸ cancelled — not needed |
 | **H7a** | **RS Components scraping adapter** — RS does not offer a public API. Polite-rate scraper (1 req/2s, custom UA, respects robots.txt). `lib/distributors/rs-components.ts`. Fallback for parts RS stocks that Mouser/Digi-Key/Farnell don't. | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **H7b** | **Mechanical wholesaler scrapers** — Eriks UK, Zoro UK, Applied Industrial. For `buy_mechanical_industrial` regime parts (fasteners, bearings, valves, pumps, fittings) that electronics distributors don't carry. | ✅ | `c20f6260` — 25 manufacturers, UK resellers, 5 tests |
 | **H8** | **Curated UK service-provider registry** — `lib/service-providers.ts`, ~40-60 hand-authored entries: UL test houses (Intertek, TÜV SÜD UK, Element), EMC precompliance, MDR notified bodies (BSI, DEKRA), G99 relay witnessing, CE/UKCA file compilers, cleanroom qual, pressure testing. Each entry: service type + provider + location + typical cost range + typical duration + contact URL. Feeds §6c PDF section and M1 NRE calculation. | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
@@ -221,7 +221,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | **H3** | **Corpus-coverage diagnostic on every PDF** — renders on §6a/§6b/§6c summary: "N BOM lines total, M had SKU matches (Mouser/DK/Farnell), K had fabricator leads (nightshift), J unmatched (no data)". Honest transparency for the founder. | ✅ | `d582f064` — computeCorpusCoverage(), 4 tests |
 | **H5** | **Synthetic-BOM coverage regression harness** — per product class, runs a canonical BOM list against H1d + nightshift + H8 and reports % matched in each regime. Run after any H-phase change to detect regressions. | ✅ | `fab3be5e` — 4 classes, 34 canonical parts, 7 tests |
 | **H6** | **Named-manufacturer authorised-reseller lookup** — curated list of ~20-30 manufacturers we see often (CATL, Sungrow, Copeland, Schneider, Siemens) with their UK authorised resellers. Separate data source from H1/H7. For `named_manufacturer_reseller` regime parts. | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
-| **H4** | **Semiconductor broker layer** — Avnet, Arrow, Future Electronics. Only matters if H1a+H1b+H1c miss an ASIC/MCU/FPGA (rare given Mouser+DK coverage). Scrape or partner API. | ❌ planned (low priority) | Supersedes CORPUS-Q5 |
+| **H4** | **Semiconductor broker layer** — Avnet, Arrow, Future Electronics. Only matters if H1a+H1b+H1c miss an ASIC/MCU/FPGA (rare given Mouser+DK coverage). Scrape or partner API. | ⏸ deferred — Mouser+DK cover 99% of electronics |
 
 ### Phase I — Safety & compliance
 
@@ -254,8 +254,8 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | L3 | BENCH-L3 live-search scaffolding | ✅ (scaffold) | `92932a6d` |
 | **L4** | **Verify BENCH-L1 actually fires on cost-waterfall page (not currently visible in logs)** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 | **L5** | **Research prompt hardening — explicit ≥5 sources + ≥3 competitors thresholds with re-prompt** | ✅ | `d582f064` — checkResearchThresholds(), 5 tests |
-| **L6** | **BENCH-L2 overnight mining run** | ❌ planned (deferred) | ~30 min + ~£1-3 |
-| **L7** | **BENCH-L3 live-search enable when L1+L2 sparse for a product class** | ❌ planned | Flip `ENABLE_LIVE_BENCHMARK_SEARCH=true` once H1 lands |
+| **L6** | **BENCH-L2 overnight mining run** | ⏸ deferred — not on critical path |
+| **L7** | **BENCH-L3 live-search enable when L1+L2 sparse for a product class** | ⏸ deferred — not on critical path |
 
 ### Phase M — Cost + NRE
 
@@ -298,7 +298,7 @@ Tristan-flagged 2026-05-07: three security-oriented agents are missing. Unlike c
 | **S2** | **`@security-finance` agent — secret-hygiene + payment audit:** Stripe key exposure in code / logs / commits, OpenRouter + Mouser + Digi-Key + Farnell API keys in env files going to wrong location, secrets in commit history, `.env` accidentally committed, webhook signing-secret validation, idempotency keys on payment flows, Stripe retry / refund integrity, negative-amount guards. **Triggers:** any Stripe-related code change, any `.env` edit, any commit referencing `secrets/`, any new webhook route. | ✅ | agent-prompts/security-finance.md + agent-pre-commit.sh auto-trigger | |
 | **S3** | **`@security-customer` agent — account-isolation + privacy audit:** Supabase RLS policy coverage on every multi-tenant table (`foundry_id`, `profile_id`), PII exposure in logs, session-fixation, cross-tenant data leakage (founder A seeing founder B's BOM), GDPR / UK DPA data-subject-access-request readiness, email-address leakage, login-bypass cookies. **Triggers:** any Supabase migration, any change to `withAuth()` / `createAdminClient()`, any new PII-holding column, any change to RLS policies. | ✅ | agent-prompts/security-customer.md + agent-pre-commit.sh auto-trigger | |
 | **S4** | **Wire the 3 security agents into `@reviewer` pre-commit path** so they fire automatically on matching file touches, not only when asked. File-pattern triggers defined in S1/S2/S3. | ✅ | agent-pre-commit.sh — auto-triggers all 3 agents on matching file patterns | |
-| **S5** | **Secret-scanning pre-commit hook** (gitleaks or trufflehog) that blocks commits containing live-looking keys. Runs locally before any agent sees the diff. Complements S2. | ❌ planned | @coder-2 (MiMo V2.5-Pro) | Blocker-level |
+| **S5** | **Secret-scanning pre-commit hook** (gitleaks or trufflehog) that blocks commits containing live-looking keys. Runs locally before any agent sees the diff. Complements S2. | ✅ | gitleaks 8.30.1 + .git/hooks/pre-commit | |
 | **S6** | **Agent-design spec** — fully author the 3 new security agents in `~/.claude/docs/agent-taxonomy.md`: system prompt, required inputs, output JSON schema, cost envelope, model assignment rationale, auto-trigger conditions. Paired with the @writer / @researcher / @classifier / @redteam / @experiment additions flagged earlier today. | ✅ done 2026-05-07 | MiMo V2.5-Pro (direct) | 14 prompt files + 3 infra docs + taxonomy + AGENTS.md wired |
 
 **Priority:** S4 + S5 are blocker-level — defensive infrastructure before real customers. S1-S3 are ongoing audit capability. None on today's critical path but all belong on the durable tracker. S6 (the agent-design spec) is DONE — see `~/.claude/docs/agent-taxonomy.md` and `~/.claude/docs/agent-prompts/`.
