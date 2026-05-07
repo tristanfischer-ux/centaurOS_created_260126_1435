@@ -1247,7 +1247,9 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
                 // Also sets a tooltip-equivalent second line: the priceSource
                 // attached by the BOM stage (database / llm / search / heuristic).
                 const priceSource = (p as any).priceSource as string | undefined
+                const hasNoPrice = priceSource === 'manifest_no_price'
                 const basis = (() => {
+                  if (hasNoPrice) return '—'
                   if (priceSource === 'database' || priceSource === 'search') return 'C'
                   if (priceSource === 'llm') return 'D'
                   if (priceSource === 'heuristic') return 'E'
@@ -1263,8 +1265,8 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
                     <Text style={{ ...s.tC, width: '17%' }}>{formatText(supplierName)}</Text>
                     <Text style={{ ...s.tC, width: '5%' }}>{grade}</Text>
                     <Text style={{ ...s.tC, width: '8%', textAlign: 'right', ...qtyCellStyle }}>{qty.toLocaleString()}</Text>
-                    <Text style={{ ...s.tC, width: '10%', textAlign: 'right' }}>{formatGBP(unitCost)}</Text>
-                    <Text style={{ ...s.tC, width: '12%', textAlign: 'right' }}>{formatGBP(extCost)}</Text>
+                    <Text style={{ ...s.tC, width: '10%', textAlign: 'right' }}>{hasNoPrice ? 'TBD' : formatGBP(unitCost)}</Text>
+                    <Text style={{ ...s.tC, width: '12%', textAlign: 'right' }}>{hasNoPrice ? 'TBD' : formatGBP(extCost)}</Text>
                   </View>
                 )
               })}
@@ -1273,15 +1275,19 @@ const ModulesSection = ({ state }: { state: PipelineState }) => {
               )}
               {/* Module subtotal row */}
               {modParts.length > 0 && (() => {
+                let tbdCount = 0
                 const moduleTotal = modParts.reduce((acc, p) => {
+                  const isNoPrice = (p as any).priceSource === 'manifest_no_price'
+                  if (isNoPrice) { tbdCount++; return acc }
                   const q = state.bomLines?.find(
                     bl => bl.childPartId === p.partNumber || bl.childPartId === p.id
                   )?.quantity ?? 1
                   return acc + (p.estimatedUnitCostGbp ?? 0) * q
                 }, 0)
+                const suffix = tbdCount > 0 ? ` (${tbdCount} TBD)` : ''
                 return (
                   <View style={{ ...s.tRow, borderTopWidth: 1, borderTopColor: BORDER_DARK, backgroundColor: '#f2f2f2' }} wrap={false}>
-                    <Text style={{ ...s.tC, width: '70%', fontWeight: 'bold' }}>Module subtotal ({modParts.length} parts)</Text>
+                    <Text style={{ ...s.tC, width: '70%', fontWeight: 'bold' }}>Module subtotal ({modParts.length} parts){suffix}</Text>
                     <Text style={{ ...s.tC, width: '18%' }}></Text>
                     <Text style={{ ...s.tC, width: '12%', textAlign: 'right', fontWeight: 'bold' }}>{formatGBP(moduleTotal)}</Text>
                   </View>
