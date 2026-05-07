@@ -242,7 +242,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **K1** | **Fire judges in parallel with 60 s per-judge timeout + 1 retry — return partial-council rather than all-or-nothing "— not scored"** | ❌ planned | COUNCIL-Q1 (was) |
+| **K1** | **Fire judges in parallel with 60 s per-judge timeout + 1 retry — return partial-council rather than all-or-nothing "— not scored"** | ✅ | `72151804` — Promise.allSettled + 2s backoff |
 | **K2** | **Exclude engine-lineage models from judge council — implemented as "never judge with a model in the lineage that generated the content being judged"** | ❌ planned | F9 architectural counterpart |
 
 ### Phase L — Research + benchmarks
