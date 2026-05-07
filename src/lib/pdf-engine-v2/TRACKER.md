@@ -34,22 +34,43 @@ Morning was spent building the Buy-side of the Make/Buy split — distributor AP
 
 Council sequenced this to avoid calibrating against a broken score. Targets for today in priority order:
 
-| # | ID | Est | Target section impact |
-|---|---|---|---|
-| 1 | **F7** compound reweight (rubric 0.4→0.15, council 0.6→0.85) | 30 min | Honest scores visible everywhere |
-| 2 | **F12** retire placebo deterministic scorer | 1 hr | Modules / Risks / Suppliers stop auto-8/10 |
-| 3 | **F13** audit judge criteria vs engine output | 1 hr | Judges score what we actually produce |
-| 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
-| 5 | **G2** relax `getRequiredFields()` | 15 min | Pairs with G1 — Round 1 → 9-10/10 pass rate |
-| 6 | **B6** required-parts manifest per product class | 2 hr | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
-| 7 | **H2** Stage 5 regime router | 45 min | Distributor APIs called for `buy_electronic` parts |
-| 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | Make/Buy/Services visible per part |
-| 9 | **J1a** pipeline emits status for failed runs | 45 min | Dashboard shows all 20 runs, not just 5 |
-| 10 | **F9** exclude engine-lineage from judges | 30 min | Gemini stops grading Gemini |
+| # | ID | Est | Model | Target section impact |
+|---|---|---|---|---|
+| 1 | **F7** compound reweight (rubric 0.4→0.15, council 0.6→0.85) | 30 min | **done — should have been @coder** | Honest scores visible everywhere |
+| 2 | **F12** retire placebo deterministic scorer | 1 hr | **@coder** (Gemini 3.1 Pro) — bounded refactor of `scorer.ts` | Modules / Risks / Suppliers stop auto-8/10 |
+| 3 | **F13** audit judge criteria vs engine output | 1 hr | **@council** (6 models) diagnose → **@coder** apply | Judges score what we actually produce |
+| 4 | **G1** widen `product-classifier.ts` to 15 classes | 45 min | **@coder** (rules + tests) | Drone / AUV / HAPS / AI server / EV charger stop rejecting |
+| 5 | **G2** relax `getRequiredFields()` | 15 min | **@coder-2** (MiMo) — trivial logic change | Pairs with G1 — Round 1 → 9-10/10 pass rate |
+| 6 | **B6** required-parts manifest per product class | 2 hr | **@coder** (needs domain-knowledge rule authoring) | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
+| 7 | **H2** Stage 5 regime router | 45 min | **@coder** (Stage 5 dispatcher + types) | Distributor APIs called for `buy_electronic` parts |
+| 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | **@coder** (React-PDF layout + 3 new sections) | Make/Buy/Services visible per part |
+| 9 | **J1a** pipeline emits status for failed runs | 45 min | **@coder-2** (MiMo) — small error-handler additions | Dashboard shows all 20 runs, not just 5 |
+| 10 | **F9** exclude engine-lineage from judges | 30 min | **@coder-2** — one-line filter + test | Gemini stops grading Gemini |
 
 **Total ~9 hours, ~£15-25 OpenRouter for evidence runs at the end of the day.**
 
 At end of day: re-run all 10 baseline briefs × both rounds (20 runs) and compare compound scores against this morning's snapshot. Target delta: Round 2 from 0/10 to 9-10/10 passing; Round 1 average compound from 71/100 (inflated) to genuinely honest 70/100+ (means content actually improved).
+
+---
+
+## Model routing policy (cost discipline)
+
+This document, this session: I (main-thread Opus 4.7 high) am **orchestration only** — planning, routing, synthesis of sub-agent results, talking to Tristan. **All actual code edits, test writes, and file reads go to sub-agents.**
+
+Why: Opus 4.7 high is ~20× the cost of Gemini 3.1 Pro for equivalent code work. The cost-discipline rule in `~/.config/opencode/AGENTS.md` is explicit: "Main thread Opus 4.7 = orchestration only." I violated this for most of the morning (F7, part-regime.ts, distributor adapters, tracker rewrites were all me). From now on:
+
+| Work class | Where it goes | Cost |
+|---|---|---|
+| Code edits, test writes, small refactors (<200 LOC) | **@coder** (Gemini 3.1 Pro) or **@coder-2** (MiMo V2.5-Pro) | ~5% of Opus |
+| Independent parallel code fixes | **@coder + @coder-2** in parallel | ~5% each |
+| Code review before any git commit | **@reviewer** (MiMo + GLM-5.1 in parallel) | ~£0.008/review |
+| Architecture decisions / bug survives one fix | **@council** (6-model diagnostic) | ~£0.06/round |
+| Curated research lists (UK test houses, authorised resellers) | **ask_alt_llm** with `google/gemini-3.1-pro-preview` | ~£0.02/call |
+| Bulk extraction / classification (corpus mining) | **ask_alt_llm** with `deepseek/deepseek-v4-flash` | ~£0.001/call |
+| Multi-file architectural refactor with type awareness | **@coder** (Gemini 3.1 Pro) — still faster than Opus | ~5% |
+| Main-thread Opus 4.7 | **Only:** read tracker state, pick next item, write sub-agent brief, review sub-agent output, update tracker, commit | — |
+
+Going forward: every ❌ planned item below has a **Model** note. If the column is empty, default is **@coder**. Exceptions are called out individually where research / council / cheap-aggregator are better suited.
 
 ---
 
