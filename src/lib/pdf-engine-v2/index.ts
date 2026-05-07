@@ -27,6 +27,7 @@ import { recordScoringRun, deriveBriefLabel } from './lib/scoring-history'
 import { validateR290Safety } from './lib/r290-safety'
 import { validateCosts } from './lib/cost-constraints'
 import { classifyProduct, getRequiredFields } from './product-classifier'
+import { checkRequiredParts } from './lib/required-parts-manifest'
 import { validateBrief } from './brief-validator'
 import { determineFeasibility } from './feasibility-gate'
 import { scoreSection, type SectionAudit } from './universal-scorer'
@@ -380,6 +381,14 @@ export async function runPipeline(
   state.parts = bomResult.data.parts
   state.bomLines = bomResult.data.bomLines
   state.costBreakdown = bomResult.data.costBreakdown
+  
+  // ── Required Parts Manifest Check ──────────────────────────────────
+  const manifestResult = checkRequiredParts(classification.productClass, state.parts || [])
+  if (manifestResult.missing.length > 0) {
+    console.log(`[required-parts] ${manifestResult.missing.length} missing parts for ${classification.productClass}: ${manifestResult.missing.map(p => p.name).join(', ')}`)
+    // Store on state for PDF rendering
+    ;(state as any).missingParts = manifestResult.missing
+  }
   
   state.sourceAttributions.push(
     { section: 'BOM', source: 'deterministic', detail: 'Deterministic expansion from Max keyParts' },
