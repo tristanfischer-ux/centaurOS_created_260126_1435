@@ -4,6 +4,7 @@ import { benchmarkCheck, PROJECT_BENCHMARKS } from '../benchmarks'
 import { classifyRegime } from '../lib/part-regime'
 import { normaliseState } from '../lib/safe-state'
 import { checkSafetyRequirements } from '../lib/safety-registry'
+import { computeNreFromRegulatory } from '../lib/nre-from-regulatory'
 import type { 
   PipelineState, 
   Module, 
@@ -941,7 +942,8 @@ const RegulatorySection = ({ state }: { state: PipelineState }) => {
               <Text style={{ ...s.tHC, width: '15%' }}>Owner role</Text>
             </View>
             {topRegs.map((r, i) => {
-              const est = estimateRegulatoryCost(r.code || r.name || '')
+              const regBreakdown = computeNreFromRegulatory([{ code: r.code, name: r.name, summary: r.summary, applicability: r.applicability }], state.productClass || state.research?.industryDomain || '')
+              const est = { costGbp: regBreakdown.items[0].estimatedCostGbp, weeks: regBreakdown.items[0].estimatedDurationWeeks, rationale: regBreakdown.items[0].standardName }
               const statusColor = /complete/i.test(r.status || '') ? GREEN :
                                   /progress|draft/i.test(r.status || '') ? AMBER :
                                   RED
@@ -958,7 +960,7 @@ const RegulatorySection = ({ state }: { state: PipelineState }) => {
             })}
             <View style={{ ...s.tRow, backgroundColor: '#fff7ed', borderTopWidth: 2, borderTopColor: BRAND }}>
               <Text style={{ ...s.tC, width: '62%', fontWeight: 'bold' }}>Total regulatory programme ({topRegs.length} standards)</Text>
-              <Text style={{ ...s.tC, width: '13%', textAlign: 'right', fontWeight: 'bold' }}>{formatGBP(topRegs.reduce((a, r) => a + estimateRegulatoryCost(r.code || r.name || '').costGbp, 0))}</Text>
+              <Text style={{ ...s.tC, width: '13%', textAlign: 'right', fontWeight: 'bold' }}>{formatGBP(computeNreFromRegulatory(topRegs, state.productClass || state.research?.industryDomain || '').totalGbp)}</Text>
               <Text style={{ ...s.tC, width: '25%' }}></Text>
             </View>
           </View>
@@ -967,7 +969,8 @@ const RegulatorySection = ({ state }: { state: PipelineState }) => {
         </Page>
       )}
       {topRegs.map((reg, idx) => {
-        const est = estimateRegulatoryCost(reg.code || reg.name || '')
+        const regBreakdown = computeNreFromRegulatory([{ code: reg.code, name: reg.name, summary: reg.summary, applicability: reg.applicability }], state.productClass || state.research?.industryDomain || '')
+        const est = { costGbp: regBreakdown.items[0].estimatedCostGbp, weeks: regBreakdown.items[0].estimatedDurationWeeks, rationale: regBreakdown.items[0].standardName }
         return (
           <Page key={idx} size="A4" style={s.page}>
             <Text style={s.h5}>2. Regulatory & Compliance</Text>
@@ -1021,54 +1024,6 @@ const RegulatorySection = ({ state }: { state: PipelineState }) => {
   )
 }
 
-// E2 FIX (2026-05-06): industry-typical £ + weeks to first-time certification
-// per standard family. UK market, accredited test house, small-batch programme.
-// Values are reference-grade order-of-magnitude — the pdf footnote flags them
-// as industry-heuristic source grade.
-function estimateRegulatoryCost(codeOrName: string): { costGbp: number; weeks: number; rationale: string } {
-  const n = codeOrName.toLowerCase()
-  // Battery / BESS safety
-  if (/ul\s*9540a/.test(n)) return { costGbp: 100000, weeks: 16, rationale: 'UL 9540A: system-level fire / TR-propagation test at UKAS lab' }
-  if (/iec\s*62619/.test(n)) return { costGbp: 40000, weeks: 12, rationale: 'IEC 62619: cell-level safety type test' }
-  if (/ul\s*1973/.test(n)) return { costGbp: 55000, weeks: 12, rationale: 'UL 1973: stationary battery type test' }
-  if (/nfpa\s*855/.test(n)) return { costGbp: 10000, weeks: 8, rationale: 'NFPA 855: installation clearances design review' }
-  // UK grid connection
-  if (/\bg99\b|grid code/.test(n)) return { costGbp: 60000, weeks: 20, rationale: 'G99 Issue 6: UK DNO grid-connection type test' }
-  if (/\bg100\b/.test(n)) return { costGbp: 35000, weeks: 14, rationale: 'G100: UK export-limit testing' }
-  // Switchgear / electrical
-  if (/(bs\s*en\s*)?61439/.test(n)) return { costGbp: 50000, weeks: 14, rationale: 'BS EN 61439: LV switchgear type test' }
-  if (/ip\s*5\d|ip\s*6\d/.test(n)) return { costGbp: 8000, weeks: 4, rationale: 'IP rating test at accredited lab' }
-  // Refrigeration / HVAC
-  if (/en\s*378/.test(n)) return { costGbp: 20000, weeks: 8, rationale: 'EN 378: refrigeration safety review + leak test' }
-  if (/en\s*14825/.test(n)) return { costGbp: 35000, weeks: 10, rationale: 'EN 14825: SCOP performance test at UKAS lab' }
-  if (/ped|pressure equipment/.test(n)) return { costGbp: 12000, weeks: 6, rationale: 'PED 2014/68: notified body assessment for cat II module' }
-  if (/mcs\s*mis|mcs\s*30/.test(n)) return { costGbp: 15000, weeks: 8, rationale: 'MCS MIS 3005: UK microgen accreditation' }
-  if (/f.?gas|517\/2014/.test(n)) return { costGbp: 4000, weeks: 2, rationale: 'F-Gas registration + installer qualification' }
-  // Machinery
-  if (/machinery directive|2006\/42/.test(n)) return { costGbp: 8000, weeks: 4, rationale: 'Machinery Directive conformity assessment + DoC' }
-  if (/en\s*60204/.test(n)) return { costGbp: 15000, weeks: 6, rationale: 'EN 60204-1: machinery electrical safety test' }
-  if (/en\s*60335/.test(n)) return { costGbp: 18000, weeks: 6, rationale: 'EN 60335: appliance safety test' }
-  // Aerospace
-  if (/as\s*9100/.test(n)) return { costGbp: 40000, weeks: 16, rationale: 'AS9100D system certification' }
-  if (/do-?160/.test(n)) return { costGbp: 60000, weeks: 20, rationale: 'DO-160 environmental qualification' }
-  // Medical
-  if (/mdr|2017\/745/.test(n)) return { costGbp: 150000, weeks: 24, rationale: 'EU MDR: notified body class II conformity' }
-  if (/510.?k/.test(n)) return { costGbp: 80000, weeks: 20, rationale: 'FDA 510(k) clearance' }
-  if (/iec\s*62304/.test(n)) return { costGbp: 25000, weeks: 8, rationale: 'IEC 62304: medical software lifecycle audit' }
-  // Food contact / agriculture
-  if (/brcgs|bs\s*en\s*1186|eu\s*10\/2011/.test(n)) return { costGbp: 6000, weeks: 4, rationale: 'Food-contact material compliance statement' }
-  if (/wras/.test(n)) return { costGbp: 3500, weeks: 4, rationale: 'WRAS potable water approval' }
-  // EMC / RED / generic
-  if (/en\s*55|emc directive|2014\/30/.test(n)) return { costGbp: 8000, weeks: 4, rationale: 'EMC test at accredited lab' }
-  if (/rohs|2011\/65/.test(n)) return { costGbp: 2500, weeks: 2, rationale: 'RoHS self-declaration + BoM review' }
-  if (/reach|1907\/2006/.test(n)) return { costGbp: 4000, weeks: 3, rationale: 'REACH substance declaration' }
-  if (/weee|2012\/19/.test(n)) return { costGbp: 2500, weeks: 2, rationale: 'WEEE producer registration' }
-  if (/ce.?mark|uk.?ca.?mark/.test(n)) return { costGbp: 6000, weeks: 4, rationale: 'CE / UKCA technical file compilation' }
-  if (/iso\s*9001/.test(n)) return { costGbp: 12000, weeks: 8, rationale: 'ISO 9001 management system certification' }
-  if (/iso\s*14001/.test(n)) return { costGbp: 8000, weeks: 6, rationale: 'ISO 14001 environmental management cert' }
-  // Fallback
-  return { costGbp: 15000, weeks: 6, rationale: 'Industry-typical certification for unmatched standard' }
-}
 
 // Section 5: Sizing
 const SizingSection = ({ state }: { state: PipelineState }) => {
@@ -1463,19 +1418,14 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
   // prices from E2's estimator; otherwise show a simpler 'tooling +
   // compliance' single-line backed by the domain base NRE.
   const regulatory = state.research?.designBrief?.regulatory || []
-  const regEstimates = regulatory.slice(0, 6).map(r => ({
-    code: r.code || r.name || 'Standard',
-    est: estimateRegulatoryCost(r.code || r.name || ''),
+  const productClass = state.productClass || state.research?.industryDomain || ''
+  const breakdown = computeNreFromRegulatory(regulatory, productClass)
+  const nreTotal = breakdown.totalGbp > 0 ? breakdown.totalGbp : (cb?.nreTotalGbp ?? 0)
+  const nreRows: Array<{ label: string; value: number; note?: string }> = breakdown.items.map(item => ({
+    label: item.standardCode,
+    value: item.estimatedCostGbp,
+    note: item.standardName,
   }))
-  const regNreTotal = regEstimates.reduce((a, e) => a + e.est.costGbp, 0)
-  const nreTotal = regNreTotal > 0 ? regNreTotal : (cb?.nreTotalGbp ?? 0)
-  const nreRows: Array<{ label: string; value: number; note?: string }> = regulatory.length > 0
-    ? regEstimates.map(e => ({
-        label: e.code,
-        value: e.est.costGbp,
-        note: e.est.rationale,
-      }))
-    : [{ label: 'Tooling, testing & compliance', value: nreTotal, note: 'Domain-average estimate (no regulatory entries detected)' }]
   const nrePerUnit = nreTotal / Math.max(1, batchSize)
 
   // Ceiling comparison

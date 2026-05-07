@@ -69,7 +69,7 @@ describe('bom-builder', () => {
     
     // Should still return parts, just without prices
     expect(res.deterministicParts.length).toBeGreaterThan(0)
-    expect(res.deterministicParts[0].estimatedUnitCostGbp).toBeUndefined()
+    expect(res.deterministicParts[0].estimatedUnitCostGbp == null).toBe(true)
   })
 
   test('Deduplication keeps deterministic over LLM', () => {

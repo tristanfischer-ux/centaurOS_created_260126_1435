@@ -57,16 +57,17 @@ export async function buildDeterministicPhase(
   let counter = 1
   for (const req of requirements) {
     const id = `det-part-${Date.now()}-${counter++}`
+    const partNumber = req.searchTerms && req.searchTerms.length > 0 ? req.searchTerms[0] : id
     const part: Part = {
       id,
-      partNumber: id,
+      partNumber,
       name: req.name,
       sourceModuleId,
       process: req.typicalProcess,
       isPurchased: req.typicalProcess.toLowerCase().includes('cots'),
       material: 'varies',
       massKg: MASS_ESTIMATES[req.name] || 1,
-      estimatedUnitCostGbp: undefined,
+      estimatedUnitCostGbp: null,
     }
     
     ;(part as any).sourceManifest = true
