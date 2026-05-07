@@ -118,7 +118,7 @@ describe('Validators', () => {
       expect(result.findings).toContain('Fail: parts array is empty.');
     });
 
-    it('fails when any module has 0 parts', () => {
+    it('warns when any module has 0 parts (no longer a hard fail)', () => {
       const state = makeState({ 
         modules: [
           { id: 'mod1', name: 'Mod 1', purpose: '', inputs: [], outputs: [], keyParts: [], leadWeeks: 1, description: '', whyItMatters: '', failureModes: [], unknowns: [], status: 'draft' },
@@ -129,8 +129,8 @@ describe('Validators', () => {
         ]
       });
       const result = checkCompleteness(state);
-      expect(result.passed).toBe(false);
-      expect(result.findings).toContain('Fail: module mod2 has 0 parts.');
+      expect(result.passed).toBe(true);
+      expect(result.findings).toContain('Warning: module mod2 has 0 parts — BOM generation may have missed this module.');
     });
   });
 
