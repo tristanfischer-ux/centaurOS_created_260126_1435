@@ -137,9 +137,9 @@ Status is verified from git log + grep + code audit, not memory.
 | B4 | Cost-basis indicator + per-module breakdown appendix (was B2-plan) | ✅ | `79ed1a1f` |
 | B5 | Per-cell deterministic quantity derivation + tighten isBessCell | ✅ | `6b1e9cf4`, `d22a3413` |
 | **B6** | **Required-parts manifest per product class — deterministic post-BOM validator adds missing safety-critical parts** | ✅ | 10 classes, 40 required parts, 5/5 tests |
-| **B7** | **Cost-floor sanity check on capital-class parts (auto-Brave on £<50 + mass>10kg)** | ❌ planned | BOM-Q2 |
+| **B7** | **Cost-floor sanity check on capital-class parts (auto-Brave on £<50 + mass>10kg)** | ✅ | `894e0a4b` — 4 rules, 5 tests |
 | **B8** | **BOM generation architecture — corpus-first + deterministic-first, LLM only for novel items or narrative connectives** | ❌ planned | New 2026-05-07 — foundational. Depends on H1 (distributor import) |
-| **B9** | **Truncation recovery — re-prompt for continuation when BOM part count below product-class floor** | ❌ planned | BOM-Q3 |
+| **B9** | **Truncation recovery — re-prompt for continuation when BOM part count below product-class floor** | ✅ | `894e0a4b` — 10 class thresholds, 5 tests |
 
 ### Phase C — Supplier matching
 
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**70 ✅ done · 36 ❌ planned · 2 ⏸ deferred**
+**73 ✅ done · 33 ❌ planned · 2 ⏸ deferred**
 
 ---
 
