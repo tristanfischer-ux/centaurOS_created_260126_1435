@@ -1405,6 +1405,77 @@ const CostWaterfallSection = ({ state }: { state: PipelineState }) => {
             ))}
           </View>
 
+          {/* M3 (2026-05-07): prominent benchmark status badge directly
+              below the waterfall total. Gives the reader an immediate
+              reality check without scrolling to the detailed comparison
+              panel further down. */}
+          {(() => {
+            const productClass = state.productClass || state.research?.industryDomain
+            if (!productClass || !unitTotalGbp) return null
+            const brief = state.research?.designBrief
+            const spec = {
+              capacityKwh: extractCapacityKwh(brief),
+              powerKw: extractPowerKw(brief),
+            }
+            const check = benchmarkCheck(productClass, unitTotalGbp, spec)
+            if (!check) return null
+
+            const badgeColour = check.status === 'within' ? GREEN
+              : check.status === 'low' ? AMBER
+              : check.status === 'high' ? RED
+              : MUTED
+            const badgeLabel = check.status === 'within' ? 'WITHIN BAND'
+              : check.status === 'low' ? 'BELOW BAND'
+              : check.status === 'high' ? 'ABOVE BAND'
+              : 'NO DATA'
+            const bgColour = check.status === 'within' ? '#f0fdf4'
+              : check.status === 'low' ? '#fffbeb'
+              : check.status === 'high' ? '#fef2f2'
+              : BG_SOFT
+
+            // No benchmark data available for this product class
+            if (check.status === 'no-data' && !check.band) {
+              return (
+                <View style={{ marginTop: 8, marginBottom: 8, padding: 10, backgroundColor: BG_SOFT, borderLeftWidth: 3, borderLeftColor: BORDER_DARK, borderRadius: 4 }} wrap={false}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                    <View style={{ paddingHorizontal: 8, paddingVertical: 3, backgroundColor: MUTED, borderRadius: 3, marginRight: 8 }}>
+                      <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#ffffff' }}>NO DATA</Text>
+                    </View>
+                    <Text style={{ fontSize: 10, fontWeight: 'bold', color: MUTED }}>Benchmark check</Text>
+                  </View>
+                  <Text style={{ fontSize: 9, color: MUTED }}>
+                    No benchmark data available for {formatText(productClass)} — cost comparison not possible.
+                  </Text>
+                </View>
+              )
+            }
+
+            // Summary line: "Unit cost £X is within/above/below the benchmark band (£Y–£Z) for {product class}"
+            const money = (n: number) => formatGBP(n)
+            const summaryText = check.band
+              ? `Unit cost ${money(unitTotalGbp)} is ${check.status === 'within' ? 'within' : check.status === 'low' ? 'below' : 'above'} the benchmark band (${money(check.band.low)}–${money(check.band.high)}) for ${formatText(productClass)}.`
+              : check.message
+
+            return (
+              <View style={{ marginTop: 8, marginBottom: 8, padding: 10, backgroundColor: bgColour, borderLeftWidth: 3, borderLeftColor: badgeColour, borderRadius: 4 }} wrap={false}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 4 }}>
+                  <View style={{ paddingHorizontal: 8, paddingVertical: 3, backgroundColor: badgeColour, borderRadius: 3, marginRight: 8 }}>
+                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: '#ffffff' }}>{badgeLabel}</Text>
+                  </View>
+                  <Text style={{ fontSize: 10, fontWeight: 'bold', color: badgeColour }}>Benchmark check</Text>
+                  {check.band && (
+                    <Text style={{ fontSize: 8, color: MUTED, marginLeft: 'auto' }}>
+                      {check.band.sampleCount} anchor points
+                    </Text>
+                  )}
+                </View>
+                <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4 }}>
+                  {summaryText}
+                </Text>
+              </View>
+            )
+          })()}
+
           <Text style={s.h3}>Per-module BOM totals</Text>
           <View style={s.tableWrap}>
             <View style={s.tHead}>

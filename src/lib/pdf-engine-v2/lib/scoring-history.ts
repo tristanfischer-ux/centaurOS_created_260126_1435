@@ -49,6 +49,16 @@ export interface ScoringRecord {
    */
   formulaVersion?: string
   /**
+   * J2 (2026-05-07): per-judge breakdown from the council scorer.
+   * Each entry carries the section name and the individual judge scores
+   * so the dashboard can show the score spread per section card.
+   * Absent on older runs — dashboard skips the display when missing.
+   */
+  councilScores?: Array<{
+    section: string
+    judgeBreakdown?: Array<{ model: string; score: number }>
+  }>
+  /**
    * J1a (2026-05-07): pipeline outcome status. 'COMPLETED' (or absent) means
    * the full pipeline ran. Failed statuses indicate the pipeline short-circuited
    * and the record carries sentinel scores (compound/rubric = -1).
@@ -136,19 +146,34 @@ function regenerateDashboard(): void {
         })()
       : `<div class="meta" style="margin:8px 0">Insufficient completed runs for trend</div>`
 
+    // J2: per-judge breakdown lookup (only when councilScores are stored)
+    const councilLookup = new Map<string, Array<{ model: string; score: number }>>()
+    if (latest.councilScores) {
+      for (const cs of latest.councilScores) {
+        if (cs.judgeBreakdown && cs.judgeBreakdown.length > 0) {
+          councilLookup.set(cs.section, cs.judgeBreakdown)
+        }
+      }
+    }
+
     // section bar chart (latest run — empty for failed runs)
     const sectionRows = isFailed ? '' : (latest.sections || []).slice(0, 12).map(s => {
       const pct = s.score < 0 ? 0 : (s.score / 10) * 100
       const colour = s.score < 0 ? '#a1a1aa' :
         s.score >= 7 ? '#16a34a' : s.score >= 5 ? '#ea580c' : '#dc2626'
       const label = s.score < 0 ? '— not scored' : `${s.score}/10`
+      // J2: show per-judge spread when available
+      const judges = councilLookup.get(s.section)
+      const judgeHtml = judges && judges.length > 0 && s.score >= 0
+        ? `<div class="judge-spread">Judges: ${judges.map(j => j.score).join(', ')} (spread ${Math.max(...judges.map(j => j.score)) - Math.min(...judges.map(j => j.score))})</div>`
+        : ''
       return `<div class="section-row">
         <div class="section-label">${escapeHtml(s.section)}</div>
         <div class="section-bar-wrap">
           <div class="section-bar" style="width:${pct}%;background:${colour}"></div>
         </div>
         <div class="section-score" style="color:${colour}">${label}</div>
-      </div>`
+      </div>${judgeHtml}`
     }).join('')
 
     const trend = completedRuns.length >= 2
@@ -204,6 +229,7 @@ function regenerateDashboard(): void {
   .section-bar-wrap { background: #f3f4f6; height: 10px; border-radius: 5px; overflow: hidden; }
   .section-bar { height: 10px; transition: width 0.3s; }
   .section-score { text-align: right; font-weight: 600; font-size: 11px; }
+  .judge-spread { grid-column: 1 / -1; font-size: 10px; color: #6b7280; margin: -1px 0 3px 98px; }
   .refresh-pill { position: fixed; top: 16px; right: 24px; background: #ffedd5; color: #9a3412; font-size: 11px; padding: 4px 10px; border-radius: 12px; }
   .status-badge { color: #fff; font-weight: 700; font-size: 12px; padding: 4px 10px; border-radius: 4px; letter-spacing: 0.02em; text-transform: uppercase; }
 </style>
@@ -211,7 +237,7 @@ function regenerateDashboard(): void {
 <body>
 <div class="refresh-pill">↻ Auto-refresh every 5s</div>
 <h1>ForgeOS engine — scoring dashboard</h1>
-<p class="subtitle">Compound score combines rubric completeness (40%) with council quality average (60%). Council sections that failed to score render as "— not scored" and are excluded from the average. History: last 20 runs per brief.</p>
+<p class="subtitle">Compound score combines rubric completeness (15%) with council quality average (85%). Council sections that failed to score render as "— not scored" and are excluded from the average. History: last 20 runs per brief.</p>
 <div class="grid">${briefCards}</div>
 <div class="meta">Generated ${new Date().toISOString()} · data: ${escapeHtml(HISTORY_PATH)}</div>
 </body>

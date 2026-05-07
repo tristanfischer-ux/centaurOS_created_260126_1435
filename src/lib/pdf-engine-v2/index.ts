@@ -649,6 +649,15 @@ export async function runPipeline(
     // local only. Lets Tristan see trends across N runs without re-running
     // the engine manually per brief.
     try {
+      // J2: extract per-judge breakdown from council scores for dashboard display
+      const rawCouncil = (state as any).councilScores as Array<{
+        section: string
+        judgeBreakdown?: Array<{ model: string; score: number }>
+      }> | undefined
+      const councilScoresForHistory = rawCouncil?.map(cs => ({
+        section: cs.section,
+        judgeBreakdown: cs.judgeBreakdown?.map(j => ({ model: j.model, score: j.score })),
+      }))
       recordScoringRun({
         timestamp: new Date().toISOString(),
         projectId: state.projectId,
@@ -660,6 +669,7 @@ export async function runPipeline(
         councilFailed: compound.councilFailed,
         sections: councilScoresForCompound,
         formulaVersion: compound.formulaVersion,
+        councilScores: councilScoresForHistory,
       })
       console.log(`[pipeline] scoring history updated — dashboard at ~/Downloads/engine-evidence/scoring-dashboard.html`)
     } catch (err) {

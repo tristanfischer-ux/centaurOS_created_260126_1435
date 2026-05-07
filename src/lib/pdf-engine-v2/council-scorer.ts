@@ -37,10 +37,20 @@ const ENGINEERING_DIMENSIONS = [
 ]
 
 const SECTION_ENGINEERING_CRITERIA: Record<string, string[]> = {
+  'ExecutiveSummary': [
+    'Key Metrics — are the most important numbers (cost, feasibility, timeline) prominently displayed?',
+    'Clarity — can a non-technical founder understand the summary?',
+    'Completeness — are all major sections represented in summary form?',
+  ],
   'Brief': [
     'Constraint Capture — are all physical limits (mass, dimensions, cost) explicitly stated?',
     'Feasibility Pre-check — do the targets align with physics and market reality?',
     'Requirement Traceability — can every requirement be traced to a specific module?',
+  ],
+  'Feasibility': [
+    'Verdict Accuracy — is the feasibility verdict (GREEN/AMBER/RED) justified by the constraints?',
+    'Constraint Coverage — are all critical constraints evaluated (mass, cost, thermal, regulatory)?',
+    'Alternative Suggestions — when RED/AMBER, are actionable alternatives provided?',
   ],
   'Regulatory': [
     'Standard Applicability — are the cited standards actually required for this product?',
@@ -83,6 +93,16 @@ const SECTION_ENGINEERING_CRITERIA: Record<string, string[]> = {
     'Source Quality — are the cited sources credible and recent?',
     'Design Relevance — does the research inform actual design decisions?',
   ],
+  'Proofreader': [
+    'Issue Detection — are genuine errors and inconsistencies identified?',
+    'False Positive Rate — are flagged issues actually problems, not noise?',
+    'Actionability — are fix recommendations specific and implementable?',
+  ],
+  'AuditLog': [
+    'Completeness — are all pipeline stages documented with outcomes?',
+    'Traceability — can each decision be traced to specific data inputs?',
+    'Transparency — are failures and workarounds honestly reported?',
+  ],
 }
 
 const JUDGING_CRITERIA: Record<string, string[]> = Object.fromEntries(
@@ -112,7 +132,11 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
   // existed), which isn't quality signal. Council judges now evaluate
   // supplier relevance + risk-matrix completeness + severity distribution.
   // If the council fails, the deterministic score is the fallback.
-  const councilSections = ['Brief', 'BOM', 'Cost', 'Suppliers', 'Risks']
+  // Proofreader + AuditLog excluded: Proofreader data is `proofreadFindings`
+  // (string | null, often null → council scores 1 on empty data) and AuditLog
+  // data lives on EngineResult, not PipelineState (extraction is dead code).
+  // Both fall through to the deterministic scorer via the full `sections` list.
+  const councilSections = ['ExecutiveSummary', 'Brief', 'Feasibility', 'BOM', 'Cost', 'Suppliers', 'Risks']
 
   for (const section of sections) {
     const data = sectionData[section]
@@ -401,6 +425,20 @@ function deterministicScore(section: string, data: string): CouncilScore {
 function extractSectionData(state: PipelineState): Record<string, string> {
   const sections: Record<string, string> = {}
 
+  // ExecutiveSummary
+  const execCost = state.costBreakdown?.unitTotalGbp || 'unknown'
+  const execFeasible = state.dimensionSheet?.feasible ?? 'unknown'
+  const execModules = state.modules?.length || 0
+  if (state.projectId) {
+    sections['ExecutiveSummary'] = [
+      `Project: ${state.projectId}`,
+      `Cost: ${execCost}`,
+      `Feasible: ${execFeasible}`,
+      `Modules: ${execModules}`,
+      `Key Stats: ${state.parts?.length || 0} parts, ${state.suppliers?.length || 0} suppliers matched`
+    ].join('\n')
+  }
+
   // Brief
   const b = state.research?.designBrief
   if (b) {
@@ -470,6 +508,30 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   sections['Suppliers'] = (state.suppliers || []).map(s =>
     `${s.partName}: ${s.suppliers?.map(sup => `${sup.name} (${sup.score}%)`).join(', ') || 'no suppliers'}`
   ).join('\n')
+
+  // Feasibility
+  const feas = (state as any).feasibility || (state as any).gates
+  if (feas) {
+    sections['Feasibility'] = [
+      `Verdict: ${feas.verdict || feas.status || 'unknown'}`,
+      `Constraints Evaluated: ${Array.isArray(feas.constraints) ? feas.constraints.join(', ') : JSON.stringify(feas.constraints || 'none')}`,
+      `Alternatives: ${Array.isArray(feas.alternatives) ? feas.alternatives.join(', ') : JSON.stringify(feas.alternatives || 'none')}`,
+    ].join('\n')
+  }
+
+  // Proofreader
+  const pr = state.proofreadFindings || (state as any).proofreaderFindings || (state as any).proofreader
+  if (pr) {
+    sections['Proofreader'] = typeof pr === 'string' ? pr : JSON.stringify(pr)
+  }
+
+  // AuditLog
+  const al = (state as any).auditLog || (state as any).stageResults
+  if (al) {
+    sections['AuditLog'] = Array.isArray(al)
+      ? al.map((a: any) => `${a.stage || a.name || 'unknown'}: ${a.status || 'unknown'} (${a.duration || a.durationMs || 0}ms). Outputs: ${a.outputs || a.keyOutputs ? JSON.stringify(a.outputs || a.keyOutputs) : 'none'}`).join('\n')
+      : JSON.stringify(al)
+  }
 
   // Research
   const r = state.research

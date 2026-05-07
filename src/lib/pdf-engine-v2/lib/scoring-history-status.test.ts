@@ -145,3 +145,112 @@ describe('recordScoringRun — status field', () => {
     expect(written.status).toBe('COMPLETED')
   })
 })
+
+describe('recordScoringRun — councilScores (J2)', () => {
+  it('should write councilScores with judgeBreakdown to the JSONL record', () => {
+    const record: ScoringRecord = {
+      timestamp: '2026-05-07T12:00:00.000Z',
+      projectId: 'j2-test',
+      briefLabel: 'bess',
+      compound: 68,
+      rubric: 75,
+      councilAvg: 6.5,
+      councilScored: 6,
+      councilFailed: 0,
+      sections: [
+        { section: 'Brief', score: 7 },
+        { section: 'BOM', score: 6 },
+      ],
+      formulaVersion: 'f7',
+      status: 'COMPLETED',
+      councilScores: [
+        {
+          section: 'Brief',
+          judgeBreakdown: [
+            { model: 'gemini-3.1-pro', score: 8 },
+            { model: 'gpt-5.4', score: 7 },
+            { model: 'grok-4.3', score: 6 },
+          ],
+        },
+        {
+          section: 'BOM',
+          judgeBreakdown: [
+            { model: 'gemini-3.1-pro', score: 7 },
+            { model: 'gpt-5.4', score: 5 },
+            { model: 'grok-4.3', score: 6 },
+          ],
+        },
+      ],
+    }
+
+    recordScoringRun(record)
+
+    const written = JSON.parse(fs.__written[0])
+    expect(written.councilScores).toBeDefined()
+    expect(written.councilScores).toHaveLength(2)
+    expect(written.councilScores[0].section).toBe('Brief')
+    expect(written.councilScores[0].judgeBreakdown).toHaveLength(3)
+    expect(written.councilScores[0].judgeBreakdown[0].model).toBe('gemini-3.1-pro')
+    expect(written.councilScores[0].judgeBreakdown[0].score).toBe(8)
+  })
+
+  it('should omit councilScores when not provided (backward compatible)', () => {
+    const record: ScoringRecord = {
+      timestamp: '2026-05-07T12:00:00.000Z',
+      projectId: 'no-council',
+      briefLabel: 'bess',
+      compound: 55,
+      rubric: 60,
+      councilAvg: null,
+      councilScored: 0,
+      councilFailed: 4,
+      sections: [],
+      formulaVersion: 'f7',
+      status: 'COMPLETED',
+    }
+
+    recordScoringRun(record)
+
+    const written = JSON.parse(fs.__written[0])
+    expect(written.councilScores).toBeUndefined()
+  })
+
+  it('should render judge spread in the dashboard HTML when councilScores are present', () => {
+    const record: ScoringRecord = {
+      timestamp: '2026-05-07T12:00:00.000Z',
+      projectId: 'j2-html-test',
+      briefLabel: 'bess',
+      compound: 70,
+      rubric: 80,
+      councilAvg: 6.5,
+      councilScored: 2,
+      councilFailed: 0,
+      sections: [
+        { section: 'Brief', score: 7 },
+      ],
+      formulaVersion: 'f7',
+      status: 'COMPLETED',
+      councilScores: [
+        {
+          section: 'Brief',
+          judgeBreakdown: [
+            { model: 'gemini-3.1-pro', score: 8 },
+            { model: 'gpt-5.4', score: 6 },
+            { model: 'grok-4.3', score: 7 },
+          ],
+        },
+      ],
+    }
+
+    recordScoringRun(record)
+
+    // The dashboard is written via writeFileSync — find the HTML call
+    const htmlCall = fs.writeFileSync.mock.calls.find(
+      (c: string[]) => typeof c[1] === 'string' && c[1].includes('<!DOCTYPE html>')
+    )
+    expect(htmlCall).toBeDefined()
+    const html = htmlCall![1] as string
+    expect(html).toContain('Judges: 8, 6, 7 (spread 2)')
+    expect(html).toContain('judge-spread')
+  })
+})
