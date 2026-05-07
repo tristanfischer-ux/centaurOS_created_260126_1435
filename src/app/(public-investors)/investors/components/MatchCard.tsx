@@ -690,34 +690,38 @@ export function MatchCard({
         <div className="mb-3" onClick={e => e.stopPropagation()}>
           <CollapsibleSection number={3} title="Key People" defaultOpen={false}>
             <div className="space-y-3">
-              <div className="flex items-start gap-3 p-3 rounded-lg bg-muted/40">
-                <div className="h-10 w-10 rounded-full bg-international-orange/10 flex items-center justify-center text-international-orange font-bold text-sm flex-shrink-0">
-                  {primaryPartner.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="text-sm font-semibold text-foreground">{primaryPartner.name}</p>
-                    {primaryPartner.is_decision_maker && (
-                      <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-international-orange/10 text-international-orange font-bold">Decision maker</span>
+              <div className="flex items-start gap-4 p-3 rounded-lg bg-muted/40">
+                <div className="flex items-start gap-3 flex-shrink-0 w-64">
+                  <div className="h-10 w-10 rounded-full bg-international-orange/10 flex items-center justify-center text-international-orange font-bold text-sm flex-shrink-0">
+                    {primaryPartner.name.split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase()}
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-semibold text-foreground">{primaryPartner.name}</p>
+                      {primaryPartner.is_decision_maker && (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-international-orange/10 text-international-orange font-bold">Decision maker</span>
+                      )}
+                    </div>
+                    {primaryPartner.title && (
+                      <p className="text-xs text-muted-foreground">{primaryPartner.title}</p>
+                    )}
+                    {primaryPartner.email && (
+                      <a href={`mailto:${primaryPartner.email}`} className="text-xs text-international-orange hover:underline block mt-1" onClick={e => e.stopPropagation()}>
+                        {primaryPartner.email_verified ? primaryPartner.email : `${primaryPartner.email} (unverified)`}
+                      </a>
+                    )}
+                    {primaryPartner.linkedin_url && (
+                      <a href={primaryPartner.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-xs text-international-orange hover:underline block mt-0.5" onClick={e => e.stopPropagation()}>
+                        LinkedIn profile →
+                      </a>
                     )}
                   </div>
-                  {primaryPartner.title && (
-                    <p className="text-xs text-muted-foreground">{primaryPartner.title}</p>
-                  )}
-                  {primaryPartner.email && (
-                    <a href={`mailto:${primaryPartner.email}`} className="text-xs text-international-orange hover:underline block mt-1" onClick={e => e.stopPropagation()}>
-                      {primaryPartner.email_verified ? primaryPartner.email : `${primaryPartner.email} (unverified)`}
-                    </a>
-                  )}
-                  {primaryPartner.linkedin_url && (
-                    <a href={primaryPartner.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-xs text-international-orange hover:underline block mt-0.5" onClick={e => e.stopPropagation()}>
-                      LinkedIn profile →
-                    </a>
-                  )}
-                  {primaryPartner.deep_bio && (
-                    <p className="text-xs text-foreground/80 leading-relaxed mt-2">{primaryPartner.deep_bio}</p>
-                  )}
                 </div>
+                {primaryPartner.deep_bio && (
+                  <div className="flex-1 min-w-0 border-l border-border pl-4">
+                    <p className="text-xs text-foreground/80 leading-relaxed">{primaryPartner.deep_bio}</p>
+                  </div>
+                )}
               </div>
             </div>
           </CollapsibleSection>
