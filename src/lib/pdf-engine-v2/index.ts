@@ -9,6 +9,7 @@
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
+import { runBriefExpansion, shouldExpandBrief } from './stages/0.5-brief-expansion'
 import { runResearch } from './stages/1-research'
 import { runDecompose } from './stages/2-decompose'
 import { runSizeLayout } from './stages/3-size-layout'
@@ -277,6 +278,29 @@ export async function runPipeline(
   state.llmAttributions.push(
     { section: 'Research', model: 'google/gemini-3.1-pro-preview', provider: 'OpenRouter' },
   )
+
+  // ── Stage 0.5: Brief Expansion ─────────────────────────────────────
+  if (shouldExpandBrief(briefText, state.research?.designBrief)) {
+    console.log('\n[pipeline] === Stage 0.5: Brief Expansion ===')
+    const expansionResult = await runBriefExpansion(briefText, classification.productClass, classification)
+    trackStage('brief_expansion', expansionResult)
+    if (expansionResult.ok && expansionResult.data) {
+      state.briefExpansion = expansionResult.data
+      // Merge expanded fields into designBrief so downstream stages and validators can use them
+      if (state.research && state.research.designBrief) {
+        state.research.designBrief = {
+          ...state.research.designBrief,
+          ...expansionResult.data.expandedFields,
+        }
+      }
+      state.sourceAttributions.push(
+        { section: 'Brief Interpretation', source: 'llm', detail: 'DeepSeek V4 Flash — brief expansion' }
+      )
+      state.llmAttributions.push(
+        { section: 'Brief Expansion', model: 'deepseek/deepseek-v4-flash', provider: 'OpenRouter' }
+      )
+    }
+  }
 
   // ── Product Specs Extraction (deterministic) ───────────────────────
   // Per-cell qty realism (2026-05-06): pull canonical specs out of the

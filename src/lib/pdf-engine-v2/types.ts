@@ -308,6 +308,13 @@ export interface SectionScore {
 export interface PipelineState {
   projectId: string
   briefText?: string
+  briefExpansion?: {
+    originalBrief: string
+    expandedFields: Record<string, unknown>
+    inferredAssumptions: Array<{ field: string; value: unknown; confidence: 'HIGH' | 'MEDIUM' | 'LOW'; reasoning: string }>
+    assumptions: string[]
+    canProceed: boolean
+  }
   // BENCH-L1 (2026-05-06): persist the product-classifier output so the PDF
   // renderer can look up public benchmark bands without re-classifying.
   productClass?: string

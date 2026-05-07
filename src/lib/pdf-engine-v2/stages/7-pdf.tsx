@@ -817,6 +817,47 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
           </>
         )}
 
+        {state.briefExpansion && (
+          <View style={{ marginBottom: 16 }}>
+            <Text style={s.h2}>1.0b Brief Interpretation <GradeLabel grade="D" label="LLM expansion" /></Text>
+            <Text style={{ ...s.para, fontSize: 9.5, color: MUTED, marginBottom: 8 }}>
+              The original brief was minimal. The engine expanded it by inferring the following constraints based on the product class.
+            </Text>
+            
+            <View style={s.tableWrap}>
+              <View style={s.tHead}>
+                <Text style={{ ...s.tHC, width: '25%' }}>Field</Text>
+                <Text style={{ ...s.tHC, width: '20%' }}>Inferred Value</Text>
+                <Text style={{ ...s.tHC, width: '15%' }}>Confidence</Text>
+                <Text style={{ ...s.tHC, width: '40%' }}>Reasoning</Text>
+              </View>
+              {state.briefExpansion.inferredAssumptions.map((inf, i) => (
+                <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                  <Text style={{ ...s.tC, width: '25%', fontWeight: 'bold' }}>{formatText(inf.field)}</Text>
+                  <Text style={{ ...s.tC, width: '20%' }}>{formatText(String(inf.value))}</Text>
+                  <View style={{ width: '15%', paddingVertical: 6, paddingHorizontal: 8 }}>
+                    <Text style={{ fontSize: 9, fontWeight: 'bold', color: inf.confidence === 'HIGH' ? GREEN : inf.confidence === 'MEDIUM' ? AMBER : RED }}>
+                      {inf.confidence}
+                    </Text>
+                  </View>
+                  <Text style={{ ...s.tC, width: '40%' }}>{formatText(inf.reasoning)}</Text>
+                </View>
+              ))}
+            </View>
+
+            {state.briefExpansion.assumptions && state.briefExpansion.assumptions.length > 0 && (
+              <View style={{ marginTop: 8 }}>
+                <Text style={s.h4}>Core Assumptions</Text>
+                {state.briefExpansion.assumptions.map((ass, i) => (
+                  <Text key={i} style={{ ...s.para, fontSize: 9, marginBottom: 2 }}>
+                    • {formatText(ass)}
+                  </Text>
+                ))}
+              </View>
+            )}
+          </View>
+        )}
+
         <Text style={s.h2}>1.1 Mission & Use Case <GradeLabel grade="A" /></Text>
         <View style={s.calloutNeutral}>
           <Text style={s.h4}>Mission</Text>
