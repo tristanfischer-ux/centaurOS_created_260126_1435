@@ -218,7 +218,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | **H7b** | **Mechanical wholesaler scrapers** — Eriks UK, Zoro UK, Applied Industrial. For `buy_mechanical_industrial` regime parts (fasteners, bearings, valves, pumps, fittings) that electronics distributors don't carry. | ❌ planned | New 2026-05-07 |
 | **H8** | **Curated UK service-provider registry** — `lib/service-providers.ts`, ~40-60 hand-authored entries: UL test houses (Intertek, TÜV SÜD UK, Element), EMC precompliance, MDR notified bodies (BSI, DEKRA), G99 relay witnessing, CE/UKCA file compilers, cleanroom qual, pressure testing. Each entry: service type + provider + location + typical cost range + typical duration + contact URL. Feeds §6c PDF section and M1 NRE calculation. | ❌ planned | New 2026-05-07 |
 | **H2** | **Part-regime router** — given a BOM line stamped by C5, route the lookup: `buy_electronic` → H1d distributor aggregator, `buy_mechanical_industrial` → H7b wholesaler scrapers, `named_manufacturer_reseller` → H6 + nightshift corpus, `make_custom_fab` → nightshift corpus (current path), `service_certification` → H8 registry. | ✅ | `regime-router.ts` — 8 tests, all 5 regimes routed |
-| **H3** | **Corpus-coverage diagnostic on every PDF** — renders on §6a/§6b/§6c summary: "N BOM lines total, M had SKU matches (Mouser/DK/Farnell), K had fabricator leads (nightshift), J unmatched (no data)". Honest transparency for the founder. | ❌ planned | Supersedes CORPUS-Q4 |
+| **H3** | **Corpus-coverage diagnostic on every PDF** — renders on §6a/§6b/§6c summary: "N BOM lines total, M had SKU matches (Mouser/DK/Farnell), K had fabricator leads (nightshift), J unmatched (no data)". Honest transparency for the founder. | ✅ | `d582f064` — computeCorpusCoverage(), 4 tests |
 | **H5** | **Synthetic-BOM coverage regression harness** — per product class, runs a canonical BOM list against H1d + nightshift + H8 and reports % matched in each regime. Run after any H-phase change to detect regressions. | ❌ planned | Supersedes CORPUS-Q6 |
 | **H6** | **Named-manufacturer authorised-reseller lookup** — curated list of ~20-30 manufacturers we see often (CATL, Sungrow, Copeland, Schneider, Siemens) with their UK authorised resellers. Separate data source from H1/H7. For `named_manufacturer_reseller` regime parts. | ❌ planned | New 2026-05-07 |
 | **H4** | **Semiconductor broker layer** — Avnet, Arrow, Future Electronics. Only matters if H1a+H1b+H1c miss an ASIC/MCU/FPGA (rare given Mouser+DK coverage). Scrape or partner API. | ❌ planned (low priority) | Supersedes CORPUS-Q5 |
@@ -253,7 +253,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | L2 | BENCH-L2 corpus-mining script + loader scaffold | ✅ (scaffold) | `92932a6d` |
 | L3 | BENCH-L3 live-search scaffolding | ✅ (scaffold) | `92932a6d` |
 | **L4** | **Verify BENCH-L1 actually fires on cost-waterfall page (not currently visible in logs)** | ❌ planned | New 2026-05-07 |
-| **L5** | **Research prompt hardening — explicit ≥5 sources + ≥3 competitors thresholds with re-prompt** | ❌ planned | RES-Q1 (was) |
+| **L5** | **Research prompt hardening — explicit ≥5 sources + ≥3 competitors thresholds with re-prompt** | ✅ | `d582f064` — checkResearchThresholds(), 5 tests |
 | **L6** | **BENCH-L2 overnight mining run** | ❌ planned (deferred) | ~30 min + ~£1-3 |
 | **L7** | **BENCH-L3 live-search enable when L1+L2 sparse for a product class** | ❌ planned | Flip `ENABLE_LIVE_BENCHMARK_SEARCH=true` once H1 lands |
 
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**73 ✅ done · 33 ❌ planned · 2 ⏸ deferred**
+**75 ✅ done · 31 ❌ planned · 2 ⏸ deferred**
 
 ---
 
