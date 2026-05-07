@@ -11,7 +11,7 @@
  *   3. Cache miss → load investor profile from `marketplace_listings`,
  *      run a single Sonnet call that returns strict JSON, log the row.
  *
- * Cost: ~£0.05 - £0.15 per generation at sonnet-4-6. The cache is what makes
+ * Cost: ~$0.001 per generation at deepseek-v4-flash via OpenRouter.
  * the £10-per-100-leads add-on margin work — every repeated search of the
  * same investor against the same founder profile reuses the cached row.
  *
@@ -24,7 +24,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { callClaudeCentral } from '@/lib/ai/claude-client'
+import { callOpenAI } from '@/lib/cad-lab/api-helpers'
 import { logLlmUsage } from '@/lib/cost-logging/llm-usage'
 import { buildFoundryContext } from '@/lib/investors/foundry-context'
 import type { FoundryContextInput } from '@/lib/investors/foundry-context'
@@ -317,7 +317,7 @@ function parseModelOutput(raw: string): ParsedOutput | null {
 // Generator
 // ---------------------------------------------------------------------------
 
-const MODEL_ID = 'google/gemini-3.1-pro-preview'
+const MODEL_ID = 'deepseek/deepseek-v4-flash'  // cheap & fast via OpenRouter — ~$0.001/insight
 
 /**
  * Generate (or reuse from cache) the why-fit / how-to-pitch / drafted-email
@@ -391,18 +391,13 @@ export async function generateInvestorMatchOutput(
 
   const userPrompt = buildUserPrompt({ foundryName, contextString, investor })
 
-  const result = await callClaudeCentral({
-    systemPrompt: SYSTEM_PROMPT,
+  const result = await callOpenAI(
+    SYSTEM_PROMPT,
     userPrompt,
-    modelId: MODEL_ID,
-    maxTokens: 1500,
-    timeoutMs: 60_000,
-    enableCache: true, // 5-min ephemeral cache on system prompt — cheap repeat calls
-    actionSlug: 'investor_match_output',
-    foundryId,
-    userId,
-    specialistId: 'fundraising-advisor',
-  })
+    MODEL_ID,
+    1500,
+    30_000,
+  )
 
   const parsed = parseModelOutput(result.text)
   if (!parsed) {
