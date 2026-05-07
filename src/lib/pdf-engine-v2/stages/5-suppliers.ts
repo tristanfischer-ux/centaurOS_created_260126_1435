@@ -15,6 +15,12 @@ import {
   tagIntersectionBoost,
   type DomainTag,
 } from '../lib/domain-tags'
+import {
+  buildReverseIndexes,
+  companiesByProcess,
+  companiesByMaterial,
+  isReverseIndexAvailable,
+} from '../lib/reverse-indexes'
 
 const DELAY_MS = 500
 const BATCH_SIZE = 5
@@ -42,6 +48,13 @@ export async function runSuppliers(
   const requiredTags = productClassToDomainTags(options?.productClass || options?.domain)
   if (requiredTags.length > 0) {
     console.log(`[suppliers] Required domain tags: ${requiredTags.join(', ')}`)
+  }
+
+  // D1+D2 (2026-05-06): build reverse indexes once so C4 (process-match
+  // validation) can verify each matched supplier actually claims the
+  // part's process / material.
+  if (isReverseIndexAvailable()) {
+    buildReverseIndexes()
   }
 
   try {
@@ -154,6 +167,17 @@ function toSupplierMatch(
   const snippetEnabled = isPageChunksAvailable()
   const keywords = partKeywords(part)
 
+  // C4 (2026-05-06): verify each supplier actually claims the part's
+  // process / material via the D1/D2 reverse indexes. If neither verifies,
+  // flag the match as unverified so the PDF can render it in red.
+  const verifyEnabled = isReverseIndexAvailable()
+  const processMatchIds = verifyEnabled && part.process
+    ? new Set(companiesByProcess(part.process, 2000))
+    : new Set<string>()
+  const materialMatchIds = verifyEnabled && part.material
+    ? new Set(companiesByMaterial(part.material, 2000))
+    : new Set<string>()
+
   return {
     partId: part.id || '',
     partName: part.name,
@@ -161,6 +185,17 @@ function toSupplierMatch(
       const snippet = (snippetEnabled && idx === 0 && h.companyId)
         ? getPartSnippetFromSupplier(h.companyId, keywords)
         : null
+
+      // C4: classify verification strength.
+      let verification: 'process+material' | 'process' | 'material' | 'unverified' = 'unverified'
+      if (h.companyId && verifyEnabled) {
+        const procOk = processMatchIds.has(h.companyId)
+        const matOk = materialMatchIds.has(h.companyId)
+        if (procOk && matOk) verification = 'process+material'
+        else if (procOk) verification = 'process'
+        else if (matOk) verification = 'material'
+      }
+
       return {
         name: h.name,
         url: h.website || '',
@@ -170,9 +205,8 @@ function toSupplierMatch(
         certifications: h.certifications,
         processes: h.processCapabilities.map(p => p.processName).filter(Boolean),
         companyId: h.companyId,
-        // D3 (2026-05-06): attach computed tags so future audit / debug
-        // passes can show which tags drove the re-rank.
         domainTags: tagsByHit?.[idx] ?? [],
+        processMatch: verification,
         datasheetSnippet: snippet
           ? {
               text: snippet.text,

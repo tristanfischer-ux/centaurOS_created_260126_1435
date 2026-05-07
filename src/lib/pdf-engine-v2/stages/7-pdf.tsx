@@ -1559,15 +1559,26 @@ const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
     reason?: string
     partsMatched: string[]
     bestScore: number
+    // C4 (2026-05-06): strongest process-match verification across all
+    // parts this supplier was matched to.
+    processMatch?: 'process+material' | 'process' | 'material' | 'unverified'
   }
   const seen = new Map<string, RolledSupplier>()
+  const matchRank: Record<string, number> = {
+    'process+material': 3, 'process': 2, 'material': 1, 'unverified': 0,
+  }
   for (const sm of rawSuppliers) {
     for (const sup of sm.suppliers || []) {
       const key = sup.name
       const existing = seen.get(key)
+      const supMatch = (sup as any).processMatch as RolledSupplier['processMatch']
       if (existing) {
         existing.partsMatched.push(sm.partName)
         if (sup.score > existing.bestScore) existing.bestScore = sup.score
+        // Keep the strongest match verification.
+        if (supMatch && (matchRank[supMatch] ?? 0) > (matchRank[existing.processMatch || 'unverified'] ?? 0)) {
+          existing.processMatch = supMatch
+        }
       } else {
         seen.set(key, {
           name: sup.name,
@@ -1578,6 +1589,7 @@ const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
           reason: sup.reason,
           partsMatched: [sm.partName],
           bestScore: sup.score,
+          processMatch: supMatch,
         })
       }
     }
@@ -1610,7 +1622,24 @@ const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
             <Text style={s.h2}>Supplier Shortlist — page {pageIdx + 1}</Text>
           )}
 
-          {page.map((sup, i) => (
+          {page.map((sup, i) => {
+            // C4 (2026-05-06): unverified supplier gets a red border and
+            // a 'not-verified' tag. Verified-process+material gets a
+            // green 'verified' tag. Amber for one-of-two.
+            const matchLabel = {
+              'process+material': { text: 'verified', colour: GREEN },
+              'process':          { text: 'process-only', colour: AMBER },
+              'material':         { text: 'material-only', colour: AMBER },
+              'unverified':       { text: 'unverified', colour: RED },
+            }[sup.processMatch || 'unverified']
+
+            // Override the left-border colour when unverified so the
+            // reader sees the red strip regardless of similarity score.
+            const leftBorderColour = sup.processMatch === 'unverified'
+              ? RED
+              : (sup.bestScore >= 0.6 ? GREEN : sup.bestScore >= 0.4 ? AMBER : BORDER_DARK)
+
+            return (
             <View
               key={i}
               style={{
@@ -1618,7 +1647,7 @@ const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
                 padding: 10,
                 backgroundColor: i % 2 === 0 ? '#fafafa' : '#ffffff',
                 borderLeftWidth: 2,
-                borderLeftColor: sup.bestScore >= 0.6 ? GREEN : sup.bestScore >= 0.4 ? AMBER : BORDER_DARK,
+                borderLeftColor: leftBorderColour,
               }}
               wrap={false}
             >
@@ -1627,6 +1656,17 @@ const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
                   {formatText(sup.name)}
                   {sup.country ? <Text style={{ fontSize: 10, color: MUTED, fontWeight: 'normal' }}>  ({sup.country})</Text> : null}
                 </Text>
+                <View style={{
+                  paddingHorizontal: 6,
+                  paddingVertical: 2,
+                  borderRadius: 2,
+                  backgroundColor: matchLabel.colour,
+                  marginRight: 6,
+                }}>
+                  <Text style={{ fontSize: 8, color: '#fff', fontFamily: 'Helvetica-Bold' }}>
+                    {matchLabel.text}
+                  </Text>
+                </View>
                 <Text style={{ fontSize: 9, color: MUTED }}>
                   sim {sup.bestScore.toFixed(2)} · {sup.partsMatched.length} part{sup.partsMatched.length > 1 ? 's' : ''}
                 </Text>
@@ -1668,7 +1708,8 @@ const SupplierShortlistSection = ({ state }: { state: PipelineState }) => {
                 <Text style={{ fontSize: 8, color: BLUE, marginTop: 2 }}>{sup.url}</Text>
               )}
             </View>
-          ))}
+            )
+          })}
 
           {pageIdx === pages.length - 1 && (
             <SourceFooter

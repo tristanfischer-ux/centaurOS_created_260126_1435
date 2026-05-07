@@ -254,6 +254,12 @@ export interface SupplierMatch {
     // description. Stage 5 uses it to re-rank matches; PDF renderer can
     // surface it for debug / audit.
     domainTags?: string[]
+    // C4 (2026-05-06): process/material verification via reverse indexes.
+    // - 'process+material' — supplier claims both the part's process AND material
+    // - 'process' — supplier claims the process only
+    // - 'material' — supplier claims the material only
+    // - 'unverified' — neither matched (PDF renders in red)
+    processMatch?: 'process+material' | 'process' | 'material' | 'unverified'
     // E4: 1-2 sentence excerpt from this supplier's pages mentioning the
     // part. Populated inline by Stage 5 so the PDF renderer doesn't hit
     // the corpus on its own (keeps the renderer pure / local-only).
