@@ -69,8 +69,15 @@ Every ID that exists in this tracker, every `pdf-engine-v2` commit, and every co
 | Per-cell qty realism | `spec-extraction` + `quantity-derivation` + 47 tests | ✅ | `6b1e9cf4` |
 | isBessCell-BMS tighten | Exclude BMS/monitor/slave from cell rule | ✅ | `d22a3413` |
 | NEW-001 | **Brief-feasibility feedback loop** — when target is impossible, surface what in the brief to relax. | ⏸ deferred | Per Tristan 2026-05-06: "resolve later, not now". Full v4 plan at `PLAN-NEW-001.md`, stub module at `stages/1.5-feasibility-advisor.ts`. 6-model council review complete. |
+| **Morning 2026-05-07 — scoring overhaul** | | | |
+| SCORE-001 | Compound score = rubric × 0.4 + council_avg × 10 × 0.6 | ✅ | `8f702a01` |
+| SCORE-002 | Honest council-failure state (score=-1 sentinel, "— not scored" in PDF) | ✅ | `8f702a01` |
+| SCORE-003 | Rubric reweight: BOM 15→25%, Cost 15→20%, sources 10→5% | ✅ | `8f702a01` |
+| SCORE-004 | Cross-run `scoring-history.jsonl` archive | ✅ | `b8156209` |
+| SCORE-005 | Suppliers + Risks promoted to council tier with deterministic fallback | ✅ | `b8156209` |
+| SCORE-006 | Auto-refreshing HTML dashboard at `~/Downloads/engine-evidence/scoring-dashboard.html` | ✅ | `b8156209` |
 
-**Tally: 44 ✅ · 0 ❌ · 1 ⏸ deferred.**
+**Tally: 50 ✅ · 0 ❌ · 1 ⏸ deferred.**
 
 ---
 
