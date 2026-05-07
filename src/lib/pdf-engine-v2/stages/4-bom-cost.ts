@@ -564,6 +564,7 @@ ${formatProcessesForPrompt(grounding.processes)}
     let groundedCount = 0
     let heuristicCount = 0
     let llmCount = 0
+    let manifestUnpricedCount = 0
 
     for (const part of mergedParts) {
       // If it's already priced by the deterministic phase, skip grounding lookup
@@ -592,9 +593,14 @@ ${formatProcessesForPrompt(grounding.processes)}
           llmCount++
         } else {
           // Last resort: heuristic by keyword
-          part.estimatedUnitCostGbp = heuristicCotsCost(part.name)
-          ;(part as any).priceSource = 'heuristic'
-          heuristicCount++
+          if ((part as any).sourceManifest) {
+            ;(part as any).priceSource = 'manifest_no_price'
+            manifestUnpricedCount++
+          } else {
+            part.estimatedUnitCostGbp = heuristicCotsCost(part.name)
+            ;(part as any).priceSource = 'heuristic'
+            heuristicCount++
+          }
         }
       } else {
         // COTS: prefer LLM estimate (often quite good for named manufacturers),
@@ -603,15 +609,20 @@ ${formatProcessesForPrompt(grounding.processes)}
           ;(part as any).priceSource = 'llm'
           llmCount++
         } else {
-          part.estimatedUnitCostGbp = heuristicCotsCost(part.name)
-          ;(part as any).priceSource = 'heuristic'
-          heuristicCount++
+          if ((part as any).sourceManifest) {
+            ;(part as any).priceSource = 'manifest_no_price'
+            manifestUnpricedCount++
+          } else {
+            part.estimatedUnitCostGbp = heuristicCotsCost(part.name)
+            ;(part as any).priceSource = 'heuristic'
+            heuristicCount++
+          }
         }
       }
     }
 
     console.log(
-      `[bom-cost] Grounded cost sources: ${groundedCount} database/distributor, ${llmCount} LLM, ${heuristicCount} heuristic (of ${mergedParts.length} total)`
+      `[bom-cost] Grounded cost sources: ${groundedCount} database/distributor, ${llmCount} LLM, ${heuristicCount} heuristic, ${manifestUnpricedCount} unpriced manifest (of ${mergedParts.length} total)`
     )
 
     // ─── Top-N web price lookup for the most expensive parts ──────────────

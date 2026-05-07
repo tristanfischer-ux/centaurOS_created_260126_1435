@@ -543,7 +543,10 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
 
   const moduleCount = state.modules?.length || 0
   const bomRows = state.parts?.length || 0
-  const nreTotal = state.costBreakdown?.nreTotalGbp
+  
+  const regulatory = state.research?.designBrief?.regulatory || []
+  const nreBreakdown = computeNreFromRegulatory(regulatory, state.productClass || state.research?.industryDomain || '')
+  const displayNre = nreBreakdown.items.length > 0 ? nreBreakdown.totalGbp : (state.costBreakdown?.nreTotalGbp ?? 0)
 
   const verdict = (!targetCost || !unitCost) ? 'PENDING' : overTarget ? 'FEASIBLE BUT OVER BUDGET' : 'FEASIBLE'
 
@@ -599,7 +602,7 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
         <View style={s.statRow}>
           <View style={s.stat}>
             <Text style={s.statLabel}>Non-Recurring Eng. (NRE)</Text>
-            <Text style={s.statValue}>{formatGBP(nreTotal)}</Text>
+            <Text style={s.statValue}>{formatGBP(displayNre)}</Text>
             <GradeLabel grade="D" label="Modelled" />
           </View>
           <View style={s.stat}>
