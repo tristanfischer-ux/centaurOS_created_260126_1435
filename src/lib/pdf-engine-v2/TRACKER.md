@@ -264,14 +264,14 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 | **M1** | **NRE from regulatory matrix (sum of £-cost × weeks per standard, not flat-per-module)** | ✅ | `69122400` — computeNreFromRegulatory(), 34 tests |
 | **M2** | **Top-10 parts market-anchor — every capital part must have a cited Farnell/RS/Mouser URL or council-flagged as "unpriced"** | ✅ | `c20f6260` — anchorPartsToMarket(), 3 tests |
 | **M3** | **Benchmark-anchor check visible on cost-waterfall page (depends on L4)** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
-| **M4** | **LLM temperature tuning + N-run median for deterministic-leaning stages (decompose, BOM)** | ❌ planned | New 2026-05-07 — reduces run-to-run variance |
+| **M4** | **LLM temperature tuning + N-run median for deterministic-leaning stages (decompose, BOM)** | ✅ | `17bf643d` — llm-temperature-config.ts, 10 stages wired |
 | **M5** | **Cost-per-compound-point tracking for future trade-off decisions** | ✅ | `ab08a68b` — per-judge breakdown on scorecard |
 
 ### Phase N — Sizing
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **N1** | **Margin + thermal-rejection statements on Sizing page — floor-budget used/spare, heat rejection required vs cooling capacity provided** | ❌ planned | SIZE-Q1 (was) |
+| **N1** | **Margin + thermal-rejection statements on Sizing page — floor-budget used/spare, heat rejection required vs cooling capacity provided** | ✅ | `17bf643d` — Floor margin + heat rejection on sizing page |
 
 ### Phase P — Platform integration (engine ↔ ForgeOS app)
 
@@ -322,7 +322,7 @@ Tristan-flagged 2026-05-07: three security-oriented agents are missing. Unlike c
 
 ## Tally
 
-**97 ✅ done · 22 ❌ planned · 2 ⏸ deferred**
+**100 ✅ done · 19 ❌ planned · 2 ⏸ deferred**
 
 ---
 
