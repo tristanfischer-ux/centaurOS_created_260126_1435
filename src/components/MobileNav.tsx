@@ -112,7 +112,7 @@ const mainNavigation = [
     { name: "Welcome", shortName: "Welcome", href: "/welcome", icon: Compass },
     { name: "Brainstorming", shortName: "Brain", href: "/agents", icon: UsersRound },
     { name: "The Forge", shortName: "Forge", href: "/the-forge-v2", icon: Hammer },
-    { name: "Investors", shortName: "Invest", href: "/investors", icon: Building2 },
+    { name: "Investors", shortName: "Invest", href: "/money/raise", icon: Building2 },
     { name: "Suppliers", shortName: "Supply", href: "/marketplace", icon: Store },
 ]
 
@@ -144,7 +144,7 @@ const cashBurnNavigation = [
     { name: "Cash Out", href: "/cash-burn/cash-out", icon: TrendingDown },
     { name: "Cash In", href: "/cash-burn/cash-in", icon: TrendingUp },
     { name: "P&L", href: "/cash-burn/pnl", icon: BarChart3 },
-    { name: "Investors", href: "/investors", icon: Building2 },
+    { name: "Investors", href: "/money/raise", icon: Building2 },
     { name: "Fundraise", href: "/fundraise", icon: Sprout },
 ]
 

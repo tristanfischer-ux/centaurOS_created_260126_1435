@@ -33,7 +33,7 @@ import type { SidebarNavItem } from './types'
 // Hidden during pivot focus (2026-04-24): Cash Burn, Cash Out, Cash In, P&L, Fundraise.
 // Investors stays — primary product surface post-pivot.
 export const moneyLegacyNavigation: SidebarNavItem[] = [
-  { name: 'Investors', href: '/investors', icon: Building2, tooltip: 'Browse 13,000+ UK VC and PE firms — search, filter, and track outreach' },
+  { name: 'Investors', href: '/money/raise', icon: Building2, tooltip: 'Browse 13,000+ UK VC and PE firms — search, filter, and track outreach' },
 ]
 
 export const moneyV2Navigation: SidebarNavItem[] = [
