@@ -1,4 +1,3 @@
-import { describe, it, expect } from 'vitest'
 import { getRequiredFields, getRecommendedFields } from './product-classifier'
 
 describe('getRequiredFields', () => {

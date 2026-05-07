@@ -198,8 +198,8 @@ Status is verified from git log + grep + code audit, not memory.
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **G1** | **Widen `product-classifier.ts` to 15 classes (drone, UAV, AUV, HAPS, EV-charger, PCB-assembly, wearable-medical, bioreactor, CGM, etc.)** | ✅ | `product-classifier.ts` — 8 new classes, specific before generic cascade, 39/39 tests |
-| **G2** | **Relax `getRequiredFields()` to minimum common field set when classifier is uncertain** | ✅ | `product-classifier.ts` — unknown → `['product_type']` only, `getRecommendedFields()` export, 10/10 tests |
+| **G1** | **Widen `product-classifier.ts` to 15 classes (drone, UAV, AUV, HAPS, EV-charger, PCB-assembly, wearable-medical, bioreactor, CGM, etc.)** | ✅ | `e6507f6f` — 8 new classes, specific before generic cascade, 39/39 tests |
+| **G2** | **Relax `getRequiredFields()` to minimum common field set when classifier is uncertain** | ✅ | `e6507f6f` — unknown → `['product_type']` only, `getRecommendedFields()` export, 10/10 tests |
 | **G3** | **Brief-expand stage `0.5-brief-expansion.ts` + new PDF "Brief interpretation" section showing original + inferred fields + assumption rationale** | ❌ planned | Tristan 2026-05-07 design proposal |
 | **G4** | **Research LLM validator + re-prompt when structured fields missing from designBrief** | ❌ planned | BRIEF-Q1 (was) |
 
