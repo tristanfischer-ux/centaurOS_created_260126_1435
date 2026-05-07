@@ -174,7 +174,7 @@ Status is verified from git log + grep + code audit, not memory.
 | E6 | CX-002 meaningful project names from brief | ✅ | `471e49cc` |
 | **E7** | **Judges for Feasibility Gate + Proofreader findings + Audit Log** | ❌ planned | New 2026-05-07 |
 | **E8** | **Cover / Executive Summary judge** | ❌ planned | New 2026-05-07 |
-| **E9** | **Strip Market Sizing + Competitor Landscape from the current PDF.** Current report answers 'can this be built, how, at what risk, at what price'. Market/competitor analysis belongs in a separate commercial report (X2). Changes: drop `marketSizing` rendering from BriefPages, drop `competitors` table, remove TAM tile from cover, adjust rubric to stop scoring market/competitor completeness, leave `designBrief.marketSizing` + `competitors` fields in state for X2 to consume later. | ❌ planned | Tristan 2026-05-07 — "this document should really be focused on what the product is: Can it be made, how, risks, pricing" |
+| **E9** | **Strip Market Sizing + Competitor Landscape from the current PDF.** Current report answers 'can this be built, how, at what risk, at what price'. Market/competitor analysis belongs in a separate commercial report (X2). Changes: drop `marketSizing` rendering from BriefPages, drop `competitors` table, remove TAM tile from cover, adjust rubric to stop scoring market/competitor completeness, leave `designBrief.marketSizing` + `competitors` fields in state for X2 to consume later. | ✅ | `57861711` — TAM/competitor rendering removed, data preserved for X2 |
 
 ### Phase F — Scoring system
 
@@ -201,7 +201,7 @@ Status is verified from git log + grep + code audit, not memory.
 | **G1** | **Widen `product-classifier.ts` to 15 classes (drone, UAV, AUV, HAPS, EV-charger, PCB-assembly, wearable-medical, bioreactor, CGM, etc.)** | ✅ | `e6507f6f` — 8 new classes, specific before generic cascade, 39/39 tests |
 | **G2** | **Relax `getRequiredFields()` to minimum common field set when classifier is uncertain** | ✅ | `e6507f6f` — unknown → `['product_type']` only, `getRecommendedFields()` export, 10/10 tests |
 | **G3** | **Brief-expand stage `0.5-brief-expansion.ts` + new PDF "Brief interpretation" section showing original + inferred fields + assumption rationale** | ❌ planned | Tristan 2026-05-07 design proposal |
-| **G4** | **Research LLM validator + re-prompt when structured fields missing from designBrief** | ❌ planned | BRIEF-Q1 (was) |
+| **G4** | **Research LLM validator + re-prompt when structured fields missing from designBrief** | ✅ | `57861711` — validateResearchOutput(), 5 tests |
 
 ### Phase H — Corpus expansion (Buy-side catalogues)
 
@@ -227,7 +227,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **I1** | **Per-class safety validator registry — BESS (UL 9540A / thermal runaway / G99), farm (food contact / WRAS), CGM (MDR / biocompatibility), drone (geofence / battery thermal), AUV (pressure / maritime), HAPS (EASA SC-HAPS)** | ❌ planned | Tristan 2026-05-07 — noticed only heatpump currently has a "Safety & Compliance" row |
+| **I1** | **Per-class safety validator registry — BESS (UL 9540A / thermal runaway / G99), farm (food contact / WRAS), CGM (MDR / biocompatibility), drone (geofence / battery thermal), AUV (pressure / maritime), HAPS (EASA SC-HAPS)** | ✅ | `57861711` — 23 requirements across 8 classes, 4 tests |
 | **I2** | **Consistent "Safety & Compliance" scorecard row in every PDF — ensure every class has an authored safety check** | ❌ planned | New 2026-05-07 |
 
 ### Phase J — Dashboard & diagnostics
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**75 ✅ done · 31 ❌ planned · 2 ⏸ deferred**
+**78 ✅ done · 28 ❌ planned · 2 ⏸ deferred**
 
 ---
 
