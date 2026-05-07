@@ -231,21 +231,36 @@ Return ONLY valid JSON:
 
   const votes: CouncilScore[] = []
 
-  for (const model of judges) {
-    try {
-      const result = await callJudge(model, prompt)
-      if (result && result.overall_score) {
-        votes.push({
-          section,
-          score: result.overall_score,
-          criteria_scores: result.criteria_scores || [],
-          overall_reasons: result.overall_reasons || [],
-          code_change_recommendations: result.code_change_recommendations || [],
-          source_attributions: result.source_attributions || [],
-        })
+  const judgePromises = judges.map(async (model) => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const result = await callJudge(model, prompt)
+        if (result && result.overall_score) {
+          return {
+            section,
+            score: result.overall_score,
+            criteria_scores: result.criteria_scores || [],
+            overall_reasons: result.overall_reasons || [],
+            code_change_recommendations: result.code_change_recommendations || [],
+            source_attributions: result.source_attributions || [],
+          } as CouncilScore
+        }
+      } catch (err) {
+        if (attempt === 0) {
+          console.warn(`[council-scorer] ${section} judge ${model} failed (attempt 1), retrying...`)
+          await new Promise(r => setTimeout(r, 2000)) // 2s backoff
+        } else {
+          console.warn(`[council-scorer] ${section} judge ${model} failed (attempt 2), skipping`)
+        }
       }
-    } catch (err) {
-      // Judge failed — skip
+    }
+    return null
+  })
+
+  const results = await Promise.allSettled(judgePromises)
+  for (const r of results) {
+    if (r.status === 'fulfilled' && r.value) {
+      votes.push(r.value)
     }
   }
 

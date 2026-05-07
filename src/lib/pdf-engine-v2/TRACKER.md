@@ -43,8 +43,8 @@ Council sequenced this to avoid calibrating against a broken score. Targets for 
 | 5 | **G2** relax `getRequiredFields()` | 15 min | **@coder-2** (MiMo) — ✅ DONE | Pairs with G1 — Round 1 → 9-10/10 pass rate |
 | 6 | **B6** required-parts manifest per product class | 2 hr | ✅ DONE | BOM 4 → 7 — adds expansion tank, PRV, PIR insulation, etc. |
 | 7 | **H2** Stage 5 regime router | 45 min | ✅ DONE | Distributor APIs called for `buy_electronic` parts |
-| 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | **@coder** (React-PDF layout + 3 new sections) | Make/Buy/Services visible per part |
-| 9 | **J1a** pipeline emits status for failed runs | 45 min | **@coder-2** (MiMo) — small error-handler additions | Dashboard shows all 20 runs, not just 5 |
+| 8 | **C8** PDF §6a / §6b / §6c restructure | 1.5 hr | ✅ DONE | Make/Buy/Services visible per part |
+| 9 | **J1a** pipeline emits status for failed runs | 45 min | ✅ DONE | Dashboard shows all 20 runs, not just 5 |
 | 10 | **F9** exclude engine-lineage from judges | 30 min | ✅ DONE `afd1d854` | Gemini stops grading Gemini |
 
 **Total ~9 hours, ~£15-25 OpenRouter for evidence runs at the end of the day.**
@@ -152,7 +152,7 @@ Status is verified from git log + grep + code audit, not memory.
 | **C5** | **Part-regime classifier at Stage 4 — every BOM line stamped `buy_electronic` / `buy_mechanical_industrial` / `named_manufacturer_reseller` / `make_custom_fab` / `service_certification`. Routes downstream lookup to the right corpus. Rules-first with LLM fallback.** | ✅ | `80b1d5f2` — 16/16 tests |
 | **C6** | **Supplier Shortlist honesty gate — only include a supplier match when (a) part regime is `make_custom_fab` or `service_certification` AND (b) process-match OR material-match verifies via D1/D2. Prevents "UK sheet-metal shop appearing on MCU query" false-positives.** | ❌ planned | New 2026-05-07 |
 | **C7** | **Match-type column on every Supplier Shortlist card — `Custom fabricator` / `Distributor SKU` / `Authorised reseller` / `Certification body` / `Speculative match`. Sets founder expectation correctly.** | ❌ planned | New 2026-05-07 |
-| **C8** | **PDF restructure: replace single "Supplier Shortlist" section with three. §6a PARTS TO BUY (distributor table MPN + £ + stock + datasheet). §6b PARTS TO MAKE (fabricator leads grouped by process — machining / sheet metal / welding / moulding / harness). §6c SERVICES & CERTIFICATION (UL / EMC / MDR / G99 test houses with cost + lead time).** | ❌ planned | New 2026-05-07 — Tristan "three structured procurement paths" framing |
+| **C8** | **PDF restructure: replace single "Supplier Shortlist" section with three. §6a PARTS TO BUY (distributor table MPN + £ + stock + datasheet). §6b PARTS TO MAKE (fabricator leads grouped by process — machining / sheet metal / welding / moulding / harness). §6c SERVICES & CERTIFICATION (UL / EMC / MDR / G99 test houses with cost + lead time).** | ✅ | `7-pdf.tsx` — 3 sections with honest empty states, GradeLabel, SourceFooter |
 
 ### Phase D — Corpus indexing
 
@@ -234,7 +234,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 | ID | Description | Status | Commit / ref |
 |---|---|---|---|
-| **J1** | **Show ALL runs in dashboard — including BRIEF INCOMPLETE, INFEASIBLE, PIPELINE ERROR with status column** | ❌ planned | Tristan 2026-05-07 — dashboard shows 5/20 runs because the other 15 never wrote qa-scores.json |
+| **J1** | **Show ALL runs in dashboard — including BRIEF INCOMPLETE, INFEASIBLE, PIPELINE ERROR with status column** | ✅ | `scoring-history.ts` + `index.ts` — 7 early-return paths emit records, status badges on dashboard |
 | **J2** | **Click-through from card → per-section council reasons + code-change-recommendations (the genuinely actionable output)** | ❌ planned | New 2026-05-07 |
 | **J3** | **Per-project long-run history beyond 20-run cap ("BESS: 11 runs, best 73, worst 62, last 71")** | ❌ planned | New 2026-05-07 |
 
@@ -292,7 +292,7 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 
 ## Tally
 
-**68 ✅ done · 38 ❌ planned · 2 ⏸ deferred**
+**70 ✅ done · 36 ❌ planned · 2 ⏸ deferred**
 
 ---
 
@@ -368,6 +368,14 @@ The nightshift corpus covers **Make** (custom-fab suppliers, 18k UK/EU companies
 ## Log
 
 (newest first — historical entries retained for SHA traceability)
+
+### 2026-05-07 12:00 — C8 + J1a shipped (PDF restructure + failed-run status)
+
+C8: Replaced monolithic Supplier Shortlist with three sections — §6a PARTS TO BUY (distributor table), §6b PARTS TO MAKE (fabricator leads by process), §6c SERVICES & CERTIFICATION (test houses). Each has honest empty state, GradeLabel, SourceFooter. Regime-router results flow through types.ts to PDF renderer.
+
+J1a: Pipeline now emits scoring records at all 7 early-return paths (BRIEF_INCOMPLETE, INFEASIBLE, PIPELINE_ERROR). Dashboard shows status badges for failed runs, filters them from sparkline trend. All 20 runs now visible.
+
+Count: 70 ✅ / 36 ❌ / 2 ⏸.
 
 ### 2026-05-07 11:45 — B6 + H2 shipped (required-parts manifest + regime router)
 
