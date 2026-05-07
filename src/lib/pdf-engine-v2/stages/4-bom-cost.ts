@@ -10,6 +10,7 @@ import {
 import type { Module, Part, BomLine, CostBreakdown, StageResult, DimensionSheet } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { BOM_GENERATION_SYSTEM } from '../prompts'
+import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { parseJsonFromLlm } from '../lib/llm-json'
 import {
   deriveQuantities,
@@ -51,6 +52,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
         },
         body: JSON.stringify({
           model,
+          temperature: STAGE_TEMPERATURES.bom,
           max_tokens: 16384,
           response_format: { type: 'json_object' },
           messages: [
@@ -661,6 +663,7 @@ Respond ONLY with valid JSON array of objects. Do not use markdown blocks.`
       },
       body: JSON.stringify({
         model: 'z-ai/glm-5.1',
+        temperature: STAGE_TEMPERATURES.bom,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt }

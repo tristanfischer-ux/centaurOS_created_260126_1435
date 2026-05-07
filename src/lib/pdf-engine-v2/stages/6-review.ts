@@ -1,5 +1,6 @@
 import type { Module, SpecialistReview, ResearchResult, StageResult } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
+import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 
 /**
  * Stage 6: Review
@@ -86,6 +87,7 @@ Respond in valid JSON matching this schema:
     },
     body: JSON.stringify({
       model: 'xiaomi/mimo-v2.5-pro',
+      temperature: STAGE_TEMPERATURES['fang-review'],
       max_tokens: 16384,
       response_format: { type: 'json_object' },
       messages: [
@@ -182,6 +184,7 @@ Return a structured text summary of your findings.`
     },
     body: JSON.stringify({
       model: 'xiaomi/mimo-v2.5-pro',
+      temperature: STAGE_TEMPERATURES.proofreader,
       max_tokens: 16384,
       messages: [
         { role: 'system', content: 'You are an expert engineering proofreader.' },

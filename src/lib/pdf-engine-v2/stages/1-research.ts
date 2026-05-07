@@ -1,6 +1,7 @@
 import type { ResearchResult, StageResult } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { RESEARCH_SYNTHESIS_SYSTEM } from '../prompts'
+import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 
 // Stage 1: Research — uses RESEARCH_SYNTHESIS_SYSTEM from prompts.ts
 // The prompt is defined in prompts.ts and imported above.
@@ -18,6 +19,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
       },
       body: JSON.stringify({
         model: 'anthropic/claude-sonnet-4-6',
+        temperature: STAGE_TEMPERATURES.research,
         max_tokens: 16384,
         messages: [
           { role: 'system', content: systemPrompt },

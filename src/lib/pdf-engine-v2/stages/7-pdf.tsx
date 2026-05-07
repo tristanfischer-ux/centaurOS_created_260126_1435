@@ -3,6 +3,7 @@ import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { benchmarkCheck, PROJECT_BENCHMARKS } from '../benchmarks'
 import { classifyRegime } from '../lib/part-regime'
 import { normaliseState } from '../lib/safe-state'
+import { checkSafetyRequirements } from '../lib/safety-registry'
 import type { 
   PipelineState, 
   Module, 
@@ -612,6 +613,34 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
             quality average (60%). Replaces the misleading "95/100" reading
             of rubric alone. */}
         {(() => {
+          const productClass = state.productClass || state.research?.industryDomain || ''
+          const bomText = state.parts?.map(p => p.name).join(' ') || ''
+          const moduleText = state.modules?.map(m => `${m.name} ${m.description} ${m.purpose}`).join(' ') || ''
+          const safetyCheck = checkSafetyRequirements(productClass, bomText, moduleText)
+          
+          const hasSafetyReqs = safetyCheck.total > 0
+          const safetyColor = hasSafetyReqs 
+            ? (safetyCheck.coveragePercent >= 80 ? GREEN : safetyCheck.coveragePercent >= 50 ? AMBER : RED)
+            : MUTED
+            
+          const safetyText = hasSafetyReqs
+            ? `${safetyCheck.addressed} of ${safetyCheck.total} safety requirements addressed (${safetyCheck.coveragePercent}%)`
+            : "No class-specific safety requirements defined"
+
+          return (
+            <View style={s.statRow}>
+              <View style={{ ...s.stat, borderTopColor: safetyColor }}>
+                <Text style={s.statLabel}>Safety & Compliance</Text>
+                <Text style={{ ...s.statValue, color: safetyColor, fontSize: 14 }}>
+                  {safetyText}
+                </Text>
+                <GradeLabel grade="D" label="Requirement check" />
+              </View>
+            </View>
+          )
+        })()}
+
+        {(() => {
           const compound = (state as any).compoundScore as {
             compound: number
             rubric: number
@@ -1029,6 +1058,61 @@ const SizingSection = ({ state }: { state: PipelineState }) => {
             <KV label="Internal Volume" value={formatNumber(ds.envelope?.interior_volume_m3, ' m³')} />
             <KV label="Rules Domain" value={ds.rules_domain} />
           </View>
+
+          {(() => {
+            let floorInfo = null
+            if (ds.floor_budget_m2 !== undefined) {
+              const floor_budget = ds.floor_budget_m2
+              const used = Object.values(ds.module_dimensions || {}).reduce((acc, v) => acc + (v.floor_m2 || 0), 0)
+              const spare = floor_budget - used
+              floorInfo = (
+                <View style={{ ...s.calloutNeutral, marginTop: 12 }}>
+                  <Text style={s.h4}>Floor Margin</Text>
+                  <Text style={s.para}>Floor budget: {used.toFixed(2)}m² used / {floor_budget.toFixed(2)}m² available ({spare.toFixed(2)}m² spare)</Text>
+                </View>
+              )
+            }
+
+            let heatRejectionW: number | null = null
+            let coolingCapacityW: number | null = null
+
+            for (const v of Object.values(ds.module_dimensions || {})) {
+              if (v.requirement?.label?.toLowerCase().match(/thermal|cooling|heat/)) {
+                if (v.requirement.unit === 'kW') {
+                  heatRejectionW = v.requirement.value * 1000
+                } else if (v.requirement.unit === 'W') {
+                  heatRejectionW = v.requirement.value
+                }
+              }
+            }
+
+            const coolingModule = state.modules?.find(m => /cool|thermal|hvac|chiller|refriger/i.test(m.name) || /cool|thermal|hvac|chiller|refriger/i.test(m.purpose))
+            if (coolingModule?.specs?.powerW) {
+              coolingCapacityW = coolingModule.specs.powerW
+            }
+
+            const thermalInfo = (
+              <View style={{ ...s.calloutNeutral, marginTop: 12 }}>
+                <Text style={s.h4}>Thermal Margin</Text>
+                {(heatRejectionW != null || coolingCapacityW != null) ? (
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={s.para}>
+                      Heat rejection required: {heatRejectionW != null ? `${heatRejectionW}W` : 'Unknown'} / Cooling capacity: {coolingCapacityW != null ? `${coolingCapacityW}W` : 'Unknown'}
+                    </Text>
+                    {heatRejectionW != null && coolingCapacityW != null && (
+                      <View style={{ marginLeft: 8, paddingHorizontal: 6, paddingVertical: 2, backgroundColor: coolingCapacityW >= heatRejectionW ? GREEN : RED, borderRadius: 4, marginBottom: 10 }}>
+                        <Text style={{ fontSize: 8, color: '#fff', fontWeight: 'bold' }}>{coolingCapacityW >= heatRejectionW ? 'MARGIN OK' : 'DEFICIT'}</Text>
+                      </View>
+                    )}
+                  </View>
+                ) : (
+                  <Text style={s.para}>Thermal margin data not available for this configuration</Text>
+                )}
+              </View>
+            )
+
+            return <>{floorInfo}{thermalInfo}</>
+          })()}
 
           <Text style={s.h3}>Module Allocation Zone Table</Text>
           <View style={s.tableWrap}>

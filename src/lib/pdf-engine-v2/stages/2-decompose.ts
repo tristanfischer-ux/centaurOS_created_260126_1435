@@ -1,5 +1,6 @@
 import type { Module, ResearchResult, StageResult } from '../types'
 import { MODULE_DECOMPOSITION_SYSTEM } from '../prompts'
+import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 
 // Stage 2: Module Decomposition — uses MODULE_DECOMPOSITION_SYSTEM from prompts.ts
 // The prompt is defined in prompts.ts and imported above.
@@ -64,6 +65,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
         },
         body: JSON.stringify({
           model,
+          temperature: STAGE_TEMPERATURES.decompose,
           max_tokens: 16384,
           messages: [
             { role: 'system', content: systemPrompt },

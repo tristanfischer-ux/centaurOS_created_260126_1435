@@ -69,6 +69,7 @@ import {
 } from "@/actions/pipeline-runs"
 import { sweepStalledRuns } from "@/actions/pipeline-runs-watchdog"
 import { callAI, callOpenAI } from "@/lib/cad-lab/api-helpers"
+import { STAGE_TEMPERATURES } from "@/lib/pdf-engine-v2/llm-temperature-config"
 import { checkAILimit } from "@/lib/ai/limit-check"
 import type {
     CadLabDesignBrief,
