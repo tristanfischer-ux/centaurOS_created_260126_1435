@@ -1756,9 +1756,16 @@ function _estimateSectionPages(sectionId: string, safe: PipelineState): number {
   }
 }
 
-// Trim order: least-critical sections first; cover/brief/source_attrib never trimmed.
+// G-B1 fix: source_attrib is mandatory and always renders (JSX unconditional render).
+// It must NOT appear in TRIM_ORDER — the loop cannot suppress it, so trimming it
+// would waste a trim slot while the page is still emitted (phantom saving).
+// source_attrib is counted in the _applyMaxPages base estimate only.
+// G-B3 fix: source_attrib is now gated by show('source_attrib') so it CAN be
+// excluded on BRIEF_INCOMPLETE when the router adds it to excludedSections.
+// When excluded it is omitted from the base estimate too (see _applyMaxPages below).
+//
+// Trim order: least-critical sections first; cover/brief are never trimmed.
 const TRIM_ORDER = [
-  'source_attrib',
   'audit_log',
   'suppliers',
   'risks',
@@ -1767,6 +1774,8 @@ const TRIM_ORDER = [
   'regulatory',
   'sizing',
   'feasibility',
+  // source_attrib: trimmed LAST — only removed if nothing else can save enough pages.
+  'source_attrib',
 ]
 
 /**
@@ -1775,7 +1784,12 @@ const TRIM_ORDER = [
  * React-PDF does not support hard page limits natively. This guard removes
  * sections from the included set (starting with least-critical) until the
  * estimated page total is at or under maxPages. Mandatory sections
- * (cover, brief, source_attrib) are never trimmed.
+ * (cover, brief) are never trimmed. source_attrib is trimmed last.
+ *
+ * G-B1 fix: source_attrib is no longer double-counted. It is counted in the
+ * base only if it is present in the included Set (i.e. not excluded by router).
+ * It is also listed at the END of TRIM_ORDER so the loop can trim it last if
+ * needed, but the JSX now respects show('source_attrib').
  *
  * @param maxPages  0 = no cap (FULL_REPORT); >0 = enforce cap
  */
@@ -1787,9 +1801,18 @@ function _applyMaxPages(
 ): Set<string> {
   if (maxPages === 0) return included
 
-  // Start with always-rendered sections
-  let estimated = _estimateSectionPages('cover', safe) + _estimateSectionPages('brief', safe) + _estimateSectionPages('source_attrib', safe)
+  // Always-rendered: cover + brief.  source_attrib is conditional (gated by show()).
+  let estimated = _estimateSectionPages('cover', safe) + _estimateSectionPages('brief', safe)
+  // Add source_attrib to base estimate only if it is in the included Set.
+  // (G-B1 fix: was unconditionally added, causing double-count when it also
+  // appeared first in TRIM_ORDER and was then "removed" from the loop.)
+  if (included.has('source_attrib')) {
+    estimated += _estimateSectionPages('source_attrib', safe)
+  }
   for (const sec of TRIM_ORDER) {
+    // source_attrib was already counted above; skip it in the sum loop to
+    // avoid double-counting it (it IS in TRIM_ORDER for the trim pass below).
+    if (sec === 'source_attrib') continue
     if (included.has(sec)) {
       estimated += _estimateSectionPages(sec, safe)
     }
@@ -1838,14 +1861,21 @@ export default function PdfRendererV3({ state }: { state: PipelineState }) {
   const maxPages: number = routerResult?.maxPages ?? 0
 
   // Build included-sections set: start with all optional sections, remove excluded.
+  // G-B2 fix: 'bom' and 'research' are now registered in the Set so that
+  //   included.delete('bom') / included.delete('research') are NOT silent no-ops
+  //   when the router emits them in excludedSections.
+  // G-B3 fix: 'source_attrib' remains in the Set so that the router can exclude
+  //   it on BRIEF_INCOMPLETE (included.delete('source_attrib') will now work).
   const included = new Set([
     'feasibility',
     'regulatory',
     'sizing',
     'modules',
+    'bom',        // G-B2: registered so router exclusions take effect
     'cost',
     'suppliers',
     'risks',
+    'research',   // G-B2: registered so router exclusions take effect
     'audit_log',
     'source_attrib',
   ])
@@ -1959,10 +1989,16 @@ export default function PdfRendererV3({ state }: { state: PipelineState }) {
         </SafeSection>
       )}
 
-      {/* Source Attribution — always rendered */}
-      <SafeSection name="SourceAttribution">
-        <SourceAttributionSection state={safe} />
-      </SafeSection>
+      {/* Source Attribution — conditional on show('source_attrib').
+          G-B3 fix: was unconditionally rendered; now gated so BRIEF_INCOMPLETE
+          (and any future route that excludes 'source_attrib') can suppress it.
+          Router adds 'source_attrib' to BRIEF_INCOMPLETE_EXCLUDED so the spec
+          "cover + brief only" is honoured exactly. */}
+      {show('source_attrib') && (
+        <SafeSection name="SourceAttribution">
+          <SourceAttributionSection state={safe} />
+        </SafeSection>
+      )}
     </Document>
   )
 }

@@ -64,6 +64,10 @@ const BRIEF_INCOMPLETE_EXCLUDED: string[] = [
   'risks',
   'research',
   'audit_log',
+  // G-B3 fix: BRIEF_INCOMPLETE spec = "cover + brief only". source_attrib was
+  // always-rendered before, silently adding 1 page and violating the spec.
+  // Now excluded so the renderer's show('source_attrib') guard suppresses it.
+  'source_attrib',
 ]
 
 const FEASIBILITY_EXCEPTION_EXCLUDED: string[] = [

@@ -31,7 +31,21 @@ const PA_PIPELINE = (process.env.PA_PIPELINE ?? 'false') === 'true'
 // Phase G: when PA_PIPELINE=true and no explicit PDF_RENDERER env var is set,
 // default to 'v3'. Legacy path (PA_PIPELINE=false) keeps 'v2' as default.
 // Explicit PDF_RENDERER env var always wins (allows override in both directions).
-const _pdfRendererVersion = process.env.PDF_RENDERER || (PA_PIPELINE ? 'v3' : 'v2')
+//
+// G-B4 fix: use ?? (not ||) so that PDF_RENDERER='' (empty string) is treated as
+// explicit/unset and falls through to the PA_PIPELINE ternary, rather than
+// silently selecting v3 when PA_PIPELINE=true. With ||, '' was falsy and fell
+// to the ternary anyway — but the intent is that '' means "no override".
+// Additionally, validate the resolved value and warn on unrecognised strings
+// (e.g. 'v4', 'V3') that would silently fall back to the legacy renderer.
+const _pdfRendererVersion = (process.env.PDF_RENDERER ?? '') || (PA_PIPELINE ? 'v3' : 'v2')
+const _VALID_RENDERER_VERSIONS = ['v2', 'v3'] as const
+if (!_VALID_RENDERER_VERSIONS.includes(_pdfRendererVersion as typeof _VALID_RENDERER_VERSIONS[number])) {
+  console.warn(
+    `[pdf-engine-v2] Unrecognised PDF_RENDERER value '${_pdfRendererVersion}'. ` +
+    `Valid values: ${_VALID_RENDERER_VERSIONS.join(', ')}. Falling back to legacy renderer (v2).`,
+  )
+}
 const _activePdfRenderer = _pdfRendererVersion === 'v3' ? PdfRendererV3 : PdfRenderer
 import { runPolish } from './stages/7-polish'
 import { pdf } from '@react-pdf/renderer'
