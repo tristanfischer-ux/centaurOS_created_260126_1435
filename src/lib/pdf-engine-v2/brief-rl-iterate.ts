@@ -224,7 +224,7 @@ Return JSON: {"changes": [{"what": "description", "old": "text to replace (or em
   return extractJSON(raw) || { changes: [] }
 }
 
-async function callLLM(model: string, system: string, user: string, maxTokens: number = 4096, temperature: number = 0.3): Promise<string> {
+async function callLLM(model: string, system: string, user: string, maxTokens: number = 16384, temperature: number = 0.3): Promise<string> {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {

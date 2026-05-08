@@ -109,7 +109,7 @@ export async function runBriefGeneration(
       },
       body: JSON.stringify({
         model: 'google/gemini-3.1-pro-preview',
-        max_tokens: 4096,
+        max_tokens: 16384,
         temperature: 0.3,
         messages: [
           { role: 'system', content: BRIEF_SYSTEM_PROMPT },
