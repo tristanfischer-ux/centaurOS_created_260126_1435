@@ -827,7 +827,7 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 ### Actual
 
-- **Commit:** TBD (committed after tracker update)
+- **Commit:** `0a839698`
 - **Files changed:**
   - `src/lib/pdf-engine-v2/stages/7-pdf-v3.tsx` — section guards via `show()` predicate + `_applyMaxPages()` max-pages enforcement + `_estimateSectionPages()` helper
   - `src/lib/pdf-engine-v2/index.ts` — renderer selection: `process.env.PDF_RENDERER || (PA_PIPELINE ? 'v3' : 'v2')`; moved `PA_PIPELINE` const declaration before `_pdfRendererVersion` to avoid temporal dead zone
