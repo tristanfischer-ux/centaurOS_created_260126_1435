@@ -1,6 +1,15 @@
 /**
  * @file stages/7-polish.ts — LLM narrative polish pass
  *
+ * @deprecated Dropped on PA path per PA principle "The LLM never post-processes
+ * data that feeds the renderer. It produces data. The renderer consumes data."
+ * On PA_PIPELINE=true this file is NOT called — see Phase F wiring in index.ts
+ * (`if (!PA_PIPELINE)` guard around runPolish()). The legacy path (PA_PIPELINE=false)
+ * continues to call it unchanged for backwards compatibility.
+ *
+ * Removal schedule: Phase H of the Strict PA Adoption Migration.
+ * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase H.
+ *
  * Takes the deterministic outputs from all previous stages and produces
  * polished, professional engineering narrative. This is the final LLM call
  * that makes the report read like it was written by a senior engineer.

@@ -17,7 +17,7 @@
 | D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | D2 | Sizing + Cost PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
-| F | Demote Review/Polish + Report Type Router | 2-3 | ⬜ Pending | ⬜ Pending | — |
+| F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ⬜ Pending | 2026-05-08 |
 | G | Renderer integration with reportType | 2-3 | ⬜ Pending | ⬜ Pending | — |
 | H | Flip defaults, cleanup | 1-2 | ⬜ Pending | ⬜ Pending | — |
 
@@ -753,33 +753,57 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 ## Phase F — Demote Review/Polish + Report Type Router
 
-**Status:** ⬜ Pending (blocked on A-D)
+**Status:** ✅ Done
+**Started:** 2026-05-08
+**Landed:** 2026-05-08
 
 ### Planned
 
 | Sub-item | Status |
 |---|---|
-| Remove `runPolish()` call from `index.ts` entirely | ⬜ |
-| Move `runReview()` call inside `if (reportType === 'FULL_REPORT')` guard | ⬜ |
-| Create `report-type-router.ts` implementing PA Stage 9 lookup table | ⬜ |
-| Add `ReportType`, `ReportTypeRouterResult` to `types.ts` | ⬜ |
-| Add `reportType?: ReportType` to `PipelineState` | ⬜ |
-| Add `reportType` to `FeasibilityResult` | ⬜ |
-| Mark `stages/7-polish.ts` as `@deprecated` | ⬜ |
-| Brief revision loop: keep as conditional on FEASIBILITY_EXCEPTION (Q1 default) | ⬜ |
+| Remove `runPolish()` call from `index.ts` entirely | ✅ |
+| Move `runReview()` call inside `if (reportType === 'FULL_REPORT')` guard | ✅ |
+| Create `report-type-router.ts` implementing PA Stage 9 lookup table | ✅ |
+| Add `ReportType`, `ReportTypeRouterResult` to `types.ts` | ✅ |
+| Add `reportType?: ReportType` to `PipelineState` | ✅ |
+| Add `reportType` to `FeasibilityResult` | ✅ |
+| Mark `stages/7-polish.ts` as `@deprecated` | ✅ |
+| Brief revision loop: keep as conditional on FEASIBILITY_EXCEPTION (Q1 default) | ✅ |
 
 ### Verification
 
-- [ ] BESS brief (one FAIL: cost) routes to FULL_REPORT
-- [ ] Brief with BOM=0 routes to FEASIBILITY_EXCEPTION
-- [ ] Brief missing mass + cost ceiling routes to BRIEF_INCOMPLETE
-- [ ] Polish log line absent from runs
-- [ ] Review runs on FULL_REPORT only
+- [x] BESS brief (one FAIL: cost) routes to FULL_REPORT — ✅ test: `report-type-router.test.ts` "BESS brief — exactly one FAIL check"
+- [x] Brief with BOM=0 routes to FEASIBILITY_EXCEPTION — ✅ test: "2+ FAIL checks → FEASIBILITY_EXCEPTION"
+- [x] Brief missing mass + cost ceiling routes to BRIEF_INCOMPLETE — ✅ test: "BRIEF_INCOMPLETE — confidence=LOW and >5 missing mandatory fields"
+- [x] Polish log line absent from runs — ✅ integration test: `index.test.ts` "NEVER calls runPolish() on PA path"
+- [x] Review runs on FULL_REPORT only — ✅ integration test: "does NOT call runReview() on FEASIBILITY_EXCEPTION" + "does NOT call runReview() on BRIEF_INCOMPLETE"
 
 ### Council review
 
 - [ ] Findings ≥2 seats addressed
 - [ ] State-machine audit (PA Stage 9 routing logic) — use GLM-5.1 + Grok 4.3 + Kimi K2.6 council per coding-council.md
+
+### Actual
+
+- Commit SHA: (see git log — feat(pdf-engine-v2): Phase F)
+- Files changed:
+  - `src/lib/pdf-engine-v2/report-type-router.ts` — **new file**: PA Stage 9 deterministic lookup table
+  - `src/lib/pdf-engine-v2/types.ts` — added `ReportType` + `ReportTypeRouterResult` re-export (PA Stage 9 delimiter); added `reportType?: ReportType` to `PipelineState`
+  - `src/lib/pdf-engine-v2/feasibility-gate.ts` — added `reportType?: ReportType` to `FeasibilityResult` (optional, backwards compat)
+  - `src/lib/pdf-engine-v2/index.ts` — imported `routeReportType`; added PA Stage 9 router call after revision loop; wrapped `runReview()` with `_shouldRunReview` guard; wrapped `runCouncilScoring()` with `_shouldRunCouncil` guard; wrapped `runPolish()` with `if (!PA_PIPELINE)` guard; added `_paRevisionEnabled` guard to brief revision loop (Q1: only fires on FEASIBILITY_EXCEPTION)
+  - `src/lib/pdf-engine-v2/stages/7-polish.ts` — added `@deprecated` JSDoc noting Phase H removal and PA principle
+  - `src/lib/pdf-engine-v2/report-type-router.test.ts` — **new file**: 21 unit tests, all passing
+  - `src/lib/pdf-engine-v2/index.test.ts` — **new file**: 12 integration tests (jest.isolateModules strategy), all passing
+- Test results: 563/563 pass (530 existing + 21 router unit tests + 12 orchestrator integration tests)
+- Typecheck: 0 new errors in Phase F files (pre-existing errors in council-scorer.test.ts, 7-pdf.tsx, bom-builder.ts are unrelated)
+- Deviations from plan:
+  - Plan said "Remove `runPolish()` call entirely" — implemented as `if (!PA_PIPELINE)` guard (keeps legacy path working, not a deletion). Deletion is Phase H.
+  - Plan said Council Scoring wrapped in `if (state.reportType === 'FULL_REPORT')` — implemented as `_shouldRunCouncil = !PA_PIPELINE || state.reportType === 'FULL_REPORT'` which also keeps legacy path unconditional.
+  - Integration tests use `jest.isolateModules` strategy (not a simple `index.test.ts` import) because `PA_PIPELINE` is a module-level constant evaluated at load time. This is the correct approach; noted for Phase H when the constant may be refactored.
+
+### Council review notes
+
+- Council review: ⬜ Pending
 
 ---
 
@@ -869,8 +893,11 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase D2: COMPLETE (2026-05-08) — Sizing Solver + Cost Computation PA schemas
 - ✅ Phase D1: council review ✅ Approved (2026-05-08) — 9 BLOCKERs fixed + 2 NOTEDs reclassified as BLOCKERs (NOTED-D1-2 and NOTED-D1-3, 2 seats each) and fixed. All 530 tests pass. Phase E unblocked.
 - ✅ Phase D2: council review ✅ Approved (after fixes) — 5 BLOCKERs fixed 2026-05-08
-- ❌ Phase E-H: unblocked, ready to start
-- ❌ All council reviews (Phase C-D onwards)
+- ✅ Phase F: COMPLETE (2026-05-08) — Report Type Router (PA Stage 9), Polish dropped on PA path, Review + Council Scoring FULL_REPORT-only guard; 33 new tests (21 unit + 12 integration); 563/563 pass
+- ❌ Phase F: council review PENDING
+- ❌ Phase E: unblocked, ready to start (gated on v2 BOM ≥8 baseline)
+- ❌ Phase G-H: pending F completion
+- ❌ All council reviews (Phase F onwards)
 
 ---
 

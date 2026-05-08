@@ -599,6 +599,14 @@ export interface ResearchConstraints {
   competitorSpecs: Array<{ name: string; mass?: number; cost?: number; keySpecs: string[] }>
 }
 
+// === PA Stage 9 Report Type Router ===
+// Added Phase F. ReportType and ReportTypeRouterResult are defined in
+// report-type-router.ts and re-exported here so consumers only need one import.
+
+export type { ReportType, ReportTypeRouterResult } from './report-type-router'
+
+// === end PA Stage 9 Report Type Router ===
+
 export interface PipelineState {
   projectId: string
   briefText?: string
@@ -635,6 +643,8 @@ export interface PipelineState {
   researchSynthesis?: ResearchSynthesis
   /** PA path only (Phase D1+): structured regulatory extraction from runRegulatoryExtraction() */
   regulatoryExtraction?: RegulatoryExtraction
+  /** PA path only (Phase F+): resolved report type from PA Stage 9 Router */
+  reportType?: import('./report-type-router').ReportType
   productClass?: string
   pipelineError?: {
     stage: string

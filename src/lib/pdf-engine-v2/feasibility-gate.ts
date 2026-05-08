@@ -18,6 +18,11 @@ export interface FeasibilityResult {
   // header. Derived from status + the most material blocker / warning.
   // Renderer shows it as a colour-coded pill.
   compactBanner: string
+  /**
+   * PA Stage 9 (Phase F+): resolved report type set by routeReportType().
+   * Optional for backwards compatibility — absent on legacy/non-PA runs.
+   */
+  reportType?: import('./report-type-router').ReportType
 }
 
 export interface BriefValidationState {

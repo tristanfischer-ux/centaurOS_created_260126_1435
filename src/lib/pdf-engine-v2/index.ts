@@ -48,6 +48,7 @@ import { runBriefRevision } from './stages/3.5-brief-revision'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
 import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON, ResearchSynthesis } from './types'
+import { routeReportType, type ReportTypeRouterResult } from './report-type-router'
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 import { mapProductClassToIndustryDomain } from './lib/industry-domain'
 
@@ -661,11 +662,23 @@ export async function runPipeline(
   // ── Feasibility → Brief Feedback Loop ───────────────────────────────
   // When Feasibility finds impossible constraints, revise the Brief with
   // feasible alternatives and re-run Feasibility. Max 2 revisions.
+  //
+  // Phase F (Q1 decision): on PA path, the revision loop only fires when a
+  // preliminary route indicates FEASIBILITY_EXCEPTION. This prevents the loop
+  // from running on BRIEF_INCOMPLETE paths (where revision is futile — the
+  // brief is too thin) and FULL_REPORT paths (where revision is unnecessary).
+  // After the loop completes, the router runs again with the updated feasibility.
   const MAX_REVISIONS = 2
   let revisionCount = 0
   const rejectedConstraints: string[] = []
 
-  while ((feasibility.status === 'RED' || feasibility.status === 'AMBER') && revisionCount < MAX_REVISIONS) {
+  // PA path: compute preliminary route to decide whether to run the revision loop.
+  // This is a cheap deterministic call (no LLM) — the final authoritative route
+  // runs after the loop below.
+  const _prelimRoute = PA_PIPELINE ? routeReportType(feasibility, state.parsedBrief) : null
+  const _paRevisionEnabled = !PA_PIPELINE || _prelimRoute?.reportType === 'FEASIBILITY_EXCEPTION'
+
+  while (_paRevisionEnabled && (feasibility.status === 'RED' || feasibility.status === 'AMBER') && revisionCount < MAX_REVISIONS) {
     revisionCount++
     console.log(`\n[pipeline] === Brief Revision ${revisionCount}/${MAX_REVISIONS} (Feasibility: ${feasibility.status}) ===`)
     
@@ -750,6 +763,22 @@ export async function runPipeline(
   if (revisionCount > 0) {
     console.log(`\n[pipeline] Brief revision complete: ${revisionCount} iterations, ${rejectedConstraints.length} constraints revised`)
     console.log(`[pipeline] Rejected constraints: ${rejectedConstraints.join(', ')}`)
+  }
+
+  // ── PA Stage 9: Report Type Router (PA_PIPELINE=true only) ───────────────
+  // Runs after the feasibility gate (and any revision loop) to determine the
+  // report type and page budget. On PA_PIPELINE=false this block is skipped
+  // entirely — downstream behaviour is unchanged on the legacy path.
+  let _paRouterResult: ReportTypeRouterResult | null = null
+  if (PA_PIPELINE) {
+    _paRouterResult = routeReportType(feasibility, state.parsedBrief)
+    state.reportType = _paRouterResult.reportType
+    ;(feasibility as any).reportType = _paRouterResult.reportType
+    ;(state as any).reportTypeRouterResult = _paRouterResult
+    console.log(
+      `[pipeline] PA Stage 9 Router: ${_paRouterResult.reportType} ` +
+      `(maxPages=${_paRouterResult.maxPages}, excluded=${_paRouterResult.excludedSections.length} sections) — ${_paRouterResult.reason}`
+    )
   }
 
   // gateResults declared at function scope (see A1 fix above). Reset here.
@@ -1175,45 +1204,62 @@ export async function runPipeline(
   } // end else USE_INTEGRATED_BOM (v1 BOM pipeline)
 
   // ── Stage 6: Review ────────────────────────────────────────────────
-  console.log('\n[pipeline] === Stage 6: Review ===')
-  const reviewResult = await runReview(state.modules, state.research)
-  trackStage('review', reviewResult)
-  if (reviewResult.ok && reviewResult.data) {
-    state.reviews = reviewResult.data.reviews
-    state.proofreadFindings = reviewResult.data.proofreadFindings
+  // Phase F: on PA path, Review only runs when reportType === 'FULL_REPORT'.
+  // Skip on FEASIBILITY_EXCEPTION and BRIEF_INCOMPLETE — saves ~3-5 min on
+  // those paths where a detailed engineering review adds no value.
+  // On the legacy path (PA_PIPELINE=false), Review runs unconditionally as before.
+  const _shouldRunReview = !PA_PIPELINE || state.reportType === 'FULL_REPORT'
+  if (_shouldRunReview) {
+    console.log('\n[pipeline] === Stage 6: Review ===')
+    const reviewResult = await runReview(state.modules, state.research)
+    trackStage('review', reviewResult)
+    if (reviewResult.ok && reviewResult.data) {
+      state.reviews = reviewResult.data.reviews
+      state.proofreadFindings = reviewResult.data.proofreadFindings
+    }
+    state.sourceAttributions.push(
+      { section: 'Reviews', source: 'llm', detail: 'Gemini 3.1 Pro — Fang engineering review' },
+      { section: 'Proofreader', source: 'llm', detail: 'Gemini 3.1 Pro — cross-module consistency check' },
+    )
+  } else {
+    trackSkippedStage('review', `PA path: skipped on ${state.reportType} — Review is FULL_REPORT-only (Phase F)`)
+    console.log(`[pipeline] Review SKIPPED — PA path, reportType=${state.reportType}`)
   }
-  
-  state.sourceAttributions.push(
-    { section: 'Reviews', source: 'llm', detail: 'Gemini 3.1 Pro — Fang engineering review' },
-    { section: 'Proofreader', source: 'llm', detail: 'Gemini 3.1 Pro — cross-module consistency check' },
-  )
 
   // ── Council Scoring (the improvement engine) ───────────────────────
-  console.log('\n[pipeline] === Council Scoring ===')
-  try {
-    const councilResult = await runCouncilScoring(state)
-    if (councilResult.ok && councilResult.data) {
-      // Merge council scores into sectionScores
-      for (const cs of councilResult.data) {
-        const existing = state.sectionScores.find(s => s.section === cs.section)
-        if (existing) {
-          existing.score = cs.score
-          existing.reasons = cs.overall_reasons
-          existing.suggestions = cs.code_change_recommendations
-        } else {
-          state.sectionScores.push({
-            section: cs.section,
-            score: cs.score,
-            reasons: cs.overall_reasons,
-            suggestions: cs.code_change_recommendations,
-          })
+  // Phase F: on PA path, Council Scoring only runs when reportType === 'FULL_REPORT'.
+  // Skip on FEASIBILITY_EXCEPTION and BRIEF_INCOMPLETE — saves ~3-5 min on those
+  // paths. On the legacy path (PA_PIPELINE=false), Council Scoring runs unconditionally.
+  const _shouldRunCouncil = !PA_PIPELINE || state.reportType === 'FULL_REPORT'
+  if (_shouldRunCouncil) {
+    console.log('\n[pipeline] === Council Scoring ===')
+    try {
+      const councilResult = await runCouncilScoring(state)
+      if (councilResult.ok && councilResult.data) {
+        // Merge council scores into sectionScores
+        for (const cs of councilResult.data) {
+          const existing = state.sectionScores.find(s => s.section === cs.section)
+          if (existing) {
+            existing.score = cs.score
+            existing.reasons = cs.overall_reasons
+            existing.suggestions = cs.code_change_recommendations
+          } else {
+            state.sectionScores.push({
+              section: cs.section,
+              score: cs.score,
+              reasons: cs.overall_reasons,
+              suggestions: cs.code_change_recommendations,
+            })
+          }
         }
+        // Store council data for PDF rendering
+        ;(state as any).councilScores = councilResult.data
       }
-      // Store council data for PDF rendering
-      ;(state as any).councilScores = councilResult.data
+    } catch (err) {
+      console.log('[pipeline] Council scoring failed, using deterministic scores:', (err as Error).message)
     }
-  } catch (err) {
-    console.log('[pipeline] Council scoring failed, using deterministic scores:', (err as Error).message)
+  } else {
+    console.log(`[pipeline] Council Scoring SKIPPED — PA path, reportType=${state.reportType}`)
   }
 
   // ── Score all sections (always runs when feasible) ─────────────────
@@ -1295,13 +1341,22 @@ export async function runPipeline(
   }
   
   // ── Polish Pass ─────────────────────────────────────────────────────
-  console.log('\n[pipeline] === Polish Pass ===')
-  const polishResult = await runPolish(state)
-  if (polishResult.ok && polishResult.data) {
-    state.modules = polishResult.data.modules
-    console.log('[polish] Narrative polished successfully')
+  // Phase F: Polish is DROPPED on PA path. The Module Decomposition prompt
+  // (PA Stage 5) must produce publication-quality technical_description directly.
+  // If quality drops, the RL loop iterates the prompt — not a Polish post-process.
+  // PA principle: "The LLM never post-processes data that feeds the renderer."
+  // Legacy path (PA_PIPELINE=false): Polish runs unconditionally as before.
+  if (!PA_PIPELINE) {
+    console.log('\n[pipeline] === Polish Pass ===')
+    const polishResult = await runPolish(state)
+    if (polishResult.ok && polishResult.data) {
+      state.modules = polishResult.data.modules
+      console.log('[polish] Narrative polished successfully')
+    } else {
+      console.log('[polish] Polish pass skipped:', polishResult.error)
+    }
   } else {
-    console.log('[polish] Polish pass skipped:', polishResult.error)
+    trackSkippedStage('polish', 'dropped on PA path per PA principle (Phase F) — see stages/7-polish.ts @deprecated')
   }
 
   } // end else (not infeasible)
