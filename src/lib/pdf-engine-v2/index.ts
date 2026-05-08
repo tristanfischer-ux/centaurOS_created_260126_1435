@@ -48,6 +48,7 @@ import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
 import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON, ResearchSynthesis } from './types'
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
+import { mapProductClassToIndustryDomain } from './lib/industry-domain'
 
 export interface EngineResult {
   ok: boolean
@@ -412,10 +413,16 @@ export async function runPipeline(
       ? { ..._paSyntheticDesignBrief, competitors: legacyCompetitors }
       : { competitors: legacyCompetitors }
 
+    // BLOCKER-1 fix: populate industryDomain on the PA dual-write so all 5
+    // downstream read-sites (`options?.domain || state.research.industryDomain`)
+    // receive a non-undefined value on the PA path. Derived from the
+    // deterministic productClass (Phase A classification step runs BEFORE
+    // Research on the PA path), using the same vocabulary as runResearch().
     state.research = {
       report: legacyReport,
       sources: synthesis.research_sources.map(s => ({ uri: '', title: s.title })),
       designBrief: preservedDesignBrief as any,
+      industryDomain: mapProductClassToIndustryDomain(classification.productClass),
     }
 
     console.log(

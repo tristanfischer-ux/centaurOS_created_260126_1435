@@ -14,6 +14,8 @@
  */
 
 import { runResearchSynthesis } from './1-research'
+import { mapProductClassToIndustryDomain } from '../lib/industry-domain'
+import { RESEARCH_SYNTHESIS_SYSTEM_PA } from '../prompts'
 import type { StructuredBriefJSON, ResearchSynthesis } from '../types'
 
 // ── BESS parsedBrief fixture (matches Phase A brief-parsing.test.ts) ─────────
@@ -497,5 +499,75 @@ describe('runResearchSynthesis — PA Stage 3', () => {
       expect(Array.isArray(result.data?.competitors)).toBe(true)
       expect(Array.isArray(result.data?.research_sources)).toBe(true)
     })
+  })
+})
+
+// ── BLOCKER-3 fix: classification injected into user message ─────────────────
+// Verifies that `runResearchSynthesis()` includes the productClass string
+// in the user message sent to the LLM (BLOCKER-3 fix).
+
+describe('BLOCKER-3 fix — classification injected into user message', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    global.fetch = mockFetch as unknown as typeof fetch
+    process.env.OPENROUTER_API_KEY = 'test-key'
+    mockFetch.mockResolvedValue(makeOpenRouterResponse(BESS_SYNTHESIS_RESPONSE))
+  })
+
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  it('user message contains the productClass string (BLOCKER-3)', async () => {
+    await runResearchSynthesis(BESS_PARSED_BRIEF, 'battery_energy_storage')
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    const [, init] = mockFetch.mock.calls[0]
+    const body = JSON.parse(init.body)
+    const userContent = body.messages[1].content as string
+    // BLOCKER-3: classification must appear in the user message
+    expect(userContent).toContain('battery_energy_storage')
+  })
+})
+
+// ── BLOCKER-1 fix: mapProductClassToIndustryDomain ──────────────────────────
+// Verifies that heat_pump (thermal_system) and BESS (energy_storage) productClass
+// values produce the correct industryDomain strings used by downstream validation.
+
+describe('BLOCKER-1 fix — mapProductClassToIndustryDomain', () => {
+  it('maps energy_storage → battery_energy_storage', () => {
+    expect(mapProductClassToIndustryDomain('energy_storage')).toBe('battery_energy_storage')
+  })
+
+  it('maps thermal_system → heat_pump (triggers HVAC safety check at index.ts line ~947)', () => {
+    // Critical mapping: thermal_system → heat_pump so the domain-specific
+    // validation (hvac_and_refrigeration / heat_pump check) runs on the PA path.
+    expect(mapProductClassToIndustryDomain('thermal_system')).toBe('heat_pump')
+  })
+
+  it('maps unknown/structural_product → generic (no domain-specific validation)', () => {
+    expect(mapProductClassToIndustryDomain('structural_product')).toBe('generic')
+    expect(mapProductClassToIndustryDomain('unknown')).toBe('generic')
+  })
+})
+
+// ── BLOCKER-2 fix: no JS comment inside JSON schema block in PA prompt ────────
+// Verifies that RESEARCH_SYNTHESIS_SYSTEM_PA contains no `//` comment
+// inside a JSON schema block.
+
+describe('BLOCKER-2 fix — no JS comment inside JSON schema in RESEARCH_SYNTHESIS_SYSTEM_PA', () => {
+  it('prompt does not contain a JS-style inline comment on the source_grade_overall line', () => {
+    // The exact bug: `"source_grade_overall": "E",  // Always E — this is LLM-generated`
+    // After the fix, the comment must be outside the JSON block.
+    const lines = RESEARCH_SYNTHESIS_SYSTEM_PA.split('\n')
+    let insideJsonBlock = false
+    for (const line of lines) {
+      if (line.trim() === '{') insideJsonBlock = true
+      if (line.trim() === '}') insideJsonBlock = false
+      if (insideJsonBlock && /^\s*"[^"]+"\s*:.*\/\//.test(line)) {
+        throw new Error(
+          `Found JS comment inside JSON schema block in RESEARCH_SYNTHESIS_SYSTEM_PA:\n  ${line.trim()}`
+        )
+      }
+    }
   })
 })

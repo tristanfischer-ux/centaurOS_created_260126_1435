@@ -12,7 +12,7 @@
 | Phase | Description | Sonnet hrs | Status | Council review | Date done |
 |---|---|---|---|---|---|
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
-| B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ⚠️ Issues to fix (2 BLOCKERs) | 2026-05-08 |
+| B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | C | Drop Training Data Dump | 0.5-1 | ⬜ Pending | ⬜ Pending | — |
 | D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
@@ -228,7 +228,7 @@ Delete `PA_PIPELINE=true` env var. Existing `runBriefGeneration()` path untouche
 
 ### Council review
 
-- [x] ⚠️ Issues to fix — council dispatched 2026-05-08, 2 BLOCKERs found, 3 NOTED findings
+- [x] ✅ Approved (after fixes) — council dispatched 2026-05-08, 3 BLOCKERs found and resolved, 2 NOTED findings deferred to Phase D
 
 #### Council notes — Phase B (2026-05-08)
 
@@ -280,6 +280,20 @@ Delete `PA_PIPELINE=true` env var. Existing `runBriefGeneration()` path untouche
 
 **Council discarded findings:**
 - Gemini: `startTime` undeclared in `runResearchSynthesis()` — FABRICATED. `const startTime = Date.now()` is declared at line 172 of `stages/1-research.ts`. Discarded per GPT-5.4 hallucination discount rule.
+
+### Council fixes applied — 2026-05-08
+
+All 3 BLOCKERs (BLOCKER-1, BLOCKER-2, and reclassified NOTED-3 → BLOCKER-3) fixed in one commit.
+
+| # | Finding | Fix | Status |
+|---|---|---|---|
+| BLOCKER-1 | `industryDomain` omitted from PA dual-write — 5 downstream sites get `undefined` | Extracted `mapProductClassToIndustryDomain()` to `lib/industry-domain.ts`; called in dual-write block | ✅ Fixed |
+| BLOCKER-2 | JS `// comment` inside JSON schema in `RESEARCH_SYNTHESIS_SYSTEM_PA` prompt | Removed inline comment from JSON block; moved explanation to prose NOTE above Rules section | ✅ Fixed |
+| BLOCKER-3 | `classification` param accepted but never injected into LLM user message | Appended `\n\nProduct classification context: ${classification}` to user message in `runResearchSynthesis()` | ✅ Fixed |
+
+**NOTED-1** (`undefined as unknown as number` type hack in competitorSpecs) and **NOTED-2** (empty benchmarkPrices/materialCosts/regulatoryCosts on PA path) deferred to Phase D — no current pipeline stage reads these arrays.
+
+New tests added: 5 (BLOCKER-3 ×1, BLOCKER-1 ×3, BLOCKER-2 ×1). All 50 Phase A+B tests pass.
 
 ### Actual
 
@@ -506,11 +520,9 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase A: council review DONE (2026-05-08) — all 6 BLOCKERs fixed (2026-05-08)
 - ❌ Phase A: PA council score comparison (PA=true vs PA=false within ±0.5) — deferred, requires live LLM run
 - ✅ Phase B: COMPLETE (2026-05-08)
-- ⚠️ Phase B: council review DONE (2026-05-08) — 2 BLOCKERs found, must fix before Phase C
-  - BLOCKER-1: industryDomain not written in PA dual-write (5 seats)
-  - BLOCKER-2: JSON inline comment in RESEARCH_SYNTHESIS_SYSTEM_PA prompt schema (4 seats)
-- ❌ Phase B: fix BLOCKERs — BLOCKED ON FIX
-- ❌ Phase C-H: blocked on Phase B BLOCKERs
+- ✅ Phase B: council review DONE (2026-05-08) — 3 BLOCKERs found and fixed (2026-05-08)
+- ✅ Phase B: council fixes applied — BLOCKER-1 (industryDomain), BLOCKER-2 (JS comment in JSON), BLOCKER-3 (classification not injected)
+- ❌ Phase C-H: blocked on Phase B completion — NOW UNBLOCKED
 - ❌ All council reviews (Phase C onwards)
 
 ---

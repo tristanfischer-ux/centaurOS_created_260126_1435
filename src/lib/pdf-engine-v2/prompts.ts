@@ -107,9 +107,11 @@ Required output schema:
       "source_grade": "A"|"B"|"C"|"D"|"E"
     }
   ],
-  "source_grade_overall": "E",  // Always E — this is LLM-generated
+  "source_grade_overall": "E",
   "claims_requiring_verification": [string]
 }
+
+NOTE: source_grade_overall MUST always be the string "E" — this is LLM-generated synthesis, not a verified primary source. Do not use any other value.
 
 Rules:
 - Use real companies and real products where possible. Do NOT invent

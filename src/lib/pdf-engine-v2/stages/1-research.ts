@@ -173,7 +173,13 @@ export async function runResearchSynthesis(
   console.log('[research-synthesis] Starting PA Stage 3 Research Synthesis...')
   console.log(`[research-synthesis] Classification: ${classification}`)
 
-  const userContent = JSON.stringify(parsedBrief, null, 2)
+  // BLOCKER-3 fix: inject classification into user message so the LLM has
+  // product-class context for domain-specific competitor selection and market
+  // framing. PA Stage 3 prompt expects this as additional context appended
+  // after the structured brief JSON.
+  const userContent =
+    JSON.stringify(parsedBrief, null, 2) +
+    `\n\nProduct classification context: ${classification}`
 
   try {
     console.log('[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...')
