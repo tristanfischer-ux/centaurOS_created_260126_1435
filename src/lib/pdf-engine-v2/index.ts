@@ -15,8 +15,15 @@ import { runDecompose } from './stages/2-decompose'
 import { runSizeLayout } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
 import { runSuppliers } from './stages/5-suppliers'
+import { runBomCostSuppliers } from './stages/4-bom-cost-suppliers'
 import { runReview } from './stages/6-review'
 import PdfRenderer from './stages/7-pdf'
+import PdfRendererV3 from './stages/7-pdf-v3'
+
+// PDF_RENDERER=v3 activates the BESS-style renderer (7-pdf-v3.tsx).
+// Default is v2 (the existing 7-pdf.tsx). Both renderers remain active.
+const _pdfRendererVersion = process.env.PDF_RENDERER ?? 'v2'
+const _activePdfRenderer = _pdfRendererVersion === 'v3' ? PdfRendererV3 : PdfRenderer
 import { runPolish } from './stages/7-polish'
 import { pdf } from '@react-pdf/renderer'
 import React from 'react'
@@ -67,13 +74,13 @@ async function generateErrorPdf(
 ): Promise<EngineResult> {
   const pdfStart = Date.now()
   try {
-    const doc = React.createElement(PdfRenderer, { state }) as any
+    const doc = React.createElement(_activePdfRenderer, { state }) as any
     const blob = await pdf(doc).toBlob()
     const buffer = Buffer.from(await blob.arrayBuffer())
     const base64 = buffer.toString('base64')
     const pdfMs = Date.now() - pdfStart
     stages.push({ name: 'pdf', ok: true, durationMs: pdfMs })
-    console.log(`[pipeline] pdf (error path): OK (${pdfMs}ms, ${Math.round(buffer.length / 1024)}KB)`)
+    console.log(`[pipeline] pdf (error path, renderer=${_pdfRendererVersion}): OK (${pdfMs}ms, ${Math.round(buffer.length / 1024)}KB)`)
 
     return {
       ok: false,  // Pipeline didn't complete successfully.
@@ -561,8 +568,77 @@ export async function runPipeline(
     } catch { /* scoring history is non-critical */ }
     // Skip to PDF generation directly (skips BOM, cost, suppliers, review, polish)
   } else {
-    // ── Stage 4: BOM + Cost ────────────────────────────────────────────
-  console.log('\n[pipeline] === Stage 4: BOM + Cost ===')
+    // ── Stage 4: BOM + Cost (+ Suppliers when BOM_PIPELINE=v2) ───────────
+  // Feature flag: BOM_PIPELINE=v2 routes to the integrated stage (4-bom-cost-suppliers.ts).
+  // Default (v1) keeps the existing 3-stage flow: 4-bom-cost → gate → 5-suppliers.
+  // Both must work; the integrated stage does NOT replace old stages until cut-over.
+  const USE_INTEGRATED_BOM = process.env.BOM_PIPELINE === 'v2'
+  console.log(`\n[pipeline] === Stage 4: BOM + Cost${USE_INTEGRATED_BOM ? ' + Suppliers (v2 integrated)' : ''} ===`)
+
+  if (USE_INTEGRATED_BOM) {
+    // ── v2: integrated BOM / Cost / Suppliers stage ────────────────────
+    const integratedResult = await runBomCostSuppliers({
+      modules: state.modules,
+      designBrief: state.research?.designBrief ?? null,
+      classification,
+      grounding: groundingData ?? undefined,
+      productSpecs,
+      domain: options?.domain || state.research.industryDomain,
+      ceilingGbp: options?.ceilingGbp,
+      trainingDataDossier: trainingDossier || options?.trainingDataDossier,
+    })
+    trackStage('bom_cost_suppliers', integratedResult)
+
+    if (!integratedResult.ok || !integratedResult.data) {
+      state.pipelineError = {
+        stage: 'bom_cost_suppliers',
+        message: integratedResult.error || 'Integrated BOM/Cost/Suppliers stage returned no data',
+        occurredAt: new Date().toISOString(),
+        recoverable: true,
+      }
+      console.error(`[pipeline] Integrated BOM failed: ${integratedResult.error}. Producing error PDF.`)
+      try {
+        recordScoringRun({
+          timestamp: new Date().toISOString(),
+          projectId: state.projectId,
+          briefLabel: deriveBriefLabel(state.projectId),
+          compound: -1,
+          rubric: -1,
+          councilAvg: null,
+          councilScored: 0,
+          councilFailed: 0,
+          sections: [],
+          formulaVersion: 'f7',
+          status: 'PIPELINE_ERROR',
+        })
+      } catch { /* scoring history is non-critical */ }
+      return await generateErrorPdf(state, stages, llmCalls, startTime)
+    }
+
+    const d = integratedResult.data
+    state.parts = d.parts                                          // backwards compat
+    state.bomLines = d.bomLines.map(bl => ({                      // strip IntegratedBomLine extras
+      parentPartId: null,
+      childPartId: bl.partNumber,
+      quantity: bl.quantity,
+    }))
+    state.costBreakdown = d.costBreakdown                         // backwards compat
+    state.suppliers = d.supplierMatches                           // backwards compat — skip stage 5
+    ;(state as any).costWaterfall = d.costWaterfall
+    ;(state as any).integratedBomLines = d.bomLines
+    ;(state as any).sectionBom = d.sectionBom
+    ;(state as any).sectionCost = d.sectionCost
+    ;(state as any).sectionSuppliers = d.sectionSuppliers
+
+    state.sourceAttributions.push(
+      { section: 'BOM', source: 'deterministic', detail: 'Deterministic expansion from keyParts manifest' },
+      { section: 'BOM', source: 'llm', detail: 'Gemini 3.1 Pro — PROPOSE_PARTS sub-task' },
+      { section: 'Cost', source: 'deterministic', detail: 'Distributor APIs (Mouser + Digi-Key + Farnell)' },
+      { section: 'Cost', source: 'llm', detail: 'ESTIMATE_MAKE_COST sub-task (Grade D)' },
+      { section: 'Suppliers', source: 'database', detail: 'Nightshift corpus semantic search' },
+    )
+  } else {
+  // ── v1: original 3-stage flow (BOM + Cost) ────────────────────────
   const bomResult = await runBomCost(state.modules, state.dimensionSheet, {
     domain: options?.domain || state.research.industryDomain,
     ceilingGbp: options?.ceilingGbp,
@@ -679,7 +755,7 @@ export async function runPipeline(
     return await generateErrorPdf(state, stages, llmCalls, startTime, gateResults)
   }
 
-  // ── Stage 5: Suppliers ─────────────────────────────────────────────
+  // ── Stage 5: Suppliers (v1 path only) ─────────────────────────────────
   console.log('\n[pipeline] === Stage 5: Suppliers ===')
   const supplierResult = await runSuppliers(state.parts, {
     domain: options?.domain || state.research.industryDomain,
@@ -691,10 +767,12 @@ export async function runPipeline(
   if (supplierResult.ok && supplierResult.data) {
     state.suppliers = supplierResult.data
   }
-  
+
   state.sourceAttributions.push(
     { section: 'Suppliers', source: 'search', detail: 'Brave Search API — commercial supplier matching' },
   )
+
+  } // end else USE_INTEGRATED_BOM (v1 BOM pipeline)
 
   // ── Stage 6: Review ────────────────────────────────────────────────
   console.log('\n[pipeline] === Stage 6: Review ===')
@@ -835,13 +913,13 @@ export async function runPipeline(
   console.log(`[pipeline] State: modules=${state.modules?.length}, parts=${state.parts?.length}, research=${!!state.research}`)
   const pdfStart = Date.now()
   try {
-    const doc = React.createElement(PdfRenderer, { state }) as any
+    const doc = React.createElement(_activePdfRenderer, { state }) as any
     const blob = await pdf(doc).toBlob()
     const buffer = Buffer.from(await blob.arrayBuffer())
     const base64 = buffer.toString('base64')
     const pdfMs = Date.now() - pdfStart
     stages.push({ name: 'pdf', ok: true, durationMs: pdfMs })
-    console.log(`[pipeline] pdf: OK (${pdfMs}ms)`)
+    console.log(`[pipeline] pdf (renderer=${_pdfRendererVersion}): OK (${pdfMs}ms)`)
 
     // After PDF generation, write QA scores to separate file
     if (state.sectionScores.length > 0) {

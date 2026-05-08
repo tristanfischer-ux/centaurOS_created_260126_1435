@@ -17,6 +17,7 @@
 import { lookupSkuMouser } from './mouser'
 import { lookupSkuDigikey } from './digikey'
 import { lookupSkuFarnell } from './farnell'
+import { lookupSkuLcsc } from './lcsc'
 import type { DistributorResult } from './mouser'
 
 export type { DistributorResult } from './mouser'
@@ -33,6 +34,9 @@ export interface AggregateResult {
   qty1GBP: number | null
 }
 
+// 'lcsc' added — API pending approval, stub returns null when key absent.
+export type CostSource = 'mouser' | 'farnell' | 'digikey' | 'lcsc' | 'supplier' | 'estimated' | 'database'
+
 function qty1Price(r: DistributorResult): number {
   if (!r.priceGBP || r.priceGBP.length === 0) return Infinity
   // Find the price break applicable at qty=1 (smallest break)
@@ -47,10 +51,11 @@ function qty1Price(r: DistributorResult): number {
 export async function findSkuForPart(mpn: string): Promise<AggregateResult | null> {
   if (!mpn || mpn.length < 2) return null
 
-  const [mouser, digikey, farnell] = await Promise.all([
+  const [mouser, digikey, farnell, lcsc] = await Promise.all([
     lookupSkuMouser(mpn).catch(() => null),
     lookupSkuDigikey(mpn).catch(() => null),
     lookupSkuFarnell(mpn).catch(() => null),
+    lookupSkuLcsc(mpn).catch(() => null),
   ])
 
   const hits: DistributorResult[] = []
@@ -58,6 +63,7 @@ export async function findSkuForPart(mpn: string): Promise<AggregateResult | nul
   if (mouser) hits.push(mouser); else misses.push('mouser')
   if (digikey) hits.push(digikey); else misses.push('digikey')
   if (farnell) hits.push(farnell); else misses.push('farnell')
+  if (lcsc) hits.push(lcsc); else misses.push('lcsc')
 
   if (hits.length === 0) return null
 
