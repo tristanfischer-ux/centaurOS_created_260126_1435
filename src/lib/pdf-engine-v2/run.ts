@@ -50,6 +50,14 @@ async function main() {
   let trainingDataDossier: string | undefined
   let domain: string | undefined
   let ceilingGbp: number | undefined
+  let outputPrefix: string | undefined
+
+  // Strip --output-prefix <value> from args before other parsing
+  const outputPrefixIdx = args.indexOf('--output-prefix')
+  if (outputPrefixIdx !== -1 && outputPrefixIdx + 1 < args.length) {
+    outputPrefix = args[outputPrefixIdx + 1]
+    args.splice(outputPrefixIdx, 2)
+  }
 
   if (args[0] === '--brief') {
     briefText = args.slice(1).join(' ')
@@ -120,8 +128,9 @@ async function main() {
   }
 
   if (result.pdf) {
-    // Write PDF to file
-    const outputPath = join(process.cwd(), `output-${Date.now()}.pdf`)
+    // Write PDF to file — use outputPrefix if provided for race-safe parallel runs
+    const filenameBase = outputPrefix ? `output-${outputPrefix}` : `output-${Date.now()}`
+    const outputPath = join(process.cwd(), `${filenameBase}.pdf`)
     const buffer = Buffer.from(result.pdf.base64, 'base64')
     writeFileSync(outputPath, buffer)
     console.error(`\n[run] PDF written to: ${outputPath}`)
