@@ -1,28 +1,44 @@
 # Stage RL Manifest — PDF Engine v2
 
-> Prepared as preparation for the stage-agnostic RL ladder.
 > Source of truth: `src/lib/pdf-engine-v2/index.ts` (pipeline orchestrator).
-> Do not edit without re-auditing against `index.ts`.
+> Phase H update (2026-05-08): PA stages are now the active default.
+> PA_PIPELINE defaults to true. Set PA_PIPELINE=false to run the legacy stage path.
+> Do not edit without re-auditing against `index.ts` and `stage-rl-iterate.ts`.
 
 ---
 
-## Pipeline Stage Table
+## PA Pipeline Stage Table (Active — default from Phase H)
 
-| Stage | `trackStage` key in `index.ts` | Prompt file / location | Output key in `PipelineState` | Existing RL script | Council scores it? | Ready for RL framework? |
-|---|---|---|---|---|---|---|
-| Training Data Dump | `training_data` | Inline `systemPrompt` in `stages/0-training-data.ts` | `(transient)` — dossier string passed to downstream, not stored on state | `scripts/stage-rl-loop.sh` (generic) | N — council scores `Research` as proxy | **N** — prompt hardcoded inline; dossier not on state so no direct scorer target |
-| Brief Generation | `brief_generation` | Inline `BRIEF_SYSTEM_PROMPT` constant in `stages/0-brief-generation.ts` | `state.generatedBrief` (`GeneratedBrief`) | `src/lib/pdf-engine-v2/brief-rl-iterate.ts` + `scripts/brief-rl-loop.sh` | Y — `Brief` section in council | **Y** — structured output, council scores `Brief`, RL iterate script exists |
-| Research | `research` | `RESEARCH_SYNTHESIS_SYSTEM` in `src/lib/pdf-engine-v2/prompts.ts` | `state.research` (`ResearchResult`) | `scripts/stage-rl-loop.sh` (generic) | Y — `Research` section in council | **Y** — prompt in dedicated file, structured JSON output, council scores |
-| Brief Revision | _(loop, not tracked)_ | Inline `REVISION_PROMPT` constant in `stages/3.5-brief-revision.ts` | `state.briefRevisions[]` (via `as any`) | None | N — no council section for revisions | **N** — not tracked as a stage; output shape is untyped `as any` on state; no council scorer |
-| Feasibility Gate | _(not LLM; deterministic)_ | `src/lib/pdf-engine-v2/feasibility-gate.ts` (rule-based, no prompt) | `state.feasibility` (via `as any`) | `scripts/feasibility-rl-loop.sh` + `scripts/feasibility-full-rl-loop.sh` + `src/lib/pdf-engine-v2/feasibility-rl-iterate.ts` | Y — `Feasibility` section in council | **N** — deterministic, no LLM prompt to evolve; council scores output but there is nothing to RL-train |
-| Feasibility Advisor | _(stub — not wired)_ | `stages/1.5-feasibility-advisor.ts` (DEFERRED, throws) | Not wired | None | N | **N** — not implemented |
-| Decompose | `decompose` | `MODULE_DECOMPOSITION_SYSTEM` in `src/lib/pdf-engine-v2/prompts.ts` | `state.modules` (`Module[]`) | `src/lib/pdf-engine-v2/decompose-rl-iterate.ts` + `scripts/decompose-rl-loop.sh` | Y — `Modules` section in council | **Y** — prompt in dedicated file, structured typed output, council scores, iterate script exists |
-| Size + Layout | `size_layout` | `stages/3-size-layout.ts` (fully deterministic rule-based solver, no LLM prompt) | `state.dimensionSheet` (`DimensionSheet`) | `scripts/sizing-rl-loop.sh` + `src/lib/pdf-engine-v2/sizing-rl-iterate.ts` | Y — `Sizing` section in council | **N** — deterministic solver with no LLM prompt; RL scripts score council output but cannot evolve a prompt |
-| BOM + Cost | `bom_cost` | `BOM_GENERATION_SYSTEM` in `src/lib/pdf-engine-v2/prompts.ts` | `state.parts` (`Part[]`), `state.bomLines` (`BomLine[]`), `state.costBreakdown` (`CostBreakdown`) | `scripts/stage-rl-loop.sh` (generic) | Y — `BOM` + `Cost` sections in council | **Y** — prompt in dedicated file, structured typed output, two council sections |
-| Suppliers | `suppliers` | `stages/5-suppliers.ts` — no LLM prompt; uses semantic embedding + Brave Search | `state.suppliers` (`SupplierMatch[]`) | `scripts/stage-rl-loop.sh` (generic) | Y — `Suppliers` section in council | **N** — no LLM prompt to evolve; matching is embedding-based + search-based |
-| Review (Fang + Proofreader) | `review` | Inline prompt string inside `fangReview()` in `stages/6-review.ts`; separate inline prompt inside `proofread()` in same file | `state.reviews` (`SpecialistReview[]`), `state.proofreadFindings` (`string`) | `scripts/stage-rl-loop.sh` (generic) | Y — `Risks` as proxy for review; `Proofreader` scored deterministically (excluded from council per code comment) | **N (partial)** — Fang prompt hardcoded inline; proofreader output is free-text string (unstructured); `Proofreader` excluded from council; two separate prompts in one file need splitting |
-| Polish | _(not tracked by trackStage)_ | Inline `POLISH_SYSTEM_PROMPT` constant in `stages/7-polish.ts` | `state.modules` (overwrites in-place) | None | N — no council section | **N** — prompt hardcoded inline; overwrites modules in-place rather than writing to a distinct state key; no scorer |
-| PDF Render | `pdf` (manual push) | `stages/7-pdf.tsx` (React/PDF renderer, no LLM) | `EngineResult.pdf` (base64 blob, not on state) | None | N | **N** — not an LLM stage; output is a binary blob |
+> Active when PA_PIPELINE=true (or unset, which is the default from Phase H).
+
+| PA Stage # | Stage name (`trackStage` key) | Prompt file / location | Output key in `PipelineState` | Council scores it? | Ready for RL framework? |
+|---|---|---|---|---|---|
+| 1 | `brief_parsing` | `BRIEF_PARSING_SYSTEM_PROMPT` in `stages/0-brief-generation.ts` | `state.parsedBrief` (`StructuredBriefJSON`) | Y — `Brief` section | **Y** — structured output, council scores `Brief`, `stage-rl-iterate.ts` PA path wired |
+| 3 | `research_synthesis` | `RESEARCH_SYNTHESIS_SYSTEM_PA` in `prompts.ts` | `state.researchSynthesis` (`ResearchSynthesis`) | Y — `Research` section | **Y** — structured JSON output, council scores `Research` |
+| 4 | `regulatory_extraction` | `REGULATORY_EXTRACTION_SYSTEM` in `prompts.ts` | `state.regulatoryExtraction` (`RegulatoryExtraction`) | Y — `Regulatory` section | **Y** — structured output, council scores `Regulatory` |
+| 5 | `decompose_pa` | `MODULE_DECOMPOSITION_SYSTEM_PA` in `prompts.ts` | `state.modules` (`ModulePA[]`) | Y — `Modules` section | **Y** — structured typed output, council scores `Modules` |
+| 7a | `size_layout` | `stages/3-size-layout.ts` (deterministic solver, no LLM prompt) | `state.dimensionSheet` (`DimensionSheetPA`) | Y — `Sizing` section | **N** — deterministic, no LLM prompt to evolve |
+| 6+7b | `bom_pa` | `stages/4-bom-cost-suppliers.ts` (integrated, LLM + distributor APIs) | `state.parts`, `state.bomLines`, `state.costBreakdown`, `state.suppliers` | Y — `BOM`, `Cost`, `Suppliers` sections | **Y (partial)** — Phase E will complete cut-over; current fallback uses legacy runBomCost |
+| post | `review` | Inline prompts in `stages/6-review.ts` | `state.reviews`, `state.proofreadFindings` | Y — `Risks` as proxy | **N (partial)** — FULL_REPORT-only (Phase F); Fang prompt hardcoded inline |
+
+---
+
+## Deprecated Legacy Stage Table (PA_PIPELINE=false only)
+
+> Active only when PA_PIPELINE=false. Preserved as rollback target.
+
+| Stage | `trackStage` key | Status |
+|---|---|---|
+| Training Data Dump | `training_data` | **@deprecated** — superseded by PA Stage 1 (Brief Parsing) + PA Stage 3 (Research Synthesis). See `stages/0-training-data.ts`. |
+| Brief Generation | `brief_generation` | **@deprecated** — superseded by PA Stage 1 (`runBriefParsing()`). See `stages/0-brief-generation.ts`. |
+| Research | `research` | **@deprecated** — superseded by PA Stage 3 (`runResearchSynthesis()`). See `stages/1-research.ts`. |
+| Decompose | `decompose` | **@deprecated** — superseded by PA Stage 5 (`runDecomposePA()`). See `stages/2-decompose.ts`. |
+| Size + Layout | `size_layout` | Shared with PA path — NOT deprecated |
+| BOM + Cost | `bom_cost` | **@deprecated** — superseded by integrated PA Stage 6+7b. See `stages/4-bom-cost.ts`. Deletion after Phase E. |
+| Suppliers | `suppliers` | **@deprecated** — folded into integrated BOM stage. See `stages/5-suppliers.ts`. Deletion after Phase E. |
+| Review | `review` | Shared with PA path (FULL_REPORT-only on PA, unconditional on legacy) |
+| Polish | _(not tracked)_ | **@deprecated** — dropped on PA path. See `stages/7-polish.ts`. |
+| PDF Render v1 | `pdf` | **@deprecated** — `stages/7-pdf.tsx` superseded by `stages/7-pdf-v3.tsx`. Default PDF_RENDERER is now v3. |
 
 ---
 

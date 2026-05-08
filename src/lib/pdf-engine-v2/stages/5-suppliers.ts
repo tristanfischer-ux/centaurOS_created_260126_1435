@@ -1,3 +1,17 @@
+/**
+ * @file stages/5-suppliers.ts — Legacy standalone Suppliers stage (v1 path)
+ *
+ * @deprecated Superseded by supplier matching inside the integrated BOM/Cost/Suppliers
+ * stage (`stages/4-bom-cost-suppliers.ts` under `BOM_PIPELINE=v2`). In the PA
+ * architecture, suppliers are part of PA Stage 6 (BOM Generation) output — not a
+ * separate pipeline stage.
+ *
+ * Deletion schedule: after Phase E cut-over, hold period ends 2026-05-22.
+ * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase E.
+ *
+ * On the PA path (default), supplier matching is handled by the integrated BOM stage.
+ */
+
 import type { Part, SupplierMatch, StageResult } from '../types'
 import {
   semanticSupplierSearch,

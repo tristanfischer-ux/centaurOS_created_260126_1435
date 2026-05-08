@@ -271,9 +271,13 @@ function _hedgePricing(raw: unknown): string {
 }
 
 /**
- * Run the research stage
+ * Run the research stage — legacy path (PA_PIPELINE=false).
  * Input: founder's brief text (subject string)
  * Output: StageResult<ResearchResult> with report, sources, regulatory, etc.
+ *
+ * @deprecated Use `runResearchSynthesis()` on the PA path (PA_PIPELINE=true / default).
+ * This function is preserved for the legacy rollback path only (PA_PIPELINE=false).
+ * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase B.
  */
 export async function runResearch(
   briefText: string,

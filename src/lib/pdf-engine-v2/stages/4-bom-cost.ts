@@ -1,3 +1,19 @@
+/**
+ * @file stages/4-bom-cost.ts — Legacy BOM + Cost stage (v1 path)
+ *
+ * @deprecated Superseded by the integrated BOM/Cost/Suppliers stage
+ * (`stages/4-bom-cost-suppliers.ts` under `BOM_PIPELINE=v2`).
+ * Phase E will cut over to the integrated stage as the default once the v2
+ * BOM scores ≥8 baseline across all 10 briefs.
+ *
+ * Deletion schedule: after Phase E cut-over, hold period ends 2026-05-22.
+ * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase E.
+ *
+ * On the PA path (default), this file is still invoked via the legacy BOM
+ * branch when BOM_PIPELINE is not set to 'v2'. Phase E removes the flag and
+ * makes the integrated stage the only path.
+ */
+
 import { calculateCost } from '../cost-model'
 import {
   loadAllGroundingData,

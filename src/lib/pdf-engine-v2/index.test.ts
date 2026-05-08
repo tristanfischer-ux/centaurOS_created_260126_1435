@@ -1,5 +1,5 @@
 /**
- * @file index.test.ts — Phase F orchestrator integration tests
+ * @file index.test.ts — Phase F + Phase H orchestrator integration tests
  *
  * Verifies that the PA path wiring in index.ts:
  *   - Never calls runPolish() on PA path (any reportType)
@@ -8,9 +8,14 @@
  *   - Runs runReview() and runCouncilScoring() on FULL_REPORT PA path
  *   - Legacy path (PA_PIPELINE=false): runPolish, runReview, runCouncilScoring all run
  *
- * Strategy: use jest.isolateModules to reload index.ts with the correct PA_PIPELINE
- * env var per test group — required because PA_PIPELINE is a module-level constant
- * evaluated at load time, not per-call.
+ * Phase H update: PA_PIPELINE is now a RUNTIME GETTER (not a load-time constant),
+ * so the jest.isolateModules workaround is no longer needed. Tests can set
+ * process.env.PA_PIPELINE directly in beforeEach/afterEach. The runWithMocks helper
+ * still calls jest.isolateModulesAsync to get fresh mock registrations per test group,
+ * but the env var is now the only mechanism needed to control the pipeline path.
+ *
+ * Phase H default: PA_PIPELINE defaults to 'true' (PA path is now the default).
+ * Tests must set PA_PIPELINE='false' explicitly to test the legacy path.
  */
 
 // Silence noisy pipeline logs in test output
@@ -112,8 +117,13 @@ const BESS_BRIEF = 'BESS 3.5 MWh battery energy storage system £180,000 cost ce
 // ── Shared mock factory ───────────────────────────────────────────────────
 
 /**
- * Run a pipeline invocation inside jest.isolateModules so each test group
- * gets a fresh module instance with the correct PA_PIPELINE env value.
+ * Run a pipeline invocation with mocked dependencies.
+ *
+ * Phase H update: PA_PIPELINE is now a runtime getter, so we no longer need
+ * jest.isolateModules to control the pipeline path. We still use
+ * jest.isolateModulesAsync to get fresh mock registrations per test group
+ * (preventing mock state leaking between groups), but the env var is now
+ * the sole control mechanism.
  *
  * Returns an object with the mock spy references so callers can assert on them.
  */
@@ -132,12 +142,14 @@ async function runWithMocks({
   let runCouncilScoringSpy!: jest.Mock
   let runPipeline!: (brief: string) => Promise<unknown>
 
-  // Set env BEFORE loading the module (PA_PIPELINE is a load-time constant)
+  // Phase H: PA_PIPELINE is a runtime getter — set env directly (no module reload needed)
   const originalEnv = process.env.PA_PIPELINE
   if (paPipeline) {
+    // Default is now true, so either set to 'true' or leave unset (both work)
     process.env.PA_PIPELINE = 'true'
   } else {
-    delete process.env.PA_PIPELINE
+    // Legacy path: must explicitly set to 'false' since default is now 'true'
+    process.env.PA_PIPELINE = 'false'
   }
 
   await jest.isolateModulesAsync(async () => {
@@ -298,15 +310,19 @@ async function runWithMocks({
     runPipeline = rp
   })
 
-  // Restore env
+  // Phase H: Run the pipeline BEFORE restoring env, because PA_PIPELINE is now a
+  // runtime getter that reads process.env at call time. If we restored env first
+  // and then called runPipeline, the getter would see the restored value (default=true)
+  // instead of the test's intended value (e.g. 'false' for legacy-path tests).
+  await runPipeline(BESS_BRIEF)
+
+  // Now restore env to original value
   if (originalEnv !== undefined) {
     process.env.PA_PIPELINE = originalEnv
   } else {
+    // Restoring to unset means PA path is active (default) — correct
     delete process.env.PA_PIPELINE
   }
-
-  // Run the pipeline
-  await runPipeline(BESS_BRIEF)
 
   return { runPolishSpy, runReviewSpy, runCouncilScoringSpy }
 }

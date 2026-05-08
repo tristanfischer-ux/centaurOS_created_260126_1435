@@ -1,3 +1,16 @@
+/**
+ * @file stages/7-pdf.tsx — Legacy PDF renderer (v2)
+ *
+ * @deprecated Superseded by the BESS-style v3 renderer (`stages/7-pdf-v3.tsx`).
+ * Phase H (current): PDF_RENDERER defaults to 'v3' when PA_PIPELINE=true (now the
+ * default). This file is only invoked when PDF_RENDERER=v2 is set explicitly or
+ * when PA_PIPELINE=false.
+ *
+ * Deletion schedule: after final regression check confirms v3 renderer parity.
+ * Do NOT delete until v3 has been validated across all 10 baseline briefs.
+ * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase H.
+ */
+
 import React from 'react'
 import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer'
 import { benchmarkCheck, PROJECT_BENCHMARKS } from '../benchmarks'

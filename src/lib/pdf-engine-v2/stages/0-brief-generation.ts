@@ -193,8 +193,12 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
 }
 
 /**
- * Generate a structured Brief from raw founder text.
- * This is the first pipeline stage — everything downstream depends on it.
+ * Generate a structured Brief from raw founder text — legacy path (PA_PIPELINE=false).
+ * This is the first pipeline stage on the legacy path.
+ *
+ * @deprecated Use `runBriefParsing()` on the PA path (PA_PIPELINE=true / default).
+ * This function is preserved for the legacy rollback path only (PA_PIPELINE=false).
+ * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase A.
  */
 export async function runBriefGeneration(
   rawBriefText: string,

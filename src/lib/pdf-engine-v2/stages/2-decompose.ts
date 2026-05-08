@@ -501,6 +501,10 @@ export async function runDecomposePA(
  * Run the decomposition stage — legacy path (PA_PIPELINE=false).
  * Input: research result from Stage 1
  * Output: StageResult<Module[]> with structured modules
+ *
+ * @deprecated Use `runDecomposePA()` on the PA path (PA_PIPELINE=true / default).
+ * This function is preserved for the legacy rollback path only (PA_PIPELINE=false).
+ * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase D1.
  */
 export async function runDecompose(
   research: ResearchResult,
