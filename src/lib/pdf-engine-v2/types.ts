@@ -511,8 +511,13 @@ export interface SizingZone {
 export interface DimensionSheetPA extends DimensionSheet {
   /** Named zones with length, volume, mass, and contents — surfaced from iso_container_layout */
   zones?: SizingZone[]
-  /** Volume utilisation as a percentage, e.g. 92 */
-  volumeUtilisationPct?: number
+  /**
+   * Volume utilisation as a percentage, e.g. 92.
+   * BLOCKER-D2-5 FIX: null when interior_volume_m3 is unavailable (prevents
+   * bogus 100% from the former `|| 1` fallback). Renderer must treat null as
+   * "unavailable" rather than 0% or 100%.
+   */
+  volumeUtilisationPct?: number | null
   /** Mass utilisation as a percentage, e.g. 96 */
   massUtilisationPct?: number
   /** Outer container envelope */

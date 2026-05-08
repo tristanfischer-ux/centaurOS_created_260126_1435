@@ -350,27 +350,68 @@ function buildSpatialPlan(
 // that already runs internally is surfaced as dimensionSheet.zones[].
 
 /**
- * ISO 40ft container physical constants.
+ * ISO container physical constants lookup.
  * Source: ISO 668:2020 Series 1 freight containers.
+ *
+ * BLOCKER-D2-4 FIX: replaced single ISO_40FT hardcode with a per-kind lookup
+ * table so that extendSizingSheetPA() can select the correct tare, payload,
+ * and external dimensions from the envelope.kind set by the solver, rather
+ * than silently using 40ft constants for every product.
  */
-const ISO_40FT = {
-  external_w_mm:  2438,
-  external_d_mm: 12192,
-  external_h_mm:  2896,
-  tare_kg:        3750,
-  max_payload_kg: 27_230,
-  // The interior dims are already in the solver; these are the external dims.
-} as const
+const ISO_CONTAINER_SPECS: Record<string, {
+  external_w_mm: number
+  external_d_mm: number
+  external_h_mm: number
+  tare_kg: number
+  max_payload_kg: number
+}> = {
+  // Standard 40ft High-Cube (most common BESS container)
+  container_40ft: {
+    external_w_mm:  2438,
+    external_d_mm: 12192,
+    external_h_mm:  2896,
+    tare_kg:        3750,
+    max_payload_kg: 27_230,
+  },
+  // Standard 20ft ISO container
+  container_20ft: {
+    external_w_mm:  2438,
+    external_d_mm:  6058,
+    external_h_mm:  2591,
+    tare_kg:        2200,
+    max_payload_kg: 25_000,
+  },
+}
+
+/** Fallback spec when envelope.kind does not match a known container type. */
+const ISO_FALLBACK_SPEC = ISO_CONTAINER_SPECS.container_40ft
 
 /**
- * Derive the PA-shape extension fields from an existing DimensionSheet when
- * the domain is battery_energy_storage (iso_container_layout).
+ * Derive the PA-shape extension fields from an existing DimensionSheet for
+ * ALL product classes — not just battery_energy_storage.
  *
- * Called inside runSizeLayout only when PA_PIPELINE=true.
+ * BLOCKER-D2-3 FIX: removed the `domain === 'battery_energy_storage'` guard
+ * that was previously inside runSizeLayout. Now extendSizingSheetPA is called
+ * for every domain when paMode=true, with domain-specific behaviour:
+ *   - iso_container_layout (BESS): zones from container partitioning + ISO
+ *     constants selected by envelope.kind (BLOCKER-D2-4 fix).
+ *   - thermal_system_layout (heat_pump): zones from solver chassis layout if
+ *     available; otherwise empty zones[] + clearanceNotes explaining no zone
+ *     allocation for this domain.
+ *   - All other layouts (generic, warehouse, etc.): universal fields
+ *     (volumeUtilisationPct, massUtilisationPct) always populated; zones
+ *     from module grouping; tare/payload derived from envelope where possible.
+ *
+ * BLOCKER-D2-5 FIX: replaced `env.interior_volume_m3 || 1` fallback with
+ * an explicit null-return path — `volumeUtilisationPct` is null when volume
+ * data is unavailable, preventing the bogus 100% figure.
+ *
+ * Called inside runSizeLayout only when PA_PIPELINE=true (paMode=true).
  */
 function extendSizingSheetPA(
   sheet: DimensionSheet,
   modules: Module[],
+  domain: string,
 ): DimensionSheetPA {
   const env = sheet.envelope
 
@@ -388,30 +429,86 @@ function extendSizingSheetPA(
     }
   }
 
-  const totalVolumeM3 = env.interior_volume_m3 || 1
-  const volumeUtilisationPct = Math.min(100, Math.round((allocatedVolumeM3 / totalVolumeM3) * 100))
+  // BLOCKER-D2-5 FIX: guard missing/zero interior_volume_m3 explicitly.
+  // Return null (not 100%) when volume data is unavailable so the renderer
+  // can display "unavailable" rather than a misleading 100% figure.
+  const totalVolumeM3: number | null =
+    typeof env.interior_volume_m3 === 'number' && env.interior_volume_m3 > 0
+      ? env.interior_volume_m3
+      : null
 
-  // Available payload = ISO max payload minus container tare.
-  const availablePayloadMassKg = ISO_40FT.max_payload_kg
-  const tareMassKg = ISO_40FT.tare_kg
+  const volumeUtilisationPct: number | null = totalVolumeM3 !== null
+    ? Math.min(100, Math.round((allocatedVolumeM3 / totalVolumeM3) * 100))
+    : null
+
+  // ── Tare / payload from envelope kind or ISO lookup ───────────────────────
+  // BLOCKER-D2-4 FIX: derive tare/payload/external dims from envelope.kind
+  // rather than hard-wiring ISO_40FT constants regardless of container size.
+  //
+  // For ISO container domains: look up by envelope.kind (container_40ft,
+  // container_20ft etc.). For non-container domains: derive best-effort
+  // estimates from the envelope geometry or set to null with a note.
+  let tareMassKg: number
+  let availablePayloadMassKg: number
+  let externalDimensionsMm: { w: number; d: number; h: number }
+
+  const containerSpec = ISO_CONTAINER_SPECS[env.kind]
+  if (containerSpec) {
+    // Known ISO container — use tabulated values.
+    tareMassKg = containerSpec.tare_kg
+    availablePayloadMassKg = containerSpec.max_payload_kg
+    externalDimensionsMm = {
+      w: containerSpec.external_w_mm,
+      d: containerSpec.external_d_mm,
+      h: containerSpec.external_h_mm,
+    }
+  } else {
+    // Non-container envelope (warehouse_bay, outdoor_unit, generic_room, etc.).
+    // Derive a conservative payload estimate from the interior volume as a
+    // rough density proxy (500 kg/m³ for dense packed electronics/machinery).
+    // Use interior dimensions as external (no separate shell measured).
+    const densityKgPerM3 = 500
+    tareMassKg = 0 // No structural container tare for non-containers
+    availablePayloadMassKg = totalVolumeM3 !== null
+      ? Math.round(totalVolumeM3 * densityKgPerM3)
+      : 0
+    externalDimensionsMm = {
+      w: env.interior_w_mm,
+      d: env.interior_d_mm,
+      h: env.interior_h_mm,
+    }
+  }
+
   const massUtilisationPct = availablePayloadMassKg > 0
     ? Math.min(100, Math.round((allocatedMassKg / availablePayloadMassKg) * 100))
     : 0
 
   // ── Zone allocation ───────────────────────────────────────────────────────
   // Group modules into functional zones based on name heuristics.
+  // Works generically for all product classes — BESS zones are specifically
+  // named; other domains fall through to generic zone grouping.
   const ZONE_KEYWORDS: Array<{ regex: RegExp; zone: string }> = [
     { regex: /battery|cell|rack|pack|lfp|bms|management/i, zone: 'Battery Zone' },
     { regex: /power.?electron|pcs|inverter|converter|transformer|switchgear/i, zone: 'Power Electronics Zone' },
-    { regex: /thermal|cooling|hvac|heat.?exchanger/i, zone: 'Thermal Management Zone' },
+    { regex: /thermal|cooling|hvac|heat.?exchanger|refrigerant|compressor|evaporator|condenser/i, zone: 'Thermal Management Zone' },
     { regex: /control|monitor|sensor|comms|communication|hmi|scada/i, zone: 'Controls & Monitoring Zone' },
     { regex: /fire|suppression|safety|detection/i, zone: 'Fire Safety Zone' },
+    { regex: /pump|hydronic|hydrobox|manifold/i, zone: 'Hydronic Zone' },
+    { regex: /structural|chassis|enclosure|housing/i, zone: 'Structural Zone' },
+    { regex: /propulsion|thrust|motor|actuator/i, zone: 'Propulsion Zone' },
+    { regex: /navigation|sensor|avionics|comput/i, zone: 'Avionics Zone' },
+    { regex: /grow|nutrient|irrigation|lighting|led/i, zone: 'Growing Zone' },
   ]
+
+  // For heat_pump domain: if no modules are available for zone partitioning
+  // (because the heat_pump solver returns early with FEASIBILITY_DEFERRED),
+  // produce an empty zones array with a clearance note explaining why.
+  const isHeatPump = domain === 'heat_pump'
 
   const zoneMap = new Map<string, { modules: Module[]; dims: ModuleDimensions[] }>()
 
   for (const mod of modules) {
-    let zoneName = 'Ancillary Zone'
+    let zoneName = 'General Zone'
     for (const { regex, zone } of ZONE_KEYWORDS) {
       if (regex.test(mod.name)) {
         zoneName = zone
@@ -439,10 +536,23 @@ function extendSizingSheetPA(
   const massMarginKg = availablePayloadMassKg - allocatedMassKg
   const massMarginPct = availablePayloadMassKg > 0 ? (massMarginKg / availablePayloadMassKg) * 100 : 100
 
-  const clearanceNotes =
-    `Container clear aisle width: ≥600 mm along the longitudinal axis for maintenance access. ` +
-    `End-panel clearance: 300 mm minimum for cable entry. ` +
-    `Top clearance to roof: ${Math.max(0, env.interior_h_mm - 2200)} mm available for overhead cable trays.`
+  let clearanceNotes: string
+  if (domain === 'battery_energy_storage' && containerSpec) {
+    clearanceNotes =
+      `Container clear aisle width: ≥600 mm along the longitudinal axis for maintenance access. ` +
+      `End-panel clearance: 300 mm minimum for cable entry. ` +
+      `Top clearance to roof: ${Math.max(0, env.interior_h_mm - 2200)} mm available for overhead cable trays.`
+  } else if (isHeatPump) {
+    clearanceNotes =
+      `Heat pump installation clearances per EN 378: minimum 1000 mm service access on at least one long side. ` +
+      `Refrigerant discharge area must be unobstructed. ` +
+      `Zone allocation is indicative — confirm with installation site survey.`
+  } else {
+    clearanceNotes =
+      `Clearance estimate based on generic envelope (${env.label}). ` +
+      `Minimum 600 mm service access on all sides recommended. ` +
+      `Domain-specific clearance requirements should be verified against applicable standards.`
+  }
 
   const massMarginNote: string | null = massMarginPct < 5
     ? `Total allocated mass: ${allocatedMassKg.toFixed(0)} kg. ` +
@@ -453,9 +563,9 @@ function extendSizingSheetPA(
   return {
     ...sheet,
     zones,
-    volumeUtilisationPct,
+    volumeUtilisationPct: volumeUtilisationPct ?? undefined,
     massUtilisationPct,
-    externalDimensionsMm: { w: ISO_40FT.external_w_mm, d: ISO_40FT.external_d_mm, h: ISO_40FT.external_h_mm },
+    externalDimensionsMm,
     internalDimensionsMm: { w: env.interior_w_mm, d: env.interior_d_mm, h: env.interior_h_mm },
     tareMassKg,
     availablePayloadMassKg,
@@ -486,10 +596,11 @@ export async function runSizeLayout(
     const spatialPlan = buildSpatialPlan(dimensionSheet, modules)
 
     // PA Stage 7a: extend with renderer fields when paMode=true.
-    // Only for iso_container_layout (battery_energy_storage) — other domains
-    // get the base sheet unchanged (zones = undefined, etc.).
-    if (options?.paMode && domain === 'battery_energy_storage') {
-      const paSheet = extendSizingSheetPA(dimensionSheet, modules)
+    // BLOCKER-D2-3 FIX: removed the domain === 'battery_energy_storage' guard
+    // so extendSizingSheetPA fires for ALL product classes on the PA path.
+    // extendSizingSheetPA now handles domain-specific behaviour internally.
+    if (options?.paMode) {
+      const paSheet = extendSizingSheetPA(dimensionSheet, modules, domain)
       return {
         ok: true,
         data: { ...paSheet, spatialPlan },

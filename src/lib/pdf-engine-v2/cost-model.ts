@@ -162,7 +162,8 @@ export function calculateCostPA(
   // 2. Build named overhead lines from the overhead multiplier.
   //    The multiplier = 1 + assembly% + test% + overhead% + contingency%.
   //    We decompose it into explicit named lines matching the BESS reference.
-  const overheadLines: CostOverheadLine[] = _buildOverheadLines(rawBom, base.overheadMultiplier, domain);
+  //    BLOCKER-D2-1 FIX: pass unitTotalGbp so the function can validate sum.
+  const overheadLines: CostOverheadLine[] = _buildOverheadLines(rawBom, base.overheadMultiplier, domain, base.unitTotalGbp);
 
   // 3. Build per-module rows with % of BOM and source grade.
   const totalBomForPct = base.perModule.reduce((s, m) => s + m.totalGbp, 0) || 1;
@@ -208,9 +209,20 @@ export function calculateCostPA(
  * The BESS reference example:
  *   BOM Total, Assembly Labour 15%, Factory Testing (flat), Shipping (flat),
  *   Overheads 8%, Contingency 10% → ESTIMATED UNIT COST
+ *
+ * BLOCKER-D2-1 FIX: the `multiplier` parameter was previously ignored —
+ * the function used hardcoded RATE_SPEC rates and the 6 lines did not sum to
+ * `unitTotalGbp`. Fix: the overhead budget above BOM is exactly
+ * `unitTotalGbp - rawBomGbp`. We decompose this budget proportionally using
+ * RATE_SPEC weight fractions, then assign any rounding residual to the last
+ * non-BOM line so the table always reconciles. Throws if the sum diverges by
+ * more than £1 after reconciliation (catches future drift).
  */
-function _buildOverheadLines(rawBomGbp: number, multiplier: number, domain: string): CostOverheadLine[] {
-  // Domain-specific overhead decomposition rates (sum to multiplier - 1).
+function _buildOverheadLines(rawBomGbp: number, multiplier: number, domain: string, unitTotalGbp: number): CostOverheadLine[] {
+  // Domain-specific overhead decomposition weight ratios.
+  // These determine how the overhead budget is split across the named lines.
+  // They do NOT determine the amounts independently — the actual overhead
+  // budget is derived from unitTotalGbp so lines always sum to the total.
   type RateSpec = { assemblyPct: number; testingFlat: number; shippingFlat: number; overheadsPct: number; contingencyPct: number };
 
   const RATE_SPEC: Record<string, RateSpec> = {
@@ -224,18 +236,49 @@ function _buildOverheadLines(rawBomGbp: number, multiplier: number, domain: stri
 
   const spec = RATE_SPEC[domain] ?? RATE_SPEC.default;
 
-  const assembly = rawBomGbp * spec.assemblyPct;
-  const overheads = rawBomGbp * spec.overheadsPct;
-  const contingency = (rawBomGbp + assembly + spec.testingFlat + spec.shippingFlat + overheads) * spec.contingencyPct;
+  // The total overhead above BOM is the authoritative budget.
+  const overheadBudget = unitTotalGbp - rawBomGbp;
 
-  return [
+  // Compute indicative amounts from RATE_SPEC proportions (unscaled).
+  const assemblyRaw = rawBomGbp * spec.assemblyPct;
+  const testingRaw  = spec.testingFlat;
+  const shippingRaw = spec.shippingFlat;
+  const overheadsRaw = rawBomGbp * spec.overheadsPct;
+  const contingencyRaw = (rawBomGbp + assemblyRaw + testingRaw + shippingRaw + overheadsRaw) * spec.contingencyPct;
+
+  const rawSum = assemblyRaw + testingRaw + shippingRaw + overheadsRaw + contingencyRaw;
+
+  // Scale all lines so that they sum to overheadBudget exactly.
+  const scale = rawSum > 0 ? overheadBudget / rawSum : 0;
+
+  const assemblyGbp   = Math.round(assemblyRaw   * scale);
+  const testingGbp    = Math.round(testingRaw    * scale);
+  const shippingGbp   = Math.round(shippingRaw   * scale);
+  const overheadsGbp  = Math.round(overheadsRaw  * scale);
+  // Assign any rounding residual to contingency so lines sum exactly.
+  const contingencyGbp = overheadBudget - assemblyGbp - testingGbp - shippingGbp - overheadsGbp;
+
+  const lines: CostOverheadLine[] = [
     { label: 'BOM Total', gbp: rawBomGbp },
-    { label: `Assembly Labour (${Math.round(spec.assemblyPct * 100)}% of BOM)`, gbp: Math.round(assembly) },
-    { label: 'Factory Testing', gbp: spec.testingFlat },
-    { label: 'Shipping and Logistics', gbp: spec.shippingFlat },
-    { label: `Overheads (${Math.round(spec.overheadsPct * 100)}% of BOM)`, gbp: Math.round(overheads) },
-    { label: `Contingency (${Math.round(spec.contingencyPct * 100)}%)`, gbp: Math.round(contingency) },
+    { label: `Assembly Labour (${Math.round(spec.assemblyPct * 100)}% of BOM)`, gbp: assemblyGbp },
+    { label: 'Factory Testing', gbp: testingGbp },
+    { label: 'Shipping and Logistics', gbp: shippingGbp },
+    { label: `Overheads (${Math.round(spec.overheadsPct * 100)}% of BOM)`, gbp: overheadsGbp },
+    { label: `Contingency (${Math.round(spec.contingencyPct * 100)}%)`, gbp: contingencyGbp },
   ];
+
+  // Validate that lines sum to unitTotalGbp within £1 rounding tolerance.
+  // Throws to surface future drift rather than silently producing a bad table.
+  const lineSum = lines.reduce((s, l) => s + l.gbp, 0);
+  const diff = Math.abs(lineSum - unitTotalGbp);
+  if (diff > 1) {
+    throw new Error(
+      `_buildOverheadLines: line sum £${lineSum.toFixed(2)} diverges from unitTotalGbp £${unitTotalGbp.toFixed(2)} by £${diff.toFixed(2)} (tolerance £1). ` +
+      `domain=${domain}, multiplier=${multiplier}, rawBom=${rawBomGbp.toFixed(2)}`
+    );
+  }
+
+  return lines;
 }
 
 /**
@@ -269,9 +312,15 @@ function _buildReductionPaths(domain: string, rawBomGbp: number): CostReductionP
     ],
   };
 
+  // BLOCKER-D2-2 FIX: replaced `Math.round(rawBomGbp * savingFraction / 100) * 100`
+  // which rounded to nearest £100 (divides by 100 BEFORE multiplying back).
+  // For rawBom=£247,800 and savingFraction=0.05, old formula gives £12,400 (£100
+  // precision) instead of the correct £12,390.00. New formula:
+  //   Math.round(rawBomGbp * savingFraction * 100) / 100
+  // multiplies first (preserves pence) then divides last (rounds to penny).
   const paths = (PATHS[domain] ?? PATHS.default).map(({ savingFraction, ...rest }): CostReductionPath => ({
     ...rest,
-    savingGbp: `~${formatGbp(Math.round(rawBomGbp * savingFraction / 100) * 100)}`,
+    savingGbp: `~${formatGbp(Math.round(rawBomGbp * savingFraction * 100) / 100)}`,
   }));
 
   return paths;

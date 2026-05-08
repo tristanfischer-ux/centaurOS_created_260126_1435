@@ -15,7 +15,7 @@
 | B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | C | Drop Training Data Dump | 0.5-1 | ✅ Done | ✅ Approved (after fixes for BLOCKER-3+4) | 2026-05-08 |
 | D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ⚠️ Issues to fix (9 BLOCKERs) | 2026-05-08 |
-| D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
+| D2 | Sizing + Cost PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
 | F | Demote Review/Polish + Report Type Router | 2-3 | ⬜ Pending | ⬜ Pending | — |
 | G | Renderer integration with reportType | 2-3 | ⬜ Pending | ⬜ Pending | — |
@@ -475,7 +475,7 @@ Phase H scope explicitly covers this: "RL scripts (`brief-rl-iterate.ts`, `decom
 ### Council review
 
 - [x] D1 council review: findings ≥2 seats addressed ⚠️ Issues to fix — 9 BLOCKERs identified, see Phase D1 Council Review section below
-- [x] D2 council review: findings ≥2 seats addressed ✅ Complete — 5 BLOCKERs identified, see below
+- [x] D2 council review: findings ≥2 seats addressed ✅ Approved (after fixes) — 5 BLOCKERs fixed 2026-05-08, see Council fixes applied section below
 - [ ] Cross-cut review (D1 + D2 together) for type consistency ⬜ Pending
 
 ---
@@ -665,6 +665,31 @@ Phase H scope explicitly covers this: "RL scripts (`brief-rl-iterate.ts`, `decom
 
 ---
 
+### Council fixes applied — 2026-05-08 (Phase D2 BLOCKERs)
+
+All 5 BLOCKERs fixed in one commit (`fix(pdf-engine-v2): Phase D2 council BLOCKERs (1-5) — overhead sums, math bugs, hardcodes`).
+
+| # | Finding | Fix | Status |
+|---|---|---|---|
+| BLOCKER-D2-1 | `_buildOverheadLines` ignores `multiplier`; lines do not sum to `unitTotalGbp` | Replaced hardcoded RATE_SPEC line amounts with overhead-budget back-calculation: total overhead = `unitTotalGbp - rawBomGbp`, distributed proportionally with residual assigned to contingency. Added £1-tolerance validation that throws on future drift. | ✅ Fixed |
+| BLOCKER-D2-2 | `savingGbp` formula `Math.round(rawBomGbp * savingFraction / 100) * 100` rounds to nearest £100 | Replaced with `Math.round(rawBomGbp * savingFraction * 100) / 100` (penny precision, multiply-first idiom). For rawBom=£100,000 @ 15% → £15,000.00 not £15,000 or £15,100. | ✅ Fixed |
+| BLOCKER-D2-3 | Hardcoded `domain === 'battery_energy_storage'` gate blocks PA fields for all other product classes | Removed domain guard from `runSizeLayout`. `extendSizingSheetPA` now fires for ALL domains on `paMode=true`. Domain-specific behaviour (container vs non-container clearance notes, zone keywords) handled inside. | ✅ Fixed |
+| BLOCKER-D2-4 | Hardcoded `ISO_40FT` tare/payload/external dims regardless of container type | Replaced `ISO_40FT` constant with `ISO_CONTAINER_SPECS` lookup table keyed on `envelope.kind` (`container_40ft`, `container_20ft`). Non-container envelopes use density-estimate for payload and interior dims as external. | ✅ Fixed |
+| BLOCKER-D2-5 | `env.interior_volume_m3 \|\| 1` silently uses 1 m³ fallback → bogus 100% utilisation | Replaced with explicit null guard: `totalVolumeM3 === null \|\| totalVolumeM3 <= 0` → `volumeUtilisationPct: null`. Updated `DimensionSheetPA.volumeUtilisationPct` type to `number \| null`. | ✅ Fixed |
+
+**NOTED findings (NOTED-D2-1 through NOTED-D2-7) deferred per council recommendation:**
+- NOTED-D2-1 (grade='D' hardcode + type union) → Phase F cleanup
+- NOTED-D2-2 (triple-state ceilingExceededBanner) → Phase F annotation
+- NOTED-D2-3 (savingGbp typed as string) → Phase F schema split
+- NOTED-D2-4 (duplicate NRE entries) → Phase F deduplication
+- NOTED-D2-5 (perModulePA + perModule dual source) → Phase F consolidation
+- NOTED-D2-6 (zone lengthMm geometric fiction) → Phase D2 cleanup / before renderer v3 ships
+- NOTED-D2-7 (massMarginNote over-limit vs tight) → Phase D2 cleanup
+
+New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3, BLOCKER-D2-4 ×2, BLOCKER-D2-5 ×1, legacy path update ×1, massless ×1) and `cost-model-pa.test.ts` (5 tests: BLOCKER-D2-1 ×3, BLOCKER-D2-2 ×3 — some tests cover multiple BLOCKERs). All 502/503 tests pass (1 pre-existing council-scorer failure unchanged). Typecheck: 0 new errors in D2-changed files.
+
+---
+
 ## Phase E — Cut Over Integrated BOM/Suppliers
 
 **Status:** ⚠️ Blocked on v2 BOM hitting ≥8 baseline (per migration plan §5.1)
@@ -813,7 +838,7 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase D1: COMPLETE (2026-05-08) — Module Decomposition PA Stage 5 + Regulatory Extraction PA Stage 4; 61 new tests; 481/482 pass; typecheck clean
 - ✅ Phase D2: COMPLETE (2026-05-08) — Sizing Solver + Cost Computation PA schemas
 - ❌ Phase D1: council review ⚠️ Issues to fix — 9 BLOCKERs found (2026-05-08). Must fix before Phase E. See Phase D Council Review Results (D1) section.
-- ❌ Phase D2: council review ⬜ Pending
+- ✅ Phase D2: council review ✅ Approved (after fixes) — 5 BLOCKERs fixed 2026-05-08
 - ❌ Phase E-H: unblocked, ready to start
 - ❌ All council reviews (Phase C-D onwards)
 
