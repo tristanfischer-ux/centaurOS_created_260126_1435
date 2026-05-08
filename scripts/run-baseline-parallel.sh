@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/opt/homebrew/bin/bash
 # Run 10 baseline evidence runs in parallel (max 4 concurrent).
 # Output: ~/Downloads/engine-evidence/post-5470c9ae/<slug>/{report.pdf,log.txt,.done}
 # Skips runs where .done already exists — safe to re-run.
