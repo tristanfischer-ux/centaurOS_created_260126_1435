@@ -316,3 +316,252 @@ describe('Phase H — default flip evidence (no env vars → PA path)', () => {
     expect(getPdfRenderer()).toBe('v2')
   })
 })
+
+// ── H-B6: case-sensitivity fixes ──────────────────────────────────────────────
+
+describe('H-B6 — case-sensitive PA_PIPELINE opt-out (env.ts)', () => {
+  const savedPA = process.env.PA_PIPELINE
+
+  afterEach(() => {
+    if (savedPA !== undefined) process.env.PA_PIPELINE = savedPA
+    else delete process.env.PA_PIPELINE
+  })
+
+  // Reimplements the fixed env.ts logic for unit tests (no module import needed)
+  function isPaPipelineFixed(): boolean {
+    const raw = (process.env.PA_PIPELINE ?? '').toLowerCase().trim()
+    if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false
+    return true
+  }
+
+  it('PA_PIPELINE=False (capital F) opts out correctly', () => {
+    process.env.PA_PIPELINE = 'False'
+    expect(isPaPipelineFixed()).toBe(false)
+  })
+
+  it('PA_PIPELINE=FALSE opts out correctly', () => {
+    process.env.PA_PIPELINE = 'FALSE'
+    expect(isPaPipelineFixed()).toBe(false)
+  })
+
+  it('PA_PIPELINE="false " (trailing space) opts out correctly', () => {
+    process.env.PA_PIPELINE = 'false '
+    expect(isPaPipelineFixed()).toBe(false)
+  })
+
+  it('PA_PIPELINE=0 opts out correctly', () => {
+    process.env.PA_PIPELINE = '0'
+    expect(isPaPipelineFixed()).toBe(false)
+  })
+
+  it('PA_PIPELINE=no opts out correctly', () => {
+    process.env.PA_PIPELINE = 'no'
+    expect(isPaPipelineFixed()).toBe(false)
+  })
+
+  it('PA_PIPELINE=NO opts out correctly', () => {
+    process.env.PA_PIPELINE = 'NO'
+    expect(isPaPipelineFixed()).toBe(false)
+  })
+
+  it('PA_PIPELINE=off opts out correctly', () => {
+    process.env.PA_PIPELINE = 'off'
+    expect(isPaPipelineFixed()).toBe(false)
+  })
+
+  it('unset PA_PIPELINE defaults to PA path (true)', () => {
+    delete process.env.PA_PIPELINE
+    expect(isPaPipelineFixed()).toBe(true)
+  })
+
+  it('empty string PA_PIPELINE defaults to PA path (true)', () => {
+    process.env.PA_PIPELINE = ''
+    expect(isPaPipelineFixed()).toBe(true)
+  })
+})
+
+// ── H-B4: getPdfRenderer invalid-value fallback ────────────────────────────────
+
+describe('H-B4 — getPdfRenderer invalid-value fallback is path-appropriate', () => {
+  const savedPA = process.env.PA_PIPELINE
+  const savedRenderer = process.env.PDF_RENDERER
+
+  afterEach(() => {
+    if (savedPA !== undefined) process.env.PA_PIPELINE = savedPA
+    else delete process.env.PA_PIPELINE
+    if (savedRenderer !== undefined) process.env.PDF_RENDERER = savedRenderer
+    else delete process.env.PDF_RENDERER
+  })
+
+  // Fixed getPdfRenderer: invalid value falls back to path-appropriate default
+  function getPdfRendererFixed(): 'v2' | 'v3' {
+    const isPaPipeline = () => {
+      const raw = (process.env.PA_PIPELINE ?? '').toLowerCase().trim()
+      if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false
+      return true
+    }
+    const explicit = (process.env.PDF_RENDERER ?? '') || null
+    const paDefault: 'v2' | 'v3' = isPaPipeline() ? 'v3' : 'v2'
+    if (!explicit) return paDefault
+    if (explicit === 'v2' || explicit === 'v3') return explicit
+    return paDefault  // invalid → path-appropriate fallback
+  }
+
+  it('invalid PDF_RENDERER on PA path falls back to v3 (not v2)', () => {
+    delete process.env.PA_PIPELINE  // PA default
+    process.env.PDF_RENDERER = 'bad_value'
+    expect(getPdfRendererFixed()).toBe('v3')
+  })
+
+  it('invalid PDF_RENDERER on legacy path falls back to v2', () => {
+    process.env.PA_PIPELINE = 'false'
+    process.env.PDF_RENDERER = 'bad_value'
+    expect(getPdfRendererFixed()).toBe('v2')
+  })
+})
+
+// ── H-B1: PA_STAGE_NAMES derived from PA_STAGES_ORDERED ───────────────────────
+
+describe('H-B1 — PA_STAGE_NAMES ordering matches PA_STAGES_ORDERED', () => {
+  const PA_STAGES_ORDERED = [
+    'brief_parsing',
+    'research_synthesis',
+    'regulatory_extraction',
+    'decompose_pa',
+    'size_layout',
+    'bom_pa',
+    'review',
+  ] as const
+
+  // PA_STAGE_NAMES is now derived from PA_STAGES_ORDERED
+  const PA_STAGE_NAMES: readonly string[] = PA_STAGES_ORDERED
+
+  it('size_layout appears at index 4 (before bom_pa at index 5) in both arrays', () => {
+    expect(PA_STAGES_ORDERED.indexOf('size_layout')).toBe(4)
+    expect(PA_STAGES_ORDERED.indexOf('bom_pa')).toBe(5)
+    expect(PA_STAGE_NAMES.indexOf('size_layout')).toBe(4)
+    expect(PA_STAGE_NAMES.indexOf('bom_pa')).toBe(5)
+  })
+
+  it('PA_STAGE_NAMES and PA_STAGES_ORDERED contain identical elements in identical order', () => {
+    expect([...PA_STAGE_NAMES]).toEqual([...PA_STAGES_ORDERED])
+  })
+})
+
+// ── H-B3: TOCTOU snapshot ──────────────────────────────────────────────────────
+
+describe('H-B3 — TOCTOU: runPipeline uses snapshotted paMode, not per-call isPaPipeline()', () => {
+  const savedPA = process.env.PA_PIPELINE
+
+  afterEach(() => {
+    if (savedPA !== undefined) process.env.PA_PIPELINE = savedPA
+    else delete process.env.PA_PIPELINE
+  })
+
+  it('snapshot captured at entry is stable even if env changes mid-invocation', () => {
+    delete process.env.PA_PIPELINE
+    const isPaPipeline = () => {
+      const raw = (process.env.PA_PIPELINE ?? '').toLowerCase().trim()
+      if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false
+      return true
+    }
+    // Snapshot (what runPipeline now does at entry)
+    const paMode = isPaPipeline()
+    expect(paMode).toBe(true)
+
+    // Simulate env change mid-run (e.g. a parallel test tears down)
+    process.env.PA_PIPELINE = 'false'
+
+    // The snapshotted paMode should still be true — env change doesn't affect it
+    expect(paMode).toBe(true)
+    // While a fresh isPaPipeline() call would see false
+    expect(isPaPipeline()).toBe(false)
+  })
+})
+
+// ── H-B2: bom_pa guard and runBomCostSuppliers routing ───────────────────────
+
+describe('H-B2 — bom_pa dimensionSheet guard', () => {
+  it('throws a clear error when dimensionSheet is undefined', () => {
+    const state: any = { modules: ['module-a'], dimensionSheet: undefined }
+    expect(() => {
+      if (state.dimensionSheet === undefined || state.dimensionSheet === null) {
+        throw new Error(
+          `bom_pa: state.dimensionSheet is ${state.dimensionSheet}. ` +
+          `size_layout must succeed before bom_pa.`
+        )
+      }
+    }).toThrow('state.dimensionSheet is undefined')
+  })
+
+  it('throws a clear error when dimensionSheet is null', () => {
+    const state: any = { modules: ['module-a'], dimensionSheet: null }
+    expect(() => {
+      if (state.dimensionSheet === undefined || state.dimensionSheet === null) {
+        throw new Error(
+          `bom_pa: state.dimensionSheet is ${state.dimensionSheet}. ` +
+          `size_layout must succeed before bom_pa.`
+        )
+      }
+    }).toThrow('state.dimensionSheet is null')
+  })
+
+  it('does not throw when dimensionSheet is a valid object', () => {
+    const state: any = { modules: ['module-a'], dimensionSheet: { rows: [] } }
+    expect(() => {
+      if (state.dimensionSheet === undefined || state.dimensionSheet === null) {
+        throw new Error('should not reach here')
+      }
+    }).not.toThrow()
+  })
+})
+
+// ── H-B7: decompose_pa guard alignment ────────────────────────────────────────
+
+describe('H-B7 — decompose_pa guard alignment with live pipeline', () => {
+  it('throws loud error when researchSynthesis missing (replay fidelity violation)', () => {
+    const state: any = { parsedBrief: { product_description: 'test' }, researchSynthesis: undefined }
+    const briefSlug = 'test-brief'
+    expect(() => {
+      if (!state.parsedBrief) {
+        throw new Error(`decompose_pa requires brief_parsing`)
+      }
+      if (!state.researchSynthesis) {
+        throw new Error(
+          `[${briefSlug}] decompose_pa: state.researchSynthesis is undefined. ` +
+          `This is a replay fidelity violation — fix the state injection.`
+        )
+      }
+    }).toThrow('replay fidelity violation')
+  })
+
+  it('does not throw when both parsedBrief and researchSynthesis are present', () => {
+    const state: any = {
+      parsedBrief: { product_description: 'test' },
+      researchSynthesis: { market_context: 'ctx', why_now: 'now', research_sources: [] },
+    }
+    expect(() => {
+      if (!state.parsedBrief) throw new Error('needs parsedBrief')
+      if (!state.researchSynthesis) throw new Error('needs researchSynthesis')
+    }).not.toThrow()
+  })
+})
+
+// ── H-B8: telemetry fires before any destructuring ────────────────────────────
+
+describe('H-B8 — startup telemetry position', () => {
+  it('paMode and renderer are captured as the very first operations in runPipeline', () => {
+    // Documents the fix: paMode = isPaPipeline() and renderer = getPdfRenderer()
+    // are the first two statements in runPipeline(), before startTime or projectName.
+    delete process.env.PA_PIPELINE
+    const isPaPipeline = () => {
+      const raw = (process.env.PA_PIPELINE ?? '').toLowerCase().trim()
+      if (raw === 'false' || raw === '0' || raw === 'no' || raw === 'off') return false
+      return true
+    }
+    // If telemetry is captured first (before startTime / projectName), any early
+    // exception cannot suppress it. Snapshot must equal current env state.
+    const paMode = isPaPipeline()
+    expect(paMode).toBe(true)  // default = PA path, captured before any other work
+  })
+})

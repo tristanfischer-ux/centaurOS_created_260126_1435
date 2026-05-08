@@ -36,11 +36,9 @@ const REPO_ROOT = join(__dirname, '..', '..', '..')
 const BRIEFS_DIR = join(__dirname, 'briefs', 'baseline-10')
 
 // ─── Runtime PA_PIPELINE check ────────────────────────────────────────────────
-// Phase H: match the runtime getter pattern from index.ts.
-// Default is TRUE (PA pipeline). Set PA_PIPELINE=false to use legacy stages.
-function isPaPipeline(): boolean {
-  return process.env.PA_PIPELINE !== 'false'
-}
+// H-B5 fix: import from env.ts (single source of truth) — no local copy.
+// H-B6 fix: case-normalised opt-out handled in env.ts (False/FALSE/0/no/off).
+import { isPaPipeline } from './env.js'
 
 // ─── Stage → council section mapping ──────────────────────────────────────────
 // Maps each pipeline stage name to the council section key(s) that measure its
@@ -76,8 +74,23 @@ const STAGE_TO_COUNCIL_SECTION: Record<string, string[]> = {
   suppliers:                ['Suppliers'],
 }
 
-// PA-active stage names — used when isPaPipeline() === true.
-const PA_STAGE_NAMES = ['brief_parsing', 'research_synthesis', 'regulatory_extraction', 'decompose_pa', 'bom_pa', 'size_layout', 'review'] as const
+// H-B1 fix: PA_STAGES_ORDERED is now module-level (canonical execution order).
+// PA_STAGE_NAMES is DERIVED from PA_STAGES_ORDERED so a single source of truth
+// controls both the execution order AND the stage name set used in parseArgs /
+// cross-path warnings. Previously they were defined independently with different
+// orderings (bom_pa↔size_layout swapped), risking latent index-based bugs.
+const PA_STAGES_ORDERED = [
+  'brief_parsing',
+  'research_synthesis',
+  'regulatory_extraction',
+  'decompose_pa',
+  'size_layout',
+  'bom_pa',
+  'review',
+] as const
+
+// PA-active stage names — derived from PA_STAGES_ORDERED (single source of truth).
+const PA_STAGE_NAMES: readonly string[] = PA_STAGES_ORDERED
 
 // Legacy stage names — used when PA_PIPELINE=false.
 const LEGACY_STAGE_NAMES = ['training_data', 'research', 'brief_generation', 'decompose', 'size_layout', 'bom_cost', 'suppliers', 'review'] as const
@@ -164,6 +177,9 @@ async function runPipelineUpToStage(
   targetStage: string,
   briefSlug: string,
 ): Promise<any | null> {
+  // H-B3 fix: snapshot paMode once at function entry so all stage branches
+  // within this invocation use the same value even if process.env changes
+  // mid-run (Jest parallel workers, test teardown).
   const paPath = isPaPipeline()
   console.log(`  [${briefSlug}] Running pipeline up to stage "${targetStage}" (PA_PIPELINE=${paPath})...`)
 
@@ -176,6 +192,8 @@ async function runPipelineUpToStage(
   const { runDecompose, runDecomposePA } = await import('./stages/2-decompose.js')
   const { runSizeLayout } = await import('./stages/3-size-layout.js')
   const { runBomCost } = await import('./stages/4-bom-cost.js')
+  // H-B2 fix: import runBomCostSuppliers for the PA bom_pa stage
+  const { runBomCostSuppliers } = await import('./stages/4-bom-cost-suppliers.js')
   const { runSuppliers } = await import('./stages/5-suppliers.js')
   const { runReview } = await import('./stages/6-review.js')
   const { classifyProduct } = await import('./product-classifier.js')
@@ -199,18 +217,9 @@ async function runPipelineUpToStage(
     sectionScores: [],
   }
 
-  // Canonical execution order for each path.
-  // The RL framework runs stages 0..targetIdx in order, matching the live pipeline.
-  // No caching — every iteration re-runs all stages from the founder brief.
-  const PA_STAGES_ORDERED = [
-    'brief_parsing',
-    'research_synthesis',
-    'regulatory_extraction',
-    'decompose_pa',
-    'size_layout',
-    'bom_pa',
-    'review',
-  ] as const
+  // H-B1 fix: use module-level PA_STAGES_ORDERED (canonical execution order,
+  // single source of truth) instead of a local copy that could diverge.
+  // The local const is removed; PA_STAGES_ORDERED is defined at module scope.
 
   const LEGACY_STAGES_ORDERED = [
     'training_data',
@@ -303,9 +312,21 @@ async function runPipelineUpToStage(
 
     // ── decompose_pa ─────────────────────────────────────────────────────────
     if (PA_STAGES_ORDERED.indexOf('decompose_pa') <= targetIdx) {
-      if (!state.parsedBrief || !state.researchSynthesis) {
-        console.error(`  [${briefSlug}] decompose_pa requires brief_parsing + research_synthesis — skipping`)
+      // H-B7 fix: align guard with live pipeline. Live pipeline requires
+      // parsedBrief only (research_synthesis may have run but is not strictly
+      // required by runDecomposePA's signature). The stricter RL guard
+      // (`parsedBrief && researchSynthesis`) broke replay fidelity for states
+      // where brief_parsing passed but research_synthesis was injected/skipped.
+      // Fix: require parsedBrief (matches live pipeline) and make a missing
+      // researchSynthesis an explicit hard error (loud failure, not silent skip).
+      if (!state.parsedBrief) {
+        console.error(`  [${briefSlug}] decompose_pa requires brief_parsing — skipping`)
         return null
+      }
+      if (!state.researchSynthesis) {
+        throw new Error(`[${briefSlug}] decompose_pa: state.researchSynthesis is undefined. ` +
+          `research_synthesis must run before decompose_pa in ordered PA execution. ` +
+          `This is a replay fidelity violation — fix the state injection.`)
       }
       // runDecomposePA(parsedBrief, classification, regulatoryExtraction?)
       const r = await runDecomposePA(state.parsedBrief, classification.productClass, state.regulatoryExtraction)
@@ -330,19 +351,34 @@ async function runPipelineUpToStage(
     }
 
     // ── bom_pa ───────────────────────────────────────────────────────────────
-    // Note: bom_pa maps to the integrated BOM stage (BOM_PIPELINE=v2).
-    // Uses legacy runBomCost as a fallback until Phase E completes the cut-over.
+    // H-B2 fix: route to runBomCostSuppliers (the PA Stage 6 integrated BOM
+    // stage) instead of the legacy runBomCost(). This matches the live PA
+    // pipeline's BOM stage and avoids field-shape mismatches between PA-shaped
+    // dimensionSheet (paMode:true) and the legacy BOM function's expectations.
+    //
+    // Guard: dimensionSheet must be defined (size_layout is soft-fail, so it
+    // may be null/undefined). If undefined we throw a clear error instead of
+    // passing undefined silently into the BOM stage.
     if (PA_STAGES_ORDERED.indexOf('bom_pa') <= targetIdx) {
       if (!state.modules?.length) {
         console.warn(`  [${briefSlug}] bom_pa: no modules available, skipping`)
       } else {
-        const r = await runBomCost(state.modules, state.dimensionSheet, {
+        if (state.dimensionSheet === undefined || state.dimensionSheet === null) {
+          throw new Error(`[${briefSlug}] bom_pa: state.dimensionSheet is ${state.dimensionSheet}. ` +
+            `size_layout must succeed before bom_pa — cannot call BOM stage without dimension data. ` +
+            `This is a required precondition on the PA path.`)
+        }
+        const r = await runBomCostSuppliers({
+          modules: state.modules,
+          designBrief: state.research?.designBrief ?? null,
+          classification,
           domain: state.research?.industryDomain,
         })
         if (r.ok && r.data) {
           state.parts = r.data.parts
           state.bomLines = r.data.bomLines
           state.costBreakdown = r.data.costBreakdown
+          state.suppliers = r.data.supplierMatches ?? []
         } else {
           console.warn(`  [${briefSlug}] bom_pa failed (non-fatal): ${r.error}`)
         }

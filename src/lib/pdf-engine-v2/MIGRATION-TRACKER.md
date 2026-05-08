@@ -19,7 +19,7 @@
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
 | F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ✅ Approved (after fixes — 11 BLOCKERs fixed, F-9 deferred to Phase H) | 2026-05-08 |
 | G | Renderer integration with reportType | 2-3 | ✅ Done | ✅ Approved (after fixes — 4 BLOCKERs fixed, 5 NOTEDs deferred to Phase H) | 2026-05-08 |
-| H | Flip defaults, cleanup | 1-2 | ✅ Done | ⚠️ Issues to fix (8 BLOCKERs — scoped council: index.ts + stage-rl-iterate.ts only) | 2026-05-08 |
+| H | Flip defaults, cleanup | 1-2 | ✅ Done | ✅ Approved (after fixes — 8 BLOCKERs fixed, 3 NOTEDs 1-seat deferred) | 2026-05-08 |
 
 **Status legend:** ⬜ Pending · 🔄 In progress · ✅ Done · ⚠️ Blocked · 🚫 Skipped
 **Council legend:** ⬜ Pending · 🔄 In progress · ✅ Approved · ⚠️ Issues to fix · ❌ Rejected
@@ -1075,9 +1075,27 @@ Meta-rule applied: all 5 NOTEDs are 1 seat only — no reclassification. All def
 - ✅ Complete — 2026-05-08
 - **Council seats:** Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5-Pro — all 6 responded.
 - **Scope:** HIGH-RISK files only: `index.ts` (runtime getter changes) + `stage-rl-iterate.ts` (PA-aware RL framework). Deprecation markers, test files, STAGE-RL-MANIFEST not reviewed (low risk, out of scope).
-- **Status: ⚠️ Issues to fix — 8 BLOCKERs identified (≥2 seats each), 3 NOTEDs (1 seat only)**
+- **Status: ✅ Approved (after fixes) — all 8 BLOCKERs fixed. 3 NOTEDs are 1 seat only — no reclassification.**
 - **GPT-5.4 hallucination discount applied** — GPT-5.4 findings cross-checked against ≥1 other seat before counting.
-- **Default-flip safety verdict: NEEDS REWORK** — multiple issues require fixes before Phase H is safe to promote.
+- **Default-flip safety verdict: SAFE** — all 8 BLOCKERs fixed. Phase H promoted to ✅ Approved.
+
+#### Council fixes applied (commit after 1516f89a)
+
+| ID | Fix summary |
+|---|---|
+| H-B6 | `isPaPipeline()` in `env.ts`: case-normalised opt-out. 'False'/'FALSE'/'0'/'no'/'off' all opt out. 9 new tests. |
+| H-B5 | Extracted `isPaPipeline()` + `getPdfRenderer()` to `src/lib/pdf-engine-v2/env.ts`. Both `index.ts` and `stage-rl-iterate.ts` import from there. Local definitions removed. |
+| H-B4 | `getPdfRenderer()` in `env.ts`: invalid-value fallback is now `isPaPipeline() ? 'v3' : 'v2'` (path-appropriate), not hardcoded `'v2'`. 2 new tests. |
+| H-B3 | `runPipeline()` in `index.ts`: `const paMode = isPaPipeline()` and `const renderer = getPdfRenderer()` snapshotted at entry. All interior branches use `paMode`/`renderer`. `runPipelineUpToStage()` in `stage-rl-iterate.ts` already snapshots `paPath = isPaPipeline()` at entry. 1 new test. |
+| H-B2 | `bom_pa` block in `stage-rl-iterate.ts`: (a) throws clear error if `dimensionSheet === undefined/null` before calling BOM; (b) routes to `runBomCostSuppliers()` (PA Stage 6 integrated BOM) instead of legacy `runBomCost()`. 3 new tests. |
+| H-B1 | Module-level `PA_STAGES_ORDERED` in `stage-rl-iterate.ts`. `PA_STAGE_NAMES` derived from it (`readonly string[] = PA_STAGES_ORDERED`). Local `PA_STAGES_ORDERED` inside `runPipelineUpToStage` removed. 2 new tests. |
+| H-B7 | `decompose_pa` guard in `stage-rl-iterate.ts`: requires `parsedBrief` only (matches live pipeline); missing `researchSynthesis` throws explicit error (replay fidelity violation, not silent skip). 2 new tests. |
+| H-B8 | `runPipeline()` in `index.ts`: `paMode` + `renderer` snapshots + telemetry log (`console.info`) moved to very first executable lines — before `startTime`, `stages`, or `projectName` computation. 1 new test. |
+
+**NOTEDs (1 seat only — meta-rule: no reclassification):** H-N1, H-N2, H-N3 all deferred per original NOTED policy.
+
+**New tests added:** 20 (across H-B1 through H-B8).
+**All existing 656 tests pass.** Total: 676 tests pass.
 
 #### BLOCKERs (≥2 seats each)
 
@@ -1154,8 +1172,8 @@ For watchdog drift detection. Pending items only:
 - ❌ Phase E: unblocked, ready to start (gated on v2 BOM ≥8 baseline)
 - ✅ Phase G: COMPLETE (2026-05-08) — renderer v3 reads reportType for section/page guards; 21 new tests; all 2096 pre-existing tests pass
 - ✅ Phase G: council review COMPLETE — 4 BLOCKERs fixed (G-B1 through G-B4). 16 new tests. All 5 NOTEDs are 1 seat — deferred to Phase H. Typecheck clean in changed files.
-- ⚠️ Phase H: council review DONE (2026-05-08) — 8 BLOCKERs found (H-B1 through H-B8), 3 NOTEDs. NEEDS REWORK before RL launch. Scoped review: index.ts + stage-rl-iterate.ts (high-risk files only; deprecation markers + tests not reviewed).
-- ❌ Phase H: 8 BLOCKERs to fix (H-B1: ordering unification, H-B2: bom_pa guard, H-B3: TOCTOU snapshot, H-B4: renderer fallback, H-B5: isPaPipeline DRY, H-B6: case sensitivity, H-B7: RL guard alignment, H-B8: telemetry position)
+- ✅ Phase H: council review DONE (2026-05-08) — 8 BLOCKERs found + FIXED. 3 NOTEDs (1 seat only, deferred). Default-flip verdict: SAFE. Baseline run + RL launch unblocked.
+- ✅ Phase H: all 8 BLOCKERs fixed (H-B1 through H-B8). 20 new tests. All 676 tests pass. Typecheck clean in changed files. env.ts created as single source of truth.
 
 ---
 

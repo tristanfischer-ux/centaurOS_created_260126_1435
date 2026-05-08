@@ -23,45 +23,25 @@ import PdfRendererV3 from './stages/7-pdf-v3'
 
 // ── Phase H: runtime getters (F-9 fix) ───────────────────────────────────────
 //
-// PA_PIPELINE is now a RUNTIME GETTER, not a module-level constant.
-// DEFAULT is TRUE — PA pipeline is the default path.
-// Set PA_PIPELINE=false to opt out (rollback / legacy path).
-// This unblocks jest.isolateModules workaround: tests can simply set
-// process.env.PA_PIPELINE = 'false' in beforeEach/afterEach without
-// needing to reload the module.
+// H-B5 fix: isPaPipeline() and getPdfRenderer() are now imported from env.ts
+// (single source of truth). The local definitions have been removed to prevent
+// the two files from silently diverging.
 //
-// Previously (Phases A-G): PA_PIPELINE was a load-time constant defaulting to 'false'.
-// Phase H flips the default to 'true' and converts to a runtime getter.
+// H-B6 fix: case-normalised opt-out ('False', 'FALSE', '0', 'no', 'off' all
+// correctly opt out). See env.ts for full documentation.
 //
-// Rollback: PA_PIPELINE=false reverts to the full legacy pipeline unchanged.
-function isPaPipeline(): boolean {
-  return process.env.PA_PIPELINE !== 'false'
-}
+// H-B4 fix: invalid PDF_RENDERER falls back to path-appropriate default
+// ('v3' on PA path, 'v2' on legacy) — no longer hardcoded to 'v2'. See env.ts.
+//
+// H-B3 fix: TOCTOU — snapshots captured once at runPipeline() entry via
+// `const paMode = isPaPipeline()` and `const renderer = getPdfRenderer()`
+// and threaded through all branches. The module-level getters below remain
+// available for generateErrorPdf() and getActivePdfRenderer() which are
+// called outside runPipeline's closure.
+import { isPaPipeline, getPdfRenderer } from './env'
 
-// PDF_RENDERER is also a runtime getter.
-// When PA pipeline is active (default), renderer defaults to 'v3'.
-// When PA pipeline is inactive (PA_PIPELINE=false), renderer defaults to 'v2'.
-// Explicit PDF_RENDERER env var always wins (allows override in both directions).
-//
-// G-B4 fix preserved: use ?? (not ||) so that PDF_RENDERER='' (empty string) is
-// treated as unset and falls through to the isPaPipeline() ternary.
-// Additionally, validate the resolved value and warn on unrecognised strings.
-const _VALID_RENDERER_VERSIONS = ['v2', 'v3'] as const
-function getPdfRenderer(): 'v2' | 'v3' {
-  const explicit = (process.env.PDF_RENDERER ?? '') || null
-  const version = explicit || (isPaPipeline() ? 'v3' : 'v2')
-  if (!_VALID_RENDERER_VERSIONS.includes(version as typeof _VALID_RENDERER_VERSIONS[number])) {
-    console.warn(
-      `[pdf-engine-v2] Unrecognised PDF_RENDERER value '${version}'. ` +
-      `Valid values: ${_VALID_RENDERER_VERSIONS.join(', ')}. Falling back to legacy renderer (v2).`,
-    )
-    return 'v2'
-  }
-  return version as 'v2' | 'v3'
-}
-
-function getActivePdfRenderer() {
-  return getPdfRenderer() === 'v3' ? PdfRendererV3 : PdfRenderer
+function getActivePdfRenderer(renderer: 'v2' | 'v3') {
+  return renderer === 'v3' ? PdfRendererV3 : PdfRenderer
 }
 import { runPolish } from './stages/7-polish'
 import { pdf } from '@react-pdf/renderer'
@@ -115,13 +95,14 @@ async function generateErrorPdf(
 ): Promise<EngineResult> {
   const pdfStart = Date.now()
   try {
-    const doc = React.createElement(getActivePdfRenderer(), { state }) as any
+    const errorRenderer = getPdfRenderer()
+    const doc = React.createElement(getActivePdfRenderer(errorRenderer), { state }) as any
     const blob = await pdf(doc).toBlob()
     const buffer = Buffer.from(await blob.arrayBuffer())
     const base64 = buffer.toString('base64')
     const pdfMs = Date.now() - pdfStart
     stages.push({ name: 'pdf', ok: true, durationMs: pdfMs })
-    console.log(`[pipeline] pdf (error path, renderer=${getPdfRenderer()}): OK (${pdfMs}ms, ${Math.round(buffer.length / 1024)}KB)`)
+    console.log(`[pipeline] pdf (error path, renderer=${errorRenderer}): OK (${pdfMs}ms, ${Math.round(buffer.length / 1024)}KB)`)
 
     return {
       ok: false,  // Pipeline didn't complete successfully.
@@ -231,6 +212,15 @@ export async function runPipeline(
     projectId?: string
   }
 ): Promise<EngineResult> {
+  // H-B8 fix: telemetry log is the very first executable line so it fires on
+  // ALL code paths, including early-exit / exception paths.
+  // H-B3 fix: snapshot paMode + renderer once at entry so every branch in this
+  // invocation sees the same values even if process.env changes mid-run (Jest
+  // parallel workers, test teardown).
+  const paMode = isPaPipeline()
+  const renderer = getPdfRenderer()
+  console.info(`[pipeline] PA_PIPELINE=${paMode} PDF_RENDERER=${renderer}`)
+
   const startTime = Date.now()
   const stages: EngineResult['stages'] = []
   let llmCalls = 0
@@ -310,13 +300,10 @@ export async function runPipeline(
   // After the overwrite we re-merge the PA constraints back in.
   let _paSyntheticDesignBrief: ReturnType<typeof _buildSyntheticDesignBrief> | null = null
 
-  // ── Phase H startup log ───────────────────────────────────────────────
-  console.info(`[pipeline] PA_PIPELINE=${isPaPipeline()} PDF_RENDERER=${getPdfRenderer()}`)
-
   // ── PA Stage 1: Brief Parsing (PA_PIPELINE=true only) ────────────────
   // Runs BEFORE Classification. Produces state.parsedBrief (StructuredBriefJSON).
   // On PA_PIPELINE=false this block is skipped entirely — existing pipeline unchanged.
-  if (isPaPipeline()) {
+  if (paMode) {
     console.log('\n[pipeline] === PA Stage 1: Brief Parsing ===')
     const briefParseResult = await runBriefParsing(briefText)
     trackStage('brief_parsing', briefParseResult)
@@ -362,7 +349,7 @@ export async function runPipeline(
   // ── Brief Validation ───────────────────────────────────────────────
   const requiredFields = getRequiredFields(classification.productClass)
   // On PA path, pass parsedBrief so validateBrief uses missing_mandatory_fields
-  const briefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, isPaPipeline() ? state.parsedBrief : null)
+  const briefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, paMode ? state.parsedBrief : null)
   
   if (!briefValidation.isValid) {
     console.log(`[pipeline] Brief INVALID — missing: ${briefValidation.missingRequired.join(', ')}`)
@@ -389,7 +376,7 @@ export async function runPipeline(
   // therefore redundant on the PA path. The dossier remains available on the
   // legacy path (PA_PIPELINE=false) for backwards compatibility.
   let trainingDossier: string | undefined
-  if (!isPaPipeline()) {
+  if (!paMode) {
     console.log('\n[pipeline] === Stage 1: Training Data Dump ===')
     try {
       const stage1Result = await runTrainingDataDump(briefText)
@@ -412,7 +399,7 @@ export async function runPipeline(
   // Falling through creates an undocumented hybrid state where PA stage 1
   // ran but legacy runDecompose receives undefined dossier — producing bad
   // output with no clear failure signal.  Fail fast instead.
-  if (isPaPipeline() && !state.parsedBrief) {
+  if (paMode && !state.parsedBrief) {
     throw new Error(
       'PA_PIPELINE=true but Brief Parsing failed to populate state.parsedBrief — ' +
       'pipeline cannot continue safely. Check Brief Parsing stage logs for the root cause.'
@@ -424,7 +411,7 @@ export async function runPipeline(
   // On legacy path (PA_PIPELINE=false), use the legacy runResearch() — unchanged.
   console.log('\n[pipeline] === Stage 2: Research ===')
 
-  if (isPaPipeline() && state.parsedBrief) {
+  if (paMode && state.parsedBrief) {
     // ── PA path: runResearchSynthesis consumes StructuredBriefJSON ────────
     console.log('[pipeline] PA path: running PA Stage 3 Research Synthesis...')
     const synthResult = await runResearchSynthesis(state.parsedBrief, classification.productClass)
@@ -587,7 +574,7 @@ export async function runPipeline(
   // and would overwrite designBrief with research-informed — but not PA-
   // informed — data. Gate it off so the PA path only uses the new parser.
   // Phase B will remove this stage from the PA path entirely.
-  if (!isPaPipeline()) {
+  if (!paMode) {
   console.log('\n[pipeline] === Stage 3: Brief Generation ===')
   const briefGenResult = await runBriefGeneration(briefText, classification.productClass)
   trackStage('brief_generation', briefGenResult)
@@ -635,7 +622,7 @@ export async function runPipeline(
     // rather than "never ran". PA Stage 1 (Brief Parsing) produces all structured constraints;
     // the legacy Brief Generation LLM call is redundant on the PA path.
     trackSkippedStage('brief_generation', 'superseded by PA Stage 1 (Brief Parsing)')
-  } // end if (!isPaPipeline()) — Brief Generation stage
+  } // end if (!paMode) — Brief Generation stage
 
   state.sourceAttributions.push(
     { section: 'Research', source: 'llm', detail: 'MiMo V2.5-Pro via OpenRouter' },
@@ -656,7 +643,7 @@ export async function runPipeline(
 
   // ── Brief Validation (post-research, now we have designBrief) ──────
   // On PA path, parsedBrief is the authoritative source; designBrief is already synced from it.
-  const briefValidationPost = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, isPaPipeline() ? state.parsedBrief : null)
+  const briefValidationPost = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, paMode ? state.parsedBrief : null)
   
   if (!briefValidationPost.isValid) {
     console.log('[pipeline] BRIEF INCOMPLETE — generating short blocked report')
@@ -711,8 +698,8 @@ export async function runPipeline(
   // PA path: compute preliminary route to decide whether to run the revision loop.
   // This is a cheap deterministic call (no LLM) — the final authoritative route
   // runs after the loop below.
-  const _prelimRoute = isPaPipeline() ? routeReportType(feasibility, state.parsedBrief) : null
-  const _paRevisionEnabled = !isPaPipeline() || _prelimRoute?.reportType === 'FEASIBILITY_EXCEPTION'
+  const _prelimRoute = paMode ? routeReportType(feasibility, state.parsedBrief) : null
+  const _paRevisionEnabled = !paMode || _prelimRoute?.reportType === 'FEASIBILITY_EXCEPTION'
 
   // F-10 fix (2 seats): use normalised status in loop condition so PA-native
   // FAIL/WARN statuses are handled identically to legacy RED/AMBER.
@@ -778,7 +765,7 @@ export async function runPipeline(
       // state.parsedBrief reflects the revision.  validateBrief reads
       // missing_mandatory_fields from parsedBrief — without this update the
       // PA validator keeps seeing the stale pre-revision missing fields.
-      if (isPaPipeline()) {
+      if (paMode) {
         const revisedBriefText = state.generatedBrief?.briefText || briefText
         const reparseResult = await runBriefParsing(revisedBriefText)
         if (reparseResult.ok && reparseResult.data) {
@@ -790,7 +777,7 @@ export async function runPipeline(
       }
 
       // Re-run Feasibility with updated constraints
-      const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, isPaPipeline() ? state.parsedBrief : null)
+      const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, paMode ? state.parsedBrief : null)
       const newFeasibility = determineFeasibility(newBriefValidation, sizingResult, null, classification.productClass)
 
       // Update feasibility
@@ -804,7 +791,7 @@ export async function runPipeline(
       // Previously _paRevisionEnabled was pre-computed once from the preliminary
       // route and never updated, so the loop always ran to MAX_REVISIONS even after
       // the route resolved.
-      if (isPaPipeline()) {
+      if (paMode) {
         const midLoopRoute = routeReportType(feasibility, state.parsedBrief)
         if (midLoopRoute.reportType !== 'FEASIBILITY_EXCEPTION') {
           console.log(`[pipeline] PA: route resolved to ${midLoopRoute.reportType} after revision ${revisionCount} — breaking loop early`)
@@ -828,7 +815,7 @@ export async function runPipeline(
   // report type and page budget. On PA_PIPELINE=false this block is skipped
   // entirely — downstream behaviour is unchanged on the legacy path.
   let _paRouterResult: ReportTypeRouterResult | null = null
-  if (isPaPipeline()) {
+  if (paMode) {
     _paRouterResult = routeReportType(feasibility, state.parsedBrief)
     state.reportType = _paRouterResult.reportType
     // F-8 fix (4 seats): `reportTypeRouterResult` is now a typed field on PipelineState
@@ -876,7 +863,7 @@ export async function runPipeline(
   // verification_status='UNVERIFIED'). Dual-writes to state.research.designBrief.regulatory
   // so downstream stages that read the legacy shape keep working.
   // Legacy path: regulatory remains embedded in Research output.
-  if (isPaPipeline() && state.parsedBrief) {
+  if (paMode && state.parsedBrief) {
     console.log('\n[pipeline] === PA Stage 4: Regulatory Extraction ===')
     const regulatoryResult = await runRegulatoryExtraction(state.parsedBrief, classification)
     trackStage('regulatory_extraction', regulatoryResult)
@@ -944,7 +931,7 @@ export async function runPipeline(
 
   let decomposeResult: Awaited<ReturnType<typeof runDecompose>>
 
-  if (isPaPipeline() && state.parsedBrief) {
+  if (paMode && state.parsedBrief) {
     // ── PA path: runDecomposePA uses PA Stage 5 prompt + schema ───────────
     console.log('[pipeline] PA path: running PA Stage 5 Module Decomposition...')
 
@@ -1270,7 +1257,7 @@ export async function runPipeline(
   // Skip on FEASIBILITY_EXCEPTION and BRIEF_INCOMPLETE — saves ~3-5 min on
   // those paths where a detailed engineering review adds no value.
   // On the legacy path (PA_PIPELINE=false), Review runs unconditionally as before.
-  const _shouldRunReview = !isPaPipeline() || state.reportType === 'FULL_REPORT'
+  const _shouldRunReview = !paMode || state.reportType === 'FULL_REPORT'
   if (_shouldRunReview) {
     console.log('\n[pipeline] === Stage 6: Review ===')
     const reviewResult = await runReview(state.modules, state.research)
@@ -1292,7 +1279,7 @@ export async function runPipeline(
   // Phase F: on PA path, Council Scoring only runs when reportType === 'FULL_REPORT'.
   // Skip on FEASIBILITY_EXCEPTION and BRIEF_INCOMPLETE — saves ~3-5 min on those
   // paths. On the legacy path (PA_PIPELINE=false), Council Scoring runs unconditionally.
-  const _shouldRunCouncil = !isPaPipeline() || state.reportType === 'FULL_REPORT'
+  const _shouldRunCouncil = !paMode || state.reportType === 'FULL_REPORT'
   if (_shouldRunCouncil) {
     console.log('\n[pipeline] === Council Scoring ===')
     try {
@@ -1413,7 +1400,7 @@ export async function runPipeline(
   // If quality drops, the RL loop iterates the prompt — not a Polish post-process.
   // PA principle: "The LLM never post-processes data that feeds the renderer."
   // Legacy path (PA_PIPELINE=false): Polish runs unconditionally as before.
-  if (!isPaPipeline()) {
+  if (!paMode) {
     console.log('\n[pipeline] === Polish Pass ===')
     const polishResult = await runPolish(state)
     if (polishResult.ok && polishResult.data) {
@@ -1435,13 +1422,13 @@ export async function runPipeline(
   console.log(`[pipeline] State: modules=${state.modules?.length}, parts=${state.parts?.length}, research=${!!state.research}`)
   const pdfStart = Date.now()
   try {
-    const doc = React.createElement(getActivePdfRenderer(), { state }) as any
+    const doc = React.createElement(getActivePdfRenderer(renderer), { state }) as any
     const blob = await pdf(doc).toBlob()
     const buffer = Buffer.from(await blob.arrayBuffer())
     const base64 = buffer.toString('base64')
     const pdfMs = Date.now() - pdfStart
     stages.push({ name: 'pdf', ok: true, durationMs: pdfMs })
-    console.log(`[pipeline] pdf (renderer=${getPdfRenderer()}): OK (${pdfMs}ms)`)
+    console.log(`[pipeline] pdf (renderer=${renderer}): OK (${pdfMs}ms)`)
 
     // After PDF generation, write QA scores to separate file
     if (state.sectionScores.length > 0) {
