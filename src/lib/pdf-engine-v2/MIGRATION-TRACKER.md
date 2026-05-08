@@ -14,7 +14,7 @@
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | C | Drop Training Data Dump | 0.5-1 | ✅ Done | ✅ Approved (after fixes for BLOCKER-3+4) | 2026-05-08 |
-| D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ⬜ Pending | 2026-05-08 |
+| D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ⚠️ Issues to fix (9 BLOCKERs) | 2026-05-08 |
 | D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
 | F | Demote Review/Polish + Report Type Router | 2-3 | ⬜ Pending | ⬜ Pending | — |
@@ -474,9 +474,111 @@ Phase H scope explicitly covers this: "RL scripts (`brief-rl-iterate.ts`, `decom
 
 ### Council review
 
-- [ ] D1 council review: findings ≥2 seats addressed ⬜ Pending
+- [x] D1 council review: findings ≥2 seats addressed ⚠️ Issues to fix — 9 BLOCKERs identified, see Phase D1 Council Review section below
 - [x] D2 council review: findings ≥2 seats addressed ✅ Complete — 5 BLOCKERs identified, see below
 - [ ] Cross-cut review (D1 + D2 together) for type consistency ⬜ Pending
+
+---
+
+## Phase D — Council Review Results (D1, commit 612c5aa4)
+
+**Date:** 2026-05-08
+**Council seats:** Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5 Pro
+**Seat status:** All 6 responded.
+**Synthesis rule:** ≥2 seats = BLOCKER. Count seats first, classify second.
+
+---
+
+### BLOCKERs (≥2 seats agreeing)
+
+**BLOCKER-D1-1 — Prompt/validator null mismatch on `estimated_mass_kg` / `estimated_dimensions_mm`** (5/6 seats: Gemini, GPT-5.4, GLM-5.1, Kimi, MiMo)
+
+- `stages/2-decompose.ts` `validateDecomposeResultPA()`: rejects `estimated_mass_kg === null` and `estimated_dimensions_mm === null` unconditionally. However `MODULE_DECOMPOSITION_SYSTEM_PA` in `prompts.ts` declares both as `number|null` in the JSON schema, giving the LLM licence to return `null` for CONCEPTUAL-maturity modules. A correctly spec-following LLM emits `null`, the validator rejects it, the single retry appends a constraint reminder but the model is already following the prompt — second rejection → stage failure. Blocks the entire PA Stage 5 on any CONCEPTUAL module.
+- Fix: Align prompt and validator. Best option: change validator to accept `null` only when `maturity === 'CONCEPTUAL'`, reject for `PRELIMINARY`/`ENGINEERING`. Alternatively, remove `| null` from the prompt schema and enforce `number` always with "provide a rough estimate" instruction. Apply same fix to `estimated_dimensions_mm` subfield validation.
+
+**BLOCKER-D1-2 — `runDecomposePA` crashes (TypeError) when `regulatoryExtraction` is `undefined`** (4/6 seats: Gemini, Grok, Kimi, MiMo)
+
+- `stages/2-decompose.ts` `runDecomposePA()`: `regSummary` is built from `regulatoryExtraction.regulatory_entries.slice(0, 10)`. The parameter is typed as optional (`?`) and the orchestrator deliberately leaves `state.regulatoryExtraction` as `undefined` when PA Stage 4 fails (non-fatal). Direct property access without optional chaining causes an unhandled `TypeError`, crashing decomposition despite Stage 4 failure being designed as non-fatal. The crash bypasses the retry logic entirely.
+- Fix: Use optional chaining: `const entries = regulatoryExtraction?.regulatory_entries ?? []; const regSummary = entries.length ? ... : ''`. Add a test: `runDecomposePA(parsedBrief, classification, undefined)` must succeed (with empty regulatory context).
+
+**BLOCKER-D1-3 — Dual-write silently skipped when `state.research.designBrief` is null/undefined** (5/6 seats: GPT-5.4, Grok, GLM-5.1, Kimi, MiMo)
+
+- `index.ts` PA Stage 4 dual-write block: `if (state.research.designBrief) { state.research.designBrief.regulatory = legacyRegulatory }`. If `state.research` exists but `designBrief` was not populated by Research Synthesis (possible on certain research shapes), the guard silently skips the write. All three downstream consumers (`council-scorer.ts:551`, `score-rubric.ts:61`, `calculators.ts:156`) read from `state.research?.designBrief?.regulatory` and will see an empty array — PA regulatory extraction succeeded but no downstream consumer can see the data. Zero warning emitted.
+- Fix: Force-initialise the path: `if (!state.research.designBrief) { state.research.designBrief = { regulatory: legacyRegulatory } as any } else { state.research.designBrief.regulatory = legacyRegulatory }`. At minimum, add an explicit `console.warn` when the dual-write is skipped. Add a test for `state.research` with no `designBrief`.
+
+**BLOCKER-D1-4 — `summary` ← `applicability` semantic mismatch in dual-write mapping** (2/6 seats: GLM-5.1, MiMo)
+
+- `index.ts` dual-write mapping: `summary: e.applicability`. The legacy `summary` field is a brief description of WHAT the regulation is. The new `applicability` field from `RegulatoryEntry` explains HOW/WHY it applies to THIS specific product. `council-scorer.ts` reads and displays both `r.summary` and `r.applicability` independently for scoring. When both carry the same applicability text, the "what the regulation is" field is empty in effect — display is misleading and council scorer has less signal.
+- Fix: Add a `summary` field to `RegulatoryEntry` (e.g. a condensed form of `standard_name + jurisdiction`), or in the dual-write generate: `summary: \`\${e.standard_name} (\${e.jurisdiction})\`` rather than repeating applicability. The two fields should not be identical.
+
+**BLOCKER-D1-5 — `normaliseEntry` does not coerce `status` to the declared enum** (2/6 seats: GLM-5.1, GPT-5.4)
+
+- `stages/1b-regulatory.ts` `normaliseEntry()`: `source_grade` and `verification_status` are hardcoded correctly, but `status` is taken from `raw.status` with only a `VALID_STATUS` Set check and fallback to `'not_started'`. The diff confirms this coercion exists. However GPT-5.4 flagged that broader field validation (including the status enum and other required fields) is absent for the general schema, and GLM-5.1 specifically flagged `status` coercion. Together: 2 seats flag schema validation gaps that include this field. `calculators.ts:157` filters `r.status === 'not_started'` — any non-canonical status string silently produces zero gap counts.
+- Status: Reviewing the diff again, the `normaliseEntry()` function does include the VALID_STATUS set check with fallback. This finding may be partially addressed already. Council noted the broader schema validation gap. Mark as BLOCKER on the broader schema validation (missing required field presence checks — standard_name, applicability, etc.) which can return ok:true with undefined values.
+
+**BLOCKER-D1-6 — MiMo as primary model in regulatory extraction fallback chain** (4/6 seats: Gemini, GPT-5.4, GLM-5.1, Kimi)
+
+- `stages/1b-regulatory.ts` model fallback chain: `['xiaomi/mimo-v2.5-pro', 'google/gemini-3.1-pro-preview', 'x-ai/grok-4.3']`. MiMo is a content-generation model optimised for creative output. Regulatory extraction requires precise structured compliance output, real standard numbers/versions, and strict schema adherence. Leading with MiMo increases risk of hallucinated standards, loose JSON, and invalid applicability reasoning — all of which normaliseEntry cannot catch (source_grade and verification_status are hardcoded, but standard_name itself could be invented).
+- Fix: Reorder chain to lead with `google/gemini-3.1-pro-preview` (best reasoner, lowest regulatory hallucination rate). Demote MiMo to last fallback or remove it from this specific stage. Add a post-parse standard_name format check.
+
+**BLOCKER-D1-7 — `classification.productClass` used directly in PA Decompose fork without null guard** (2/6 seats: GPT-5.4, MiMo)
+
+- `index.ts` PA Decompose fork: `runDecomposePA(state.parsedBrief, classification.productClass, state.regulatoryExtraction)`. The regulatory extraction stage defensively handles classification with a `typeof` check. The decompose call accesses `.productClass` directly. If `classification` is ever passed as a plain string at the orchestrator level (which the regulatory extraction code explicitly anticipates), `classification.productClass` is `undefined`, which propagates to the LLM prompt as the string `"undefined"`.
+- Fix: Extract a shared helper: `const productClass = typeof classification === 'string' ? classification : (classification.productClass ?? 'UNKNOWN')`. Use it in both call sites.
+
+**BLOCKER-D1-8 — `validateDecomposeResultPA` does not validate required fields beyond cause/interfaces/maturity/estimates** (2/6 seats: GPT-5.4, GLM-5.1)
+
+- `stages/2-decompose.ts` `validateDecomposeResultPA()`: checks modules existence, interfaces non-empty, maturity enum, non-null mass/dimensions, and failure_mode.cause ≠ 'Unknown'. Does NOT validate: `name` (non-empty string), `purpose` (non-empty string), `expected_parts` (non-empty array with name/quantity/role), `estimated_lead_time_weeks` (number), interface `type` enum. LLM can omit these fields and the stage returns `ok:true`, delivering partial modules downstream.
+- Fix: Add presence checks for `name`, `purpose`, `expected_parts` (array length ≥ 1), `estimated_lead_time_weeks` (number). At minimum validate the interface `type` enum value.
+
+**BLOCKER-D1-9 — Unsafe `as typeof decomposeResult` type cast suppresses structural divergence** (3/6 seats: GLM-5.1, Kimi, MiMo)
+
+- `index.ts`: `decomposeResult = paResult as typeof decomposeResult`. The comment says "ModulePA extends Module" but this is a declaration not a runtime guarantee. If `ModulePA` ever adds required fields not in `Module`, or if the result wrapper shape diverges, the cast silences the compiler. More critically, if `paResult.ok === false`, the cast still type-passes — the error shape is then processed by the `if (!decomposeResult.ok)` block below, which may not handle PA-specific error structures.
+- Fix: Use explicit narrowing: `if (!paResult.ok || !paResult.data) { decomposeResult = paResult; } else { decomposeResult = { ...paResult, data: paResult.data as unknown as Module[] }; }`. Or type `decomposeResult` as a union and handle both branches explicitly.
+
+---
+
+### NOTED (1 seat only)
+
+**NOTED-D1-1 — `validateDecomposeResultPA` failure_modes null guard missing** (1 seat: Kimi)
+
+- If the LLM omits `failure_modes` entirely, iterating over undefined throws TypeError in the cause check loop. Low probability given prompt instructions, but unguarded.
+- Fix: Guard with `Array.isArray(module.failure_modes)` before iterating.
+
+**NOTED-D1-2 — regSummary slices only first 10 regulatory entries** (2 seats: GLM-5.1, MiMo)
+
+- `runDecomposePA` passes only entries 0–9 to the decompose prompt. For products with >10 applicable standards (medical devices, aerospace), constraints beyond the 10th are invisible to the module decomposition.
+- Fix: Raise limit or log an explicit truncation warning when `regulatory_entries.length > 10`.
+
+**NOTED-D1-3 — `STAGE_TEMPERATURES.research` reused for regulatory extraction** (2 seats: GLM-5.1, Kimi)
+
+- Regulatory extraction is a precision extraction task; research temperature (potentially higher) adds unnecessary non-determinism. Define `STAGE_TEMPERATURES.regulatory_extraction = 0.15` independently.
+
+**NOTED-D1-4 — `normaliseRegulatoryExtraction` returns `[]` silently when `regulatory_entries` not an array** (1 seat: GLM-5.1)
+
+- Zero-entry silent fallback with no warning. Combined with non-fatal error path, consistently malformed responses produce zero entries every run with no visibility.
+- Fix: Log a warning with type/value snippet when `regulatory_entries` is not an array.
+
+**NOTED-D1-5 — PA Stage 4 non-fatal failure has no state sentinel** (1 seat: GLM-5.1)
+
+- No flag on `state` when regulatory extraction fails. Downstream scorers cannot distinguish "no regulatory data extracted" from "regulatory extraction not run on this pipeline variant".
+
+**NOTED-D1-6 — `max_tokens: 8192` may truncate regulatory output for complex products** (1 seat: GLM-5.1)
+
+- Products with 20+ applicable standards (medical, aerospace) may see JSON truncated mid-array. Consider raising to 16384 or adding a post-parse truncation check.
+
+---
+
+### Seat summary
+
+| Seat | Status | Key contribution |
+|---|---|---|
+| `google/gemini-3.1-pro-preview` | ✅ Complete | BLOCKER-D1-1 (null/validator mismatch), BLOCKER-D1-2 (crash on undefined regulatory), BLOCKER-D1-3 (dual-write skip), BLOCKER-D1-6 (MiMo primary) |
+| `openai/gpt-5.4` | ✅ Complete | BLOCKER-D1-1, BLOCKER-D1-3, BLOCKER-D1-5/8 (schema validation gap), BLOCKER-D1-7, BLOCKER-D1-9 |
+| `x-ai/grok-4.3` | ✅ Complete | BLOCKER-D1-2 (TypeError on undefined), BLOCKER-D1-3 (dual-write guard), BLOCKER-D1-1 |
+| `z-ai/glm-5.1` | ✅ Complete | BLOCKER-D1-1, BLOCKER-D1-3, BLOCKER-D1-4 (summary≡applicability), BLOCKER-D1-5, BLOCKER-D1-6, BLOCKER-D1-8, BLOCKER-D1-9 |
+| `moonshotai/kimi-k2.6` | ✅ Complete | BLOCKER-D1-2, BLOCKER-D1-3 (WARNING), BLOCKER-D1-1, BLOCKER-D1-6, BLOCKER-D1-9 |
+| `xiaomi/mimo-v2.5-pro` | ✅ Complete | BLOCKER-D1-1, BLOCKER-D1-2, BLOCKER-D1-3, BLOCKER-D1-4, BLOCKER-D1-7, BLOCKER-D1-9 |
 
 ---
 
@@ -710,7 +812,7 @@ For watchdog drift detection. Pending items only:
 - ⏸ Phase C: BLOCKER-2 deferred to Phase H — stage-rl-iterate.ts RL scripts; Phase H covers all RL script updates
 - ✅ Phase D1: COMPLETE (2026-05-08) — Module Decomposition PA Stage 5 + Regulatory Extraction PA Stage 4; 61 new tests; 481/482 pass; typecheck clean
 - ✅ Phase D2: COMPLETE (2026-05-08) — Sizing Solver + Cost Computation PA schemas
-- ❌ Phase D1: council review ⬜ Pending
+- ❌ Phase D1: council review ⚠️ Issues to fix — 9 BLOCKERs found (2026-05-08). Must fix before Phase E. See Phase D Council Review Results (D1) section.
 - ❌ Phase D2: council review ⬜ Pending
 - ❌ Phase E-H: unblocked, ready to start
 - ❌ All council reviews (Phase C-D onwards)
