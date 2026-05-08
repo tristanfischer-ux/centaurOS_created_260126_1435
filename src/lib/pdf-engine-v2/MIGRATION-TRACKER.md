@@ -11,7 +11,7 @@
 
 | Phase | Description | Sonnet hrs | Status | Council review | Date done |
 |---|---|---|---|---|---|
-| A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ⬜ Pending | 2026-05-08 |
+| A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ⚠️ Issues to fix | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | C | Drop Training Data Dump | 0.5-1 | ⬜ Pending | ⬜ Pending | — |
 | D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
@@ -66,9 +66,94 @@
 
 ### Council review
 
-- [ ] Coding council fires on commit (6 LLMs from different lineages)
+- [x] Coding council fires on commit (6 LLMs from different lineages) — 2026-05-08
 - [ ] All findings flagged by 2+ seats addressed before Phase B starts
-- [ ] Council notes appended to this section
+- [x] Council notes appended to this section (see below)
+
+**Council result: ⚠️ Issues to fix — 4 BLOCKERs, 6 NOTED. Phase B blocked until resolved.**
+
+### Council notes — 2026-05-08
+
+**Council seats:** Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5-Pro — all 6 responded.
+
+**Synthesis rules applied:** findings flagged by ≥2 seats = BLOCKER. GPT-5.4 solo findings discounted unless code-grounded.
+
+---
+
+#### BLOCKERs (must fix before Phase B)
+
+**BLOCKER-1: `state.research` overwrite loses syntheticDesignBrief** [Grok 4.3 + MiMo V2.5-Pro]
+- File: `index.ts` ~line 343
+- `state.research = researchResult.data` unconditionally replaces the entire object after `runResearch()`, destroying the `syntheticDesignBrief` the PA bridge wrote at lines ~250-267. On PA path, the brief constraints (cost ceiling, mass, etc.) extracted from `parsedBrief` are silently lost before downstream scoring runs.
+- Fix: after `state.research = researchResult.data`, re-apply the synthetic designBrief: `if (PA_PIPELINE && state.parsedBrief) state.research.designBrief = { ...state.research.designBrief, ...syntheticDesignBrief }`. Alternatively extract `syntheticDesignBrief` to a variable and merge it after the research overwrite.
+
+**BLOCKER-2: `parsed.constraints.safety_standards = []` crashes when `constraints` is undefined** [GLM-5.1 + Gemini 3.1 Pro]
+- File: `stages/0-brief-generation.ts` ~line 447
+- The normalisation guard uses optional chaining in the condition (`parsed.constraints?.safety_standards`) but then assigns directly: `parsed.constraints.safety_standards = []`. If the LLM omits `constraints` entirely, the condition is safely `true` but the assignment throws `TypeError: Cannot set property 'safety_standards' of undefined`. Same bug for `additional_constraints`.
+- Fix: add `if (!parsed.constraints) parsed.constraints = {} as any` before the array normalisation guards.
+
+**BLOCKER-3: Stale `state.parsedBrief` in brief-revision loop** [Grok 4.3 + MiMo V2.5-Pro]
+- File: `index.ts` ~line 515
+- The 3rd `validateBrief` call inside the brief-revision loop passes the original `state.parsedBrief` (never updated after the initial parse). If the revision fills a previously-missing field, the PA validator still reports it as missing via `missing_mandatory_fields`. Revisions are effectively invisible to the PA path.
+- Fix: either re-run `runBriefParsing()` after revision and store the new result in `state.parsedBrief`, or switch the revision-loop call to pass `null` (legacy path) since the revision already updated `state.research.designBrief`.
+
+**BLOCKER-4: `target_performance.value: number` (non-nullable) in system prompt schema conflicts with anti-invention rule** [Kimi K2.6 + Gemini 3.1 Pro]
+- File: `stages/0-brief-generation.ts` — `BRIEF_PARSING_SYSTEM_PROMPT`
+- The schema in the prompt declares `"value": number` (not `number|null`) for `target_performance`. The rules section simultaneously says "NEVER invent performance numbers... the value is null". These are contradictory instructions — LLMs following schema strictly will hallucinate a number; LLMs following the rule will emit null, which violates the schema. The TypeScript type correctly allows `number|null` but the prompt does not match it.
+- Fix: update the schema line in the prompt to: `"target_performance": { "key_metric": string|null, "value": number|null, "unit": string|null, "source": "user"|"inferred" }`. Also update `operating_environment.temp_min_c` and `temp_max_c` to `number|null` with the same reasoning.
+
+---
+
+#### NOTED findings (1 seat each — review but not blocking Phase B)
+
+**NOTED-1: `[User's natural-language brief text goes here]` literal placeholder in user message** [Kimi K2.6]
+- File: `stages/0-brief-generation.ts` — `runBriefParsing()` user message composition
+- The user message is: `` `[User's natural-language brief text goes here]\n\n${rawBriefText}` `` — the placeholder looks like an unfinalised template artifact. It adds noise and may confuse the parser.
+- Fix: remove the prefix, pass `rawBriefText` directly.
+
+**NOTED-2: USD/EUR cost ceiling silently dropped in synthetic bridge** [Grok 4.3 + Gemini 3.1 Pro + GPT-5.4 — 3 seats but qualitatively same as HIGH not BLOCKER at Phase A]
+- File: `index.ts` — `syntheticDesignBrief.constraints.unitCostCeilingGbp`
+- Cost ceilings in USD or EUR become `undefined` in the bridge. `universal-scorer.ts` cost-ceiling check is silently skipped. No warning emitted.
+- Fix (Phase B): log a warning, or populate `BriefConstraints.costCeilings[]` with the original currency/value as a record.
+
+**NOTED-3: `runBriefGeneration()` not gated on PA_PIPELINE — double brief parsing on PA path** [MiMo V2.5-Pro]
+- File: `index.ts` ~line 355
+- On `PA_PIPELINE=true`, both `runBriefParsing()` and `runBriefGeneration()` run. The `runBriefGeneration()` sync (lines 364-391) spreads `existing?.regulatory`, `existing?.sources`, `existing?.competitors` from `state.research.designBrief` after the research overwrite (not from the PA bridge). This is probably correct behaviour for Phase A (Bridge just seeds constraints; Brief Generation enriches with research-informed data), but the interaction is not documented and deserves an explicit comment.
+- Note: this is not a regression on `PA_PIPELINE=false`. Noted for Phase B where Research is rewritten to consume `parsedBrief` directly.
+
+**NOTED-4: Undiscriminated `target_performance` union type in `types.ts`** [GLM-5.1 + GPT-5.4]
+- File: `types.ts`
+- The union `StructuredBriefPerformance & { value: number|null } | { key_metric: string|null; ... }` has no discriminant. Both branches are structurally compatible when fields are non-null, making runtime narrowing impossible.
+- Fix: flatten to a single type `{ key_metric: string|null; value: number|null; unit: string|null; source: 'user'|'inferred' }`.
+
+**NOTED-5: `project_id` is LLM-hallucinated — non-deterministic across runs** [Kimi K2.6]
+- File: `stages/0-brief-generation.ts`
+- `runBriefParsing()` provides no `project_id` to the LLM; the LLM invents one each call. Identical briefs produce different `project_id` values, breaking any deduplication or caching that uses this field.
+- Fix: pass a deterministic hash of `rawBriefText` as a context hint, or strip `project_id` from the schema and generate it in TypeScript.
+
+**NOTED-6: No runtime validation at JSON.parse boundary** [GLM-5.1]
+- File: `stages/0-brief-generation.ts`
+- `JSON.parse` cast to `StructuredBriefJSON` is not validated at runtime. Any LLM output that parses as valid JSON but has wrong field types passes silently. Zod or equivalent would give meaningful errors.
+- Fix (Phase B): add Zod schema at parse boundary. Low priority for Phase A as the normalisation guards catch the most dangerous cases (after BLOCKER-2 is fixed).
+
+---
+
+#### Agreement summary
+
+| Finding | Seats | Status |
+|---|---|---|
+| `state.research` overwrite loses syntheticDesignBrief | Grok + MiMo | BLOCKER-1 |
+| `constraints` undefined crash in normalisation | GLM + Gemini | BLOCKER-2 |
+| Stale parsedBrief in revision loop | Grok + MiMo | BLOCKER-3 |
+| Prompt schema contradicts anti-invention rule | Kimi + Gemini | BLOCKER-4 |
+| Placeholder string in user message | Kimi only | NOTED-1 |
+| USD/EUR cost ceiling silent drop | Grok + Gemini + GPT | NOTED-2 |
+| Double brief parsing on PA path | MiMo only | NOTED-3 |
+| Non-discriminated target_performance union | GLM + GPT | NOTED-4 |
+| Non-deterministic project_id | Kimi only | NOTED-5 |
+| No runtime JSON schema validation | GLM only | NOTED-6 |
+
+**GPT-5.4 note:** GPT-5.4's findings were corroborated by 2+ other seats in all HIGH cases. No solo GPT-5.4 findings were elevated to BLOCKER.
 
 ### Actual
 
@@ -321,7 +406,8 @@ Tracking the migration plan's §5 risks as they materialise:
 For watchdog drift detection. Pending items only:
 
 - ✅ Phase A: COMPLETE (2026-05-08)
-- ❌ Phase A: council review pending (main thread to dispatch)
+- ⚠️ Phase A: council review DONE (2026-05-08) — 4 BLOCKERs must be fixed before Phase B
+- ❌ Phase A: 4 BLOCKERs pending fix: (1) state.research overwrite loses syntheticDesignBrief; (2) constraints=undefined crash in normalisation guards; (3) stale parsedBrief in revision loop; (4) prompt schema contradicts anti-invention rule
 - ❌ Phase A: PA council score comparison (PA=true vs PA=false within ±0.5) — deferred, requires live LLM run
 - ❌ Phase B-H: blocked on prior phases
 - ❌ All council reviews (Phase A onwards)
