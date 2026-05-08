@@ -1,3 +1,88 @@
+// ── PA Stage 1 — Brief Parsing types ─────────────────────────────────────────
+
+export interface StructuredBriefConstraintValue<T = number | null> {
+  value: T
+  currency?: 'GBP' | 'USD' | 'EUR'
+  source: 'user' | 'inferred'
+}
+
+export interface StructuredBriefDimensions {
+  w: number | null
+  d: number | null
+  h: number | null
+  source: 'user' | 'inferred'
+}
+
+export interface StructuredBriefPerformance {
+  key_metric: string
+  value: number
+  unit: string
+  source: 'user' | 'inferred'
+}
+
+export interface StructuredBriefOperatingEnvironment {
+  temp_min_c: number
+  temp_max_c: number
+  source: 'user' | 'inferred'
+}
+
+export interface StructuredBriefSafetyStandard {
+  standard: string
+  source: 'user' | 'inferred'
+}
+
+export interface StructuredBriefAdditionalConstraint {
+  description: string
+  source: 'user' | 'inferred'
+}
+
+export interface StructuredBriefJSON {
+  project_id: string
+  product_description: string
+  mission_statement: string
+  target_customers: string
+  why_now: string
+  constraints: {
+    unit_cost_ceiling: {
+      value: number | null
+      currency: 'GBP' | 'USD' | 'EUR'
+      source: 'user' | 'inferred'
+    }
+    max_mass_kg: {
+      value: number | null
+      source: 'user' | 'inferred'
+    }
+    max_dimensions_mm: StructuredBriefDimensions
+    target_performance: StructuredBriefPerformance & { value: number | null } | {
+      key_metric: string | null
+      value: number | null
+      unit: string | null
+      source: 'user' | 'inferred'
+    }
+    target_process: {
+      value: string | null
+      source: 'user' | 'inferred'
+    }
+    target_material: {
+      value: string | null
+      source: 'user' | 'inferred'
+    }
+    batch_size: {
+      value: number | null
+      source: 'user' | 'inferred'
+    }
+    design_life: {
+      value: string | null
+      source: 'user' | 'inferred'
+    }
+    operating_environment: StructuredBriefOperatingEnvironment
+    safety_standards: StructuredBriefSafetyStandard[]
+    additional_constraints: StructuredBriefAdditionalConstraint[]
+  }
+  missing_mandatory_fields: string[]
+  confidence: 'HIGH' | 'MEDIUM' | 'LOW'
+}
+
 export interface ResearchResult {
   report: string
   sources: Array<{ uri: string; title: string }>
@@ -345,6 +430,8 @@ export interface PipelineState {
     assumptions: string[]
     canProceed: boolean
   }
+  /** PA path only: structured brief output from runBriefParsing() */
+  parsedBrief?: StructuredBriefJSON
   productClass?: string
   pipelineError?: {
     stage: string

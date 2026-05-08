@@ -9,7 +9,7 @@
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
-import { runBriefGeneration } from './stages/0-brief-generation'
+import { runBriefGeneration, runBriefParsing } from './stages/0-brief-generation'
 import { runResearch, extractResearchConstraints } from './stages/1-research'
 import { runDecompose } from './stages/2-decompose'
 import { runSizeLayout } from './stages/3-size-layout'
@@ -24,6 +24,11 @@ import PdfRendererV3 from './stages/7-pdf-v3'
 // Default is v2 (the existing 7-pdf.tsx). Both renderers remain active.
 const _pdfRendererVersion = process.env.PDF_RENDERER ?? 'v2'
 const _activePdfRenderer = _pdfRendererVersion === 'v3' ? PdfRendererV3 : PdfRenderer
+
+// PA_PIPELINE=true activates the Prompt Architecture migration path (Phase A+).
+// Default is 'false' — existing pipeline runs unchanged.
+// Set PA_PIPELINE=true in .env.local or vercel env to test the new path.
+const PA_PIPELINE = (process.env.PA_PIPELINE ?? 'false') === 'true'
 import { runPolish } from './stages/7-polish'
 import { pdf } from '@react-pdf/renderer'
 import React from 'react'
@@ -41,7 +46,7 @@ import { determineFeasibility } from './feasibility-gate'
 import { runBriefRevision } from './stages/3.5-brief-revision'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
-import type { PipelineState, StageResult, BriefConstraints } from './types'
+import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON } from './types'
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 
 export interface EngineResult {
@@ -198,6 +203,64 @@ export async function runPipeline(
   let gateResults: Array<{ gate: string; passed: boolean; findings: string[] }> = []
 
 
+  // ── PA Stage 1: Brief Parsing (PA_PIPELINE=true only) ────────────────
+  // Runs BEFORE Classification. Produces state.parsedBrief (StructuredBriefJSON).
+  // On PA_PIPELINE=false this block is skipped entirely — existing pipeline unchanged.
+  if (PA_PIPELINE) {
+    console.log('\n[pipeline] === PA Stage 1: Brief Parsing ===')
+    const briefParseResult = await runBriefParsing(briefText)
+    trackStage('brief_parsing', briefParseResult)
+
+    if (briefParseResult.ok && briefParseResult.data) {
+      state.parsedBrief = briefParseResult.data
+      console.log(`[pipeline] PA Brief parsed: confidence=${briefParseResult.data.confidence}, missing=${briefParseResult.data.missing_mandatory_fields.length} fields`)
+
+      // Backwards-compat bridge: synthesise state.research.designBrief from
+      // parsedBrief.constraints so downstream stages that read designBrief
+      // keep working without modification (Phase B will update them properly).
+      const pb = briefParseResult.data
+      const c = pb.constraints
+      const syntheticDesignBrief = {
+        useCase: pb.product_description || '',
+        targetProcess: c.target_process?.value || '',
+        targetMaterial: c.target_material?.value || '',
+        toleranceTarget: '',
+        quantityTarget: c.batch_size?.value != null ? String(c.batch_size.value) : '',
+        complianceNotes: c.safety_standards?.map(s => s.standard).join(', ') || '',
+        mission: pb.mission_statement,
+        targetCustomers: pb.target_customers,
+        whyNow: pb.why_now,
+        constraints: {
+          unitCostCeilingGbp: (c.unit_cost_ceiling?.currency === 'GBP' && c.unit_cost_ceiling?.value != null)
+            ? c.unit_cost_ceiling.value
+            : undefined,
+          maxMassKg: c.max_mass_kg?.value ?? undefined,
+          batchSize: c.batch_size?.value ?? undefined,
+          operatingTemperature: (c.operating_environment?.temp_min_c != null && c.operating_environment?.temp_max_c != null)
+            ? `${c.operating_environment.temp_min_c}°C to ${c.operating_environment.temp_max_c}°C`
+            : undefined,
+        } as BriefConstraints,
+        regulatory: [],
+        sources: [],
+        competitors: [],
+      }
+
+      // Initialise state.research if not yet set, so the designBrief bridge works
+      if (!state.research) {
+        state.research = {
+          report: '',
+          sources: [],
+          designBrief: syntheticDesignBrief,
+        }
+      } else {
+        state.research.designBrief = syntheticDesignBrief
+      }
+    } else {
+      console.warn(`[pipeline] PA Brief Parsing failed: ${briefParseResult.error}. Continuing without parsedBrief.`)
+      // Non-fatal on PA path — downstream stages fall back to legacy behaviour
+    }
+  }
+
   // ── Product Classification ──────────────────────────────────────────
   console.log('\n[pipeline] === Product Classification ===')
   const classification = classifyProduct(briefText)
@@ -208,7 +271,8 @@ export async function runPipeline(
 
   // ── Brief Validation ───────────────────────────────────────────────
   const requiredFields = getRequiredFields(classification.productClass)
-  const briefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields)
+  // On PA path, pass parsedBrief so validateBrief uses missing_mandatory_fields
+  const briefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, PA_PIPELINE ? state.parsedBrief : null)
   
   if (!briefValidation.isValid) {
     console.log(`[pipeline] Brief INVALID — missing: ${briefValidation.missingRequired.join(', ')}`)
@@ -348,7 +412,8 @@ export async function runPipeline(
   console.log(`[pipeline] Product specs extracted: ${summariseSpecs(productSpecs)}`)
 
   // ── Brief Validation (post-research, now we have designBrief) ──────
-  const briefValidationPost = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields)
+  // On PA path, parsedBrief is the authoritative source; designBrief is already synced from it.
+  const briefValidationPost = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, PA_PIPELINE ? state.parsedBrief : null)
   
   if (!briefValidationPost.isValid) {
     console.log('[pipeline] BRIEF INCOMPLETE — generating short blocked report')
@@ -447,7 +512,7 @@ export async function runPipeline(
       ;(state as any).briefRevisions = [...((state as any).briefRevisions || []), rev]
       
       // Re-run Feasibility with updated constraints
-      const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields)
+      const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, PA_PIPELINE ? state.parsedBrief : null)
       const newFeasibility = determineFeasibility(newBriefValidation, sizingResult, null, classification.productClass)
       
       // Update feasibility

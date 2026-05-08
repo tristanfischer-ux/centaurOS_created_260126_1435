@@ -11,7 +11,7 @@
 
 | Phase | Description | Sonnet hrs | Status | Council review | Date done |
 |---|---|---|---|---|---|
-| A | Brief Parsing as new Stage 1 | 3-4 | 🔄 In progress | ⬜ Pending | — |
+| A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ⬜ Pending | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | C | Drop Training Data Dump | 0.5-1 | ⬜ Pending | ⬜ Pending | — |
 | D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
@@ -37,31 +37,32 @@
 
 ## Phase A — Brief Parsing as new Stage 1
 
-**Status:** 🔄 In progress
-**Started:** 2026-05-08 (this dispatch)
+**Status:** ✅ Done
+**Started:** 2026-05-08
+**Landed:** 2026-05-08
 **Estimated:** 3-4 sonnet hours
 
 ### Planned (from migration plan)
 
 | Sub-item | Status |
 |---|---|
-| Rewrite `stages/0-brief-generation.ts` prompt to PA Stage 1 schema | ⬜ |
-| Rename function to `runBriefParsing()` | ⬜ |
-| Add `StructuredBriefJSON` interface to `types.ts` | ⬜ |
-| Add `parsedBrief?: StructuredBriefJSON` to `PipelineState` | ⬜ |
-| Move `runBriefParsing()` call to top of pipeline (before Classification) on `PA_PIPELINE=true` | ⬜ |
-| Dual-write to `state.research.designBrief` for backwards compat | ⬜ |
-| Update `brief-validator.ts` to read `parsedBrief.missing_mandatory_fields` when present | ⬜ |
-| Unit test against BESS brief fixture passes | ⬜ |
-| Typecheck clean | ⬜ |
+| Add PA Stage 1 prompt + `runBriefParsing()` to `stages/0-brief-generation.ts` | ✅ |
+| Keep existing `runBriefGeneration()` function intact (no deletion) | ✅ |
+| Add `StructuredBriefJSON` interface to `types.ts` | ✅ |
+| Add `parsedBrief?: StructuredBriefJSON` to `PipelineState` | ✅ |
+| Move `runBriefParsing()` call to top of pipeline (before Classification) on `PA_PIPELINE=true` | ✅ |
+| Dual-write to `state.research.designBrief` for backwards compat | ✅ |
+| Update `brief-validator.ts` to read `parsedBrief.missing_mandatory_fields` when present | ✅ |
+| Unit test against BESS brief fixture passes | ✅ |
+| Typecheck clean (in pdf-engine-v2 files) | ✅ |
 
 ### Verification criteria
 
-- [ ] `runBriefParsing()` produces valid `StructuredBriefJSON` against BESS brief fixture
-- [ ] `parsedBrief.constraints.unit_cost_ceiling.value` === 180000 for BESS brief
-- [ ] `parsedBrief.missing_mandatory_fields` empty for BESS brief
-- [ ] `PA_PIPELINE=false` runs unchanged (no regression)
-- [ ] `PA_PIPELINE=true` produces council score within ±0.5 of `PA_PIPELINE=false` baseline
+- [x] `runBriefParsing()` produces valid `StructuredBriefJSON` against BESS brief fixture
+- [x] `parsedBrief.constraints.unit_cost_ceiling.value` === 180000 for BESS brief
+- [x] `parsedBrief.missing_mandatory_fields` empty for BESS brief
+- [x] `PA_PIPELINE=false` runs unchanged (no regression) — structural: `if (PA_PIPELINE)` block skipped, `validateBrief` receives `null` for parsedBrief on default path
+- [ ] `PA_PIPELINE=true` produces council score within ±0.5 of `PA_PIPELINE=false` baseline — **DEFERRED** to Phase B (requires live LLM run; live integration test out of scope per brief)
 
 ### Council review
 
@@ -69,12 +70,21 @@
 - [ ] All findings flagged by 2+ seats addressed before Phase B starts
 - [ ] Council notes appended to this section
 
-### Actual (filled in after phase lands)
+### Actual
 
-- Commit SHA: TBD
-- Files changed: TBD
-- Deviations from plan: TBD
-- Council findings: TBD
+- Commit SHA: see git log (Phase A commit)
+- Files changed:
+  - `src/lib/pdf-engine-v2/types.ts` — added `StructuredBriefJSON` + helper interfaces, added `parsedBrief?` to `PipelineState`
+  - `src/lib/pdf-engine-v2/stages/0-brief-generation.ts` — added `runBriefParsing()` with verbatim PA Stage 1 system prompt; `runBriefGeneration()` untouched
+  - `src/lib/pdf-engine-v2/index.ts` — added `PA_PIPELINE` flag, `runBriefParsing` import, PA Stage 1 block (before Classification), backwards-compat `designBrief` synthesis, updated all 3 `validateBrief` call sites
+  - `src/lib/pdf-engine-v2/brief-validator.ts` — added optional `parsedBrief` param; when present, short-circuits to PA path using `missing_mandatory_fields`; legacy path unchanged
+  - `src/lib/pdf-engine-v2/stages/brief-parsing.test.ts` — **new file**: 15 tests, all passing
+- Test result: 15/15 pass (BESS fixture, thin brief, error handling)
+- Typecheck: 0 errors in pdf-engine-v2 files (pre-existing errors in scripts/ and council-scorer.test.ts are unrelated)
+- Deviations from plan:
+  - Migration plan said "Rename function to `runBriefParsing()`" — instead ADDED `runBriefParsing()` alongside existing `runBriefGeneration()` as the brief explicitly requires both to coexist. File header updated to explain both.
+  - Council score comparison (`PA_PIPELINE=true` vs `false` within ±0.5) deferred — requires a live LLM run; live integration testing is out of scope per brief (no `npm run engine` runs allowed).
+- Council findings: TBD — pending main thread council dispatch
 
 ### Rollback plan
 
@@ -310,10 +320,11 @@ Tracking the migration plan's §5 risks as they materialise:
 
 For watchdog drift detection. Pending items only:
 
-- ❌ Phase A: ALL sub-items (just dispatched)
+- ✅ Phase A: COMPLETE (2026-05-08)
+- ❌ Phase A: council review pending (main thread to dispatch)
+- ❌ Phase A: PA council score comparison (PA=true vs PA=false within ±0.5) — deferred, requires live LLM run
 - ❌ Phase B-H: blocked on prior phases
-- ❌ All council reviews
-- ❌ All verification criteria
+- ❌ All council reviews (Phase A onwards)
 
 ---
 

@@ -1,3 +1,5 @@
+import type { StructuredBriefJSON } from './types'
+
 export interface BriefValidation {
   isValid: boolean
   missingRequired: string[]
@@ -22,13 +24,39 @@ export interface DesignBriefPayload {
 
 /**
  * Validates the founder's brief against required fields for the specific product class.
+ *
+ * When state.parsedBrief is present (PA_PIPELINE=true path), validation is driven by
+ * parsedBrief.missing_mandatory_fields instead of the legacy raw-text detection.
+ * When parsedBrief is absent, legacy behaviour is unchanged.
  */
 export function validateBrief(
   briefText: string,
   designBrief: DesignBriefPayload | null | undefined,
   productClass: string,
-  requiredFields: string[]
+  requiredFields: string[],
+  parsedBrief?: StructuredBriefJSON | null,
 ): BriefValidation {
+  // ── PA path: use parsedBrief.missing_mandatory_fields as the authoritative source ──
+  if (parsedBrief) {
+    const missingRequired = [...parsedBrief.missing_mandatory_fields]
+    const blockedReasons = missingRequired.map(f => `Missing mandatory field: ${f}`)
+    const canProceed = missingRequired.length === 0
+
+    return {
+      isValid: canProceed,
+      missingRequired,
+      missingRecommended: [],
+      warnings: parsedBrief.confidence === 'LOW'
+        ? ['Brief confidence is LOW — consider providing more detail']
+        : [],
+      classification: productClass,
+      requiredFields,
+      canProceedToFullReport: canProceed,
+      blockedReasons,
+    }
+  }
+
+  // ── Legacy path (PA_PIPELINE=false): existing logic below ────────────────
   const missingRequired: string[] = []
   const missingRecommended: string[] = []
   const warnings: string[] = []
