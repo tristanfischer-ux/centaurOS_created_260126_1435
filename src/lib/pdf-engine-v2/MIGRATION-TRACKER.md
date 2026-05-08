@@ -12,7 +12,7 @@
 | Phase | Description | Sonnet hrs | Status | Council review | Date done |
 |---|---|---|---|---|---|
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
-| B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ⬜ Pending | 2026-05-08 |
+| B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ⚠️ Issues to fix (2 BLOCKERs) | 2026-05-08 |
 | C | Drop Training Data Dump | 0.5-1 | ⬜ Pending | ⬜ Pending | — |
 | D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
@@ -228,7 +228,58 @@ Delete `PA_PIPELINE=true` env var. Existing `runBriefGeneration()` path untouche
 
 ### Council review
 
-- [ ] ⬜ Pending — main thread to dispatch council next
+- [x] ⚠️ Issues to fix — council dispatched 2026-05-08, 2 BLOCKERs found, 3 NOTED findings
+
+#### Council notes — Phase B (2026-05-08)
+
+**Seats convened:** Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5 Pro (all 6 responded)
+
+**Verdict: ⚠️ FIX BLOCKERS BEFORE PHASE C**
+
+---
+
+##### BLOCKER-1 — `industryDomain` silent drop in dual-write (5 seats: Gemini, GPT-5.4, Grok, GLM, MiMo)
+
+**File:** `src/lib/pdf-engine-v2/index.ts` — PA path dual-write block  
+**Description:** The PA path sets `state.research = { report, sources, designBrief }` but omits `industryDomain`. `_buildSyntheticDesignBrief()` does not populate `industryDomain`. Downstream reads at lines 783, 827, 884, 947, 1002 all use `options?.domain || state.research.industryDomain` — on the PA path with no domain override, `state.research.industryDomain` is `undefined`. Domain-specific validation (HVAC/heat-pump safety check at line 947) silently skips. Decompose/Sizing/BOM/Suppliers receive `undefined` as domain.  
+**Suggested fix:** Set `industryDomain` in the dual-write from `classification.productClass` (already available in the PA branch), or derive it from `state.parsedBrief` if a domain field is added to `StructuredBriefJSON`.
+
+---
+
+##### BLOCKER-2 — Inline JS comment in JSON schema in `RESEARCH_SYNTHESIS_SYSTEM_PA` (4 seats: Grok, GLM, Kimi, MiMo)
+
+**File:** `src/lib/pdf-engine-v2/prompts.ts` — `RESEARCH_SYNTHESIS_SYSTEM_PA` schema block  
+**Description:** The prompt's JSON output schema contains `"source_grade_overall": "E",  // Always E — this is LLM-generated` — a JS-style inline comment inside a JSON schema block shown to the LLM. Comments are not valid JSON. When an LLM attempts to reproduce this schema, it may include the comment syntax in its JSON output, causing `JSON.parse()` to throw and `runResearchSynthesis()` to return `{ ok: false }`. Non-deterministic failure rate depending on model.  
+**Suggested fix:** Remove the comment from the JSON block entirely. Move the annotation to a prose rule above the schema: `IMPORTANT: source_grade_overall MUST always be the string "E" — this is LLM-generated synthesis.`
+
+---
+
+##### NOTED-1 — `undefined as unknown as number` type hack in `competitorSpecs` (4 seats: Gemini, GPT-5.4, Grok, GLM) — severity: HIGH
+
+**File:** `src/lib/pdf-engine-v2/index.ts` — PA path `state.researchConstraints` population  
+**Description:** `mass: undefined as unknown as number` and `cost: undefined as unknown as number` bypass TypeScript type guarantees. Code-verified: `state.researchConstraints` is written but has no current reader in the production pipeline (the arrays are for state persistence only). Not a current pipeline crash, but a type contract violation. Self-acknowledged in Phase B tracker comment ("Phase D can address properly").  
+**Status:** Deferred to Phase D as per plan. Document explicitly.
+
+---
+
+##### NOTED-2 — Empty `benchmarkPrices/materialCosts/regulatoryCosts` on PA path (4 seats: Gemini, GPT-5.4, Grok, GLM) — severity: MEDIUM
+
+**File:** `src/lib/pdf-engine-v2/index.ts` — PA path `state.researchConstraints`  
+**Description:** `benchmarkPrices: []`, `materialCosts: []`, `regulatoryCosts: []` are all empty on the PA path. Code-verified: no current pipeline stage reads these arrays back from `state.researchConstraints` in production. This is a known gap acknowledged in the tracker — Phase D will add proper constraint extraction from synthesis data.  
+**Status:** Known gap. Phase D scope. Add explicit guard comment in code.
+
+---
+
+##### NOTED-3 — `classification` parameter unused in prompt (2 seats: GPT-5.4, Kimi) — severity: MEDIUM
+
+**File:** `src/lib/pdf-engine-v2/stages/1-research.ts` — `runResearchSynthesis()` signature  
+**Description:** `classification: string` is accepted and logged but never injected into the system prompt or user message. If the PA Stage 3 spec requires classification context for the LLM, this is a spec gap. At minimum, it's dead API surface that misleads future maintainers.  
+**Status:** Verify against prompt_architecture.pdf. Either inject into user message or remove the parameter.
+
+---
+
+**Council discarded findings:**
+- Gemini: `startTime` undeclared in `runResearchSynthesis()` — FABRICATED. `const startTime = Date.now()` is declared at line 172 of `stages/1-research.ts`. Discarded per GPT-5.4 hallucination discount rule.
 
 ### Actual
 
@@ -455,9 +506,12 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase A: council review DONE (2026-05-08) — all 6 BLOCKERs fixed (2026-05-08)
 - ❌ Phase A: PA council score comparison (PA=true vs PA=false within ±0.5) — deferred, requires live LLM run
 - ✅ Phase B: COMPLETE (2026-05-08)
-- ❌ Phase B: council review — PENDING (main thread to dispatch)
-- ❌ Phase C-H: next up — Phase C unblocked
-- ❌ All council reviews (Phase B onwards)
+- ⚠️ Phase B: council review DONE (2026-05-08) — 2 BLOCKERs found, must fix before Phase C
+  - BLOCKER-1: industryDomain not written in PA dual-write (5 seats)
+  - BLOCKER-2: JSON inline comment in RESEARCH_SYNTHESIS_SYSTEM_PA prompt schema (4 seats)
+- ❌ Phase B: fix BLOCKERs — BLOCKED ON FIX
+- ❌ Phase C-H: blocked on Phase B BLOCKERs
+- ❌ All council reviews (Phase C onwards)
 
 ---
 
