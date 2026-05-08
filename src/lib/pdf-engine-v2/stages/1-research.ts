@@ -90,13 +90,13 @@ async function callOpenRouter(systemPrompt: string, userContent: string, jsonFor
     jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim()
     
     // Fix common LLM JSON issues
-    // 1. Escape unescaped newlines inside string values
-    jsonStr = jsonStr.replace(/(?<!\\)\n/g, '\\n')
-    // 2. Escape unescaped tabs
-    jsonStr = jsonStr.replace(/(?<!\\)\t/g, '\\t')
-    // 3. Remove control characters (except \n, \t, \r)
+    // NOTE: do NOT escape newlines or tabs here — LLMs return pretty-printed JSON
+    // with structural newlines between keys. Replacing \n with \\n corrupts those
+    // structural whitespace characters and makes JSON.parse() fail with
+    // "Expected property name or '}'" at position 1.
+    // 1. Remove non-printable control characters (safe — excludes \n \t \r which JSON.parse handles)
     jsonStr = jsonStr.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
-    // 4. Fix trailing commas before } or ]
+    // 2. Fix trailing commas before } or ]
     jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1')
 
     // Find JSON object

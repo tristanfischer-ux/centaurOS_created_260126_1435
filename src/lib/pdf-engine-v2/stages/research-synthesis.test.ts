@@ -571,3 +571,167 @@ describe('BLOCKER-2 fix — no JS comment inside JSON schema in RESEARCH_SYNTHES
     }
   })
 })
+
+// ── Emergency fix: PA Stage 3 JSON parser tolerance ──────────────────────────
+// The bug: callOpenRouter() was replacing ALL literal newlines with \\n before
+// JSON.parse(). LLMs return pretty-printed JSON with structural newlines between
+// keys. Replacing those structural newlines produced "Expected property name or
+// '}' in JSON at position 1" on every real LLM response.
+//
+// These tests verify the parser handles real-world LLM response variants that
+// were failing in the pa-baseline-deedc9ca run.
+
+// Fixture: realistic pretty-printed CGM response (matches the real failing
+// r1-cgm/log.txt response shape — 11201 chars, market_context starts the object)
+const CGM_PRETTY_PRINTED_JSON = JSON.stringify(
+  {
+    market_context:
+      'The global Continuous Glucose Monitoring (CGM) market is experiencing robust growth, ' +
+      'driven by the rising prevalence of diabetes, particularly Type 2, and an expanding interest ' +
+      'in metabolic health among non-diabetic consumers. Industry reports suggest the market was ' +
+      'valued at approximately $6.1 billion in 2023 and is projected to grow at a compound annual ' +
+      'growth rate (CAGR) of around 7.2% through 2030. This growth is fuelled by technological ' +
+      'advancements improving sensor accuracy and user experience.\n\n' +
+      'Wearable biosensor platforms have benefited from miniaturisation trends in MEMS and ASIC ' +
+      'design. Factory-calibrated, single-wear patch CGM devices are now feasible at sub-£30 ' +
+      'unit cost targets, provided electrochemical glucose enzyme layers and ASIC firmware are ' +
+      'co-designed to eliminate user calibration steps.',
+    why_now:
+      'Published data indicates consumer interest in metabolic health tracking has grown beyond ' +
+      'the diabetic population. Several UK and EU regulatory pathways now classify low-risk CGM ' +
+      'devices as Class IIa medical devices under MDR 2017/745, reducing approval timelines ' +
+      'relative to Class III pathways.',
+    competitors: [
+      {
+        company: 'Abbott',
+        product: 'FreeStyle Libre 3',
+        pricing: 'Listed at approximately £35 per sensor (published UK pharmacy price)',
+        key_specs: '14-day wear, 0.3g, 70–500 mg/dL range, Bluetooth LE, CE marked',
+        strengths: ['Market-leading installed base', 'Libre network connectivity'],
+        weaknesses: ['Requires companion app', 'No real-time alert on base sensor'],
+        differentiation_angle: 'Proposed product targets sub-£20 BOM by eliminating the reader dongle and reducing firmware to a single-chip ASIC.',
+      },
+      {
+        company: 'Dexcom',
+        product: 'G7',
+        pricing: 'Listed at approximately £45 per sensor (published UK pharmacy price)',
+        key_specs: '10-day wear, warm-up 30 min, MDI and pump-compatible',
+        strengths: ['Clinical evidence base', 'Alarm sensitivity'],
+        weaknesses: ['Higher price point', 'Oviform ergonomics vs patch form factor'],
+        differentiation_angle: 'Proposed product differentiates on flush patch form factor and consumer metabolic wellness positioning.',
+      },
+      {
+        company: 'Medtronic',
+        product: 'Guardian 4 Sensor',
+        pricing: 'Pricing not publicly listed; part of closed-loop pump system',
+        key_specs: '7-day wear, factory-calibrated, predictive alerts, closed-loop compatible',
+        strengths: ['Deep clinical integration', 'Predictive low glucose alerts'],
+        weaknesses: ['Requires Medtronic pump — not standalone', 'Complex onboarding'],
+        differentiation_angle: 'Proposed product is pump-agnostic and positions as a standalone consumer device rather than clinical companion hardware.',
+      },
+    ],
+    research_sources: [
+      {
+        title: 'ISO 15197:2013 — In vitro diagnostic test systems — Requirements for blood-glucose monitoring systems',
+        type: 'standard',
+        year: 2013,
+        relevance: 'Accuracy standard applicable to CGM claims in UK/EU markets',
+        source_grade: 'A',
+      },
+      {
+        title: 'EU MDR 2017/745 — Medical Device Regulation',
+        type: 'government_policy',
+        year: 2017,
+        relevance: 'Governs Class IIa CGM device approval pathway in the EU and UK (via UKCA)',
+        source_grade: 'A',
+      },
+    ],
+    source_grade_overall: 'E',
+    claims_requiring_verification: [
+      'CGM market valued at ~$6.1 billion in 2023 (unverified estimate)',
+      'CAGR of ~7.2% through 2030 (unverified estimate)',
+      'Abbott FreeStyle Libre 3 priced at ~£35 per sensor',
+      'Dexcom G7 priced at ~£45 per sensor',
+    ],
+  },
+  null,
+  2  // pretty-print with 2-space indent — produces structural newlines
+)
+
+describe('Emergency fix — PA Stage 3 JSON parser tolerance (pa-baseline-deedc9ca)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    global.fetch = mockFetch as unknown as typeof fetch
+    process.env.OPENROUTER_API_KEY = 'test-key'
+  })
+
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  it('parses pretty-printed LLM JSON (structural newlines between keys) — the real pa-baseline failure', async () => {
+    // This is the exact pattern that caused ALL 10 baseline briefs to fail:
+    // the LLM returned pretty-printed JSON (with newlines between keys) and the
+    // old parser replaced those structural newlines with \\n, breaking JSON.parse().
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: CGM_PRETTY_PRINTED_JSON } }] }),
+      text: async () => '',
+    })
+    const result = await runResearchSynthesis(BESS_PARSED_BRIEF, 'wearable_medical')
+    expect(result.ok).toBe(true)
+    expect(result.data).toBeDefined()
+    expect(result.data?.market_context).toContain('CGM')
+    expect((result.data?.competitors ?? []).length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('parses pretty-printed JSON with multi-paragraph string values (newlines inside strings)', async () => {
+    // market_context contains actual \\n paragraph breaks in the value.
+    // These appear as JSON-escaped \\n sequences inside the string — valid JSON.
+    // The parser must not double-escape them.
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: CGM_PRETTY_PRINTED_JSON } }] }),
+      text: async () => '',
+    })
+    const result = await runResearchSynthesis(BESS_PARSED_BRIEF, 'wearable_medical')
+    expect(result.ok).toBe(true)
+    // market_context had embedded \n\n — sanitiseLlmOutput normalises it but string is non-empty
+    expect((result.data?.market_context ?? '').length).toBeGreaterThan(50)
+  })
+
+  it('parses JSON wrapped in markdown code fence (```json ... ```)', async () => {
+    // Some LLMs wrap their output in triple-backtick fences even when told not to.
+    const fenced = '```json\n' + CGM_PRETTY_PRINTED_JSON + '\n```'
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: fenced } }] }),
+      text: async () => '',
+    })
+    const result = await runResearchSynthesis(BESS_PARSED_BRIEF, 'wearable_medical')
+    expect(result.ok).toBe(true)
+    expect(result.data?.market_context).toContain('CGM')
+  })
+
+  it('parses JSON with trailing comma before closing brace', async () => {
+    // Some LLMs emit trailing commas on the last array/object entry.
+    const trailingComma = CGM_PRETTY_PRINTED_JSON.replace(
+      '"LFP cells have fallen below $60/kWh, making containerised BESS economically viable for grid applications."',
+      '"LFP cells have fallen below $60/kWh, making containerised BESS economically viable for grid applications."'
+    ).replace(/"claims_requiring_verification": \[[\s\S]*?\]/, (match) =>
+      match.replace(/("(?:[^"\\]|\\.)*")\s*\n(\s*\])/, '$1,\n$2')
+    )
+    mockFetch.mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ choices: [{ message: { content: trailingComma } }] }),
+      text: async () => '',
+    })
+    const result = await runResearchSynthesis(BESS_PARSED_BRIEF, 'wearable_medical')
+    expect(result.ok).toBe(true)
+    expect(result.data).toBeDefined()
+  })
+})
