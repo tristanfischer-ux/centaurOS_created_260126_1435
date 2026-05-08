@@ -1184,6 +1184,7 @@ For watchdog drift detection. Pending items only:
 - **Issue:** `runResearchSynthesis()` returned `ok: false` / "Failed to parse JSON response from LLM" on every one of the 10 pa-baseline-deedc9ca briefs (CGM, drone, edge AI, heatpump, EV charger, bioreactor, farm, AUV, BESS, HAPS).
 - **Root cause:** `callOpenRouter()` in `stages/1-research.ts` applied `jsonStr.replace(/(?<!\\)\n/g, '\\n')` to escape newlines before `JSON.parse()`. LLMs return pretty-printed JSON with structural newlines between key-value pairs. Those structural newlines got converted to literal `\n` characters, producing invalid JSON and causing `JSON.parse()` to throw "Expected property name or '}' in JSON at position 1".
 - **Fix:** Removed the newline-escaping (`replace(/(?<!\\)\n/g, '\\n')`) and tab-escaping (`replace(/(?<!\\)\t/g, '\\t')`) lines from `callOpenRouter()`. `JSON.parse()` handles pretty-printed JSON natively; only non-printing control characters (below `\x20`, excluding `\n`, `\t`, `\r`) are stripped. Added 4 new unit tests covering pretty-printed JSON, multi-paragraph strings, markdown-fenced responses, and trailing commas. Commit: _see below_.
+- **Fix commit:** `4a18538f` — "fix(pdf-engine-v2): PA Stage 3 JSON parser tolerance for LLM response variants"
 - **Status:** ✅ resolved — all 30 research-synthesis tests pass, full suite 2212/2213 pass (1 pre-existing failure in unrelated `03-enrichment.test.ts`), typecheck clean in modified files.
 
 ---
