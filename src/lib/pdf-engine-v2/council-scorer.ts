@@ -9,6 +9,74 @@
 import type { PipelineState, SectionScore, StageResult } from './types'
 import { sanitiseLlmOutput } from './sanitiser'
 
+// ─── B1: Product-class → domain expert mapping ─────────────────────────────
+// Used to inject the right persona into the judge prompt so judges evaluate
+// content against the correct domain standard rather than defaulting to HVAC.
+
+const PRODUCT_CLASS_DOMAIN_EXPERT: Record<string, string> = {
+  // Thermal / HVAC
+  thermal_system:        'HVAC and refrigeration engineer',
+
+  // Energy storage
+  energy_storage:        'power systems and battery engineer',
+
+  // Aerospace (crewed / uncrewed / orbital)
+  haps:                  'aerospace engineer specialising in high-altitude unmanned systems',
+  drone:                 'aerospace engineer specialising in unmanned aerial vehicles',
+  auv:                   'marine systems and subsea engineer',
+  aerospace:             'aerospace engineer',
+
+  // Medical / life-sciences
+  wearable_medical:      'biomedical engineer specialising in wearable medical devices',
+  bioreactor:            'bioprocess and biomedical engineer',
+  medical_device:        'biomedical and regulatory engineer',
+
+  // Power electronics
+  ev_charger:            'power electronics engineer specialising in EV charging systems',
+
+  // Computing / AI hardware
+  edge_ai_server:        'computer hardware and data-centre engineer',
+
+  // Agriculture / controlled environment
+  vertical_farm:         'agricultural engineer specialising in controlled-environment agriculture',
+
+  // Electronics manufacturing
+  pcb_assembly:          'electronics manufacturing engineer',
+
+  // Automotive / vehicle
+  vehicle:               'automotive engineer',
+
+  // Consumer and general electronics
+  consumer_electronics:  'consumer electronics engineer',
+
+  // Industrial machinery
+  industrial_machine:    'industrial mechanical engineer',
+
+  // Home appliances
+  appliance:             'mechanical and electrical appliance engineer',
+
+  // Clockwork / precision mechanisms
+  mechanical_clockwork:  'precision mechanical engineer',
+
+  // Fluid systems
+  fluid_processing:      'fluid systems and process engineer',
+
+  // Structural products
+  structural_product:    'structural and civil engineer',
+
+  // Robotics
+  robotics:              'robotics and mechatronics engineer',
+}
+
+/**
+ * Returns the domain expert persona for the judge prompt.
+ * Falls back to 'experienced engineer' when productClass is absent or unrecognised.
+ */
+function getDomainExpert(productClass: string | undefined): string {
+  if (!productClass) return 'experienced engineer'
+  return PRODUCT_CLASS_DOMAIN_EXPERT[productClass] ?? 'experienced engineer'
+}
+
 export interface SourceAttribution {
   section: string
   sourceType: 'llm' | 'deterministic' | 'search' | 'database' | 'user'
@@ -155,7 +223,7 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
     if (councilSections.includes(section)) {
       // Council scoring for high-impact sections
       try {
-        const councilScore = await scoreSectionWithCouncil(section, data)
+        const councilScore = await scoreSectionWithCouncil(section, data, state.productClass)
         scores.push(councilScore)
         console.log(`[council-scorer] ${section}: ${councilScore.score}/10 (council)`)
       } catch (err) {
@@ -219,11 +287,17 @@ export async function runCouncilScoring(state: PipelineState): Promise<StageResu
 
 // ─── Score a Single Section with 3 Judges ──────────────────────────────────
 
-async function scoreSectionWithCouncil(section: string, sectionData: string): Promise<CouncilScore> {
+async function scoreSectionWithCouncil(section: string, rawSectionData: string, productClass?: string): Promise<CouncilScore> {
+  // H5: sanitise LLM-generated section content before injecting into judge prompt.
+  const sectionData = sanitiseLlmOutput(rawSectionData)
+
   const criteria = JUDGING_CRITERIA[section]
   const criteriaList = criteria.map((c, i) => `${i + 1}. ${c}`).join('\n')
 
-  const prompt = `As an experienced HVAC engineer, evaluate this section for engineering quality. Score each criterion 1-10. For scores below 5, explain specifically what is wrong from an engineering perspective. Recommend specific code changes.
+  // B1: dynamic domain expert persona based on the product class.
+  const domainExpert = getDomainExpert(productClass)
+
+  const prompt = `As an experienced ${domainExpert}, evaluate this section for engineering quality. Score each criterion 1-10. For scores below 5, explain specifically what is wrong from an engineering perspective. Recommend specific code changes.
 
 JUDGING CRITERIA:
 ${criteriaList}
@@ -249,9 +323,16 @@ Return ONLY valid JSON:
   // SCORE-F9 (2026-05-07): exclude engine-lineage models from judge council
   // to prevent self-evaluation. Previously Gemini (Chase) and DeepSeek (Max,
   // Jian, Priya, Finn) were both judges and content generators.
+  //
+  // B2 (2026-05-08): replaced xiaomi/mimo-v2.5-pro — it generates Stage 0
+  // training data and Stage 1 research content, making it a self-judge.
+  // Replaced with openai/gpt-5.4 (OpenAI lineage, zero overlap with content
+  // generators Gemini/MiMo/DeepSeek, strong engineering non-hallucination).
+  // Verified available on OpenRouter 2026-05-08. Alternates if gpt-5.4 is
+  // unavailable: moonshotai/kimi-k2.6 or meta-llama/llama-4-maverick.
   const judges = [
     'x-ai/grok-4.3',          // honest adversary, 98% tool-use, 75% non-hallucination
-    'xiaomi/mimo-v2.5-pro',   // honest generalist, 75% non-hallucination
+    'openai/gpt-5.4',         // B2: replaced MiMo — OpenAI lineage, no overlap with content generators
     'z-ai/glm-5.1',           // schema enforcer, 74% non-hallucination
   ]
 
@@ -309,9 +390,12 @@ Return ONLY valid JSON:
     const reason = votes.find(v => v.criteria_scores[i]?.reason)?.criteria_scores[i]?.reason || ''
     return { criterion: c, score: avg, reason }
   })
-  
-  // Composite score = average of all dimension scores
-  const avgScore = Math.round(avgCriteria.reduce((sum, c) => sum + c.score, 0) / avgCriteria.length)
+
+  // B4 (2026-05-08): composite uses overall_score directly (mean across judges),
+  // not the double-mean over criteria. This matches what the dashboard displays
+  // (judgeBreakdown[].score is also from overall_score) so RL trains on the same
+  // signal the scorecard shows. The criteria breakdown is kept for display/debug.
+  const avgScore = Math.round(votes.reduce((sum, v) => sum + v.score, 0) / votes.length)
 
   // Deduplicate source attributions
   const allAttributions = votes.flatMap(v => v.source_attributions)
@@ -353,6 +437,12 @@ async function callJudge(model: string, prompt: string): Promise<any> {
       body: JSON.stringify({
         model,
         max_tokens: 4096,
+        // B3 (2026-05-08): deterministic reward signal required for RL.
+        // temperature: 0 forces greedy decoding. top_p: 1 is a no-op at
+        // temperature 0 but included for explicit clarity. OpenRouter passes
+        // these through to all three judges (Grok, GPT, GLM).
+        temperature: 0,
+        top_p: 1,
         messages: [{ role: 'user', content: prompt }],
       }),
       signal: controller.signal,
