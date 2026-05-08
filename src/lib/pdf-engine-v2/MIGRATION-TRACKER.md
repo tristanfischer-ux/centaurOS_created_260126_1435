@@ -785,7 +785,7 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 ### Actual
 
-- Commit SHA: (see git log — feat(pdf-engine-v2): Phase F)
+- Commit SHA: `ee601bf8`
 - Files changed:
   - `src/lib/pdf-engine-v2/report-type-router.ts` — **new file**: PA Stage 9 deterministic lookup table
   - `src/lib/pdf-engine-v2/types.ts` — added `ReportType` + `ReportTypeRouterResult` re-export (PA Stage 9 delimiter); added `reportType?: ReportType` to `PipelineState`
