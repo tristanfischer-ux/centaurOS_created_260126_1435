@@ -130,6 +130,13 @@ async function callOpenRouter(systemPrompt: string, userContent: string, jsonFor
         return { report: reportOnly[1], sources: [], regulatory: [], designBrief: {} }
       }
 
+      // Strategy 6: response is prose, not JSON — use it directly as report
+      // This handles cases where the LLM thinks out loud before producing content
+      if (raw.length > 200 && !raw.trim().startsWith('{')) {
+        console.warn('[research] Response is prose, not JSON. Using as report text.')
+        return { report: raw, sources: [], regulatory: [], designBrief: {} }
+      }
+
       console.error('[research] JSON parsing failed. First 500 chars:', raw.slice(0, 500))
       throw new Error('Failed to parse JSON response from LLM')
     }
