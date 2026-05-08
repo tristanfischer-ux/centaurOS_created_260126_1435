@@ -89,6 +89,51 @@ Also extract structured data as JSON at the end:
 \`\`\``
 
 /**
+ * Extract structured fields from brief text when JSON extraction fails.
+ * Parses the 5-section template to find objectives, constraints, etc.
+ */
+function extractFieldsFromText(text: string, fields: any): void {
+  // Extract objectives from "## 2. Core Objectives" section
+  const objMatch = text.match(/## 2\. Core Objectives\s*([\s\S]*?)(?=\n## |\n*$)/)
+  if (objMatch) {
+    const bullets = objMatch[1].match(/^-\s+(.+)$/gm)
+    if (bullets) {
+      fields.objectives = bullets.map(b => b.replace(/^-\s+/, '').trim())
+    }
+  }
+  
+  // Extract constraints from "### Constraints" section
+  const consMatch = text.match(/### Constraints\s*([\s\S]*?)(?=\n## |\n### |\n*$)/)
+  if (consMatch) {
+    const bullets = consMatch[1].match(/^-\s+(.+)$/gm)
+    if (bullets) {
+      fields.constraints = bullets.map(b => b.replace(/^-\s+/, '').trim())
+    }
+  }
+  
+  // Extract requirements from "### Requirements" section
+  const reqMatch = text.match(/### Requirements\s*([\s\S]*?)(?=\n### |\n## |\n*$)/)
+  if (reqMatch) {
+    const bullets = reqMatch[1].match(/^-\s+(.+)$/gm)
+    if (bullets) {
+      fields.requirements = bullets.map(b => b.replace(/^-\s+/, '').trim())
+    }
+  }
+  
+  // Extract cost ceiling from constraints text
+  const costMatch = text.match(/[Cc]ost.*?£([\d,]+)/)
+  if (costMatch) fields.costCeiling = parseInt(costMatch[1].replace(/,/g, ''))
+  
+  // Extract mass from constraints text
+  const massMatch = text.match(/[Mm]ass.*?([\d,.]+)\s*kg/)
+  if (massMatch) fields.maxMass = parseFloat(massMatch[1].replace(/,/g, ''))
+  
+  // Extract production volume
+  const volMatch = text.match(/([\d,]+)\s*(?:units?|pcs?)\s*(?:per|\/)\s*year/i)
+  if (volMatch) fields.productionVolume = volMatch[0]
+}
+
+/**
  * Generate a structured Brief from raw founder text.
  * This is the first pipeline stage — everything downstream depends on it.
  */
@@ -155,8 +200,13 @@ export async function runBriefGeneration(
         const parsed = JSON.parse(jsonMatch[1])
         fields = { ...fields, ...parsed }
       } catch (e) {
-        console.warn('[brief-gen] Failed to parse structured JSON, using defaults')
+        console.warn('[brief-gen] Failed to parse structured JSON, extracting from text')
+        extractFieldsFromText(raw, fields)
       }
+    } else {
+      // No JSON block found — extract fields from the brief text
+      console.warn('[brief-gen] No JSON block found, extracting from text')
+      extractFieldsFromText(raw, fields)
     }
 
     // Extract the brief text (everything before the JSON block)
