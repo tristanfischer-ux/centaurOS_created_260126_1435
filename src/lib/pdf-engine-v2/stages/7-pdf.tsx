@@ -556,6 +556,128 @@ function SafeSection({ name, children }: { name: string; children: React.ReactEl
   }
 }
 
+// Section: Table of Contents
+const TableOfContents = () => {
+  return (
+    <Page size="A4" style={s.page}>
+      <Text style={s.h1}>Table of Contents</Text>
+      
+      <View style={{ marginTop: 12, gap: 12 }}>
+        <Text style={s.paraLarge}>1. Project Brief</Text>
+        <Text style={s.paraLarge}>2. Executive Summary</Text>
+        <Text style={s.paraLarge}>3. Feasibility Gate</Text>
+        <Text style={s.paraLarge}>4. Regulatory &amp; Compliance</Text>
+        <Text style={s.paraLarge}>5. Sizing &amp; Spatial Optimisation</Text>
+        <Text style={s.paraLarge}>6. System Modules</Text>
+        <Text style={s.paraLarge}>7. Economics</Text>
+        <Text style={s.paraLarge}>8. Supplier Shortlist: Parts to Buy</Text>
+        <Text style={s.paraLarge}>9. Supplier Shortlist: Parts to Make</Text>
+        <Text style={s.paraLarge}>10. Supplier Shortlist: Services &amp; Certification</Text>
+        <Text style={s.paraLarge}>11. Supplier Shortlist: Other Parts</Text>
+        <Text style={s.paraLarge}>12. Failure Modes &amp; Effects Analysis (FMEA)</Text>
+        <Text style={s.paraLarge}>13. Research Sources</Text>
+        <Text style={s.paraLarge}>14. Audit Log</Text>
+      </View>
+      <PageFooter section="Table of Contents" />
+    </Page>
+  )
+}
+
+// Section: Executive Summary
+const ExecutiveSummaryPage = ({ state }: { state: PipelineState }) => {
+  const brief = state.research?.designBrief
+  const projectName = formatText(brief?.useCase || 'Engineering Design Report')
+  const description = formatText(brief?.mission || brief?.whyNow || 'Executive overview of project specifications and feasibility.')
+  
+  const unitCost = state.costBreakdown?.unitTotalGbp
+  const targetCost = brief?.constraints?.unitCostCeilingGbp
+  
+  const regulatory = brief?.regulatory || []
+  const nreBreakdown = computeNreFromRegulatory(regulatory, state.productClass || state.research?.industryDomain || '')
+  const displayNre = nreBreakdown.items.length > 0 ? nreBreakdown.totalGbp : (state.costBreakdown?.nreTotalGbp ?? 0)
+
+  const feasibility = (state as any).feasibility as { status?: string; compactBanner?: string, reason?: string } | undefined
+  const verdict = feasibility?.status || 'UNKNOWN'
+  const verdictColor = verdict === 'RED' ? RED : verdict === 'AMBER' ? AMBER : GREEN
+  
+  const moduleCount = state.modules?.length || 0
+  const bomRows = state.parts?.length || 0
+  
+  const compound = (state as any).compoundScore as { compound: number } | undefined
+  
+  const allRisks = state.modules?.flatMap(m => (m.riskMatrix || []).map(r => ({ ...r, moduleName: m.name }))) || []
+  const enrichedRisks = allRisks.map(r => ({
+    ...r,
+    rpn: (r.severity || 0) * (r.likelihood || 0) * (r.detection ?? 5),
+  })).sort((a, b) => b.rpn - a.rpn).slice(0, 3)
+
+  return (
+    <Page size="A4" style={s.page}>
+      <Text style={s.h1}>Executive Summary <GradeLabel grade="A" label="Synthesis" /></Text>
+      
+      <View style={{ marginBottom: 16 }}>
+        <Text style={s.h2}>{projectName}</Text>
+        <Text style={s.paraLarge}>{description}</Text>
+      </View>
+      
+      <View style={{ marginBottom: 16, padding: 12, backgroundColor: BG_SOFT, borderLeftWidth: 4, borderLeftColor: verdictColor, borderRadius: 4 }}>
+        <Text style={{ fontSize: 12, fontWeight: 'bold', color: verdictColor, marginBottom: 4 }}>
+          FEASIBILITY VERDICT: {verdict}
+        </Text>
+        <Text style={s.para}>
+          {formatText(feasibility?.reason || feasibility?.compactBanner || 'No specific reason provided.')}
+        </Text>
+      </View>
+      
+      <Text style={s.h3}>Key Metrics</Text>
+      <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
+        <View style={{ ...s.stat, flexBasis: '45%' }}>
+          <Text style={s.statLabel}>Est. Unit Cost</Text>
+          <Text style={s.statValue}>{formatGBP(unitCost)}</Text>
+          <Text style={s.statSub}>Target: {formatGBP(targetCost)}</Text>
+        </View>
+        <View style={{ ...s.stat, flexBasis: '45%' }}>
+          <Text style={s.statLabel}>NRE Total</Text>
+          <Text style={s.statValue}>{formatGBP(displayNre)}</Text>
+        </View>
+        <View style={{ ...s.stat, flexBasis: '45%', marginTop: 8 }}>
+          <Text style={s.statLabel}>Complexity</Text>
+          <Text style={s.statValue}>{moduleCount} Modules</Text>
+          <Text style={s.statSub}>{bomRows} BOM Lines</Text>
+        </View>
+        <View style={{ ...s.stat, flexBasis: '45%', marginTop: 8 }}>
+          <Text style={s.statLabel}>Compound Quality</Text>
+          <Text style={s.statValue}>{compound?.compound ?? 'N/A'}/100</Text>
+        </View>
+      </View>
+      
+      {enrichedRisks.length > 0 && (
+        <View style={{ marginTop: 8 }}>
+          <Text style={s.h3}>Top 3 Identified Risks</Text>
+          <View style={s.tableWrap}>
+            <View style={s.tHead}>
+              <Text style={{ ...s.tHC, width: '25%' }}>Module</Text>
+              <Text style={{ ...s.tHC, width: '45%' }}>Hazard</Text>
+              <Text style={{ ...s.tHC, width: '30%', textAlign: 'right' }}>RPN (S×O×D)</Text>
+            </View>
+            {enrichedRisks.map((r, i) => (
+              <View key={i} style={i % 2 === 0 ? s.tRow : s.tRowAlt} wrap={false}>
+                <Text style={{ ...s.tC, width: '25%', fontWeight: 'bold' }}>{formatText(r.moduleName)}</Text>
+                <Text style={{ ...s.tC, width: '45%' }}>{formatText(r.hazard)}</Text>
+                <Text style={{ ...s.tC, width: '30%', textAlign: 'right', fontWeight: 'bold', color: r.rpn >= 200 ? RED : r.rpn >= 100 ? AMBER : GREEN }}>
+                  {r.rpn}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      )}
+      
+      <PageFooter section="Executive Summary" />
+    </Page>
+  )
+}
+
 // Section 1: Cover Page
 const CoverPage = ({ state }: { state: PipelineState }) => {
   const unitCost = state.costBreakdown?.unitTotalGbp
@@ -862,6 +984,11 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
     <>
       <Page size="A4" style={s.page}>
         <Text style={s.h1}>1. Project Brief: {formatText(state.productClass || state.research?.industryDomain || 'Engineering Design')} <GradeLabel grade="A" /></Text>
+
+        <Text style={s.h2}>Founder's Original Brief</Text>
+        <View style={{ ...s.calloutNeutral, marginBottom: 16 }}>
+          <Text style={s.paraLarge}>{formatText(rawBrief)}</Text>
+        </View>
 
         <Text style={s.h2}>1. Project Purpose</Text>
         <View style={{ ...s.calloutNeutral, marginBottom: 16 }}>
@@ -2196,7 +2323,7 @@ const RisksSection = ({ state }: { state: PipelineState }) => {
 const SourceAttributionSection = ({ state }: { state: PipelineState }) => {
   return (
     <Page size="A4" style={s.page}>
-      <Text style={s.h1}>7. Source Attribution & Section Grading <GradeLabel grade="A" /></Text>
+      <Text style={s.h1}>Research Sources &amp; Attribution <GradeLabel grade="A" /></Text>
       <Text style={s.paraLarge}>Every section is graded on a scale of A-E depending on the highest certainty of the generated constraints and claims.</Text>
 
       <View style={s.tableWrap}>
@@ -2372,8 +2499,10 @@ export default function PdfRenderer({ state }: { state: PipelineState }) {
   return (
     <Document title={`Engineering Report: ${formatText(safe.projectId)}`} author="Fractional Forge PDF Engine">
       <SafeSection name="Cover"><CoverPage state={safe} /></SafeSection>
-      <SafeSection name="Feasibility Gate"><FeasibilityGatePage state={safe} /></SafeSection>
+      <SafeSection name="Table of Contents"><TableOfContents /></SafeSection>
       <SafeSection name="Brief"><BriefPages state={safe} /></SafeSection>
+      <SafeSection name="Executive Summary"><ExecutiveSummaryPage state={safe} /></SafeSection>
+      <SafeSection name="Feasibility Gate"><FeasibilityGatePage state={safe} /></SafeSection>
       <SafeSection name="Regulatory"><RegulatorySection state={safe} /></SafeSection>
       <SafeSection name="Sizing"><SizingSection state={safe} /></SafeSection>
       <SafeSection name="Modules"><ModulesSection state={safe} /></SafeSection>
@@ -2383,7 +2512,7 @@ export default function PdfRenderer({ state }: { state: PipelineState }) {
       <SafeSection name="Supplier Shortlist: Services"><SupplierServiceSection state={safe} /></SafeSection>
       <SafeSection name="Supplier Shortlist: Other Parts"><SupplierOtherSection state={safe} /></SafeSection>
       <SafeSection name="Risks"><RisksSection state={safe} /></SafeSection>
-      <SafeSection name="Source Attribution"><SourceAttributionSection state={safe} /></SafeSection>
+      <SafeSection name="Research Sources"><SourceAttributionSection state={safe} /></SafeSection>
       <SafeSection name="Audit Log"><AuditLogSection state={safe} /></SafeSection>
       {/* Scorecard pages at the end */}
       {/* F8: look up council scores on state to access per-judge breakdown */}

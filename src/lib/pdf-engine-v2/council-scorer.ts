@@ -459,9 +459,19 @@ function extractSectionData(state: PipelineState): Record<string, string> {
 
   // Regulatory
   const reg = state.research?.designBrief?.regulatory || []
-  sections['Regulatory'] = reg.map(r =>
-    `${r.code}: ${r.name}. ${r.summary}. Applicability: ${r.applicability || 'none'}. Design Impact: ${r.designImpact || 'none'}. Evidence: ${r.evidenceRequired || 'none'}. Owner: ${r.ownerRole || 'none'}. Gap Action: ${r.gapAction || 'none'}.`
-  ).join('\n')
+  if (reg.length > 0) {
+    sections['Regulatory'] = reg.map(r =>
+      `${r.code}: ${r.name}. ${r.summary}. Applicability: ${r.applicability || 'none'}. Design Impact: ${r.designImpact || 'none'}. Evidence: ${r.evidenceRequired || 'none'}. Owner: ${r.ownerRole || 'none'}. Gap Action: ${r.gapAction || 'none'}.`
+    ).join('\n')
+  } else {
+    // Fallback: extract from research report text
+    const report = state.research?.report || ''
+    const standardMatches = report.match(/(?:IEC|BS EN|ISO|UL|EASA|DNV|MDR|G99|F-Gas|RoHS|CE|UKCA)[^\n.,]{0,80}/gi) || []
+    const regulatoryText = standardMatches.length > 0
+      ? `Regulatory standards identified in research:\n${standardMatches.join('\n')}`
+      : 'No regulatory data available in research output.'
+    sections['Regulatory'] = regulatoryText
+  }
 
   // Sizing
   const ds = state.dimensionSheet
@@ -541,6 +551,15 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   // Research
   const r = state.research
   if (r) {
+    let text = ''
+    if (r.report && r.report.length > 100) {
+      text = r.report
+    } else if (r.trainingDataDossier && r.trainingDataDossier.length > 100) {
+      text = r.trainingDataDossier
+    } else if (r.sources && r.sources.length > 0) {
+      text = r.sources.map(s => `${s.title}: ${s.relevance || ''}`).join('\n')
+    }
+
     const researchText = [
       `Report length: ${(r.report || '').length} chars`,
       `Training Dossier length: ${(r.trainingDataDossier || '').length} chars`,
@@ -548,8 +567,10 @@ function extractSectionData(state: PipelineState): Record<string, string> {
       `Standards: ${r.standardCodes?.join(', ') || 'none'}`,
       `Domain: ${r.industryDomain || 'unknown'}`,
       `Market Sizing TAM: ${r.designBrief?.marketSizing?.tamMUsd || 'unknown'} M USD`,
-      `Competitors: ${r.designBrief?.competitors?.length || 0}`
+      `Competitors: ${r.designBrief?.competitors?.length || 0}`,
+      `\nResearch Content:\n${text.slice(0, 4000)}`
     ].filter(Boolean).join('\n')
+    
     if (researchText.length >= 10) {
       sections['Research'] = researchText
     }
