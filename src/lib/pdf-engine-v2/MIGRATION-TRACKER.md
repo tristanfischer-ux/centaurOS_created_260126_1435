@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
-| C | Drop Training Data Dump | 0.5-1 | ⬜ Pending | ⬜ Pending | — |
+| C | Drop Training Data Dump | 0.5-1 | ✅ Done | ⬜ Pending | 2026-05-08 |
 | D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
@@ -318,25 +318,37 @@ Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouc
 
 ## Phase C — Drop Training Data Dump
 
-**Status:** ⬜ Pending (blocked on B)
+**Status:** ✅ Done (2026-05-08)
 
 ### Planned
 
 | Sub-item | Status |
 |---|---|
-| Gate `runTrainingDataDump()` call in `index.ts` with `if (!PA_PIPELINE)` | ⬜ |
-| Mark `stages/0-training-data.ts` as `@deprecated` in JSDoc | ⬜ |
-| Confirm downstream calls compile on both paths | ⬜ |
+| Gate `runTrainingDataDump()` call in `index.ts` with `if (!PA_PIPELINE)` | ✅ |
+| Mark `stages/0-training-data.ts` as `@deprecated` in JSDoc | ✅ |
+| Confirm downstream calls compile on both paths | ✅ |
 
 ### Verification
 
-- [ ] No `[stage-0] Starting parallel execution` log on PA path
-- [ ] Pipeline wall-clock decreases by Training Data duration (~3-5 min)
-- [ ] Council Research score unchanged or improved
+- [x] No `[stage-0] Starting parallel execution` log on PA path (gated by `if (!PA_PIPELINE)`)
+- [ ] Pipeline wall-clock decreases by Training Data duration (~3-5 min) — requires live LLM run
+- [ ] Council Research score unchanged or improved — requires live LLM run
+
+### Actual
+
+**Commit:** TBD (commit created at end of this file update)
+**Files changed:**
+- `src/lib/pdf-engine-v2/index.ts` — gated `runTrainingDataDump()` call with `if (!PA_PIPELINE)`; `trainingDossier` defaults to `undefined` on PA path; legacy path unchanged
+- `src/lib/pdf-engine-v2/stages/0-training-data.ts` — added `@deprecated` JSDoc at file top and on `runTrainingDataDump()` function export
+
+**Tests:**
+- Existing 50 tests (24 Phase A + 21 Phase B + 5 Phase B fix): all still pass (372 → 377 total; 1 pre-existing council-scorer failure unchanged)
+- New Phase C tests added: 5 tests in `src/lib/pdf-engine-v2/stages/training-data-gate.test.ts` — all pass
+- Typecheck: no new errors in changed files; pre-existing errors in unrelated files unchanged
 
 ### Council review
 
-- [ ] All findings ≥2 seats addressed before Phase D
+- ⬜ Pending — all findings ≥2 seats addressed before Phase D
 
 ---
 
@@ -522,7 +534,9 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase B: COMPLETE (2026-05-08)
 - ✅ Phase B: council review DONE (2026-05-08) — 3 BLOCKERs found and fixed (2026-05-08)
 - ✅ Phase B: council fixes applied — BLOCKER-1 (industryDomain), BLOCKER-2 (JS comment in JSON), BLOCKER-3 (classification not injected)
-- ❌ Phase C-H: blocked on Phase B completion — NOW UNBLOCKED
+- ✅ Phase C: COMPLETE (2026-05-08) — Training Data Dump gated off on PA path; 5 new tests pass
+- ❌ Phase C: council review pending (before Phase D)
+- ❌ Phase D-H: unblocked, ready to start
 - ❌ All council reviews (Phase C onwards)
 
 ---

@@ -1,3 +1,12 @@
+/**
+ * @file 0-training-data.ts — Stage 0: Training Data Knowledge Dump
+ *
+ * @deprecated Stage runs only on the legacy `PA_PIPELINE=false` path.
+ * Will be deleted in Phase H of the strict adoption migration
+ * (`src/lib/pdf-engine-v2/STRICT-ADOPTION-MIGRATION-PLAN.md`).
+ * Do NOT call from the PA path (`PA_PIPELINE=true`).
+ */
+
 import { StageResult } from '../types';
 import { sanitiseLlmOutput } from '../sanitiser';
 
@@ -9,6 +18,13 @@ const STAGE_0_MODELS = [
 
 const BATCH_TIMEOUT_MS = 300000;
 
+/**
+ * Run the Training Data Knowledge Dump stage.
+ *
+ * @deprecated Called only on the legacy `PA_PIPELINE=false` path.
+ * Will be deleted in Phase H of the strict adoption migration.
+ * Do NOT call from the PA path.
+ */
 export async function runTrainingDataDump(
     productDescription: string,
     designBriefContext: string = ""

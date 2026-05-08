@@ -337,16 +337,23 @@ export async function runPipeline(
   }
 
   // ── Stage 1: Training Data Knowledge Dump ──────────────────────────
-  console.log('\n[pipeline] === Stage 1: Training Data Dump ===')
+  // Phase C: gated off on PA_PIPELINE=true. The PA Stage 3 Research Synthesis
+  // receives the structured brief (PA Stage 1 output) and is expected to generate
+  // market context from its own parametric knowledge — the Training Data Dump is
+  // therefore redundant on the PA path. The dossier remains available on the
+  // legacy path (PA_PIPELINE=false) for backwards compatibility.
   let trainingDossier: string | undefined
-  try {
-    const stage1Result = await runTrainingDataDump(briefText)
-    trackStage('training_data', stage1Result)
-    if (stage1Result.ok && stage1Result.data) {
-      trainingDossier = (stage1Result.data as any).dossier
+  if (!PA_PIPELINE) {
+    console.log('\n[pipeline] === Stage 1: Training Data Dump ===')
+    try {
+      const stage1Result = await runTrainingDataDump(briefText)
+      trackStage('training_data', stage1Result)
+      if (stage1Result.ok && stage1Result.data) {
+        trainingDossier = (stage1Result.data as any).dossier
+      }
+    } catch (err) {
+      console.log('[pipeline] Training data failed, continuing without dossier:', (err as Error).message)
     }
-  } catch (err) {
-    console.log('[pipeline] Training data failed, continuing without dossier:', (err as Error).message)
   }
 
   // ── Stage 2: Research ─────────────────────────────────────────────────
