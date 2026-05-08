@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
-# Run all 20 baseline evidence runs sequentially in background.
-# Output: ~/Downloads/engine-evidence/post-g12-b6/<slug>/{report.pdf,log.txt,.done}
-# Total time: ~60-100 min (20 runs × 3-5 min each).
+# Run 10 baseline evidence runs sequentially in background.
+# Output: ~/Downloads/engine-evidence/post-5470c9ae/<slug>/{report.pdf,log.txt,.done}
+# Total time: ~100-110 min (10 runs × 10-11 min each).
+# Skips runs where .done already exists — safe to re-run.
 
 set -eo pipefail
 
@@ -22,24 +23,12 @@ BRIEFS=(
   "baseline-10/08-auv-coastal.md"
   "baseline-10/09-bess-container.md"
   "baseline-10/10-haps-stratospheric.md"
-  "baseline-10-minimal/01-cgm-wearable.md"
-  "baseline-10-minimal/02-drone-prosumer.md"
-  "baseline-10-minimal/03-edge-ai-server.md"
-  "baseline-10-minimal/04-heatpump-30kw.md"
-  "baseline-10-minimal/05-dc-fast-ev-charger.md"
-  "baseline-10-minimal/06-pharma-bioreactor.md"
-  "baseline-10-minimal/07-vertical-farm.md"
-  "baseline-10-minimal/08-auv-coastal.md"
-  "baseline-10-minimal/09-bess-container.md"
-  "baseline-10-minimal/10-haps-stratospheric.md"
 )
 
 # Slugs for output directories
 SLUGS=(
   "r1-cgm" "r1-drone" "r1-edge-ai" "r1-heatpump" "r1-ev-charger"
   "r1-bioreactor" "r1-farm" "r1-auv" "r1-bess" "r1-haps"
-  "r2-cgm" "r2-drone" "r2-edge-ai" "r2-heatpump" "r2-ev-charger"
-  "r2-bioreactor" "r2-farm" "r2-auv" "r2-bess" "r2-haps"
 )
 
 echo "$(date -u +%Y-%m-%dT%H:%M:%SZ) Starting ${#BRIEFS[@]} evidence runs" | tee "$EVIDENCE_ROOT/batch.log"
@@ -48,6 +37,11 @@ for i in "${!BRIEFS[@]}"; do
   BRIEF="src/lib/pdf-engine-v2/briefs/${BRIEFS[$i]}"
   SLUG="${SLUGS[$i]}"
   OUT_DIR="$EVIDENCE_ROOT/$SLUG"
+
+  if [ -f "$OUT_DIR/.done" ]; then
+    echo "$(date -u +%H:%M:%S) [$((i+1))/${#BRIEFS[@]}] $SLUG already done, skipping" | tee -a "$EVIDENCE_ROOT/batch.log"
+    continue
+  fi
 
   echo "$(date -u +%H:%M:%S) [$((i+1))/${#BRIEFS[@]}] Starting $SLUG..." | tee -a "$EVIDENCE_ROOT/batch.log"
 
