@@ -88,6 +88,16 @@ async function callOpenRouter(systemPrompt: string, userContent: string, jsonFor
     // Strip markdown code blocks
     jsonStr = jsonStr.replace(/```json/g, '').replace(/```/g, '').trim()
     
+    // Fix common LLM JSON issues
+    // 1. Escape unescaped newlines inside string values
+    jsonStr = jsonStr.replace(/(?<!\\)\n/g, '\\n')
+    // 2. Escape unescaped tabs
+    jsonStr = jsonStr.replace(/(?<!\\)\t/g, '\\t')
+    // 3. Remove control characters (except \n, \t, \r)
+    jsonStr = jsonStr.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
+    // 4. Fix trailing commas before } or ]
+    jsonStr = jsonStr.replace(/,\s*([}\]])/g, '$1')
+
     // Find JSON object
     const firstBrace = jsonStr.indexOf('{')
     const lastBrace = jsonStr.lastIndexOf('}')
@@ -113,6 +123,13 @@ async function callOpenRouter(systemPrompt: string, userContent: string, jsonFor
           }
         }
       }
+      
+      // Strategy 5: extract report field as plain text
+      const reportOnly = raw.match(/"report"\s*:\s*"((?:[^"\\]|\\.)*)"/s)
+      if (reportOnly) {
+        return { report: reportOnly[1], sources: [], regulatory: [], designBrief: {} }
+      }
+
       console.error('[research] JSON parsing failed. First 500 chars:', raw.slice(0, 500))
       throw new Error('Failed to parse JSON response from LLM')
     }
