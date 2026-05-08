@@ -13,7 +13,7 @@
 |---|---|---|---|---|---|
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
-| C | Drop Training Data Dump | 0.5-1 | ✅ Done | ⬜ Pending | 2026-05-08 |
+| C | Drop Training Data Dump | 0.5-1 | ✅ Done | ⚠️ Issues to fix (2 BLOCKERs) | 2026-05-08 |
 | D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ⬜ Pending | 2026-05-08 |
 | D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
@@ -348,7 +348,32 @@ Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouc
 
 ### Council review
 
-- ⬜ Pending — all findings ≥2 seats addressed before Phase D
+- ⚠️ **2 BLOCKERs found — Phase D must NOT proceed until fixed** (2026-05-08)
+
+#### Council notes — 6-LLM diagnostic council (2026-05-08)
+
+Seats: Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5 Pro.
+Synthesis rule: ≥2 independent seats = BLOCKER.
+
+**BLOCKER-1 — BOM stages pass `undefined` dossier silently on PA path** (6/6 seats)
+
+- `index.ts` lines 909 and 966: `runBomCostSuppliers` and `runBomCost` are guarded by `BOM_PIPELINE` flag, NOT `PA_PIPELINE`. On `PA_PIPELINE=true`, `trainingDossier` is `undefined`. Both BOM stages accept it as optional and ternary-guard the prompt injection, so there is no crash. However the Training Data Context block is silently dropped from BOM/Supplier prompts with no log, no metric, and no test confirming output quality is acceptable. This is the exact silent-drop scenario the migration review targets.
+- Fix required: either (a) add a PA-aware BOM log/warning and integration test asserting acceptable BOM output without dossier, or (b) gate BOM with `PA_PIPELINE` and create PA BOM variants in Phase E.
+
+**BLOCKER-2 — `stage-rl-iterate.ts` not updated, runs dump unconditionally on PA path** (6/6 seats)
+
+- `src/lib/pdf-engine-v2/stage-rl-iterate.ts` lines 165–228: calls `runTrainingDataDump` unconditionally and passes dossier to legacy `runResearch` and `runDecompose`. When `PA_PIPELINE=true`, the main pipeline skips the dump and uses `runResearchSynthesis` / `runDecomposePA`. RL iterations therefore run with different stage implementations and different context than the main pipeline — a live architectural fork with no guard.
+- Fix required: mirror `if (!PA_PIPELINE)` gate in `stage-rl-iterate.ts`, or add a hard runtime assertion if RL is not yet PA-compatible.
+
+**NOTED-1 — PA fallback path: `PA_PIPELINE=true && !parsedBrief` falls back to legacy Decompose with `undefined` dossier** (2/6 seats: GPT-5.4, Kimi)
+
+- `index.ts` line 805: guard is `if (PA_PIPELINE && state.parsedBrief)`. If `parsedBrief` is absent on a PA run, execution falls through to legacy `runDecompose` which now receives `undefined` dossier. The ternary guard prevents a crash but this is an undocumented hybrid state.
+- No fix required before Phase D (parsedBrief absence = pipeline error condition), but should be documented.
+
+**NOTED-2 — No `trackStage` skip marker on PA path** (2/6 seats: GPT-5.4, Kimi)
+
+- When `PA_PIPELINE=true`, Stage 1 runs no `trackStage` call. Telemetry consumers expecting a `training_data` stage entry on every run will see a gap.
+- Low priority; add an explicit skip record when convenient.
 
 ---
 
@@ -576,7 +601,9 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase B: council review DONE (2026-05-08) — 3 BLOCKERs found and fixed (2026-05-08)
 - ✅ Phase B: council fixes applied — BLOCKER-1 (industryDomain), BLOCKER-2 (JS comment in JSON), BLOCKER-3 (classification not injected)
 - ✅ Phase C: COMPLETE (2026-05-08) — Training Data Dump gated off on PA path; 5 new tests pass
-- ❌ Phase C: council review pending (before Phase D)
+- ⚠️ Phase C: council review DONE (2026-05-08) — 2 BLOCKERs found; Phase D blocked until fixed
+- ❌ Phase C: BLOCKER-1 — BOM stages pass undefined dossier silently on PA path (fix: log/test or PA BOM variants)
+- ❌ Phase C: BLOCKER-2 — stage-rl-iterate.ts not updated, runs dump unconditionally on PA path (fix: mirror PA gate)
 - ✅ Phase D1: COMPLETE (2026-05-08) — Module Decomposition PA Stage 5 + Regulatory Extraction PA Stage 4; 61 new tests; 481/482 pass; typecheck clean
 - ✅ Phase D2: COMPLETE (2026-05-08) — Sizing Solver + Cost Computation PA schemas
 - ❌ Phase D1: council review ⬜ Pending
