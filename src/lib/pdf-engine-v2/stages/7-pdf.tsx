@@ -808,47 +808,117 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
 // Section 3: Brief Section
 const BriefPages = ({ state }: { state: PipelineState }) => {
   const b = state.research?.designBrief
-  // UX1 (2026-05-06): show the raw user-submitted brief verbatim so the
-  // reader sees the exact prompt that produced this report. Kept alongside
-  // the LLM-synthesised Mission / Use Case / Market Context so both are
-  // visible: what was asked vs how the engine interpreted it.
   const rawBrief = state.briefText?.trim()
+
+  const extractFirstSentence = (text?: string) => {
+    if (!text) return null;
+    const match = text.match(/^.*?[.!?](?:\s|$)/);
+    return match ? match[0].trim() : text.trim();
+  }
+
+  const projectPurpose = b?.mission || b?.useCase || extractFirstSentence(rawBrief) || "Not specified — requires founder input";
+
+  const coreObjectives: string[] = [];
+  if (b?.constraints?.unitCostCeilingGbp) coreObjectives.push(`Achieve unit cost ≤ ${formatGBP(b.constraints.unitCostCeilingGbp)}`);
+  if (b?.constraints?.maxMassKg) coreObjectives.push(`Stay within ${formatNumber(b.constraints.maxMassKg)} kg mass budget`);
+  const vol = b?.quantityTarget || b?.constraints?.batchSize;
+  if (vol) coreObjectives.push(`Scale to ${typeof vol === 'number' ? formatNumber(vol) : vol} production volume`);
+  
+  const jurisdiction = (b as any)?.jurisdiction || (b?.constraints as any)?.jurisdiction || (state.research as any)?.jurisdiction;
+  if (jurisdiction) coreObjectives.push(`Comply with ${jurisdiction} regulatory framework`);
+  
+  coreObjectives.push("Meet all stated regulatory and safety requirements");
+  
+  const finalObjectives = coreObjectives.slice(0, 5);
+
+  const stdCodes = (state.research as any)?.standardCodes?.join(', ') || b?.regulatory?.map(r => r.code).join(', ');
+
+  const reqs = [
+    { label: "Target Process", value: b?.targetProcess },
+    { label: "Target Material", value: b?.targetMaterial },
+    { label: "Tolerance Target", value: b?.toleranceTarget },
+    { label: "Applicable Standards", value: stdCodes }
+  ].filter(r => r.value);
+
+  const cons = [
+    { label: "Cost Ceiling", value: b?.constraints?.unitCostCeilingGbp ? formatGBP(b.constraints.unitCostCeilingGbp) : null },
+    { label: "Max Mass", value: b?.constraints?.maxMassKg ? `${formatNumber(b.constraints.maxMassKg)} kg` : null },
+    { label: "Volume/Batch", value: vol ? (typeof vol === 'number' ? formatNumber(vol) : String(vol)) : null },
+    { label: "Jurisdiction", value: jurisdiction },
+    { label: "Envelope", value: (b?.constraints as any)?.envelope || state.dimensionSheet?.envelope?.interior_volume_m3 ? `${state.dimensionSheet?.envelope?.interior_volume_m3} m³` : null },
+    { label: "Temperature", value: (b?.constraints as any)?.temperature || (b?.constraints as any)?.operatingTemperature }
+  ].filter(c => c.value);
+
+  const inScopeRaw = (b as any)?.inScope || "Full engineering design, BOM generation, cost analysis, supplier matching, regulatory assessment";
+  const outOfScopeRaw = (b as any)?.outOfScope || "Detailed structural FEA, Certification testing, Production tooling design";
+  const outOfScopeList = typeof outOfScopeRaw === 'string' ? outOfScopeRaw.split(',').map(s => s.trim()) : outOfScopeRaw;
+
+  const successCriteria: string[] = [];
+  if (b?.constraints?.unitCostCeilingGbp) successCriteria.push(`Unit cost at or below ${formatGBP(b.constraints.unitCostCeilingGbp)} at stated production volume`);
+  if (b?.constraints?.maxMassKg) successCriteria.push(`Total mass ≤ ${formatNumber(b.constraints.maxMassKg)} kg`);
+  successCriteria.push(`All regulatory certifications identified for target jurisdiction`);
 
   return (
     <>
       <Page size="A4" style={s.page}>
-        <Text style={s.h1}>1. Brief & Requirements <GradeLabel grade="A" /></Text>
+        <Text style={s.h1}>1. Project Brief: {formatText(state.productClass || state.research?.industryDomain || 'Engineering Design')} <GradeLabel grade="A" /></Text>
 
-        {rawBrief && (
-          <>
-            <Text style={s.h2}>1.0 Original Brief <GradeLabel grade="A" label="founder input" /></Text>
-            <Text style={{ ...s.para, fontSize: 9.5, color: MUTED, marginBottom: 4 }}>
-              The verbatim text supplied by the founder. Everything in the rest of the report is
-              derived from this prompt.
-            </Text>
-            <View
-              style={{
-                padding: 12,
-                backgroundColor: '#f6f7f8',
-                borderLeftWidth: 3,
-                borderLeftColor: BRAND,
-                marginBottom: 8,
-              }}
-            >
-              <Text style={{ fontSize: 10, lineHeight: 1.5, fontFamily: 'Helvetica', color: INK }}>
-                {formatText(rawBrief)}
-              </Text>
+        <Text style={s.h2}>1. Project Purpose</Text>
+        <View style={{ ...s.calloutNeutral, marginBottom: 16 }}>
+          <Text style={s.paraLarge}>{formatText(projectPurpose)}</Text>
+        </View>
+
+        <Text style={s.h2}>2. Core Objectives</Text>
+        <View style={{ marginBottom: 16 }}>
+          <Bullets items={finalObjectives} />
+        </View>
+
+        <Text style={s.h2}>3. Key Requirements & Constraints</Text>
+        <View style={{ flexDirection: 'row', gap: 16, marginBottom: 16 }}>
+          <View style={{ flex: 1 }}>
+            <Text style={s.h4}>Requirements</Text>
+            <View style={{ borderTopWidth: 1, borderTopColor: BORDER_DARK }}>
+              {reqs.length > 0 ? reqs.map((r, i) => (
+                <KV key={i} label={r.label} value={r.value} />
+              )) : <Text style={{ ...s.para, fontSize: 9, marginTop: 4, color: MUTED }}>None specified</Text>}
             </View>
-          </>
-        )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={s.h4}>Constraints</Text>
+            <View style={{ borderTopWidth: 1, borderTopColor: BORDER_DARK }}>
+              {cons.length > 0 ? cons.map((c, i) => (
+                <KV key={i} label={c.label} value={c.value} />
+              )) : <Text style={{ ...s.para, fontSize: 9, marginTop: 4, color: MUTED }}>None specified</Text>}
+            </View>
+          </View>
+        </View>
 
-        {state.briefExpansion && (
-          <View style={{ marginBottom: 16 }}>
-            <Text style={s.h2}>1.0b Brief Interpretation <GradeLabel grade="D" label="LLM expansion" /></Text>
+        <Text style={s.h2}>4. Scope Boundaries</Text>
+        <View style={{ marginBottom: 16 }}>
+          <Text style={{ ...s.para, fontWeight: 'bold' }}>In scope:</Text>
+          <Text style={{ ...s.para, marginBottom: 8 }}>{formatText(inScopeRaw)}</Text>
+          <Text style={{ ...s.para, fontWeight: 'bold' }}>Out of scope:</Text>
+          <Bullets items={Array.isArray(outOfScopeList) ? outOfScopeList : [outOfScopeList]} />
+        </View>
+
+        <Text style={s.h2}>5. Success Criteria</Text>
+        <View style={{ marginBottom: 16 }}>
+          <Bullets items={successCriteria} />
+        </View>
+
+        <SourceFooter sources={[{ type: 'System', detail: 'Derived from founder brief and engine expansion' }]} overallGrade="A" />
+        <PageFooter section="1. Project Brief" />
+      </Page>
+
+      <Page size="A4" style={s.page}>
+        <Text style={s.h1}>Appendices</Text>
+        
+        {state.briefExpansion ? (
+          <View style={{ marginBottom: 24 }}>
+            <Text style={s.h2}>Appendix: Engine-Inferred Assumptions <GradeLabel grade="D" label="LLM expansion" /></Text>
             <Text style={{ ...s.para, fontSize: 9.5, color: MUTED, marginBottom: 8 }}>
               The original brief was minimal. The engine expanded it by inferring the following constraints based on the product class.
             </Text>
-            
             <View style={s.tableWrap}>
               <View style={s.tHead}>
                 <Text style={{ ...s.tHC, width: '25%' }}>Field</Text>
@@ -869,7 +939,7 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
                 </View>
               ))}
             </View>
-
+            
             {state.briefExpansion.assumptions && state.briefExpansion.assumptions.length > 0 && (
               <View style={{ marginTop: 8 }}>
                 <Text style={s.h4}>Core Assumptions</Text>
@@ -881,41 +951,11 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
               </View>
             )}
           </View>
-        )}
-
-        <Text style={s.h2}>1.1 Mission & Use Case <GradeLabel grade="A" /></Text>
-        <View style={s.calloutNeutral}>
-          <Text style={s.h4}>Mission</Text>
-          <Text style={s.paraLarge}>{formatText(b?.mission)}</Text>
-        </View>
-        <View style={s.calloutNeutral}>
-          <Text style={s.h4}>Use Case</Text>
-          <Text style={s.paraLarge}>{formatText(b?.useCase)}</Text>
-        </View>
-
-        <Text style={s.h2}>1.2 Market Context & Timing <GradeLabel grade="B" /></Text>
-        <Text style={s.para}>{formatText(b?.whyNow)}</Text>
-        <Text style={s.para}>{formatText(b?.targetCustomers)}</Text>
-
-        <SourceFooter sources={[{ type: 'User Input', detail: 'Original brief provided' }, { type: 'LLM Output', detail: 'Research synthesis based on prompt' }]} overallGrade="C" />
-        <PageFooter section="1. Brief — Overview" />
-      </Page>
-
-      <Page size="A4" style={s.page}>
-        <Text style={s.h2}>1.3 Constraints & Targets <GradeLabel grade="A" /></Text>
-        <View style={{ borderTopWidth: 1, borderTopColor: BORDER_DARK }}>
-          <KV label="Target Material" value={b?.targetMaterial} />
-          <KV label="Target Process" value={b?.targetProcess} />
-          <KV label="Tolerance Target" value={b?.toleranceTarget} />
-          <KV label="Quantity Target" value={b?.quantityTarget} />
-          <KV label="Batch Size" value={b?.constraints?.batchSize} />
-          <KV label="Target Cost Ceiling" value={formatGBP(b?.constraints?.unitCostCeilingGbp)} />
-          <KV label="Max Mass" value={formatNumber(b?.constraints?.maxMassKg, ' kg')} />
-        </View>
+        ) : null}
 
         {b?.sources && b.sources.length > 0 && (
-          <View style={{ marginTop: 24 }}>
-            <Text style={s.h3}>Research Sources</Text>
+          <View style={{ marginBottom: 24 }}>
+            <Text style={s.h2}>Appendix: Research Sources <GradeLabel grade="B" /></Text>
             <View style={s.tableWrap}>
               <View style={s.tHead}>
                 <Text style={{ ...s.tHC, width: '40%' }}>Title</Text>
@@ -934,8 +974,18 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
             </View>
           </View>
         )}
-        <SourceFooter sources={[{ type: 'Mixed', detail: 'Constraints provided by User, Sources generated by LLM' }]} overallGrade="B" />
-        <PageFooter section="1. Brief — Constraints" />
+        
+        {stdCodes && (
+          <View style={{ marginBottom: 24 }}>
+            <Text style={s.h2}>Appendix: Applicable Standards <GradeLabel grade="B" /></Text>
+            <View style={s.calloutNeutral}>
+              <Text style={s.para}>{formatText(stdCodes)}</Text>
+            </View>
+          </View>
+        )}
+        
+        <SourceFooter sources={[{ type: 'System', detail: 'Generated Appendices' }]} overallGrade="B" />
+        <PageFooter section="Appendices" />
       </Page>
     </>
   )
@@ -1097,11 +1147,12 @@ const SizingSection = ({ state }: { state: PipelineState }) => {
             let coolingCapacityW: number | null = null
 
             for (const v of Object.values(ds.module_dimensions || {})) {
-              if (v.requirement?.label?.toLowerCase().match(/thermal|cooling|heat/)) {
-                if (v.requirement.unit === 'kW') {
-                  heatRejectionW = v.requirement.value * 1000
-                } else if (v.requirement.unit === 'W') {
-                  heatRejectionW = v.requirement.value
+              const req = (v as any).requirement
+              if (req?.label?.toLowerCase().match(/thermal|cooling|heat/)) {
+                if (req.unit === 'kW') {
+                  heatRejectionW = req.value * 1000
+                } else if (req.unit === 'W') {
+                  heatRejectionW = req.value
                 }
               }
             }
