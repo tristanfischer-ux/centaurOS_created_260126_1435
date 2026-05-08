@@ -83,6 +83,36 @@ export interface StructuredBriefJSON {
   confidence: 'HIGH' | 'MEDIUM' | 'LOW'
 }
 
+// ── PA Stage 3 — Research Synthesis types ────────────────────────────────────
+
+export interface ResearchCompetitor {
+  company: string
+  product: string
+  pricing: string
+  key_specs: string
+  strengths: string[]
+  weaknesses: string[]
+  differentiation_angle: string
+}
+
+export interface ResearchSource {
+  title: string
+  type: 'standard' | 'market_report' | 'datasheet' | 'competitor_spec' | 'government_policy'
+  year: number
+  relevance: string
+  source_grade: 'A' | 'B' | 'C' | 'D' | 'E'
+}
+
+export interface ResearchSynthesis {
+  market_context: string
+  why_now: string
+  competitors: ResearchCompetitor[]
+  research_sources: ResearchSource[]
+  /** Always 'E' — this is LLM-generated synthesis. Individual sources may be higher. */
+  source_grade_overall: 'E'
+  claims_requiring_verification: string[]
+}
+
 export interface ResearchResult {
   report: string
   sources: Array<{ uri: string; title: string }>
@@ -432,6 +462,8 @@ export interface PipelineState {
   }
   /** PA path only: structured brief output from runBriefParsing() */
   parsedBrief?: StructuredBriefJSON
+  /** PA path only (Phase B+): structured research synthesis from runResearchSynthesis() */
+  researchSynthesis?: ResearchSynthesis
   productClass?: string
   pipelineError?: {
     stage: string

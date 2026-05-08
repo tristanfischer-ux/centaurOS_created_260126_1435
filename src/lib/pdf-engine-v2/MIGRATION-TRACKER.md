@@ -12,7 +12,7 @@
 | Phase | Description | Sonnet hrs | Status | Council review | Date done |
 |---|---|---|---|---|---|
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
-| B | Reorder Research to consume Brief Parsing | 3-4 | ⬜ Pending | ⬜ Pending | — |
+| B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ⬜ Pending | 2026-05-08 |
 | C | Drop Training Data Dump | 0.5-1 | ⬜ Pending | ⬜ Pending | — |
 | D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
@@ -198,29 +198,56 @@ Delete `PA_PIPELINE=true` env var. Existing `runBriefGeneration()` path untouche
 
 ## Phase B — Reorder Research to Consume Brief Parsing
 
-**Status:** ⬜ Pending (blocked on A)
+**Status:** ✅ Done
+**Started:** 2026-05-08
+**Landed:** 2026-05-08
+**Estimated:** 3-4 sonnet hours
 
 ### Planned
 
 | Sub-item | Status |
 |---|---|
-| Rewrite `stages/1-research.ts` `runResearch()` to accept `StructuredBriefJSON` | ⬜ |
-| Adopt PA Stage 3 output schema | ⬜ |
-| Add `ResearchSynthesis` interface to `types.ts` | ⬜ |
-| Update `RESEARCH_SYNTHESIS_SYSTEM` in `prompts.ts` to PA Stage 3 prompt | ⬜ |
-| Remove `extractResearchConstraints()` on PA path | ⬜ |
-| Dual-write `state.research` for backwards compat | ⬜ |
+| Add new `runResearchSynthesis(parsedBrief, classification)` to `stages/1-research.ts` (DO NOT delete `runResearch()`) | ✅ |
+| Adopt PA Stage 3 output schema (`ResearchSynthesis`, `ResearchCompetitor`, `ResearchSource`) | ✅ |
+| Add `ResearchSynthesis`, `ResearchCompetitor`, `ResearchSource` interfaces to `types.ts` | ✅ |
+| Add `researchSynthesis?: ResearchSynthesis` to `PipelineState` | ✅ |
+| Add `RESEARCH_SYNTHESIS_SYSTEM_PA` constant to `prompts.ts` (DO NOT delete `RESEARCH_SYNTHESIS_SYSTEM`) | ✅ |
+| Wire orchestrator: PA path calls `runResearchSynthesis`, legacy path calls `runResearch` | ✅ |
+| Dual-write `state.research` from `state.researchSynthesis` for backwards compat | ✅ |
+| Remove `extractResearchConstraints()` call on PA path only | ✅ |
+| Unit tests at `stages/research-synthesis.test.ts` | ✅ |
 
 ### Verification
 
-- [ ] `state.researchSynthesis.competitors.length >= 3` for BESS brief
-- [ ] `state.researchSynthesis.claims_requiring_verification` non-empty
-- [ ] `source_grade_overall === 'E'`
-- [ ] Research council score ≥ current baseline
+- [x] `state.researchSynthesis.competitors.length >= 3` for BESS brief — ✅ verified in test
+- [x] `state.researchSynthesis.claims_requiring_verification` non-empty — ✅ verified in test
+- [x] `source_grade_overall === 'E'` — ✅ verified in test (also forced in normalisation, never LLM-alterable)
+- [x] `market_context` contains domain-relevant keywords (LFP, BESS, grid) — ✅ verified in test
+- [ ] Research council score ≥ current baseline — **DEFERRED** to council dispatch (requires live LLM run; out of scope per brief)
+- [x] `PA_PIPELINE=false` regression: all 24 Phase A tests + 366 total existing tests still pass — ✅
 
 ### Council review
 
-- [ ] All findings ≥2 seats addressed before Phase C
+- [ ] ⬜ Pending — main thread to dispatch council next
+
+### Actual
+
+- Commit SHA: see git log (Phase B commit)
+- Files changed:
+  - `src/lib/pdf-engine-v2/types.ts` — added `ResearchCompetitor`, `ResearchSource`, `ResearchSynthesis` interfaces; added `researchSynthesis?: ResearchSynthesis` to `PipelineState`
+  - `src/lib/pdf-engine-v2/prompts.ts` — added `RESEARCH_SYNTHESIS_SYSTEM_PA` verbatim from prompt_architecture.pdf pages 7-8; `RESEARCH_SYNTHESIS_SYSTEM` untouched
+  - `src/lib/pdf-engine-v2/stages/1-research.ts` — added `runResearchSynthesis()` + `_hedgePricing()` helper; `runResearch()` untouched
+  - `src/lib/pdf-engine-v2/index.ts` — added PA branch in Research stage: `runResearchSynthesis` on `PA_PIPELINE=true`, legacy `runResearch` on `PA_PIPELINE=false`; `extractResearchConstraints()` skipped on PA path; dual-write to `state.research` for downstream compat
+  - `src/lib/pdf-engine-v2/stages/research-synthesis.test.ts` — **new file**: 21 tests, all passing
+- Test result: 21/21 new tests pass. 24/24 Phase A tests pass. 367 total tests: 366 pass, 1 pre-existing failure (`council-scorer.test.ts` — unrelated to Phase B, existed before commit `d2474db0`)
+- Typecheck: 0 new errors in pdf-engine-v2 changed files. Pre-existing errors in `council-scorer.test.ts` and `stages/7-pdf.tsx` unchanged.
+- Deviations from plan:
+  - Plan said "Update `RESEARCH_SYNTHESIS_SYSTEM` in `prompts.ts` to PA Stage 3 prompt" — instead ADDED `RESEARCH_SYNTHESIS_SYSTEM_PA` alongside the existing constant (brief explicitly requires no deletion). Comment added to clarify which prompt serves which path.
+  - `competitorSpecs` in minimal `researchConstraints` uses `undefined as unknown as number` for mass/cost to satisfy the existing `ResearchConstraints` type without inventing values — Phase D can address properly.
+
+### Rollback plan
+
+Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouched.
 
 ---
 
@@ -427,7 +454,9 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase A: COMPLETE (2026-05-08)
 - ✅ Phase A: council review DONE (2026-05-08) — all 6 BLOCKERs fixed (2026-05-08)
 - ❌ Phase A: PA council score comparison (PA=true vs PA=false within ±0.5) — deferred, requires live LLM run
-- ❌ Phase B-H: next up — Phase B unblocked
+- ✅ Phase B: COMPLETE (2026-05-08)
+- ❌ Phase B: council review — PENDING (main thread to dispatch)
+- ❌ Phase C-H: next up — Phase C unblocked
 - ❌ All council reviews (Phase B onwards)
 
 ---

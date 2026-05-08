@@ -1,6 +1,7 @@
-import type { ResearchResult, StageResult, ResearchConstraints } from '../types'
+import type { ResearchResult, StageResult, ResearchConstraints, ResearchSynthesis, ResearchCompetitor, ResearchSource } from '../types'
+import type { StructuredBriefJSON } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
-import { RESEARCH_SYNTHESIS_SYSTEM } from '../prompts'
+import { RESEARCH_SYNTHESIS_SYSTEM, RESEARCH_SYNTHESIS_SYSTEM_PA } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 
 // Stage 1: Research — uses RESEARCH_SYNTHESIS_SYSTEM from prompts.ts
@@ -144,6 +145,123 @@ async function callOpenRouter(systemPrompt: string, userContent: string, jsonFor
     clearTimeout(timeout)
     throw error
   }
+}
+
+/**
+ * PA Stage 3 — Research Synthesis (PA_PIPELINE=true only).
+ *
+ * Consumes a StructuredBriefJSON (from Phase A's runBriefParsing) and a
+ * Classification string. Returns a ResearchSynthesis conforming to the
+ * PA Stage 3 schema from prompt_architecture.pdf pages 7-8.
+ *
+ * Anti-invention rules (per PA doc, verbatim):
+ *   - Use real companies and real products. Do NOT invent competitor names or
+ *     fictional product specs.
+ *   - Any cited statistic MUST appear in claims_requiring_verification.
+ *   - source_grade_overall is always 'E' (LLM-generated synthesis).
+ *   - NEVER present any market claim as verified fact.
+ *   - Include 3-5 competitors with differentiation rationale.
+ *
+ * Does NOT delete runResearch() — that function remains the fallback on
+ * PA_PIPELINE=false.
+ */
+export async function runResearchSynthesis(
+  parsedBrief: StructuredBriefJSON,
+  classification: string,
+): Promise<StageResult<ResearchSynthesis>> {
+  const startTime = Date.now()
+  console.log('[research-synthesis] Starting PA Stage 3 Research Synthesis...')
+  console.log(`[research-synthesis] Classification: ${classification}`)
+
+  const userContent = JSON.stringify(parsedBrief, null, 2)
+
+  try {
+    console.log('[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...')
+    const rawJson = await callOpenRouter(RESEARCH_SYNTHESIS_SYSTEM_PA, userContent, true)
+
+    // ── Normalise competitors ───────────────────────────────────────────
+    const competitors: ResearchCompetitor[] = Array.isArray(rawJson.competitors)
+      ? rawJson.competitors.map((c: any): ResearchCompetitor => ({
+          company: sanitiseLlmOutput(c.company || ''),
+          product: sanitiseLlmOutput(c.product || ''),
+          // Anti-invention: if pricing is absent or a raw number with no hedging,
+          // wrap it to make clear it is approximate / unverified.
+          pricing: _hedgePricing(c.pricing),
+          key_specs: sanitiseLlmOutput(c.key_specs || ''),
+          strengths: Array.isArray(c.strengths)
+            ? c.strengths.map((s: any) => sanitiseLlmOutput(String(s)))
+            : [sanitiseLlmOutput(String(c.strengths || ''))].filter(Boolean),
+          weaknesses: Array.isArray(c.weaknesses)
+            ? c.weaknesses.map((w: any) => sanitiseLlmOutput(String(w)))
+            : [sanitiseLlmOutput(String(c.weaknesses || ''))].filter(Boolean),
+          differentiation_angle: sanitiseLlmOutput(c.differentiation_angle || ''),
+        }))
+      : []
+
+    // ── Normalise research_sources ──────────────────────────────────────
+    const VALID_SOURCE_TYPES = new Set(['standard', 'market_report', 'datasheet', 'competitor_spec', 'government_policy'])
+    const VALID_GRADES = new Set(['A', 'B', 'C', 'D', 'E'])
+
+    const research_sources: ResearchSource[] = Array.isArray(rawJson.research_sources)
+      ? rawJson.research_sources.map((s: any): ResearchSource => ({
+          title: sanitiseLlmOutput(s.title || ''),
+          type: VALID_SOURCE_TYPES.has(s.type) ? s.type : 'standard',
+          year: Number(s.year) > 1900 ? Number(s.year) : new Date().getFullYear(),
+          relevance: sanitiseLlmOutput(s.relevance || ''),
+          source_grade: VALID_GRADES.has(s.source_grade) ? s.source_grade : 'E',
+        }))
+      : []
+
+    // ── Normalise claims_requiring_verification ─────────────────────────
+    const claims_requiring_verification: string[] = Array.isArray(rawJson.claims_requiring_verification)
+      ? rawJson.claims_requiring_verification.map((c: any) => sanitiseLlmOutput(String(c)))
+      : []
+
+    const synthesis: ResearchSynthesis = {
+      market_context: sanitiseLlmOutput(rawJson.market_context || ''),
+      why_now: sanitiseLlmOutput(rawJson.why_now || ''),
+      competitors,
+      research_sources,
+      // Always E — per PA doc: LLM-generated synthesis is always grade E.
+      source_grade_overall: 'E',
+      claims_requiring_verification,
+    }
+
+    console.log(
+      `[research-synthesis] Complete: ${competitors.length} competitors, ` +
+      `${research_sources.length} sources, ` +
+      `${claims_requiring_verification.length} claims flagged for verification`
+    )
+
+    return { ok: true, data: synthesis, durationMs: Date.now() - startTime }
+  } catch (error: any) {
+    console.error('[research-synthesis] PA Stage 3 failed:', error)
+    return {
+      ok: false,
+      error: error.message || 'Unknown error during PA Research Synthesis',
+      durationMs: Date.now() - startTime,
+    }
+  }
+}
+
+/**
+ * Anti-invention helper: if pricing is a bare number string (no currency
+ * symbol, no hedging words), prepend "Listed at approximately" so the
+ * rendered report never presents an LLM guess as a verified price.
+ * If pricing is null, undefined, or empty, return a safe placeholder.
+ */
+function _hedgePricing(raw: unknown): string {
+  if (raw == null || raw === '') return 'Pricing not publicly listed'
+  const str = sanitiseLlmOutput(String(raw))
+  if (!str) return 'Pricing not publicly listed'
+  // Already hedged if it contains qualifiers
+  const HEDGE_WORDS = /approx|listed|estimated|from|starting|around|roughly|industry/i
+  if (HEDGE_WORDS.test(str)) return str
+  // If it looks like a bare number (possibly with currency prefix), add hedge
+  if (/^[£$€]?\d[\d,.]+/.test(str)) {
+    return `Listed at approximately ${str}`
+  }
+  return str
 }
 
 /**

@@ -10,7 +10,7 @@ import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
 import { runBriefGeneration, runBriefParsing } from './stages/0-brief-generation'
-import { runResearch, extractResearchConstraints } from './stages/1-research'
+import { runResearch, runResearchSynthesis, extractResearchConstraints } from './stages/1-research'
 import { runDecompose } from './stages/2-decompose'
 import { runSizeLayout } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
@@ -46,7 +46,7 @@ import { determineFeasibility } from './feasibility-gate'
 import { runBriefRevision } from './stages/3.5-brief-revision'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
-import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON } from './types'
+import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON, ResearchSynthesis } from './types'
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 
 export interface EngineResult {
@@ -348,66 +348,161 @@ export async function runPipeline(
     console.log('[pipeline] Training data failed, continuing without dossier:', (err as Error).message)
   }
 
-  // ── Stage 2: Research (uses raw founder text + training data) ──────
+  // ── Stage 2: Research ─────────────────────────────────────────────────
+  // Phase B: on PA_PIPELINE=true, use runResearchSynthesis() (PA Stage 3).
+  // On PA_PIPELINE=false, use the legacy runResearch() — unchanged.
   console.log('\n[pipeline] === Stage 2: Research ===')
-  const researchResult = await runResearch(briefText, {
-    trainingDataDossier: trainingDossier || options?.trainingDataDossier,
-  })
-  trackStage('research', researchResult)
-  if (!researchResult.ok || !researchResult.data) {
-    // A4 (2026-05-06): do not silently drop the PDF when a critical stage
-    // fails. Set pipelineError and fall through — the renderer produces a
-    // short error report with the brief echoed and the stage that failed.
-    state.pipelineError = {
-      stage: 'research',
-      message: researchResult.error || 'Research stage returned no data',
-      occurredAt: new Date().toISOString(),
-      recoverable: false,
-    }
-    console.error(`[pipeline] Research failed: ${researchResult.error}. Producing error PDF.`)
-    // J1a: emit scoring record so the dashboard shows this run as failed.
-    try {
-      recordScoringRun({
-        timestamp: new Date().toISOString(),
-        projectId: state.projectId,
-        briefLabel: deriveBriefLabel(state.projectId),
-        compound: -1,
-        rubric: -1,
-        councilAvg: null,
-        councilScored: 0,
-        councilFailed: 0,
-        sections: [],
-        formulaVersion: 'f7',
-        status: 'PIPELINE_ERROR',
-      })
-    } catch { /* scoring history is non-critical */ }
-    return await generateErrorPdf(state, stages, llmCalls, startTime)
-  }
-  state.research = researchResult.data
 
-  // BLOCKER-1 fix: runResearch() overwrites state.research entirely, destroying
-  // the syntheticDesignBrief the PA bridge wrote at Stage 1.  Re-merge the PA
-  // constraints now so Decompose/Sizing/BOM/Cost all see the parsed brief data.
-  if (PA_PIPELINE && _paSyntheticDesignBrief) {
-    state.research.designBrief = {
-      ...state.research.designBrief,
-      ...(_paSyntheticDesignBrief as any),
-      // Merge constraints: research may have added fields, PA constraints are authoritative
-      constraints: {
-        ...state.research.designBrief?.constraints,
-        ..._paSyntheticDesignBrief.constraints,
-      },
-    }
-    console.log('[pipeline] PA bridge: re-merged syntheticDesignBrief into state.research after Research overwrite')
-  }
+  if (PA_PIPELINE && state.parsedBrief) {
+    // ── PA path: runResearchSynthesis consumes StructuredBriefJSON ────────
+    console.log('[pipeline] PA path: running PA Stage 3 Research Synthesis...')
+    const synthResult = await runResearchSynthesis(state.parsedBrief, classification.productClass)
+    trackStage('research', synthResult)
 
-  // Extract constraints for downstream stages
-  const constraintsResult = await extractResearchConstraints(
-    state.research.report, 
-    JSON.stringify(state.research.designBrief || {})
-  )
-  state.researchConstraints = constraintsResult
-  console.log(`[pipeline] Extracted research constraints: ${constraintsResult.benchmarkPrices.length} benchmarks, ${constraintsResult.materialCosts.length} materials, ${constraintsResult.regulatoryCosts.length} regs, ${constraintsResult.competitorSpecs.length} competitors`)
+    if (!synthResult.ok || !synthResult.data) {
+      state.pipelineError = {
+        stage: 'research',
+        message: synthResult.error || 'PA Research Synthesis returned no data',
+        occurredAt: new Date().toISOString(),
+        recoverable: false,
+      }
+      console.error(`[pipeline] PA Research Synthesis failed: ${synthResult.error}. Producing error PDF.`)
+      try {
+        recordScoringRun({
+          timestamp: new Date().toISOString(),
+          projectId: state.projectId,
+          briefLabel: deriveBriefLabel(state.projectId),
+          compound: -1,
+          rubric: -1,
+          councilAvg: null,
+          councilScored: 0,
+          councilFailed: 0,
+          sections: [],
+          formulaVersion: 'f7',
+          status: 'PIPELINE_ERROR',
+        })
+      } catch { /* scoring history is non-critical */ }
+      return await generateErrorPdf(state, stages, llmCalls, startTime)
+    }
+
+    // Store the typed PA output on state
+    state.researchSynthesis = synthResult.data
+
+    // ── Dual-write: synthesise legacy state.research shape for backwards compat ──
+    // Downstream stages (Decompose, Sizing, BOM, etc.) read state.research.report
+    // and state.research.designBrief. They are NOT modified in Phase B.
+    // The PA constraints from parsedBrief (already in _paSyntheticDesignBrief)
+    // are the authoritative source; we merge the new synthesis narrative on top.
+    const synthesis = synthResult.data
+    const legacyReport =
+      synthesis.market_context + '\n\n' + synthesis.why_now
+
+    const legacyCompetitors = synthesis.competitors.map(c => ({
+      name: c.company,
+      product: c.product,
+      technicalSpecs: c.key_specs,
+      pricing: c.pricing,
+      strengths: c.strengths.join('; '),
+      weaknesses: c.weaknesses.join('; '),
+      differentiationAngle: c.differentiation_angle,
+    }))
+
+    // Preserve the designBrief built from parsedBrief (BLOCKER-1 guard)
+    const preservedDesignBrief = _paSyntheticDesignBrief
+      ? { ..._paSyntheticDesignBrief, competitors: legacyCompetitors }
+      : { competitors: legacyCompetitors }
+
+    state.research = {
+      report: legacyReport,
+      sources: synthesis.research_sources.map(s => ({ uri: '', title: s.title })),
+      designBrief: preservedDesignBrief as any,
+    }
+
+    console.log(
+      `[pipeline] PA Research Synthesis complete: ${synthesis.competitors.length} competitors, ` +
+      `${synthesis.claims_requiring_verification.length} claims flagged. ` +
+      `Dual-wrote to state.research for downstream compat.`
+    )
+
+    // Phase B: constraints already in parsedBrief — skip extractResearchConstraints().
+    // The constraints are in state.parsedBrief.constraints; legacy extractResearchConstraints
+    // (which calls the LLM again) is not needed on the PA path.
+    // Populate a minimal researchConstraints from parsedBrief for downstream safety.
+    const pb = state.parsedBrief
+    state.researchConstraints = {
+      benchmarkPrices: [],
+      materialCosts: [],
+      regulatoryCosts: [],
+      competitorSpecs: synthesis.competitors.map(c => ({
+        name: c.company,
+        mass: undefined as unknown as number,
+        cost: undefined as unknown as number,
+        keySpecs: [c.key_specs].filter(Boolean),
+      })),
+    }
+    console.log('[pipeline] PA path: skipped extractResearchConstraints() — constraints from parsedBrief')
+
+  } else {
+    // ── Legacy path: runResearch() unchanged ─────────────────────────────
+    const researchResult = await runResearch(briefText, {
+      trainingDataDossier: trainingDossier || options?.trainingDataDossier,
+    })
+    trackStage('research', researchResult)
+    if (!researchResult.ok || !researchResult.data) {
+      // A4 (2026-05-06): do not silently drop the PDF when a critical stage
+      // fails. Set pipelineError and fall through — the renderer produces a
+      // short error report with the brief echoed and the stage that failed.
+      state.pipelineError = {
+        stage: 'research',
+        message: researchResult.error || 'Research stage returned no data',
+        occurredAt: new Date().toISOString(),
+        recoverable: false,
+      }
+      console.error(`[pipeline] Research failed: ${researchResult.error}. Producing error PDF.`)
+      // J1a: emit scoring record so the dashboard shows this run as failed.
+      try {
+        recordScoringRun({
+          timestamp: new Date().toISOString(),
+          projectId: state.projectId,
+          briefLabel: deriveBriefLabel(state.projectId),
+          compound: -1,
+          rubric: -1,
+          councilAvg: null,
+          councilScored: 0,
+          councilFailed: 0,
+          sections: [],
+          formulaVersion: 'f7',
+          status: 'PIPELINE_ERROR',
+        })
+      } catch { /* scoring history is non-critical */ }
+      return await generateErrorPdf(state, stages, llmCalls, startTime)
+    }
+    state.research = researchResult.data
+
+    // BLOCKER-1 fix: runResearch() overwrites state.research entirely, destroying
+    // the syntheticDesignBrief the PA bridge wrote at Stage 1.  Re-merge the PA
+    // constraints now so Decompose/Sizing/BOM/Cost all see the parsed brief data.
+    if (_paSyntheticDesignBrief) {
+      state.research.designBrief = {
+        ...state.research.designBrief,
+        ...(_paSyntheticDesignBrief as any),
+        // Merge constraints: research may have added fields, PA constraints are authoritative
+        constraints: {
+          ...state.research.designBrief?.constraints,
+          ..._paSyntheticDesignBrief.constraints,
+        },
+      }
+      console.log('[pipeline] PA bridge: re-merged syntheticDesignBrief into state.research after Research overwrite')
+    }
+
+    // Extract constraints for downstream stages (legacy path only)
+    const constraintsResult = await extractResearchConstraints(
+      state.research.report,
+      JSON.stringify(state.research.designBrief || {})
+    )
+    state.researchConstraints = constraintsResult
+    console.log(`[pipeline] Extracted research constraints: ${constraintsResult.benchmarkPrices.length} benchmarks, ${constraintsResult.materialCosts.length} materials, ${constraintsResult.regulatoryCosts.length} regs, ${constraintsResult.competitorSpecs.length} competitors`)
+  }
 
   // ── Stage 3: Brief Generation (legacy path only) ─────────────────────
   // NOTED-3 fix: on PA_PIPELINE=true the parsedBrief already holds all
