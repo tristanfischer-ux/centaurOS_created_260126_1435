@@ -54,7 +54,7 @@ import { mapProductClassToIndustryDomain } from './lib/industry-domain'
 export interface EngineResult {
   ok: boolean
   state: PipelineState
-  stages: Array<{ name: string; ok: boolean; durationMs: number; error?: string }>
+  stages: Array<{ name: string; ok: boolean; durationMs: number; error?: string; skipped?: boolean; skipReason?: string }>
   gateResults?: Array<{ gate: string; passed: boolean; findings: string[] }>
   pdf?: { filename: string; base64: string; sizeBytes: number }
   totalDurationMs: number
@@ -256,6 +256,14 @@ export async function runPipeline(
     console.log(`[pipeline] ${name}: ${result.ok ? 'OK' : 'FAILED'} (${result.durationMs}ms)${result.error ? ` — ${result.error}` : ''}`)
   }
 
+  // BLOCKER-4 fix: emit a skip telemetry record so the dashboard shows
+  // "skipped — superseded by PA Stage X" instead of "never ran" when a
+  // legacy stage is gated off on the PA path.
+  function trackSkippedStage(name: string, reason: string) {
+    stages.push({ name, ok: true, durationMs: 0, skipped: true, skipReason: reason })
+    console.log(`[pipeline] ${name}: SKIPPED — ${reason}`)
+  }
+
   // A1 FIX (2026-05-06): gateResults must be function-scoped so the final
   // return statement can reference it on every code path (brief-invalid,
   // feasibility-RED, sizing-INFEASIBLE, and the happy path all end at the
@@ -355,6 +363,23 @@ export async function runPipeline(
     } catch (err) {
       console.log('[pipeline] Training data failed, continuing without dossier:', (err as Error).message)
     }
+  } else {
+    // BLOCKER-4 fix: emit skip record so dashboard shows "skipped — superseded by PA Stage 1+3"
+    // rather than "never ran". PA Stage 1 (Brief Parsing) + PA Stage 3 (Research Synthesis)
+    // together replace the Training Data Dump on the PA path.
+    trackSkippedStage('training_data', 'superseded by PA Stage 1 (Brief Parsing) + PA Stage 3 (Research Synthesis)')
+  }
+
+  // BLOCKER-3 fix: if PA_PIPELINE=true but Brief Parsing failed to populate
+  // state.parsedBrief, do NOT silently fall through to the legacy pipeline.
+  // Falling through creates an undocumented hybrid state where PA stage 1
+  // ran but legacy runDecompose receives undefined dossier — producing bad
+  // output with no clear failure signal.  Fail fast instead.
+  if (PA_PIPELINE && !state.parsedBrief) {
+    throw new Error(
+      'PA_PIPELINE=true but Brief Parsing failed to populate state.parsedBrief — ' +
+      'pipeline cannot continue safely. Check Brief Parsing stage logs for the root cause.'
+    )
   }
 
   // ── Stage 2: Research ─────────────────────────────────────────────────
@@ -568,6 +593,11 @@ export async function runPipeline(
   } else {
     console.warn('[pipeline] Brief generation failed, using raw text:', briefGenResult.error)
   }
+  } else {
+    // BLOCKER-4 fix: emit skip record so dashboard shows "skipped — superseded by PA Stage 1"
+    // rather than "never ran". PA Stage 1 (Brief Parsing) produces all structured constraints;
+    // the legacy Brief Generation LLM call is redundant on the PA path.
+    trackSkippedStage('brief_generation', 'superseded by PA Stage 1 (Brief Parsing)')
   } // end if (!PA_PIPELINE) — Brief Generation stage
 
   state.sourceAttributions.push(
