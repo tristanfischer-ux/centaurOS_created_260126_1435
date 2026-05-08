@@ -308,12 +308,12 @@ Required output schema:
     "unit_cost_ceiling": { "value": number|null, "currency": "GBP"|"USD"|"EUR", "source": "user"|"inferred" },
     "max_mass_kg": { "value": number|null, "source": "user"|"inferred" },
     "max_dimensions_mm": { "w": number|null, "d": number|null, "h": number|null, "source": "user"|"inferred" },
-    "target_performance": { "key_metric": string, "value": number, "unit": string, "source": "user"|"inferred" },
+    "target_performance": { "key_metric": string|null, "value": number|null, "unit": string|null, "source": "user"|"inferred" },
     "target_process": { "value": string|null, "source": "user"|"inferred" },
     "target_material": { "value": string|null, "source": "user"|"inferred" },
     "batch_size": { "value": number|null, "source": "user"|"inferred" },
     "design_life": { "value": string|null, "source": "user"|"inferred" },
-    "operating_environment": { "temp_min_c": number, "temp_max_c": number, "source": "user"|"inferred" },
+    "operating_environment": { "temp_min_c": number|null, "temp_max_c": number|null, "source": "user"|"inferred" },
     "safety_standards": [{ "standard": string, "source": "user"|"inferred" }],
     "additional_constraints": [{ "description": string, "source": "user"|"inferred" }]
   },
@@ -325,8 +325,9 @@ Rules:
 - If the user states a constraint explicitly, source = "user".
 - If you infer a constraint from context (e.g. ISO container dimensions from "40ft container"), source = "inferred".
 - If a field is genuinely unknown and cannot be reasonably inferred, set value to null and add to missing_mandatory_fields.
-- NEVER invent performance numbers. If the user says "efficient" but doesn't give a COP or efficiency target, the value is null.
-- Dimensions: always in mm. Mass: always in kg. Cost: preserve the user's stated currency.`
+- NEVER invent performance numbers. If the user says "efficient" but doesn't give a COP or efficiency target, the value is null. Example: { "key_metric": "efficiency", "value": null, "unit": "COP", "source": "inferred" }
+- Dimensions: always in mm. Mass: always in kg. Cost: preserve the user's stated currency.
+- operating_environment temps may be null if the user gives no operating range; do not invent a range.`
 
 /**
  * PA Stage 1 — Brief Parsing.
@@ -355,7 +356,7 @@ export async function runBriefParsing(
         temperature: 0.1,
         messages: [
           { role: 'system', content: BRIEF_PARSING_SYSTEM_PROMPT },
-          { role: 'user', content: `[User's natural-language brief text goes here]\n\n${rawBriefText}` },
+          { role: 'user', content: rawBriefText },
         ],
       }),
     }, 120000)
@@ -388,6 +389,26 @@ export async function runBriefParsing(
     // Normalise missing_mandatory_fields to array
     if (!Array.isArray(parsed.missing_mandatory_fields)) {
       parsed.missing_mandatory_fields = []
+    }
+
+    // BLOCKER-2 fix: initialise constraints object BEFORE any field-level
+    // normalisation. If the LLM omits the entire constraints block the optional
+    // chaining in the guards below is safely true, but the subsequent assignment
+    // (parsed.constraints.safety_standards = []) would throw TypeError on undefined.
+    if (!parsed.constraints) {
+      parsed.constraints = {
+        unit_cost_ceiling: { value: null, currency: 'GBP', source: 'inferred' },
+        max_mass_kg: { value: null, source: 'inferred' },
+        max_dimensions_mm: { w: null, d: null, h: null, source: 'inferred' },
+        target_performance: { key_metric: null, value: null, unit: null, source: 'inferred' },
+        target_process: { value: null, source: 'inferred' },
+        target_material: { value: null, source: 'inferred' },
+        batch_size: { value: null, source: 'inferred' },
+        design_life: { value: null, source: 'inferred' },
+        operating_environment: { temp_min_c: null, temp_max_c: null, source: 'inferred' },
+        safety_standards: [],
+        additional_constraints: [],
+      } as any
     }
 
     // Normalise safety_standards and additional_constraints to arrays

@@ -287,4 +287,189 @@ describe('runBriefParsing — PA Stage 1', () => {
       expect(Array.isArray(result.data?.missing_mandatory_fields)).toBe(true)
     })
   })
+
+  // ── BLOCKER-2 fix: LLM omits entire constraints object ────────────────────
+
+  describe('BLOCKER-2: no-constraints LLM output', () => {
+    it('does not throw when LLM omits the constraints object entirely', async () => {
+      // Simulate an LLM that returns a valid top-level structure but omits constraints.
+      // Before the fix this crashed with:
+      //   TypeError: Cannot set property 'safety_standards' of undefined
+      const responseNoConstraints = {
+        ...BESS_PARSED_RESPONSE,
+        constraints: undefined as any,
+      }
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(responseNoConstraints))
+      const result = await runBriefParsing(BESS_BRIEF)
+      // Should not throw, should return ok=true with a default constraints object
+      expect(result.ok).toBe(true)
+      expect(result.data).toBeDefined()
+    })
+
+    it('initialises safety_standards to [] when constraints is missing', async () => {
+      const responseNoConstraints = { ...BESS_PARSED_RESPONSE, constraints: undefined as any }
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(responseNoConstraints))
+      const result = await runBriefParsing(BESS_BRIEF)
+      expect(result.ok).toBe(true)
+      expect(Array.isArray(result.data?.constraints.safety_standards)).toBe(true)
+    })
+
+    it('initialises additional_constraints to [] when constraints is missing', async () => {
+      const responseNoConstraints = { ...BESS_PARSED_RESPONSE, constraints: undefined as any }
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(responseNoConstraints))
+      const result = await runBriefParsing(BESS_BRIEF)
+      expect(result.ok).toBe(true)
+      expect(Array.isArray(result.data?.constraints.additional_constraints)).toBe(true)
+    })
+  })
+
+  // ── BLOCKER-4/6 fix: target_performance with null value parses correctly ──
+
+  describe('BLOCKER-4/6: target_performance null value (anti-invention rule)', () => {
+    it('accepts target_performance.value = null without coercing to a number', async () => {
+      // The prompt now declares value as number|null — this verifies normalisation
+      // doesn't accidentally drop or invent a number.
+      const responseNullPerf = {
+        ...BESS_PARSED_RESPONSE,
+        constraints: {
+          ...BESS_PARSED_RESPONSE.constraints,
+          target_performance: {
+            key_metric: 'efficiency',
+            value: null,
+            unit: 'COP',
+            source: 'inferred' as const,
+          },
+        },
+      }
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(responseNullPerf))
+      const result = await runBriefParsing(BESS_BRIEF)
+      expect(result.ok).toBe(true)
+      expect(result.data?.constraints.target_performance.value).toBeNull()
+      expect(result.data?.constraints.target_performance.key_metric).toBe('efficiency')
+    })
+
+    it('accepts target_performance.key_metric = null', async () => {
+      const responseNullMetric = {
+        ...BESS_PARSED_RESPONSE,
+        constraints: {
+          ...BESS_PARSED_RESPONSE.constraints,
+          target_performance: {
+            key_metric: null,
+            value: null,
+            unit: null,
+            source: 'inferred' as const,
+          },
+        },
+      }
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(responseNullMetric))
+      const result = await runBriefParsing(BESS_BRIEF)
+      expect(result.ok).toBe(true)
+      expect(result.data?.constraints.target_performance.value).toBeNull()
+      expect(result.data?.constraints.target_performance.key_metric).toBeNull()
+    })
+  })
+
+  // ── BLOCKER-5 fix: USD/EUR cost ceiling is handled, not silently dropped ──
+
+  describe('BLOCKER-5: non-GBP cost ceiling', () => {
+    it('does not silently drop a USD cost ceiling', async () => {
+      const responseUsd = {
+        ...BESS_PARSED_RESPONSE,
+        constraints: {
+          ...BESS_PARSED_RESPONSE.constraints,
+          unit_cost_ceiling: { value: 250000, currency: 'USD' as const, source: 'user' as const },
+        },
+      }
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(responseUsd))
+      const result = await runBriefParsing(BESS_BRIEF)
+      // runBriefParsing just parses — it returns the raw parsed JSON unchanged.
+      // The currency preservation is at the index.ts bridge layer.
+      // Verify that USD ceiling survives the parse round-trip.
+      expect(result.ok).toBe(true)
+      expect(result.data?.constraints.unit_cost_ceiling.currency).toBe('USD')
+      expect(result.data?.constraints.unit_cost_ceiling.value).toBe(250000)
+    })
+
+    it('does not silently drop a EUR cost ceiling', async () => {
+      const responseEur = {
+        ...BESS_PARSED_RESPONSE,
+        constraints: {
+          ...BESS_PARSED_RESPONSE.constraints,
+          unit_cost_ceiling: { value: 200000, currency: 'EUR' as const, source: 'user' as const },
+        },
+      }
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(responseEur))
+      const result = await runBriefParsing(BESS_BRIEF)
+      expect(result.ok).toBe(true)
+      expect(result.data?.constraints.unit_cost_ceiling.currency).toBe('EUR')
+      expect(result.data?.constraints.unit_cost_ceiling.value).toBe(200000)
+    })
+  })
+
+  // ── NOTED-1 fix: no placeholder in user message ───────────────────────────
+
+  describe('NOTED-1: placeholder stripped from user message', () => {
+    it('does not include the literal placeholder in the user message', async () => {
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(BESS_PARSED_RESPONSE))
+      await runBriefParsing(BESS_BRIEF)
+      const [, init] = mockFetch.mock.calls[0]
+      const body = JSON.parse(init.body)
+      const userContent = body.messages[1].content as string
+      expect(userContent).not.toContain("[User's natural-language brief text goes here]")
+      expect(userContent).toBe(BESS_BRIEF)
+    })
+  })
+})
+
+// ── BLOCKER-3 tests: revision loop updates state.parsedBrief ─────────────────
+// These tests exercise index.ts logic via a lightweight stub — they verify that
+// after runBriefParsing is called post-revision the new parsedBrief is used.
+// Because index.ts is an orchestrator (difficult to unit test in isolation without
+// mocking every stage), we test the re-parse call behaviour via the parser itself.
+
+describe('BLOCKER-3: parsedBrief re-parse after revision', () => {
+  const mockFetch2 = jest.fn()
+
+  beforeEach(() => {
+    jest.clearAllMocks()
+    global.fetch = mockFetch2 as unknown as typeof fetch
+    process.env.OPENROUTER_API_KEY = 'test-key'
+  })
+
+  afterEach(() => {
+    delete process.env.OPENROUTER_API_KEY
+  })
+
+  it('runBriefParsing called on revised text returns updated missing_mandatory_fields', async () => {
+    // Simulate pre-revision parse: cost ceiling missing
+    const preRevisionParsed: StructuredBriefJSON = {
+      ...THIN_BRIEF_PARSED_RESPONSE,
+      missing_mandatory_fields: ['unit_cost_ceiling', 'max_mass_kg'],
+    }
+    // Simulate post-revision parse: cost ceiling now filled
+    const postRevisionParsed: StructuredBriefJSON = {
+      ...THIN_BRIEF_PARSED_RESPONSE,
+      missing_mandatory_fields: ['max_mass_kg'],
+      constraints: {
+        ...THIN_BRIEF_PARSED_RESPONSE.constraints,
+        unit_cost_ceiling: { value: 5000, currency: 'GBP', source: 'user' },
+      },
+    }
+
+    // First call returns pre-revision, second returns post-revision
+    mockFetch2
+      .mockResolvedValueOnce(makeOpenRouterResponse(preRevisionParsed))
+      .mockResolvedValueOnce(makeOpenRouterResponse(postRevisionParsed))
+
+    const firstResult = await runBriefParsing('I want to build a drone')
+    expect(firstResult.ok).toBe(true)
+    expect(firstResult.data?.missing_mandatory_fields).toContain('unit_cost_ceiling')
+
+    // After revision, re-run the parser on the revised text
+    const revisedResult = await runBriefParsing('I want to build a drone with cost ceiling £5000')
+    expect(revisedResult.ok).toBe(true)
+    // Post-revision parsedBrief no longer lists unit_cost_ceiling as missing
+    expect(revisedResult.data?.missing_mandatory_fields).not.toContain('unit_cost_ceiling')
+    expect(revisedResult.data?.constraints.unit_cost_ceiling.value).toBe(5000)
+  })
 })

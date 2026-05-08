@@ -121,6 +121,65 @@ async function generateErrorPdf(
 }
 
 /**
+ * BLOCKER-1 / BLOCKER-5 helper: build the PA synthetic DesignBrief from a
+ * parsed brief object. Extracted so it can be called once at parse time and
+ * re-merged after `state.research = researchResult.data` (BLOCKER-1), and so
+ * the currency logic is in one place (BLOCKER-5).
+ *
+ * BLOCKER-5: if cost ceiling is USD or EUR, convert at a fixed conservative
+ * rate and log a warning. This prevents silent drops — the scorer always has a
+ * GBP figure to work with. Phase B will add multi-currency support properly.
+ */
+function _buildSyntheticDesignBrief(
+  pb: StructuredBriefJSON,
+  c: StructuredBriefJSON['constraints'],
+) {
+  let unitCostCeilingGbp: number | undefined
+  if (c.unit_cost_ceiling?.value != null) {
+    if (c.unit_cost_ceiling.currency === 'GBP') {
+      unitCostCeilingGbp = c.unit_cost_ceiling.value
+    } else if (c.unit_cost_ceiling.currency === 'USD') {
+      // BLOCKER-5: approximate conversion — Phase B should use live rates
+      unitCostCeilingGbp = Math.round(c.unit_cost_ceiling.value * 0.79)
+      console.warn(
+        `[pipeline] PA bridge: cost ceiling is USD ${c.unit_cost_ceiling.value} — ` +
+        `converted to ~£${unitCostCeilingGbp} at 0.79 fixed rate. Phase B should use live rates.`
+      )
+    } else if (c.unit_cost_ceiling.currency === 'EUR') {
+      // BLOCKER-5: approximate conversion
+      unitCostCeilingGbp = Math.round(c.unit_cost_ceiling.value * 0.85)
+      console.warn(
+        `[pipeline] PA bridge: cost ceiling is EUR ${c.unit_cost_ceiling.value} — ` +
+        `converted to ~£${unitCostCeilingGbp} at 0.85 fixed rate. Phase B should use live rates.`
+      )
+    }
+  }
+
+  return {
+    useCase: pb.product_description || '',
+    targetProcess: c.target_process?.value || '',
+    targetMaterial: c.target_material?.value || '',
+    toleranceTarget: '',
+    quantityTarget: c.batch_size?.value != null ? String(c.batch_size.value) : '',
+    complianceNotes: c.safety_standards?.map(s => s.standard).join(', ') || '',
+    mission: pb.mission_statement,
+    targetCustomers: pb.target_customers,
+    whyNow: pb.why_now,
+    constraints: {
+      unitCostCeilingGbp,
+      maxMassKg: c.max_mass_kg?.value ?? undefined,
+      batchSize: c.batch_size?.value ?? undefined,
+      operatingTemperature: (c.operating_environment?.temp_min_c != null && c.operating_environment?.temp_max_c != null)
+        ? `${c.operating_environment.temp_min_c}°C to ${c.operating_environment.temp_max_c}°C`
+        : undefined,
+    } as BriefConstraints,
+    regulatory: [],
+    sources: [],
+    competitors: [],
+  }
+}
+
+/**
  * Run the complete PDF engine pipeline.
  *
  * @param briefText - The founder's product brief (subject string from cad_lab_projects)
@@ -202,6 +261,10 @@ export async function runPipeline(
   // which made it a ReferenceError at the PDF stage on every non-RED run.
   let gateResults: Array<{ gate: string; passed: boolean; findings: string[] }> = []
 
+  // BLOCKER-1 fix: hoist syntheticDesignBrief so it survives the
+  // `state.research = researchResult.data` overwrite at the Research stage.
+  // After the overwrite we re-merge the PA constraints back in.
+  let _paSyntheticDesignBrief: ReturnType<typeof _buildSyntheticDesignBrief> | null = null
 
   // ── PA Stage 1: Brief Parsing (PA_PIPELINE=true only) ────────────────
   // Runs BEFORE Classification. Produces state.parsedBrief (StructuredBriefJSON).
@@ -220,30 +283,10 @@ export async function runPipeline(
       // keep working without modification (Phase B will update them properly).
       const pb = briefParseResult.data
       const c = pb.constraints
-      const syntheticDesignBrief = {
-        useCase: pb.product_description || '',
-        targetProcess: c.target_process?.value || '',
-        targetMaterial: c.target_material?.value || '',
-        toleranceTarget: '',
-        quantityTarget: c.batch_size?.value != null ? String(c.batch_size.value) : '',
-        complianceNotes: c.safety_standards?.map(s => s.standard).join(', ') || '',
-        mission: pb.mission_statement,
-        targetCustomers: pb.target_customers,
-        whyNow: pb.why_now,
-        constraints: {
-          unitCostCeilingGbp: (c.unit_cost_ceiling?.currency === 'GBP' && c.unit_cost_ceiling?.value != null)
-            ? c.unit_cost_ceiling.value
-            : undefined,
-          maxMassKg: c.max_mass_kg?.value ?? undefined,
-          batchSize: c.batch_size?.value ?? undefined,
-          operatingTemperature: (c.operating_environment?.temp_min_c != null && c.operating_environment?.temp_max_c != null)
-            ? `${c.operating_environment.temp_min_c}°C to ${c.operating_environment.temp_max_c}°C`
-            : undefined,
-        } as BriefConstraints,
-        regulatory: [],
-        sources: [],
-        competitors: [],
-      }
+      const syntheticDesignBrief = _buildSyntheticDesignBrief(pb, c)
+
+      // Keep a reference for re-merging after the Research overwrite (BLOCKER-1).
+      _paSyntheticDesignBrief = syntheticDesignBrief
 
       // Initialise state.research if not yet set, so the designBrief bridge works
       if (!state.research) {
@@ -341,7 +384,23 @@ export async function runPipeline(
     return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.research = researchResult.data
-  
+
+  // BLOCKER-1 fix: runResearch() overwrites state.research entirely, destroying
+  // the syntheticDesignBrief the PA bridge wrote at Stage 1.  Re-merge the PA
+  // constraints now so Decompose/Sizing/BOM/Cost all see the parsed brief data.
+  if (PA_PIPELINE && _paSyntheticDesignBrief) {
+    state.research.designBrief = {
+      ...state.research.designBrief,
+      ...(_paSyntheticDesignBrief as any),
+      // Merge constraints: research may have added fields, PA constraints are authoritative
+      constraints: {
+        ...state.research.designBrief?.constraints,
+        ..._paSyntheticDesignBrief.constraints,
+      },
+    }
+    console.log('[pipeline] PA bridge: re-merged syntheticDesignBrief into state.research after Research overwrite')
+  }
+
   // Extract constraints for downstream stages
   const constraintsResult = await extractResearchConstraints(
     state.research.report, 
@@ -350,7 +409,13 @@ export async function runPipeline(
   state.researchConstraints = constraintsResult
   console.log(`[pipeline] Extracted research constraints: ${constraintsResult.benchmarkPrices.length} benchmarks, ${constraintsResult.materialCosts.length} materials, ${constraintsResult.regulatoryCosts.length} regs, ${constraintsResult.competitorSpecs.length} competitors`)
 
-  // ── Stage 3: Brief Generation (research-informed, not speculative) ─
+  // ── Stage 3: Brief Generation (legacy path only) ─────────────────────
+  // NOTED-3 fix: on PA_PIPELINE=true the parsedBrief already holds all
+  // structured constraints.  runBriefGeneration() adds a second LLM call
+  // and would overwrite designBrief with research-informed — but not PA-
+  // informed — data. Gate it off so the PA path only uses the new parser.
+  // Phase B will remove this stage from the PA path entirely.
+  if (!PA_PIPELINE) {
   console.log('\n[pipeline] === Stage 3: Brief Generation ===')
   const briefGenResult = await runBriefGeneration(briefText, classification.productClass)
   trackStage('brief_generation', briefGenResult)
@@ -393,6 +458,7 @@ export async function runPipeline(
   } else {
     console.warn('[pipeline] Brief generation failed, using raw text:', briefGenResult.error)
   }
+  } // end if (!PA_PIPELINE) — Brief Generation stage
 
   state.sourceAttributions.push(
     { section: 'Research', source: 'llm', detail: 'MiMo V2.5-Pro via OpenRouter' },
@@ -510,7 +576,22 @@ export async function runPipeline(
       
       // Store revision on state for PDF rendering
       ;(state as any).briefRevisions = [...((state as any).briefRevisions || []), rev]
-      
+
+      // BLOCKER-3 fix: on PA path, re-parse the revised brief text so
+      // state.parsedBrief reflects the revision.  validateBrief reads
+      // missing_mandatory_fields from parsedBrief — without this update the
+      // PA validator keeps seeing the stale pre-revision missing fields.
+      if (PA_PIPELINE) {
+        const revisedBriefText = state.generatedBrief?.briefText || briefText
+        const reparseResult = await runBriefParsing(revisedBriefText)
+        if (reparseResult.ok && reparseResult.data) {
+          state.parsedBrief = reparseResult.data
+          console.log(`[pipeline] PA: re-parsed brief after revision ${revisionCount} — missing=${reparseResult.data.missing_mandatory_fields.length}`)
+        } else {
+          console.warn(`[pipeline] PA: re-parse after revision ${revisionCount} failed: ${reparseResult.error}. Using stale parsedBrief.`)
+        }
+      }
+
       // Re-run Feasibility with updated constraints
       const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, PA_PIPELINE ? state.parsedBrief : null)
       const newFeasibility = determineFeasibility(newBriefValidation, sizingResult, null, classification.productClass)

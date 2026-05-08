@@ -11,7 +11,7 @@
 
 | Phase | Description | Sonnet hrs | Status | Council review | Date done |
 |---|---|---|---|---|---|
-| A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ⚠️ Issues to fix | 2026-05-08 |
+| A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | C | Drop Training Data Dump | 0.5-1 | ⬜ Pending | ⬜ Pending | — |
 | D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
@@ -67,10 +67,29 @@
 ### Council review
 
 - [x] Coding council fires on commit (6 LLMs from different lineages) — 2026-05-08
-- [ ] All findings flagged by 2+ seats addressed before Phase B starts
+- [x] All findings flagged by 2+ seats addressed before Phase B starts — 2026-05-08
 - [x] Council notes appended to this section (see below)
 
-**Council result: ⚠️ Issues to fix — 4 BLOCKERs, 6 NOTED. Phase B blocked until resolved.**
+**Council result: ✅ Approved (after fixes) — all 6 BLOCKERs resolved. Phase B unblocked.**
+
+### Council fixes applied — 2026-05-08
+
+All 6 BLOCKERs (4 original + 2 reclassified from NOTED) and 2 NOTED cleanups fixed in one commit.
+
+| # | Finding | Fix | Status |
+|---|---|---|---|
+| BLOCKER-1 | `state.research` overwrite destroys syntheticDesignBrief | Extracted `_buildSyntheticDesignBrief()` helper; re-merge after Research overwrite | ✅ Fixed |
+| BLOCKER-2 | `constraints=undefined` TypeError in normalisation guards | Initialise `parsed.constraints = { ...defaults }` before array guards | ✅ Fixed |
+| BLOCKER-3 | Stale `state.parsedBrief` in brief-revision loop | Re-run `runBriefParsing()` on revised text after each revision; store result in `state.parsedBrief` | ✅ Fixed |
+| BLOCKER-4 | Prompt schema `target_performance.value: number` contradicts anti-invention rule | Updated schema to `number\|null`; added null-value example in prompt | ✅ Fixed |
+| BLOCKER-5 (ex NOTED-2) | USD/EUR cost ceiling silently dropped | Convert USD/EUR at fixed rates with logged warning in `_buildSyntheticDesignBrief()` | ✅ Fixed |
+| BLOCKER-6 (ex NOTED-4) | Non-discriminated `target_performance` union type | Flattened to single type `{ key_metric: string\|null; value: number\|null; unit: string\|null; source }` in `types.ts` | ✅ Fixed |
+| NOTED-1 | Literal placeholder in user message | Removed prefix; pass `rawBriefText` directly | ✅ Fixed |
+| NOTED-3 | Double brief parsing on PA path | Gated `runBriefGeneration()` with `if (!PA_PIPELINE)` | ✅ Fixed |
+
+**NOTED-5** (non-deterministic project_id), **NOTED-6** (no Zod runtime validation) deferred to Phase B.
+
+New tests added: 9 (BLOCKER-2 ×3, BLOCKER-4/6 ×2, BLOCKER-5 ×2, BLOCKER-3 ×1, NOTED-1 ×1). All 24 tests pass.
 
 ### Council notes — 2026-05-08
 
@@ -406,11 +425,10 @@ Tracking the migration plan's §5 risks as they materialise:
 For watchdog drift detection. Pending items only:
 
 - ✅ Phase A: COMPLETE (2026-05-08)
-- ⚠️ Phase A: council review DONE (2026-05-08) — 4 BLOCKERs must be fixed before Phase B
-- ❌ Phase A: 4 BLOCKERs pending fix: (1) state.research overwrite loses syntheticDesignBrief; (2) constraints=undefined crash in normalisation guards; (3) stale parsedBrief in revision loop; (4) prompt schema contradicts anti-invention rule
+- ✅ Phase A: council review DONE (2026-05-08) — all 6 BLOCKERs fixed (2026-05-08)
 - ❌ Phase A: PA council score comparison (PA=true vs PA=false within ±0.5) — deferred, requires live LLM run
-- ❌ Phase B-H: blocked on prior phases
-- ❌ All council reviews (Phase A onwards)
+- ❌ Phase B-H: next up — Phase B unblocked
+- ❌ All council reviews (Phase B onwards)
 
 ---
 

@@ -13,16 +13,20 @@ export interface StructuredBriefDimensions {
   source: 'user' | 'inferred'
 }
 
+// BLOCKER-6 fix: flattened single shape with nullable value — no discriminated
+// union needed. Matches the prompt schema (BLOCKER-4) and eliminates any-coercion
+// silent drops when narrowing the former undiscriminated union.
 export interface StructuredBriefPerformance {
-  key_metric: string
-  value: number
-  unit: string
+  key_metric: string | null
+  value: number | null
+  unit: string | null
   source: 'user' | 'inferred'
 }
 
+// BLOCKER-4 fix: temp values are nullable — LLM must not invent them.
 export interface StructuredBriefOperatingEnvironment {
-  temp_min_c: number
-  temp_max_c: number
+  temp_min_c: number | null
+  temp_max_c: number | null
   source: 'user' | 'inferred'
 }
 
@@ -53,12 +57,8 @@ export interface StructuredBriefJSON {
       source: 'user' | 'inferred'
     }
     max_dimensions_mm: StructuredBriefDimensions
-    target_performance: StructuredBriefPerformance & { value: number | null } | {
-      key_metric: string | null
-      value: number | null
-      unit: string | null
-      source: 'user' | 'inferred'
-    }
+    // BLOCKER-6 fix: single flat type, no union. value is nullable — anti-invention rule.
+    target_performance: StructuredBriefPerformance
     target_process: {
       value: string | null
       source: 'user' | 'inferred'
