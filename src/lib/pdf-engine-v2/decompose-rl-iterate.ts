@@ -287,13 +287,44 @@ async function callLLM(model: string, system: string, user: string, maxTokens: n
 
 function extractJSON(text: string): any {
   let s = text.replace(/^\s*```json\s*/m, '').replace(/```\s*$/m, '').trim()
-  const first = s.indexOf('{')
+  
+  const firstObj = s.indexOf('{')
   const firstArr = s.indexOf('[')
-  const start = firstArr >= 0 && (firstArr < first || first < 0) ? firstArr : first
-  const lastObj = s.lastIndexOf('}')
-  const lastArr = s.lastIndexOf(']')
-  const end = Math.max(lastObj, lastArr)
-  if (start >= 0 && end > start) s = s.slice(start, end + 1)
+  let start = -1
+  if (firstObj >= 0 && firstArr >= 0) start = Math.min(firstObj, firstArr)
+  else if (firstObj >= 0) start = firstObj
+  else if (firstArr >= 0) start = firstArr
+
+  if (start >= 0) {
+    const isArray = s[start] === '['
+    const openChar = isArray ? '[' : '{'
+    const closeChar = isArray ? ']' : '}'
+    
+    let count = 0
+    let end = -1
+    let inString = false
+    let escape = false
+    
+    for (let i = start; i < s.length; i++) {
+      const char = s[i]
+      if (escape) { escape = false; continue }
+      if (char === '\\') { escape = true; continue }
+      if (char === '"') { inString = !inString; continue }
+      if (!inString) {
+        if (char === openChar) count++
+        else if (char === closeChar) {
+          count--
+          if (count === 0) {
+            end = i
+            break
+          }
+        }
+      }
+    }
+    
+    if (end > start) s = s.slice(start, end + 1)
+  }
+  
   try { return JSON.parse(s) } catch { return null }
 }
 

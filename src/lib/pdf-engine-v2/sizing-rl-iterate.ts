@@ -47,8 +47,6 @@ async function main() {
     console.log(`[sizing-rl] Loaded ${modules.length} modules from ${modulesPath}`)
   } else {
     console.log('[sizing-rl] Generating decomposition...')
-    const { runBriefGeneration } = await import(join(__dirname, 'stages/0-brief-generation'))
-    const briefGenResult = await runBriefGeneration(originalBrief, 'unknown')
     // Use the decompose RL to get modules
     modules = await generateDecomposition(originalBrief, research)
     console.log(`[sizing-rl] Generated ${modules.length} modules`)
@@ -89,7 +87,7 @@ async function main() {
   }
   
   const final = history[history.length - 1]
-  const best = history.reduce((a, b) => a.overall > b.overall ? a : b)
+  const best = history.length ? history.reduce((a, b) => a.overall > b.overall ? a : b) : { overall: 0 }
   console.log(`\n[sizing-rl] === Summary ===`)
   console.log(`[sizing-rl] Final: ${final?.overall}/10, Best: ${best.overall}/10`)
   console.log(`[sizing-rl] Iterations: ${history.length}`)
@@ -237,8 +235,19 @@ Return JSON: {"changes": [{"what": "description", "reasoning": "why this helps"}
   return extractJSON(raw) || { changes: [] }
 }
 
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    return response
+  } finally {
+    clearTimeout(timer)
+  }
+}
+
 async function callLLM(model: string, system: string, user: string, maxTokens: number = 16384, temperature: number = 0.3): Promise<string> {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -253,8 +262,7 @@ async function callLLM(model: string, system: string, user: string, maxTokens: n
         { role: 'user', content: user },
       ],
     }),
-    signal: AbortSignal.timeout(180000),
-  })
+  }, 180000)
   
   if (!response.ok) throw new Error(`API ${response.status}`)
   const json = await response.json()
@@ -263,13 +271,44 @@ async function callLLM(model: string, system: string, user: string, maxTokens: n
 
 function extractJSON(text: string): any {
   let s = text.replace(/^\s*```json\s*/m, '').replace(/```\s*$/m, '').trim()
-  const first = s.indexOf('{')
+  
+  const firstObj = s.indexOf('{')
   const firstArr = s.indexOf('[')
-  const start = firstArr >= 0 && (firstArr < first || first < 0) ? firstArr : first
-  const lastObj = s.lastIndexOf('}')
-  const lastArr = s.lastIndexOf(']')
-  const end = Math.max(lastObj, lastArr)
-  if (start >= 0 && end > start) s = s.slice(start, end + 1)
+  let start = -1
+  if (firstObj >= 0 && firstArr >= 0) start = Math.min(firstObj, firstArr)
+  else if (firstObj >= 0) start = firstObj
+  else if (firstArr >= 0) start = firstArr
+
+  if (start >= 0) {
+    const isArray = s[start] === '['
+    const openChar = isArray ? '[' : '{'
+    const closeChar = isArray ? ']' : '}'
+    
+    let count = 0
+    let end = -1
+    let inString = false
+    let escape = false
+    
+    for (let i = start; i < s.length; i++) {
+      const char = s[i]
+      if (escape) { escape = false; continue }
+      if (char === '\\') { escape = true; continue }
+      if (char === '"') { inString = !inString; continue }
+      if (!inString) {
+        if (char === openChar) count++
+        else if (char === closeChar) {
+          count--
+          if (count === 0) {
+            end = i
+            break
+          }
+        }
+      }
+    }
+    
+    if (end > start) s = s.slice(start, end + 1)
+  }
+  
   try { return JSON.parse(s) } catch { return null }
 }
 

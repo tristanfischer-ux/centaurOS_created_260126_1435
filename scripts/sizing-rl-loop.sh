@@ -35,7 +35,7 @@ for i in "${!BRIEFS[@]}"; do
 done
 
 for pid in "${PIDS[@]}"; do
-  wait "$pid" 2>/dev/null || true
+  wait "$pid"
 done
 
 echo ""

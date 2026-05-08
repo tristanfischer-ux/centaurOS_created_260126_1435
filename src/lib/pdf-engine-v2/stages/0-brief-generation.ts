@@ -93,6 +93,50 @@ Also extract structured data as JSON at the end:
  * Parses the 5-section template to find objectives, constraints, etc.
  */
 function extractFieldsFromText(text: string, fields: any): void {
+  // Extract project name and purpose
+  const titleMatch = text.match(/# Project Brief:\s*(.+)/i)
+  if (titleMatch) {
+    const parts = titleMatch[1].split('+').map(s => s.trim())
+    if (parts.length > 0) fields.projectName = parts[0]
+    if (parts.length > 1) fields.purpose = parts.slice(1).join(' + ')
+  }
+
+  const purposeMatch = text.match(/## 1\. Project Purpose\s*([\s\S]*?)(?=\n## |\n*$)/)
+  if (purposeMatch && !fields.purpose) {
+    fields.purpose = purposeMatch[1].trim()
+  }
+
+  // Extract scope
+  const scopeMatch = text.match(/## 4\. Scope Boundaries\s*([\s\S]*?)(?=\n## |\n*$)/)
+  if (scopeMatch) {
+    const inMatch = scopeMatch[1].match(/\*\*In scope:\*\*\s*(.+)/i)
+    if (inMatch) fields.inScope = inMatch[1].trim()
+    const outMatch = scopeMatch[1].match(/\*\*Out of scope:\*\*\s*(.+)/i)
+    if (outMatch) {
+      fields.outOfScope = outMatch[1].split(/,|\band\b/).map(s => s.trim()).filter(Boolean)
+    }
+  }
+
+  // Extract success criteria
+  const successMatch = text.match(/## 5\. Success Criteria\s*([\s\S]*?)(?=\n## |\n*$)/)
+  if (successMatch) {
+    const bullets = successMatch[1].match(/^-\s+(.+)$/gm)
+    if (bullets) fields.successCriteria = bullets.map(b => b.replace(/^-\s+/, '').trim())
+  }
+
+  // Extract new constraints
+  const jurisdictionMatch = text.match(/[Jj]urisdiction.*?(UK|EU|US|Europe|United States|Global|International|[A-Z][a-z]+)/)
+  if (jurisdictionMatch) fields.jurisdiction = jurisdictionMatch[1].trim()
+  
+  const envelopeMatch = text.match(/[Ee]nvelope.*?(?:dimensions|size)?[:\s]+([\d.,\s]+(?:x|\*)[\d.,\s]+(?:x|\*)[\d.,\s]+(?:m|cm|mm))/i)
+  if (envelopeMatch) fields.envelope = envelopeMatch[1].trim()
+  
+  const tempMatch = text.match(/[Oo]perating\s*[Tt]emp(?:erature)?[:\s]+(-?\d+\s*(?:to|-)\s*-?\d+\s*(?:°C|C|°F|F))/i)
+  if (tempMatch) fields.operatingTemp = tempMatch[1].trim()
+
+  const standardsMatch = text.match(/[Ss]tandards[:\s]+((?:(?:ISO|IEC|EN|BS|UL|CE)\s*\d+[, \n]*)+)/i)
+  if (standardsMatch) fields.standards = standardsMatch[1].split(',').map(s => s.trim()).filter(Boolean)
+
   // Extract objectives from "## 2. Core Objectives" section
   const objMatch = text.match(/## 2\. Core Objectives\s*([\s\S]*?)(?=\n## |\n*$)/)
   if (objMatch) {
@@ -121,7 +165,7 @@ function extractFieldsFromText(text: string, fields: any): void {
   }
   
   // Extract cost ceiling from constraints text
-  const costMatch = text.match(/[Cc]ost.*?£([\d,]+)/)
+  const costMatch = text.match(/[Cc]ost.*?(?:£|\$|€)\s*([\d,]+)/)
   if (costMatch) fields.costCeiling = parseInt(costMatch[1].replace(/,/g, ''))
   
   // Extract mass from constraints text
@@ -131,6 +175,17 @@ function extractFieldsFromText(text: string, fields: any): void {
   // Extract production volume
   const volMatch = text.match(/([\d,]+)\s*(?:units?|pcs?)\s*(?:per|\/)\s*year/i)
   if (volMatch) fields.productionVolume = volMatch[0]
+}
+
+async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal })
+    return response
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
 /**
@@ -146,7 +201,7 @@ export async function runBriefGeneration(
   console.log(`[brief-gen] Input: ${rawBriefText.length} chars, product class: ${productClass}`)
 
   try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
@@ -161,8 +216,7 @@ export async function runBriefGeneration(
           { role: 'user', content: `FOUNDER BRIEF:\n${rawBriefText}\n\nPRODUCT CLASS: ${productClass}` },
         ],
       }),
-      signal: AbortSignal.timeout(180000),
-    })
+    }, 180000)
 
     if (!response.ok) {
       throw new Error(`OpenRouter API ${response.status}`)
@@ -174,6 +228,9 @@ export async function runBriefGeneration(
     if (!raw) {
       throw new Error('Empty response from LLM')
     }
+
+    // Extract the brief text (everything before the JSON block)
+    const briefText = raw.replace(/```json[\s\S]*?```/, '').trim()
 
     // Extract the structured JSON from the end of the response
     const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/)
@@ -201,29 +258,12 @@ export async function runBriefGeneration(
         fields = { ...fields, ...parsed }
       } catch (e) {
         console.warn('[brief-gen] Failed to parse structured JSON, extracting from text')
-        extractFieldsFromText(raw, fields)
+        extractFieldsFromText(briefText, fields)
       }
     } else {
       // No JSON block found — extract fields from the brief text
       console.warn('[brief-gen] No JSON block found, extracting from text')
-      extractFieldsFromText(raw, fields)
-    }
-
-    // Extract the brief text (everything before the JSON block)
-    const briefText = raw.replace(/```json[\s\S]*?```/, '').trim()
-
-    // Extract numeric constraints from the brief text if not in JSON
-    if (fields.costCeiling === null) {
-      const costMatch = briefText.match(/£([\d,]+)/)
-      if (costMatch) fields.costCeiling = parseInt(costMatch[1].replace(/,/g, ''))
-    }
-    if (fields.maxMass === null) {
-      const massMatch = briefText.match(/([\d,.]+)\s*kg/i)
-      if (massMatch) fields.maxMass = parseFloat(massMatch[1].replace(/,/g, ''))
-    }
-    if (fields.productionVolume === null) {
-      const volMatch = briefText.match(/([\d,]+)\s*(?:units?|pcs?|pieces?)\s*(?:per|\/)\s*year/i)
-      if (volMatch) fields.productionVolume = volMatch[0]
+      extractFieldsFromText(briefText, fields)
     }
 
     console.log(`[brief-gen] Generated: ${briefText.length} chars, ${fields.objectives.length} objectives, ${fields.constraints.length} constraints`)
