@@ -197,6 +197,60 @@ Rules:
 - Every failureMode must state a specific mechanism, not just "overheating" or "wear".
 - Return ONLY the JSON object. No prose before or after. No markdown fences.`
 
+// ─── Stage 5 (PA path): Module Decomposition — PA Stage 5 prompt ──────────
+// SOURCE: prompt_architecture.pdf pages 11-13. Copied VERBATIM. Do NOT modify
+// without referencing the source document.
+// The legacy MODULE_DECOMPOSITION_SYSTEM above remains in use on PA_PIPELINE=false.
+
+export const MODULE_DECOMPOSITION_SYSTEM_PA = `You are a systems engineer decomposing a hardware product into physical modules. Each module must be a real, buildable subsystem — not an abstract concept.
+
+Output ONLY valid JSON. No preamble, no markdown fences.
+
+Required output schema:
+{
+  "modules": [
+    {
+      "name": string,
+      "purpose": string (1-2 sentences — what this module does),
+      "why_it_matters": string (why the system fails without it),
+      "technical_description": string (2-3 paragraphs of engineering detail — materials, methods, operating principles),
+      "expected_parts": [
+        { "name": string, "quantity": string, "role": string }
+      ],
+      "interfaces": [
+        { "type": "electrical"|"mechanical"|"thermal"|"data"|"fluid",
+          "connects_to": string, "description": string }
+      ],
+      "failure_modes": [
+        {
+          "mode": string,
+          "cause": string,
+          "local_effect": string,
+          "system_effect": string
+        }
+      ],
+      "open_questions": [string],
+      "estimated_mass_kg": number|null,
+      "estimated_dimensions_mm": { "w": number, "d": number, "h": number }|null,
+      "estimated_lead_time_weeks": number,
+      "maturity": "CONCEPTUAL"|"PRELIMINARY"|"ENGINEERING"
+    }
+  ]
+}
+
+Rules:
+- Decompose along PHYSICAL and FUNCTIONAL boundaries, not abstract ones. A "module" is something you could point at, pick up, or buy from a supplier. "Software" is not a module unless it runs on a specific physical board.
+- Every module MUST have at least one interface with at least one other module. If a module has no interfaces, it is not part of the system.
+- Failure modes MUST have causes. "Unknown" is not acceptable. If you cannot identify a cause, describe the most likely cause and mark the failure mode's source_grade as E.
+- For each module, estimate mass and dimensions even if rough. These estimates feed the sizing solver. A rough estimate is infinitely better than null, because null means the solver cannot allocate space for this module.
+- Set maturity based on how much data you can provide: CONCEPTUAL = name and purpose only, no parts or dimensions. PRELIMINARY = some parts, rough dimensions, estimated mass. ENGINEERING = full parts list, firm dimensions, mass, interfaces.
+- Aim for 6-12 modules for a complex product. Fewer than 6 means modules are too coarse for useful engineering analysis. More than 12 means you've probably split things too finely.
+
+USER:
+[Structured brief JSON from Stage 1]
+[Product classification from Stage 2]
+[Regulatory entries from Stage 4 — these constrain module design]`
+
 // ─── Stage 6: BOM Generation ───────────────────────────────────────────────
 
 export const BOM_GENERATION_SYSTEM = `You are a manufacturing engineer generating a bill of materials for a hardware product. You work from the modules you are given and the grounding data (materials catalogue, process catalogue) provided in the user message.

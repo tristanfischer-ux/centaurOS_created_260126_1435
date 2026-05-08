@@ -11,7 +11,8 @@ import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
 import { runBriefGeneration, runBriefParsing } from './stages/0-brief-generation'
 import { runResearch, runResearchSynthesis, extractResearchConstraints } from './stages/1-research'
-import { runDecompose } from './stages/2-decompose'
+import { runDecompose, runDecomposePA } from './stages/2-decompose'
+import { runRegulatoryExtraction } from './stages/1b-regulatory'
 import { runSizeLayout } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
 import { runSuppliers } from './stages/5-suppliers'
@@ -748,11 +749,76 @@ export async function runPipeline(
     // Go straight to PDF with decision page
   } else {
 
+  // ── PA Stage 4: Regulatory Extraction (PA_PIPELINE=true only) ────────────
+  // Runs after Research Synthesis lands, before Module Decomposition.
+  // Produces state.regulatoryExtraction (RegulatoryExtraction with source_grade='C',
+  // verification_status='UNVERIFIED'). Dual-writes to state.research.designBrief.regulatory
+  // so downstream stages that read the legacy shape keep working.
+  // Legacy path: regulatory remains embedded in Research output.
+  if (PA_PIPELINE && state.parsedBrief) {
+    console.log('\n[pipeline] === PA Stage 4: Regulatory Extraction ===')
+    const regulatoryResult = await runRegulatoryExtraction(state.parsedBrief, classification)
+    trackStage('regulatory_extraction', regulatoryResult)
+
+    if (regulatoryResult.ok && regulatoryResult.data) {
+      state.regulatoryExtraction = regulatoryResult.data
+
+      // Dual-write: synthesise legacy state.research.designBrief.regulatory shape
+      // so downstream stages that read state.research.designBrief.regulatory keep working.
+      if (state.research) {
+        const legacyRegulatory = regulatoryResult.data.regulatory_entries.map(e => ({
+          code: e.standard_name,
+          name: e.standard_name,
+          summary: e.applicability,
+          status: e.status,
+          applicability: e.applicability,
+          designImpact: e.engineering_impact,
+          evidenceRequired: e.evidence_required,
+          ownerRole: e.owner,
+          gapAction: e.gap_action,
+        }))
+        if (state.research.designBrief) {
+          state.research.designBrief.regulatory = legacyRegulatory
+        }
+      }
+
+      console.log(
+        `[pipeline] PA Regulatory Extraction complete: ${regulatoryResult.data.regulatory_entries.length} entries. ` +
+        `All source_grade=C, verification_status=UNVERIFIED. Dual-wrote to state.research.designBrief.regulatory.`
+      )
+    } else {
+      // Non-fatal: log warning and continue. Decompose will proceed without regulatory context.
+      console.warn(
+        `[pipeline] PA Regulatory Extraction failed: ${regulatoryResult.error}. ` +
+        `Continuing without regulatoryExtraction — module decomposition will not have regulatory context.`
+      )
+    }
+  }
+
   // ── Stage 2: Decompose ─────────────────────────────────────────────
+  // Phase D1: on PA_PIPELINE=true, use runDecomposePA() (PA Stage 5 schema).
+  // On PA_PIPELINE=false, use the legacy runDecompose() — unchanged.
   console.log('\n[pipeline] === Stage 2: Decompose ===')
-  const decomposeResult = await runDecompose(state.research, {
-    trainingDataDossier: trainingDossier || options?.trainingDataDossier,
-  })
+
+  let decomposeResult: Awaited<ReturnType<typeof runDecompose>>
+
+  if (PA_PIPELINE && state.parsedBrief) {
+    // ── PA path: runDecomposePA uses PA Stage 5 prompt + schema ───────────
+    console.log('[pipeline] PA path: running PA Stage 5 Module Decomposition...')
+    const paResult = await runDecomposePA(
+      state.parsedBrief,
+      classification.productClass,
+      state.regulatoryExtraction,
+    )
+    // Cast to legacy type for unified error handling below (ModulePA extends Module)
+    decomposeResult = paResult as typeof decomposeResult
+  } else {
+    // ── Legacy path: unchanged ────────────────────────────────────────────
+    decomposeResult = await runDecompose(state.research, {
+      trainingDataDossier: trainingDossier || options?.trainingDataDossier,
+    })
+  }
+
   trackStage('decompose', decomposeResult)
   if (!decomposeResult.ok || !decomposeResult.data) {
     // A4: decompose is critical — without modules we can't make a BOM or

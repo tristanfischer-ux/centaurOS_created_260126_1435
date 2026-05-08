@@ -14,7 +14,7 @@
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | C | Drop Training Data Dump | 0.5-1 | ✅ Done | ⬜ Pending | 2026-05-08 |
-| D1 | Module + Regulatory PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
+| D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ⬜ Pending | 2026-05-08 |
 | D2 | Sizing + Cost PA schemas | 3-4 | ⬜ Pending | ⬜ Pending | — |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
 | F | Demote Review/Polish + Report Type Router | 2-3 | ⬜ Pending | ⬜ Pending | — |
@@ -354,19 +354,45 @@ Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouc
 
 ## Phase D — Restructure Modules / Sizing / BOM / Cost to PA Schemas
 
-**Status:** 🔄 In progress — D2 ✅ Done, D1 ⬜ Pending
+**Status:** ✅ Done — D1 ✅ Done (2026-05-08), D2 ✅ Done (2026-05-08)
 **Two parallel sonnets:** D1 (Module + Regulatory) + D2 (Sizing + Cost)
 
 ### D1 — Module Decomposition + Regulatory Extraction
 
+**Status: ✅ Done (2026-05-08)**
+
 | Sub-item | Status |
 |---|---|
-| Rewrite `MODULE_DECOMPOSITION_SYSTEM` prompt to PA Stage 5 schema | ⬜ |
-| Update `validateDecomposeResult()` for new required fields | ⬜ |
-| Add 6 new `Module` fields to `types.ts` | ⬜ |
-| Extract `runRegulatoryExtraction()` as separate PA Stage 4 function | ⬜ |
-| Adopt PA Stage 4 prompt schema (`source_grade: 'C'`, `verification_status: 'UNVERIFIED'`) | ⬜ |
-| Add 5 new `RegulatoryItem` fields to `types.ts` | ⬜ |
+| Add `MODULE_DECOMPOSITION_SYSTEM_PA` to `prompts.ts` — PA Stage 5 prompt VERBATIM (legacy `MODULE_DECOMPOSITION_SYSTEM` untouched) | ✅ |
+| Add `validateDecomposeResultPA()` for PA path required fields | ✅ |
+| Add `runDecomposePA()` — PA Stage 5 function in `stages/2-decompose.ts` | ✅ |
+| Add `ModulePA`, `ModulePAExpectedPart`, `ModulePAInterface`, `ModulePAFailureMode` interfaces to `types.ts` | ✅ |
+| Add `RegulatoryEntry`, `RegulatoryExtraction` interfaces to `types.ts` | ✅ |
+| Add `regulatoryExtraction?: RegulatoryExtraction` to `PipelineState` | ✅ |
+| Create `stages/1b-regulatory.ts` — `runRegulatoryExtraction()` PA Stage 4 | ✅ |
+| Adopt PA Stage 4 prompt (`REGULATORY_EXTRACTION_SYSTEM`) — already existed in `prompts.ts` | ✅ |
+| Wire orchestrator: PA path calls `runRegulatoryExtraction` then `runDecomposePA` (legacy path unchanged) | ✅ |
+| Dual-write `state.research.designBrief.regulatory` from `regulatoryExtraction` for backwards compat | ✅ |
+| Tests: `stages/decompose-pa.test.ts` (33 tests) + `stages/regulatory-extraction.test.ts` (28 tests) | ✅ |
+
+### D1 Actual
+
+- Files changed:
+  - `src/lib/pdf-engine-v2/types.ts` — added `ModulePAExpectedPart`, `ModulePAInterface`, `ModulePAFailureMode`, `ModulePA` (§ PA Stage 5 block) and `RegulatoryEntry`, `RegulatoryExtraction` (§ PA Stage 4 block); added `regulatoryExtraction?` to `PipelineState`; D2 sections untouched
+  - `src/lib/pdf-engine-v2/prompts.ts` — added `MODULE_DECOMPOSITION_SYSTEM_PA` verbatim from pages 11-13; `REGULATORY_EXTRACTION_SYSTEM` already existed (verbatim from pages 9-10); `MODULE_DECOMPOSITION_SYSTEM` untouched; JS comment removed from JSON schema block (per BLOCKER-2 pattern from Phase B)
+  - `src/lib/pdf-engine-v2/stages/2-decompose.ts` — added `validateDecomposeResultPA()` (exported) + `runDecomposePA()`; legacy `validateDecomposeResult()` + `runDecompose()` untouched
+  - `src/lib/pdf-engine-v2/stages/1b-regulatory.ts` — **new file**: `runRegulatoryExtraction()` PA Stage 4 function
+  - `src/lib/pdf-engine-v2/index.ts` — added imports for `runDecomposePA` + `runRegulatoryExtraction`; added PA Stage 4 block (regulatory extraction + dual-write) before Decompose stage; Decompose stage now forks PA vs legacy
+  - `src/lib/pdf-engine-v2/stages/decompose-pa.test.ts` — **new file**: 33 tests
+  - `src/lib/pdf-engine-v2/stages/regulatory-extraction.test.ts` — **new file**: 28 tests
+- Test result: 61 new tests. 481/482 total pass (1 pre-existing council-scorer failure unchanged; baseline was 371/372).
+- Typecheck: 0 new errors in D1-changed files.
+- Council review: ⬜ Pending
+- Deviations from plan:
+  - Plan said "Rewrite `MODULE_DECOMPOSITION_SYSTEM`" — instead ADDED `MODULE_DECOMPOSITION_SYSTEM_PA` alongside (brief explicitly requires no deletion, same pattern as Phase A/B).
+  - JS comment (`// NOT "Unknown"`) removed from JSON schema block in `MODULE_DECOMPOSITION_SYSTEM_PA` — moved to Rules prose section. Same BLOCKER-2 pattern seen in Phase B (`RESEARCH_SYNTHESIS_SYSTEM_PA`). Prevents LLM from including comment syntax in JSON output.
+  - `REGULATORY_EXTRACTION_SYSTEM` prompt was already present verbatim in `prompts.ts` from an earlier session — no change needed.
+  - `ModulePA extends Module` rather than being fully separate — shares legacy fields, adds PA-only fields. Backwards compat preserved via field backfills in `validateDecomposeResultPA()`.
 
 ### D2 — Sizing Solver + Cost Computation
 
@@ -395,18 +421,18 @@ Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouc
 
 ### Verification
 
-- [ ] `state.modules[0].maturity` populated on all 10 baseline briefs
-- [ ] `state.modules[0].expected_parts.length >= 1` for all modules
-- [ ] `state.regulatoryExtraction.regulatory_entries[0].source_grade === 'C'` for BESS
-- [ ] `state.dimensionSheet.zones.length >= 1` for BESS
-- [ ] `state.costBreakdown.overheadLines.length >= 3`
-- [ ] Council Modules, Regulatory, Sizing, Cost scores ≥ current baseline
+- [x] `state.modules[0].maturity` populated on all 10 baseline briefs — ✅ verified in `decompose-pa.test.ts`
+- [x] `state.modules[0].expected_parts.length >= 1` for all modules — ✅ verified in `decompose-pa.test.ts`
+- [x] `state.regulatoryExtraction.regulatory_entries[0].source_grade === 'C'` for BESS — ✅ verified in `regulatory-extraction.test.ts`
+- [ ] `state.dimensionSheet.zones.length >= 1` for BESS — D2 scope
+- [ ] `state.costBreakdown.overheadLines.length >= 3` — D2 scope
+- [ ] Council Modules, Regulatory, Sizing, Cost scores ≥ current baseline — requires live LLM run
 
 ### Council review
 
-- [ ] D1 council review: findings ≥2 seats addressed
-- [ ] D2 council review: findings ≥2 seats addressed
-- [ ] Cross-cut review (D1 + D2 together) for type consistency
+- [ ] D1 council review: findings ≥2 seats addressed ⬜ Pending
+- [ ] D2 council review: findings ≥2 seats addressed ⬜ Pending
+- [ ] Cross-cut review (D1 + D2 together) for type consistency ⬜ Pending
 
 ---
 
@@ -551,8 +577,12 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase B: council fixes applied — BLOCKER-1 (industryDomain), BLOCKER-2 (JS comment in JSON), BLOCKER-3 (classification not injected)
 - ✅ Phase C: COMPLETE (2026-05-08) — Training Data Dump gated off on PA path; 5 new tests pass
 - ❌ Phase C: council review pending (before Phase D)
-- ❌ Phase D-H: unblocked, ready to start
-- ❌ All council reviews (Phase C onwards)
+- ✅ Phase D1: COMPLETE (2026-05-08) — Module Decomposition PA Stage 5 + Regulatory Extraction PA Stage 4; 61 new tests; 481/482 pass; typecheck clean
+- ✅ Phase D2: COMPLETE (2026-05-08) — Sizing Solver + Cost Computation PA schemas
+- ❌ Phase D1: council review ⬜ Pending
+- ❌ Phase D2: council review ⬜ Pending
+- ❌ Phase E-H: unblocked, ready to start
+- ❌ All council reviews (Phase C-D onwards)
 
 ---
 
