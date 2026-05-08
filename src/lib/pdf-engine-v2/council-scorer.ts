@@ -267,7 +267,7 @@ Return ONLY valid JSON:
           return {
             model,
             section,
-            score: result.overall_score,
+            score: Math.max(1, Math.min(10, Math.round(result.overall_score))),
             criteria_scores: result.criteria_scores || [],
             overall_reasons: result.overall_reasons || [],
             code_change_recommendations: result.code_change_recommendations || [],

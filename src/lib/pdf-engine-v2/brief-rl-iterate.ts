@@ -173,7 +173,11 @@ Return ONLY JSON: {"score": N, "criteria": [{"name":"...","score":N,"reason":"..
       const raw = await callLLM(model, 'Return ONLY valid JSON.', `${rubric}\n\nBRIEF:\n${briefText.slice(0, 6000)}`, 2048)
       if (!raw) continue
       const parsed = extractJSON(raw)
-      if (parsed) votes.push({ model, ...parsed })
+      if (parsed) {
+        // Clamp score to 1-10 (some judges hallucinate out-of-range scores)
+        parsed.score = Math.max(1, Math.min(10, Math.round(parsed.score || 0)))
+        votes.push({ model, ...parsed })
+      }
     } catch (e: any) {
       console.warn(`[brief-rl] Judge ${model}: ${e.message}`)
     }
