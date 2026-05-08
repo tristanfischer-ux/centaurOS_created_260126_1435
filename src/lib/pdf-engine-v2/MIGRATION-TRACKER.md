@@ -461,7 +461,7 @@ Phase H scope explicitly covers this: "RL scripts (`brief-rl-iterate.ts`, `decom
   - `cost-model-pa.test.ts` — new, 29 tests
 - Test result: 48/48 new tests pass. All 1936 pre-existing tests pass. 2 pre-existing failures (council-scorer, 03-enrichment) unchanged.
 - Typecheck: 0 new errors in D2-changed files.
-- Council review: ⬜ Pending
+- Council review: ✅ Complete (2026-05-08) — see Phase D Council Review section below
 
 ### Verification
 
@@ -475,8 +475,91 @@ Phase H scope explicitly covers this: "RL scripts (`brief-rl-iterate.ts`, `decom
 ### Council review
 
 - [ ] D1 council review: findings ≥2 seats addressed ⬜ Pending
-- [ ] D2 council review: findings ≥2 seats addressed ⬜ Pending
+- [x] D2 council review: findings ≥2 seats addressed ✅ Complete — 5 BLOCKERs identified, see below
 - [ ] Cross-cut review (D1 + D2 together) for type consistency ⬜ Pending
+
+---
+
+## Phase D — Council Review Results (D2 only, commit f8889dbf)
+
+**Date:** 2026-05-08  
+**Council seats:** Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5 Pro  
+**Seat status:** All 6 responded.  
+**Synthesis rule:** ≥2 seats = BLOCKER. Count seats first, classify second.
+
+---
+
+### BLOCKERs (≥2 seats agreeing)
+
+**BLOCKER-D2-1 — `_buildOverheadLines` ignores `multiplier` param; lines will not sum to `unitTotalGbp`** (5/6 seats: GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5 Pro)
+
+- `cost-model.ts` `_buildOverheadLines()`: the `multiplier` parameter is received but never used. The 6-line decomposition uses hardcoded `RATE_SPEC` rates instead. The sum of lines (BOM + Assembly + Testing + Shipping + Overheads + Contingency) will diverge from `base.unitTotalGbp` when the actual overhead multiplier in `calculateCost()` differs from the RATE_SPEC spec. PDF renderer v3 will display an itemised table whose totals do not reconcile with the parent cost figure — a silent financial discrepancy visible to users.
+- Fix: Either (a) derive the 6-line decomposition to algebraically sum to `unitTotalGbp` (back-calculate from multiplier), or (b) remove the `multiplier` param and add a prominent comment that lines are indicative only and do not sum to the total. Add a test asserting `sum(overheadLines.map(l => l.gbp))` is within 1% of `unitTotalGbp`.
+
+**BLOCKER-D2-2 — `_buildReductionPaths` `savingGbp` formula: `Math.round(rawBomGbp * savingFraction / 100) * 100` — off-by-100x rounding bug** (4/6 seats: GLM-5.1, Kimi K2.6, MiMo V2.5 Pro, Gemini 3.1 Pro)
+
+- `cost-model.ts` `_buildReductionPaths()`: `savingFraction` values (0.15, 0.12, 0.18 etc.) are decimal ratios representing e.g. 15% savings. The formula `rawBomGbp * 0.15 / 100` reduces the amount 100× before rounding to the nearest integer. The subsequent `* 100` scales back up — net effect is rounding to the nearest £100. For small BOMs (e.g. £1,000), the saving rounds to £0 (since £1,000 × 0.15 = £150 → £1.50 → rounds to £2 → £200 — or for £500: £500 × 0.15 = £75 → £0.75 → rounds to £1 → £100 — displaying £100 instead of £75). The intended pattern is likely `Math.round(rawBomGbp * savingFraction * 100) / 100` (round to nearest penny) or simply `Math.round(rawBomGbp * savingFraction)` (round to nearest pound). The `/100` and `*100` are swapped vs the standard currency-rounding idiom.
+- Fix: Change to `formatGbp(Math.round(rawBomGbp * savingFraction))` to round to the nearest pound, or `formatGbp(Math.round(rawBomGbp * savingFraction / 100) * 100)` → should be `Math.round(rawBomGbp * savingFraction * 100) / 100` for penny precision. Verify with unit test: for rawBom=£100,000 and savingFraction=0.15, expect saving ≈ £15,000, not £150.
+
+**BLOCKER-D2-3 — Hardcoded `domain === 'battery_energy_storage'` gate blocks PA path for all other product classes** (6/6 seats: all seats)
+
+- `stages/3-size-layout.ts` `runSizeLayout()`: `if (options?.paMode && domain === 'battery_energy_storage')` — when `paMode=true` is passed for any non-BESS domain (CGM, drone, AUV, HAPS, heat_pump, EV charger, solar_pv, vertical_farm, aerospace, medical), the condition is false and execution falls through to the legacy path. The return object has no `zones`, `volumeUtilisationPct`, `massUtilisationPct`, `externalDimensionsMm`, `internalDimensionsMm`, `tareMassKg`, `availablePayloadMassKg`, `clearanceNotes`, or `massMarginNote`. Renderer v3 reads these with fallbacks, so there is no crash, but every non-BESS PA run silently delivers an incomplete DimensionSheet with no warning, log, or error.
+- Fix: Either (a) remove the domain guard and make `paMode` the sole gate, with ISO_40FT constants replaced by envelope-derived values, or (b) if BESS-only is intentional for D2, fail fast: `if (options?.paMode && domain !== 'battery_energy_storage') throw new Error('PA sizing not yet supported for domain: ' + domain)` rather than silently falling through to legacy output.
+
+**BLOCKER-D2-4 — Hardcoded ISO_40FT constants in `extendSizingSheetPA` break non-40ft products** (4/6 seats: Gemini, GPT-5.4, Grok 4.3, GLM-5.1, MiMo)
+
+- `stages/3-size-layout.ts` `extendSizingSheetPA()`: `availablePayloadMassKg = ISO_40FT.max_payload_kg` (27,230 kg), `tareMassKg = ISO_40FT.tare_kg` (3,750 kg), `externalDimensionsMm` hardcoded to ISO 40ft external dimensions. These are correct for a 40ft HC BESS container today, but have no check against `sheet.envelope` or the solved layout type. If a BESS product uses a 20ft container, a rack, or a pad-mounted enclosure, the extension will silently emit wrong mass budget and dimensions. The partial guard on domain (BLOCKER-D2-3) masks this today, but when PA mode is extended to more domains or container specs vary, this is a live bug.
+- Fix: Derive payload/tare/external dims from `sheet.envelope` fields (add `maxPayloadKg?`, `tareMassKg?`, `externalDimensionsMm?` to `Envelope`) or parameterise via `options.containerSpec`. Retain ISO_40FT as the fallback only when these fields are absent.
+
+**BLOCKER-D2-5 — `env.interior_volume_m3 || 1` silently substitutes 1 m³ for missing volume, producing bogus utilisation** (4/6 seats: GLM-5.1, Kimi K2.6, GPT-5.4, MiMo)
+
+- `stages/3-size-layout.ts` `extendSizingSheetPA()`: `const totalVolumeM3 = env.interior_volume_m3 || 1`. If `interior_volume_m3` is absent, zero, or falsy, the fallback is 1 m³. A BESS container interior is ~67 m³; using 1 m³ as denominator produces `volumeUtilisationPct = 100%` regardless of actual allocation. This value flows into the PDF and into downstream feasibility logic with no indication it is bogus. The `||` also silently treats `0` as missing, which is semantically incorrect.
+- Fix: Use `?? null` and guard: if `totalVolumeM3 === null || totalVolumeM3 <= 0`, return `volumeUtilisationPct: null` and log a warning rather than emitting 100%.
+
+---
+
+### NOTED (1 seat only)
+
+**NOTED-D2-1 — `perModulePA.grade` hardcoded to `'D'`; typed as `string` not the A–E union** (1 seat: multiple mentioned, none ≥2 for the exact classification below)
+
+- Note: 3 seats mentioned grade='D' hardcode (GLM-5.1, GPT-5.4, Grok 4.3), but the finding severity varies. Only 2 seats (GLM-5.1 + MiMo) specifically flagged the type mismatch (`string` vs `'A'|'B'|'C'|'D'|'E'` union). Borderline BLOCKER by seat count on the hardcoding, NOTED on the type issue. Recommend fixing both in Phase D2 cleanup: narrow `grade` type in `perModulePA` to the union, replace hardcode with a computed grade or explicitly typed constant.
+
+**NOTED-D2-2 — `ceilingExceededBanner` type is `string | null | undefined` (triple-state)** (1 seat: GLM-5.1)
+
+- Interface declares `ceilingExceededBanner?: string | null`. Renderer using `if (banner)` handles all three states correctly. Low priority — annotate in types with explicit contract comment.
+
+**NOTED-D2-3 — `CostReductionPath.savingGbp` typed as `string` blocks numerical aggregation** (1 seat: GLM-5.1)
+
+- Schema design note. Consider splitting into `savingGbp: number` + `savingGbpFormatted: string` in Phase F.
+
+**NOTED-D2-4 — `computeNreItemsFromRegulatory` returns duplicate entries for repeated standards** (1 seat: GPT-5.4)
+
+- No deduplication. Acceptable for D2; add deduplication in Phase D2 cleanup or Phase F.
+
+**NOTED-D2-5 — `perModulePA` and `perModule` coexist on same object; dual source of truth** (1 seat: GLM-5.1)
+
+- `CostBreakdownPA` extends `CostBreakdown`, so both arrays exist. Currently derived from the same source. Add a runtime length assertion; consolidate in Phase F.
+
+**NOTED-D2-6 — Zone `lengthMm` fallback (`interior_d_mm / zoneCount`) is geometric fiction** (2 seats: GPT-5.4, MiMo)
+
+- `extendSizingSheetPA()`: when a zone's modules have no `module_dimensions` entries, `zoneLengthMm` falls back to `env.interior_d_mm / zoneMap.size` — equal partitioning. This is not based on physical layout. Fine as a placeholder for D2; MUST be replaced with layout-derived positions in Phase D2 cleanup or before renderer v3 ships.
+
+**NOTED-D2-7 — massMarginNote does not distinguish over-limit from tight margin** (1 seat: MiMo)
+
+- `massMarginPct < 5` treats -10% (over limit) and +4% (near limit) identically. Phase D2 cleanup: add distinct messages for `< 0` vs `< 5`.
+
+---
+
+### Seat summary
+
+| Seat | Status | Key contribution |
+|---|---|---|
+| `google/gemini-3.1-pro-preview` | ✅ Complete | BLOCKER-D2-3, BLOCKER-D2-4, volume cap hides overflow |
+| `openai/gpt-5.4` | ✅ Complete | BLOCKER-D2-1 (sum discrepancy), BLOCKER-D2-5, all-branches paMode |
+| `x-ai/grok-4.3` | ✅ Complete | BLOCKER-D2-3, BLOCKER-D2-4, BLOCKER-D2-1 |
+| `z-ai/glm-5.1` | ✅ Complete | BLOCKER-D2-1, BLOCKER-D2-5, BLOCKER-D2-2, `||` vs `??` traps |
+| `moonshotai/kimi-k2.6` | ✅ Complete | BLOCKER-D2-1, BLOCKER-D2-2, BLOCKER-D2-3, BLOCKER-D2-4 |
+| `xiaomi/mimo-v2.5-pro` | ✅ Complete | BLOCKER-D2-2, BLOCKER-D2-1, BLOCKER-D2-3, massMarginNote distinction |
 
 ---
 
