@@ -1711,6 +1711,108 @@ const SourceAttributionSection = ({ state }: { state: PipelineState }) => {
   )
 }
 
+// ─── Section inclusion helpers (Phase G) ─────────────────────────────────────
+
+/**
+ * Section ID → section name mapping (matches PA Stage 9 router output):
+ *   'feasibility'  → FeasibilityGatePage
+ *   'regulatory'   → RegulatoryOverviewSection + per-standard blocks
+ *   'sizing'       → SizingSection
+ *   'modules'      → ModuleOverviewTable + ModuleDetailSection
+ *   'bom'          → BOM is embedded in module detail; 'bom' guard is a subset of 'modules'
+ *   'cost'         → CostSection
+ *   'suppliers'    → SupplierAppendix
+ *   'risks'        → FMEASection
+ *   'research'     → research is embedded in Brief (not a separate rendered section)
+ *   'audit_log'    → AuditLogSection
+ *
+ * Cover and BriefPages are ALWAYS rendered (never excluded).
+ * SourceAttributionSection is ALWAYS rendered (provenance disclosure).
+ */
+
+/**
+ * Estimate the number of PDF pages for a named section.
+ *
+ * Used for max-pages enforcement. Conservative upper bounds per section.
+ */
+function _estimateSectionPages(sectionId: string, safe: PipelineState): number {
+  const regs = (safe.research?.designBrief?.regulatory ?? []) as unknown[]
+  const moduleCount = safe.modules?.length ?? 0
+  const riskCount = safe.modules?.flatMap(m => m.riskMatrix ?? []).length ?? 0
+
+  switch (sectionId) {
+    case 'cover':         return 1
+    case 'brief':         return 2
+    case 'feasibility':   return 1
+    case 'regulatory':    return 1 + Math.min(regs.length, 10)
+    case 'sizing':        return 1
+    case 'modules':       return 1 + moduleCount  // overview + per-module detail
+    case 'cost':          return 1
+    case 'suppliers':     return 1
+    case 'risks':         return 1 + Math.min(riskCount, 20)
+    case 'audit_log':     return 1
+    case 'source_attrib': return 1
+    default:              return 1
+  }
+}
+
+// Trim order: least-critical sections first; cover/brief/source_attrib never trimmed.
+const TRIM_ORDER = [
+  'source_attrib',
+  'audit_log',
+  'suppliers',
+  'risks',
+  'cost',
+  'modules',
+  'regulatory',
+  'sizing',
+  'feasibility',
+]
+
+/**
+ * Apply max-pages enforcement by trimming trailing optional sections.
+ *
+ * React-PDF does not support hard page limits natively. This guard removes
+ * sections from the included set (starting with least-critical) until the
+ * estimated page total is at or under maxPages. Mandatory sections
+ * (cover, brief, source_attrib) are never trimmed.
+ *
+ * @param maxPages  0 = no cap (FULL_REPORT); >0 = enforce cap
+ */
+function _applyMaxPages(
+  included: Set<string>,
+  maxPages: number,
+  safe: PipelineState,
+  auditWarnings: string[],
+): Set<string> {
+  if (maxPages === 0) return included
+
+  // Start with always-rendered sections
+  let estimated = _estimateSectionPages('cover', safe) + _estimateSectionPages('brief', safe) + _estimateSectionPages('source_attrib', safe)
+  for (const sec of TRIM_ORDER) {
+    if (included.has(sec)) {
+      estimated += _estimateSectionPages(sec, safe)
+    }
+  }
+
+  if (estimated <= maxPages) return included
+
+  const trimmed = new Set(included)
+  for (const sec of TRIM_ORDER) {
+    if (estimated <= maxPages) break
+    if (trimmed.has(sec)) {
+      const saving = _estimateSectionPages(sec, safe)
+      trimmed.delete(sec)
+      estimated -= saving
+      const msg = `[pdf-v3] max-pages cap (${maxPages}): trimmed '${sec}' (saved ~${saving} pages, est now ~${estimated})`
+      console.warn(msg)
+      auditWarnings.push(msg)
+    }
+  }
+
+  return trimmed
+}
+
 // ─── Main Export ───────────────────────────────────────────────────────────────
 
 export default function PdfRendererV3({ state }: { state: PipelineState }) {
@@ -1721,93 +1823,149 @@ export default function PdfRendererV3({ state }: { state: PipelineState }) {
     jurisdiction?: string
   }>
 
-  // ToC: only render when total page count would exceed 25.
-  // We estimate page count: cover(1) + feasibility(1) + brief(1-2) + regulatory(1+N) +
-  // sizing(1) + module overview(1) + modules(N) + cost(1) + suppliers(1) + fmea(1+N) + audit(1) + attribution(1)
+  // ── Phase G: Report Type routing ──────────────────────────────────────────
+  // Read the router result stamped on state by PA Stage 9 (index.ts).
+  // On legacy path (PA_PIPELINE=false) this field is absent — default to
+  // FULL_REPORT behaviour (nothing excluded, no page cap).
+  const routerResult = (safe as any).reportTypeRouterResult as {
+    reportType: string
+    maxPages: number
+    excludedSections: string[]
+    reason?: string
+  } | undefined
+
+  const excludedSections: string[] = routerResult?.excludedSections ?? []
+  const maxPages: number = routerResult?.maxPages ?? 0
+
+  // Build included-sections set: start with all optional sections, remove excluded.
+  const included = new Set([
+    'feasibility',
+    'regulatory',
+    'sizing',
+    'modules',
+    'cost',
+    'suppliers',
+    'risks',
+    'audit_log',
+    'source_attrib',
+  ])
+  for (const id of excludedSections) {
+    included.delete(id)
+  }
+
+  // Apply max-pages enforcement (trims trailing optional sections if over cap).
+  const auditWarnings: string[] = []
+  const finalSections = _applyMaxPages(included, maxPages, safe, auditWarnings)
+
+  // Convenience predicate
+  const show = (id: string): boolean => finalSections.has(id)
+
+  // ToC: only render when estimated page count > 25 AND FULL_REPORT.
   const moduleCount = safe.modules?.length ?? 0
   const regCount = regs.length
   const riskCount = safe.modules?.flatMap(m => m.riskMatrix ?? []).length ?? 0
   const estimatedPages = 2 + 2 + (1 + regCount) + 1 + (1 + moduleCount) + 1 + 1 + (1 + riskCount) + 1 + 1
-  const showToc = estimatedPages > 25
+  const showToc = estimatedPages > 25 && (routerResult?.reportType ?? 'FULL_REPORT') === 'FULL_REPORT'
 
   return (
     <Document
       title={`Engineering Report: ${dash(safe.projectId)}`}
       author="Fractional Forge PDF Engine v3"
     >
-      {/* Cover */}
+      {/* Cover — always rendered */}
       <SafeSection name="Cover">
         <CoverPage state={safe} />
       </SafeSection>
 
-      {/* Table of Contents — only when >25 pages */}
+      {/* Table of Contents — only when >25 pages on FULL_REPORT */}
       {showToc && (
         <SafeSection name="TableOfContents">
           <TableOfContents show={showToc} />
         </SafeSection>
       )}
 
-      {/* Feasibility Gate */}
-      <SafeSection name="FeasibilityGate">
-        <FeasibilityGatePage state={safe} />
-      </SafeSection>
+      {/* Feasibility Gate — excluded on BRIEF_INCOMPLETE */}
+      {show('feasibility') && (
+        <SafeSection name="FeasibilityGate">
+          <FeasibilityGatePage state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Brief and Requirements */}
+      {/* Brief and Requirements — always rendered */}
       <SafeSection name="Brief">
         <BriefPages state={safe} />
       </SafeSection>
 
-      {/* Regulatory Overview */}
-      <SafeSection name="RegulatoryOverview">
-        <RegulatoryOverviewSection state={safe} />
-      </SafeSection>
+      {/* Regulatory Overview — excluded on BRIEF_INCOMPLETE */}
+      {show('regulatory') && (
+        <SafeSection name="RegulatoryOverview">
+          <RegulatoryOverviewSection state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Per-standard regulatory detail pages */}
-      {regs.slice(0, 10).map((reg, idx) => (
+      {/* Per-standard regulatory detail pages — excluded on BRIEF_INCOMPLETE */}
+      {show('regulatory') && regs.slice(0, 10).map((reg, idx) => (
         <SafeSection key={`reg-${idx}`} name={`Reg:${reg.code}`}>
           <RegulatoryStandardBlock reg={reg} idx={idx} />
         </SafeSection>
       ))}
 
-      {/* Sizing */}
-      <SafeSection name="Sizing">
-        <SizingSection state={safe} />
-      </SafeSection>
+      {/* Sizing — excluded on BRIEF_INCOMPLETE */}
+      {show('sizing') && (
+        <SafeSection name="Sizing">
+          <SizingSection state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Module overview table */}
-      <SafeSection name="ModuleOverview">
-        <ModuleOverviewTable state={safe} />
-      </SafeSection>
+      {/* Module overview table — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
+      {show('modules') && (
+        <SafeSection name="ModuleOverview">
+          <ModuleOverviewTable state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Per-module detail pages */}
-      <SafeSection name="ModuleDetail">
-        <ModuleDetailSection state={safe} />
-      </SafeSection>
+      {/* Per-module detail pages — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
+      {show('modules') && (
+        <SafeSection name="ModuleDetail">
+          <ModuleDetailSection state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Cost */}
-      <SafeSection name="Cost">
-        <CostSection state={safe} />
-      </SafeSection>
+      {/* Cost — excluded on BRIEF_INCOMPLETE */}
+      {show('cost') && (
+        <SafeSection name="Cost">
+          <CostSection state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Supplier Appendix */}
-      <SafeSection name="SupplierAppendix">
-        <SupplierAppendix state={safe} />
-      </SafeSection>
+      {/* Supplier Appendix — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
+      {show('suppliers') && (
+        <SafeSection name="SupplierAppendix">
+          <SupplierAppendix state={safe} />
+        </SafeSection>
+      )}
 
-      {/* FMEA */}
-      <SafeSection name="FMEA">
-        <FMEASection state={safe} />
-      </SafeSection>
+      {/* FMEA / Risk Register — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
+      {show('risks') && (
+        <SafeSection name="FMEA">
+          <FMEASection state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Audit Log */}
-      <SafeSection name="AuditLog">
-        <AuditLogSection state={safe} />
-      </SafeSection>
+      {/* Audit Log — excluded on BRIEF_INCOMPLETE */}
+      {show('audit_log') && (
+        <SafeSection name="AuditLog">
+          <AuditLogSection state={safe} />
+        </SafeSection>
+      )}
 
-      {/* Source Attribution */}
+      {/* Source Attribution — always rendered */}
       <SafeSection name="SourceAttribution">
         <SourceAttributionSection state={safe} />
       </SafeSection>
     </Document>
   )
 }
+
+// ── Phase G: exported helpers for testing ────────────────────────────────────
+export { _estimateSectionPages, _applyMaxPages }

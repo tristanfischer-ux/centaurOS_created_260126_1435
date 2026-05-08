@@ -21,15 +21,18 @@ import { runReview } from './stages/6-review'
 import PdfRenderer from './stages/7-pdf'
 import PdfRendererV3 from './stages/7-pdf-v3'
 
-// PDF_RENDERER=v3 activates the BESS-style renderer (7-pdf-v3.tsx).
-// Default is v2 (the existing 7-pdf.tsx). Both renderers remain active.
-const _pdfRendererVersion = process.env.PDF_RENDERER ?? 'v2'
-const _activePdfRenderer = _pdfRendererVersion === 'v3' ? PdfRendererV3 : PdfRenderer
-
 // PA_PIPELINE=true activates the Prompt Architecture migration path (Phase A+).
 // Default is 'false' — existing pipeline runs unchanged.
 // Set PA_PIPELINE=true in .env.local or vercel env to test the new path.
 const PA_PIPELINE = (process.env.PA_PIPELINE ?? 'false') === 'true'
+
+// PDF_RENDERER=v3 activates the BESS-style renderer (7-pdf-v3.tsx).
+// Default is v2 (the existing 7-pdf.tsx). Both renderers remain active.
+// Phase G: when PA_PIPELINE=true and no explicit PDF_RENDERER env var is set,
+// default to 'v3'. Legacy path (PA_PIPELINE=false) keeps 'v2' as default.
+// Explicit PDF_RENDERER env var always wins (allows override in both directions).
+const _pdfRendererVersion = process.env.PDF_RENDERER || (PA_PIPELINE ? 'v3' : 'v2')
+const _activePdfRenderer = _pdfRendererVersion === 'v3' ? PdfRendererV3 : PdfRenderer
 import { runPolish } from './stages/7-polish'
 import { pdf } from '@react-pdf/renderer'
 import React from 'react'
