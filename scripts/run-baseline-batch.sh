@@ -6,8 +6,8 @@
 set -eo pipefail
 
 REPO_ROOT="/Users/tristanfischer/Developer/CentaurOS created 260126 1435"
-EVIDENCE_ROOT="$HOME/Downloads/engine-evidence/post-g12-b6"
-LABEL="post-g12-b6"
+EVIDENCE_ROOT="$HOME/Downloads/engine-evidence/post-5470c9ae"
+LABEL="post-5470c9ae"
 
 mkdir -p "$EVIDENCE_ROOT"
 
