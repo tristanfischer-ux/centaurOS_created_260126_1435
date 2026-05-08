@@ -31,6 +31,7 @@ import { classifyProduct, getRequiredFields } from './product-classifier'
 import { checkRequiredParts } from './lib/required-parts-manifest'
 import { validateBrief } from './brief-validator'
 import { determineFeasibility } from './feasibility-gate'
+import { runBriefRevision } from './stages/3.5-brief-revision'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
 import type { PipelineState, StageResult, BriefConstraints } from './types'
@@ -378,6 +379,85 @@ export async function runPipeline(
   state.productClass = classification.productClass
   console.log(`[pipeline] Feasibility: ${feasibility.status} — ${feasibility.reason}`)
   console.log(`[pipeline] Allowed sections: ${feasibility.allowedSections.join(', ')}`)
+
+  // ── Feasibility → Brief Feedback Loop ───────────────────────────────
+  // When Feasibility finds impossible constraints, revise the Brief with
+  // feasible alternatives and re-run Feasibility. Max 2 revisions.
+  const MAX_REVISIONS = 2
+  let revisionCount = 0
+  const rejectedConstraints: string[] = []
+
+  while ((feasibility.status === 'RED' || feasibility.status === 'AMBER') && revisionCount < MAX_REVISIONS) {
+    revisionCount++
+    console.log(`\n[pipeline] === Brief Revision ${revisionCount}/${MAX_REVISIONS} (Feasibility: ${feasibility.status}) ===`)
+    
+    const feasText = feasibility.reason || feasibility.blockers?.join('; ') || 'Infeasible constraints found'
+    
+    const revisionResult = await runBriefRevision(
+      briefText,
+      state.generatedBrief?.briefText || briefText,
+      feasText,
+      classification.productClass,
+    )
+    
+    if (revisionResult.ok && revisionResult.data?.hasRevisions) {
+      const rev = revisionResult.data
+      console.log(`[pipeline] Brief revised: ${rev.changes.length} constraints updated`)
+      
+      // Log what changed
+      for (const change of rev.changes) {
+        console.log(`[pipeline]   ${change.constraint}: ${change.original} → ${change.revised} (${change.reasoning})`)
+        rejectedConstraints.push(`${change.constraint}: ${change.original}`)
+      }
+      
+      // Update the Brief's constraint VALUES (not text)
+      if (state.generatedBrief?.fields) {
+        for (const change of rev.changes) {
+          const field = change.constraint.toLowerCase()
+          if (field.includes('cost') || field.includes('price')) {
+            const match = change.revised.match(/[\d,]+/)
+            if (match) state.generatedBrief.fields.costCeiling = parseInt(match[0].replace(/,/g, ''))
+          } else if (field.includes('mass') || field.includes('weight')) {
+            const match = change.revised.match(/[\d,.]+/)
+            if (match) state.generatedBrief.fields.maxMass = parseFloat(match[0].replace(/,/g, ''))
+          } else if (field.includes('volume') || field.includes('production')) {
+            state.generatedBrief.fields.productionVolume = change.revised
+          }
+        }
+      }
+      
+      // Sync revised constraints back to designBrief
+      if (state.research?.designBrief && state.generatedBrief?.fields) {
+        const bf = state.generatedBrief.fields
+        state.research.designBrief.constraints = {
+          ...state.research.designBrief.constraints,
+          unitCostCeilingGbp: bf.costCeiling ?? state.research.designBrief.constraints?.unitCostCeilingGbp,
+          maxMassKg: bf.maxMass ?? state.research.designBrief.constraints?.maxMassKg,
+        }
+      }
+      
+      // Store revision on state for PDF rendering
+      ;(state as any).briefRevisions = [...((state as any).briefRevisions || []), rev]
+      
+      // Re-run Feasibility with updated constraints
+      const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields)
+      const newFeasibility = determineFeasibility(newBriefValidation, sizingResult, null, classification.productClass)
+      
+      // Update feasibility
+      Object.assign(feasibility, newFeasibility)
+      ;(state as any).feasibility = feasibility
+      console.log(`[pipeline] Feasibility after revision ${revisionCount}: ${feasibility.status}`)
+    } else {
+      console.log('[pipeline] No revisions proposed — breaking loop')
+      break
+    }
+  }
+  
+  // Log final state
+  if (revisionCount > 0) {
+    console.log(`\n[pipeline] Brief revision complete: ${revisionCount} iterations, ${rejectedConstraints.length} constraints revised`)
+    console.log(`[pipeline] Rejected constraints: ${rejectedConstraints.join(', ')}`)
+  }
 
   // gateResults declared at function scope (see A1 fix above). Reset here.
   gateResults = []
