@@ -51,7 +51,7 @@ import { runBriefRevision } from './stages/3.5-brief-revision'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
 import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON, ResearchSynthesis } from './types'
-import { routeReportType, type ReportTypeRouterResult } from './report-type-router'
+import { routeReportType, normaliseStatus, type ReportTypeRouterResult } from './report-type-router'
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 import { mapProductClassToIndustryDomain } from './lib/industry-domain'
 
@@ -681,7 +681,15 @@ export async function runPipeline(
   const _prelimRoute = PA_PIPELINE ? routeReportType(feasibility, state.parsedBrief) : null
   const _paRevisionEnabled = !PA_PIPELINE || _prelimRoute?.reportType === 'FEASIBILITY_EXCEPTION'
 
-  while (_paRevisionEnabled && (feasibility.status === 'RED' || feasibility.status === 'AMBER') && revisionCount < MAX_REVISIONS) {
+  // F-10 fix (2 seats): use normalised status in loop condition so PA-native
+  // FAIL/WARN statuses are handled identically to legacy RED/AMBER.
+  // Previously the loop checked raw status strings, so PA-native `FAIL`/`WARN`
+  // never triggered revisions even when the router treated them as failure/warning.
+  while (
+    _paRevisionEnabled &&
+    (normaliseStatus(feasibility.status) === 'FAIL' || normaliseStatus(feasibility.status) === 'WARN') &&
+    revisionCount < MAX_REVISIONS
+  ) {
     revisionCount++
     console.log(`\n[pipeline] === Brief Revision ${revisionCount}/${MAX_REVISIONS} (Feasibility: ${feasibility.status}) ===`)
     
@@ -751,11 +759,25 @@ export async function runPipeline(
       // Re-run Feasibility with updated constraints
       const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, PA_PIPELINE ? state.parsedBrief : null)
       const newFeasibility = determineFeasibility(newBriefValidation, sizingResult, null, classification.productClass)
-      
+
       // Update feasibility
       Object.assign(feasibility, newFeasibility)
       ;(state as any).feasibility = feasibility
       console.log(`[pipeline] Feasibility after revision ${revisionCount}: ${feasibility.status}`)
+
+      // F-12 fix (3 seats): re-evaluate route inside the loop after each revision.
+      // If revision improved feasibility from FAIL+2 → WARN+1 (route is now
+      // FULL_REPORT), break immediately rather than running a wasted 2nd iteration.
+      // Previously _paRevisionEnabled was pre-computed once from the preliminary
+      // route and never updated, so the loop always ran to MAX_REVISIONS even after
+      // the route resolved.
+      if (PA_PIPELINE) {
+        const midLoopRoute = routeReportType(feasibility, state.parsedBrief)
+        if (midLoopRoute.reportType !== 'FEASIBILITY_EXCEPTION') {
+          console.log(`[pipeline] PA: route resolved to ${midLoopRoute.reportType} after revision ${revisionCount} — breaking loop early`)
+          break
+        }
+      }
     } else {
       console.log('[pipeline] No revisions proposed — breaking loop')
       break
@@ -776,8 +798,12 @@ export async function runPipeline(
   if (PA_PIPELINE) {
     _paRouterResult = routeReportType(feasibility, state.parsedBrief)
     state.reportType = _paRouterResult.reportType
-    ;(feasibility as any).reportType = _paRouterResult.reportType
-    ;(state as any).reportTypeRouterResult = _paRouterResult
+    // F-8 fix (4 seats): `reportTypeRouterResult` is now a typed field on PipelineState
+    // (added to types.ts). `(feasibility as any).reportType` cast removed — feasibility
+    // is still a FeasibilityResult (which already has `reportType?: ReportType` from
+    // feasibility-gate.ts Phase F addition), so direct assignment is safe.
+    feasibility.reportType = _paRouterResult.reportType
+    state.reportTypeRouterResult = _paRouterResult
     console.log(
       `[pipeline] PA Stage 9 Router: ${_paRouterResult.reportType} ` +
       `(maxPages=${_paRouterResult.maxPages}, excluded=${_paRouterResult.excludedSections.length} sections) — ${_paRouterResult.reason}`
@@ -1262,6 +1288,11 @@ export async function runPipeline(
       console.log('[pipeline] Council scoring failed, using deterministic scores:', (err as Error).message)
     }
   } else {
+    // F-2 fix (5 seats): emit a trackSkippedStage record for council_scoring so
+    // telemetry consumers see a gap entry rather than silently missing the stage.
+    // Previously only console.log was emitted — Review and Polish both used
+    // trackSkippedStage but Council Scoring did not.
+    trackSkippedStage('council_scoring', `PA path: skipped on ${state.reportType} — Council Scoring is FULL_REPORT-only (Phase F)`)
     console.log(`[pipeline] Council Scoring SKIPPED — PA path, reportType=${state.reportType}`)
   }
 

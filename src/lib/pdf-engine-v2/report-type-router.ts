@@ -88,10 +88,14 @@ function countFailChecks(feasibilityResult: FeasibilityResult): number {
 /**
  * Map a FeasibilityResult status to a PA-normalised tier.
  * Returns 'PASS' | 'WARN' | 'FAIL'.
+ *
+ * F-1 fix (5 seats): unknown/null/UNREVIEWED status now maps to FEASIBILITY_EXCEPTION
+ * (fail-closed), not PASS (fail-open). Callers receiving FEASIBILITY_EXCEPTION from
+ * an unknown status should treat the result as worst-case.
  */
-function normaliseStatus(status: string): 'PASS' | 'WARN' | 'FAIL' {
-  const s = (status ?? '').toUpperCase()
-  // PA vocabulary
+export function normaliseStatus(status: string | null | undefined): 'PASS' | 'WARN' | 'FAIL' {
+  const s = ((status ?? '') as string).toUpperCase()
+  // PA vocabulary — explicit handling for every known value
   if (s === 'PASS') return 'PASS'
   if (s === 'WARN') return 'WARN'
   if (s === 'FAIL') return 'FAIL'
@@ -99,9 +103,21 @@ function normaliseStatus(status: string): 'PASS' | 'WARN' | 'FAIL' {
   if (s === 'GREEN') return 'PASS'
   if (s === 'AMBER') return 'WARN'
   if (s === 'RED') return 'FAIL'
-  if (s === 'UNREVIEWED') return 'PASS'  // treat unreviewed as pass (safe default)
-  return 'PASS'
+  // F-1: UNREVIEWED and any unknown string → FAIL (fail-closed; treat as worst case).
+  // Previously this defaulted to PASS which silently routed errored/pending
+  // feasibility results to FULL_REPORT with zero banners.
+  return 'FAIL'
 }
+
+/**
+ * Sentinel value for "no page cap" on FULL_REPORT paths.
+ *
+ * F-11 fix (3 seats): using the named constant + JSDoc makes the convention
+ * explicit so renderers (Phase G) cannot misread 0 as "zero pages allowed".
+ * Phase G renderer must check `maxPages === UNLIMITED_PAGES` before applying
+ * any page cap — never interpret 0 as a hard limit of zero pages.
+ */
+export const UNLIMITED_PAGES = 0
 
 /**
  * PA Stage 9 — Report Type Router
@@ -122,12 +138,14 @@ export function routeReportType(
   if (
     parsedBrief &&
     parsedBrief.confidence === 'LOW' &&
-    parsedBrief.missing_mandatory_fields.length > 5
+    // F-6 fix (3 seats): guard against undefined/null array before .length access.
+    // LLMs may omit missing_mandatory_fields even when schema declares it required.
+    (parsedBrief.missing_mandatory_fields ?? []).length > 5
   ) {
     return {
       reportType: 'BRIEF_INCOMPLETE',
       maxPages: 6,
-      reason: `Brief confidence is LOW and ${parsedBrief.missing_mandatory_fields.length} mandatory fields are missing (${parsedBrief.missing_mandatory_fields.slice(0, 3).join(', ')}…). Cannot produce a full engineering report without a complete brief.`,
+      reason: `Brief confidence is LOW and ${(parsedBrief.missing_mandatory_fields ?? []).length} mandatory fields are missing (${(parsedBrief.missing_mandatory_fields ?? []).slice(0, 3).join(', ')}…). Cannot produce a full engineering report without a complete brief.`,
       excludedSections: BRIEF_INCOMPLETE_EXCLUDED,
     }
   }
@@ -149,12 +167,28 @@ export function routeReportType(
   }
 
   // ── Rule 3: FULL_REPORT — clean PASS ─────────────────────────────────
-  if (normStatus === 'PASS') {
+  // F-7 fix (4 seats): added failCount === 0 guard. PASS + blockers>0 is a
+  // data inconsistency (gate says pass but blockers list is non-empty). Rather
+  // than silently dropping blockers, we route to FEASIBILITY_EXCEPTION so the
+  // inconsistency is surfaced to the user, not hidden.
+  if (normStatus === 'PASS' && failCount === 0) {
     return {
       reportType: 'FULL_REPORT',
-      maxPages: 0,
+      maxPages: UNLIMITED_PAGES,
       reason: 'Feasibility gate passed all checks. Full report rendered.',
       excludedSections: [],
+    }
+  }
+
+  // ── Rule 3b: PASS + blockers>0 — data inconsistency ─────────────────
+  // F-7 fix: PASS status with non-zero blockers is a data inconsistency.
+  // Route to FEASIBILITY_EXCEPTION so blockers are visible, not silently dropped.
+  if (normStatus === 'PASS' && failCount > 0) {
+    return {
+      reportType: 'FEASIBILITY_EXCEPTION',
+      maxPages: 12,
+      reason: `Feasibility gate returned ${feasibilityResult.status} (PASS) but ${failCount} blocker(s) are present — data inconsistency. Routing to FEASIBILITY_EXCEPTION to surface blockers.`,
+      excludedSections: FEASIBILITY_EXCEPTION_EXCLUDED,
     }
   }
 
@@ -163,32 +197,63 @@ export function routeReportType(
     const banners = (feasibilityResult.warnings ?? []).map(w => `Warning: ${w}`)
     return {
       reportType: 'FULL_REPORT',
-      maxPages: 0,
+      maxPages: UNLIMITED_PAGES,
       reason: `Feasibility gate returned ${feasibilityResult.status} with ${feasibilityResult.warnings?.length ?? 0} warnings and zero fail checks. Full report rendered with warning banners.`,
       excludedSections: [],
       warningBanners: banners,
     }
   }
 
-  // ── Rule 4b: FULL_REPORT — WARN/FAIL with exactly one fail check ──────
-  // Includes: WARN with exactly 1 fail check, or FAIL with exactly 1 fail check.
-  if (failCount === 1) {
+  // ── Rule 4b: FULL_REPORT — WARN with exactly one fail check ──────────
+  // F-5 fix (3 seats): this rule now only fires for WARN status. FAIL status
+  // with exactly 1 blocker previously fell here (Rule 4b had no normStatus
+  // guard), producing a FULL_REPORT for a FAIL/RED feasibility result.
+  // FAIL + any blocker count → FEASIBILITY_EXCEPTION (handled below in Rule 5).
+  if (normStatus === 'WARN' && failCount === 1) {
     const failCheck = feasibilityResult.blockers?.[0] ?? 'One feasibility check failed'
     return {
       reportType: 'FULL_REPORT',
-      maxPages: 0,
-      reason: `Feasibility gate returned ${feasibilityResult.status} with exactly one fail check. Full report rendered with prominent warning callout.`,
+      maxPages: UNLIMITED_PAGES,
+      reason: `Feasibility gate returned ${feasibilityResult.status} (WARN) with exactly one fail check. Full report rendered with prominent warning callout.`,
       excludedSections: [],
       warningBanners: [failCheck],
     }
   }
 
-  // ── Default: FULL_REPORT ──────────────────────────────────────────────
-  // Catches any edge case not covered above (e.g. WARN with >1 fail but not >1 blocker).
+  // ── Rule 4c: FEASIBILITY_EXCEPTION — WARN with ≥2 fail checks ────────
+  // F-3 fix (4 seats): WARN + ≥2 blockers previously fell through to the
+  // default route → FULL_REPORT with no banners. Per PA Stage 9 spec,
+  // WARN with multiple blockers should not be treated as a clean pass.
+  if (normStatus === 'WARN' && failCount >= 2) {
+    return {
+      reportType: 'FEASIBILITY_EXCEPTION',
+      maxPages: 12,
+      reason: `Feasibility gate returned ${feasibilityResult.status} (WARN) with ${failCount} fail checks. Multiple concurrent warnings require exception report.`,
+      excludedSections: FEASIBILITY_EXCEPTION_EXCLUDED,
+    }
+  }
+
+  // ── Rule 5: FEASIBILITY_EXCEPTION — FAIL with any blocker count ───────
+  // F-4 fix (3 seats): FAIL + 0 blockers previously fell to the default → FULL_REPORT.
+  // F-5 fix: FAIL + 1 blocker previously fell to Rule 4b → FULL_REPORT.
+  // Both are now caught here. FAIL status NEVER produces an uncapped full report.
+  if (normStatus === 'FAIL') {
+    return {
+      reportType: 'FEASIBILITY_EXCEPTION',
+      maxPages: 12,
+      reason: `Feasibility gate returned ${feasibilityResult.status} (FAIL) with ${failCount} fail check(s). FAIL status always routes to FEASIBILITY_EXCEPTION regardless of blocker count.`,
+      excludedSections: FEASIBILITY_EXCEPTION_EXCLUDED,
+    }
+  }
+
+  // ── Default: FEASIBILITY_EXCEPTION (fail-closed) ─────────────────────
+  // F-1 / F-3 / F-4 fix: the default is now FEASIBILITY_EXCEPTION, not FULL_REPORT.
+  // Any status combination that reaches here is unexpected. Fail closed so the
+  // inconsistency is visible rather than silently producing an uncapped report.
   return {
-    reportType: 'FULL_REPORT',
-    maxPages: 0,
-    reason: `Default route: status=${feasibilityResult.status}, failCount=${failCount}. Rendering full report.`,
-    excludedSections: [],
+    reportType: 'FEASIBILITY_EXCEPTION',
+    maxPages: 12,
+    reason: `Unexpected route: status=${feasibilityResult.status} (normalised=${normStatus}), failCount=${failCount}. Defaulting to FEASIBILITY_EXCEPTION (fail-closed).`,
+    excludedSections: FEASIBILITY_EXCEPTION_EXCLUDED,
   }
 }

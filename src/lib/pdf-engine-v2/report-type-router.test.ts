@@ -94,11 +94,16 @@ describe('routeReportType — PA Stage 9', () => {
     })
   })
 
-  // ── Rule 2: BESS brief — one FAIL check → FULL_REPORT with warning ────
+  // ── Rule 2: BESS brief — FAIL/RED with any blocker count → FEASIBILITY_EXCEPTION
+  // F-5 fix: FAIL status (RED) with exactly one blocker now routes to
+  // FEASIBILITY_EXCEPTION, not FULL_REPORT. FAIL status never produces an
+  // uncapped full report regardless of blocker count.
 
-  describe('BESS brief — exactly one FAIL check (cost)', () => {
-    it('routes to FULL_REPORT (not FEASIBILITY_EXCEPTION) with exactly one blocker', () => {
-      // BESS brief: cost exceeds ceiling — 1 FAIL check only
+  describe('BESS brief — FAIL/RED status (any blocker count → FEASIBILITY_EXCEPTION)', () => {
+    it('routes to FEASIBILITY_EXCEPTION for FAIL/RED with exactly one blocker (F-5 fix)', () => {
+      // BESS brief: cost exceeds ceiling — 1 FAIL check only.
+      // F-5 fix: was previously FULL_REPORT; FAIL status now always routes to
+      // FEASIBILITY_EXCEPTION regardless of blocker count.
       const feasibility = makeFeasibility({
         status: 'RED',
         blockers: ['Cost estimate (£220,000) exceeds ceiling (£180,000)'],
@@ -106,28 +111,29 @@ describe('routeReportType — PA Stage 9', () => {
       })
       const parsedBrief = makeParsedBrief()
       const result = routeReportType(feasibility, parsedBrief)
-      expect(result.reportType).toBe('FULL_REPORT')
+      expect(result.reportType).toBe('FEASIBILITY_EXCEPTION')
     })
 
-    it('populates warningBanners with the single fail check description', () => {
-      const failCheck = 'Cost estimate (£220,000) exceeds ceiling (£180,000)'
-      const feasibility = makeFeasibility({
-        status: 'RED',
-        blockers: [failCheck],
-        warnings: [],
-      })
-      const result = routeReportType(feasibility, makeParsedBrief())
-      expect(result.warningBanners).toBeDefined()
-      expect(result.warningBanners).toContain(failCheck)
-    })
-
-    it('sets maxPages to 0 (no cap) on single-FAIL FULL_REPORT', () => {
+    it('sets maxPages to 12 on FAIL/RED single-blocker FEASIBILITY_EXCEPTION', () => {
       const feasibility = makeFeasibility({
         status: 'RED',
         blockers: ['single failure'],
       })
       const result = routeReportType(feasibility, makeParsedBrief())
-      expect(result.maxPages).toBe(0)
+      expect(result.maxPages).toBe(12)
+    })
+
+    it('WARN + exactly one blocker still routes to FULL_REPORT with warning callout', () => {
+      const failCheck = 'Cost is 1.1× ceiling — marginally over'
+      const feasibility = makeFeasibility({
+        status: 'WARN' as any,
+        blockers: [failCheck],
+        warnings: [],
+      })
+      const result = routeReportType(feasibility, makeParsedBrief())
+      expect(result.reportType).toBe('FULL_REPORT')
+      expect(result.warningBanners).toBeDefined()
+      expect(result.warningBanners).toContain(failCheck)
     })
   })
 

@@ -17,7 +17,7 @@
 | D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | D2 | Sizing + Cost PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
-| F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ⚠️ Issues to fix (12 BLOCKERs — fix before Phase H) | 2026-05-08 |
+| F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ✅ Approved (after fixes — 11 BLOCKERs fixed, F-9 deferred to Phase H) | 2026-05-08 |
 | G | Renderer integration with reportType | 2-3 | ⬜ Pending | ⬜ Pending | — |
 | H | Flip defaults, cleanup | 1-2 | ⬜ Pending | ⬜ Pending | — |
 
@@ -782,9 +782,10 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 - [x] State-machine audit complete — all 6 seats fired 2026-05-08
 - [x] ≥2-seat findings classified as BLOCKERs per synthesis rule
-- [ ] BLOCKERs addressed (see notes below — FIX BLOCKERs before Phase H flip)
+- [x] BLOCKERs F-1 through F-8, F-10, F-11, F-12 fixed (2026-05-08)
+- [x] F-9 deferred to Phase H per reviewer (acceptable in Next.js/Vercel build-time env)
 
-**Result: ⚠️ Issues to fix — 12 BLOCKERs, 1 NOTED**
+**Result: ✅ Approved (after fixes) — 11 BLOCKERs fixed, F-9 deferred to Phase H**
 
 ### Actual
 
@@ -847,6 +848,58 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 ---
 
+### Council fixes applied — 2026-05-08
+
+All 11 BLOCKERs (F-1 through F-12, excluding F-9 deferred) fixed in one commit.
+
+Meta-rule applied: NOTED-F-1 has 1 seat (Gemini only) → stays NOTED, deferred to Phase H. No reclassification warranted.
+
+| ID | Seats | Fix | Files |
+|---|---|---|---|
+| F-1 | 5 | `normaliseStatus()` fail-closed: unknown/UNREVIEWED/null → `FAIL` (was `PASS`). Export `normaliseStatus` for index.ts F-10 fix. | `report-type-router.ts` |
+| F-2 | 5 | Added `trackSkippedStage('council_scoring', ...)` in `_shouldRunCouncil` else branch — matches Review and Polish skip telemetry. | `index.ts` |
+| F-3 | 4 | Added `Rule 4c`: `WARN + failCount >= 2` → `FEASIBILITY_EXCEPTION`. Closes routing hole where WARN+>1 blockers fell to default FULL_REPORT. | `report-type-router.ts` |
+| F-4 | 3 | Added `Rule 5`: `FAIL + failCount === 0` → `FEASIBILITY_EXCEPTION`. Data inconsistency no longer silently produces full report. | `report-type-router.ts` |
+| F-5 | 3 | `Rule 4b` restricted to `normStatus === 'WARN'` only. FAIL+1 blocker now routes to FEASIBILITY_EXCEPTION via Rule 5, not FULL_REPORT. | `report-type-router.ts` |
+| F-6 | 3 | `(parsedBrief.missing_mandatory_fields ?? []).length > 5` — null guard prevents TypeError when LLM omits the array. | `report-type-router.ts` |
+| F-7 | 4 | Rule 3 now `normStatus === 'PASS' && failCount === 0`. PASS+blockers>0 routes to FEASIBILITY_EXCEPTION (data inconsistency surfaced). Added Rule 3b for this case. | `report-type-router.ts` |
+| F-8 | 4 | Added `reportTypeRouterResult?: ReportTypeRouterResult` to `PipelineState`. Replaced `(state as any).reportTypeRouterResult` and `(feasibility as any).reportType` casts with typed assignments. | `types.ts`, `index.ts` |
+| F-10 | 2 | While loop now uses `normaliseStatus(feasibility.status) === 'FAIL'/'WARN'` so PA-native `FAIL`/`WARN` statuses trigger revision loop (was checking raw legacy strings `RED`/`AMBER` only). | `index.ts` |
+| F-11 | 3 | Exported `UNLIMITED_PAGES = 0` constant with JSDoc explaining "0 = no cap" convention. All FULL_REPORT `maxPages` values use `UNLIMITED_PAGES`. Phase G renderer's `if (maxPages === 0) return included` check is compatible. | `report-type-router.ts` |
+| F-12 | 3 | After each revision + feasibility rerun, calls `routeReportType()` mid-loop. Breaks early when route resolves to non-FEASIBILITY_EXCEPTION, avoiding wasted iteration. | `index.ts` |
+
+**Default route changed (all BLOCKERs combined):** The default return in `routeReportType()` now returns `FEASIBILITY_EXCEPTION` (fail-closed), not `FULL_REPORT`. All defined paths are now exhaustive — the default should never be reached in practice.
+
+**Existing tests updated:** 3 tests in `report-type-router.test.ts` updated to reflect F-5 fix (RED+1 blocker now → FEASIBILITY_EXCEPTION, not FULL_REPORT). New test added: WARN+1 blocker → FULL_REPORT with warning callout (the WARN case that was previously tested as RED).
+
+**New tests added:** 33 tests in `phase-f-council-blockers.test.ts`:
+- F-1: 6 tests (unknown/UNREVIEWED/null status → FAIL; routeReportType FEASIBILITY_EXCEPTION; known PASS regression)
+- F-3: 4 tests (AMBER+2 blockers, WARN+2 blockers, WARN+3 blockers → FEASIBILITY_EXCEPTION; WARN+1 regression)
+- F-4: 3 tests (RED+0, FAIL+0 blockers → FEASIBILITY_EXCEPTION)
+- F-5: 3 tests (RED+1, FAIL+1 → FEASIBILITY_EXCEPTION; WARN+1 regression)
+- F-6: 3 tests (undefined/null missing_mandatory_fields no TypeError; treated as empty array)
+- F-7: 3 tests (PASS+0 regression; PASS+1, PASS+2 → FEASIBILITY_EXCEPTION)
+- F-11: 4 tests (UNLIMITED_PAGES exported; FULL_REPORT uses it; FEASIBILITY_EXCEPTION does not)
+- F-2/F-8/F-10/F-12: 10 tests (structural: export checks, PipelineState typed field, normaliseStatus PA vocab, route improvement mid-loop)
+
+**All tests:** 617/617 pass (584 baseline + 33 new).
+
+**Typecheck:** No new errors in changed files. Pre-existing errors in `council-scorer.test.ts`, `council-scorer.ts`, `index.test.ts(352)`, `bom-builder.ts`, `stages/7-pdf.tsx` unchanged.
+
+### Deferred to Phase H — F-9
+
+**F-9 (5 seats) — PA_PIPELINE load-time constant**
+
+Not fixed in this commit per reviewer decision: F-9 is acceptable as a load-time constant in Next.js/Vercel build-time env (env vars are stable per build; no long-lived workers).
+
+**Phase H sonnet brief MUST include:** "Convert `PA_PIPELINE` from load-time constant to runtime check: read `process.env.PA_PIPELINE` inside each call site or via a memoised getter so tests don't need `jest.isolateModules` workaround AND so runtime env-var changes take effect without restart."
+
+### Deferred to Phase H — NOTED-F-1
+
+**NOTED-F-1 (1 seat — Gemini only):** Rule 4b `warningBanners` ignores concurrent `warnings[]` — only first blocker surfaced. 1 seat only; meta-rule requires ≥2 seats for reclassification to BLOCKER. Deferred to Phase H as low-impact.
+
+---
+
 ## Phase G — Renderer Integration with reportType
 
 **Status:** ✅ Done (2026-05-08)
@@ -885,7 +938,47 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 ### Council review
 
-- [ ] Findings ≥2 seats addressed
+**Status: ⚠️ Issues to fix (2026-05-08)**
+
+6-seat council convened at commit `0a839698`. Seats: Gemini 3.1 Pro (partial/prose), GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6 (truncated/reasoning-only), MiMo-V2.5-Pro. Effective seats with structured findings: GPT-5.4, Grok 4.3, GLM-5.1, MiMo-V2.5-Pro (4 of 6).
+
+#### BLOCKER findings (≥2 seats)
+
+| ID | Seats | Severity | Finding |
+|---|---|---|---|
+| G-B1 | GLM-5.1, MiMo, GPT-5.4, Grok | CRITICAL | `source_attrib` is in **both** the `included` Set AND counted in the base estimate inside `_applyMaxPages`, and is first in `TRIM_ORDER`. Double-count causes off-by-1 overestimate. The trim loop "removes" `source_attrib` from `finalSections` to reduce the estimate, but the JSX always renders `<SourceAttributionSection>` unconditionally — so the save is phantom. The loop has spent a trim on a section it cannot actually suppress, while the estimate is still wrong. Effect: when over budget, the trim loop fires one extra trim on a section that was already mandatory, potentially cascading to remove an optional section (e.g., `feasibility`) that would have fit. Fix: remove `source_attrib` from `TRIM_ORDER` (it is mandatory); count it only in the base estimate, never in the loop. |
+| G-B2 | GLM-5.1, MiMo, GPT-5.4, Grok | HIGH | `'bom'` and `'research'` appear in both router exclusion arrays (`BRIEF_INCOMPLETE_EXCLUDED`, `FEASIBILITY_EXCEPTION_EXCLUDED`) but are **not** in the `included` Set. `included.delete('bom')` and `included.delete('research')` are silent no-ops. The router emits these IDs and the renderer silently ignores them. BOM content embedded in `ModuleDetailSection` and research content embedded in `BriefPages` are never suppressed regardless of exclusion instruction. Currently masked because both routes also exclude `modules` (so BOM doesn't render anyway), but any future router path that excludes only `'bom'` will fail silently. Fix: either (a) add a `showBom` prop to `ModuleDetailSection` gated by `!excludedSections.includes('bom')`, or (b) emit a warning when `excludedSections` contains IDs absent from `included`. |
+| G-B3 | GPT-5.4, MiMo, Grok, Gemini (partial) | HIGH | `source_attrib` always rendered on `BRIEF_INCOMPLETE` violates stated spec ("render only cover + brief"). The 6-page cap was specified without accounting for the provenance-disclosure page. Baseline for `BRIEF_INCOMPLETE` is `cover(1) + brief(2) + source_attrib(1) = 4`, leaving only 2 pages for trimmable content. If spec intended cover+brief only = 3 pages, source_attrib silently adds 1 page and the nominal cap is 6 when it should be 5 for content. Needs an explicit spec decision: is `source_attrib` mandatory on `BRIEF_INCOMPLETE`? If yes, update router `maxPages` from 6→5 for non-attribution budget, or confirm 6 is correct including attribution. |
+| G-B4 | GPT-5.4, MiMo | MEDIUM | `PDF_RENDERER` env var uses `||` (not `??`). Empty string `''` is falsy under `||` and falls through to the `PA_PIPELINE` ternary, making `PA_PIPELINE=true + PDF_RENDERER=''` silently select v3. Old `??` treated `''` as explicit and fell through to legacy. Additionally, invalid values (`'v4'`, `'V3'`) are accepted without warning — they pass the `||` check but fail `=== 'v3'` and silently land on legacy renderer. Fix: validate `_pdfRendererVersion` against `['v2','v3']` after computation and emit a `console.warn` on invalid value. |
+
+#### NOTED findings (1 seat only)
+
+| ID | Seat | Finding |
+|---|---|---|
+| G-N1 | GPT-5.4 | `routerResult` absent while `state.reportType` is present causes silent FULL_REPORT fallback on partially migrated state. Recommend validation or warning. |
+| G-N2 | GPT-5.4 | `ToC` not included in max-pages estimate/enforcement — estimated section trimming can pass cap check but ToC adds 1 page on large FULL_REPORT renders. |
+| G-N3 | GLM-5.1 | `maxPages === 0` as "no cap" sentinel is ambiguous — a valid future report type with `maxPages: 0` would render uncapped. Recommend `null`/`undefined` or `Number.MAX_SAFE_INTEGER` as sentinel. |
+| G-N4 | MiMo | `routerResult` cast via `(safe as any)` with no compile-time type enforcement. Shared `ReportTypeRouterResult` interface should be imported, not redeclared inline. |
+| G-N5 | MiMo | `TRIM_ORDER` has no runtime guard for IDs added to `included` but missing from TRIM_ORDER — maintenance hazard. |
+
+#### Council meta
+
+- Gemini 3.1 Pro: responded with prose/reasoning, no clean JSON. Key themes extracted: `estimatedPages` defined (false alarm — variable IS declared in safe-cast section, confirmed by source read), `source_attrib` double-count concern (corroborates G-B1), ReferenceError concern (false alarm).
+- Kimi K2.6: hit `max_tokens=16000` producing reasoning-only, no JSON. Identified same `source_attrib` / `bom`/`research` no-op concerns — corroborates G-B1 and G-B2.
+- Confirmed false-alarm findings: `estimatedPages` IS declared in the component body (line 1867); `regs` IS declared (line 1821). ReferenceError claims from Grok/MiMo were based on the abridged diff not including the safe-cast section.
+
+#### Required fixes before Phase H
+
+1. **G-B1 (CRITICAL):** Remove `source_attrib` from `TRIM_ORDER` — it cannot be trimmed (JSX unconditional render). Remove double-count in `_applyMaxPages` base estimate OR remove from `included` Set. The cleanest fix: remove from both `TRIM_ORDER` and `included` Set since it is always-rendered and `show('source_attrib')` is never called.
+2. **G-B2 (HIGH):** Add warning/error when `excludedSections` contains IDs absent from `included` Set (`'bom'`, `'research'`). Optionally add `showBom` prop to `ModuleDetailSection`.
+3. **G-B3 (HIGH):** Explicit spec decision on `source_attrib` + `BRIEF_INCOMPLETE`. Update `maxPages` or document intentional deviation.
+4. **G-B4 (MEDIUM):** Add `console.warn` for invalid `PDF_RENDERER` values; document `||` vs `??` behavioural change.
+
+- [x] Council review complete (2026-05-08) — 4 BLOCKERs, 5 NOTED
+- [ ] G-B1 fix committed
+- [ ] G-B2 fix committed
+- [ ] G-B3 spec decision recorded
+- [ ] G-B4 warning added
 
 ---
 
@@ -952,7 +1045,7 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase D1: council review ✅ Approved (2026-05-08) — 9 BLOCKERs fixed + 2 NOTEDs reclassified as BLOCKERs (NOTED-D1-2 and NOTED-D1-3, 2 seats each) and fixed. All 530 tests pass. Phase E unblocked.
 - ✅ Phase D2: council review ✅ Approved (after fixes) — 5 BLOCKERs fixed 2026-05-08
 - ✅ Phase F: COMPLETE (2026-05-08) — Report Type Router (PA Stage 9), Polish dropped on PA path, Review + Council Scoring FULL_REPORT-only guard; 33 new tests (21 unit + 12 integration); 563/563 pass
-- ⚠️ Phase F: council review COMPLETE — 12 BLOCKERs to fix before Phase H flip. Fix priority: F-3/F-4/F-5/F-6/F-7 (routing correctness) first, then F-1/F-2/F-8/F-10/F-11/F-12 (telemetry/type safety). F-9 (PA_PIPELINE runtime) deferred to Phase H.
+- ✅ Phase F: council review COMPLETE — 11 BLOCKERs fixed (F-1 to F-8, F-10, F-11, F-12). F-9 deferred to Phase H. 33 new tests. 617/617 pass. Typecheck clean in changed files.
 - ❌ Phase E: unblocked, ready to start (gated on v2 BOM ≥8 baseline)
 - ✅ Phase G: COMPLETE (2026-05-08) — renderer v3 reads reportType for section/page guards; 21 new tests; all 2096 pre-existing tests pass
 - ❌ Phase G: council review PENDING

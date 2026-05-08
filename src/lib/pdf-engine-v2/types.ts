@@ -645,6 +645,12 @@ export interface PipelineState {
   regulatoryExtraction?: RegulatoryExtraction
   /** PA path only (Phase F+): resolved report type from PA Stage 9 Router */
   reportType?: import('./report-type-router').ReportType
+  /**
+   * PA path only (Phase F+): full result from PA Stage 9 Router.
+   * F-8 fix: typed field replaces the `(state as any).reportTypeRouterResult` cast
+   * that previously bypassed the type system.
+   */
+  reportTypeRouterResult?: import('./report-type-router').ReportTypeRouterResult
   productClass?: string
   pipelineError?: {
     stage: string
