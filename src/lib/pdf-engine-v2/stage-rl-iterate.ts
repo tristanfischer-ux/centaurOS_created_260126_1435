@@ -17,19 +17,34 @@
  *
  * 4. STAGE-AGNOSTIC — parameterised by stage name, not a separate script per stage.
  *
+ * 5. JSON OUTPUT — `--json-output <path>` writes a machine-readable result file
+ *    consumed by the autonomous rl-driver.sh bash loop.
+ *
+ * 6. COUNCIL INTEGRATION — when a prompt diff exceeds 20 lines, a 6-LLM council
+ *    reviews the diff before commit. ≥2 BLOCKER votes revert the iteration.
+ *
  * Usage:
  *   npx tsx src/lib/pdf-engine-v2/stage-rl-iterate.ts \
  *     --stage decompose \
  *     --iterations 5 \
  *     --briefs all \
  *     --label my-run \
- *     --output ~/Downloads/engine-evidence/my-run
+ *     --output ~/Downloads/engine-evidence/my-run \
+ *     --json-output ~/Downloads/engine-evidence/my-run/result.json
  */
 
 import { writeFileSync, mkdirSync, readFileSync, existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { readdirSync } from 'fs'
+
+// Council integration and shared types — extracted into a separate module so
+// Jest can import them without triggering the fileURLToPath/__dirname
+// SyntaxError that occurs under Jest's CJS transform.
+export type { RlIterationResult, CouncilDiffResult } from './stage-rl-council.js'
+export { reviewPromptDiffWithCouncil } from './stage-rl-council.js'
+import type { RlIterationResult, CouncilDiffResult } from './stage-rl-council.js'
+import { reviewPromptDiffWithCouncil } from './stage-rl-council.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const REPO_ROOT = join(__dirname, '..', '..', '..')
@@ -155,7 +170,10 @@ function parseArgs() {
     })
   }
 
-  return { stage, iterations, briefFiles, label, outputDir: output }
+  // --json-output <path>: if provided, write a machine-readable result JSON at the end.
+  const jsonOutput = get('--json-output') || null
+
+  return { stage, iterations, briefFiles, label, outputDir: output, jsonOutput }
 }
 
 // ─── Per-brief pipeline run up to target stage ────────────────────────────────
@@ -722,7 +740,8 @@ function extractJSON(text: string): any {
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { stage, iterations, briefFiles, label, outputDir } = parseArgs()
+  const { stage, iterations, briefFiles, label, outputDir, jsonOutput } = parseArgs()
+  const startedAt = new Date().toISOString()
 
   console.log(`\n[stage-rl] === Stage RL Iterate ===`)
   console.log(`[stage-rl] Stage:      ${stage}`)
@@ -730,6 +749,7 @@ async function main() {
   console.log(`[stage-rl] Briefs:     ${briefFiles.length} files`)
   console.log(`[stage-rl] Label:      ${label}`)
   console.log(`[stage-rl] Output:     ${outputDir}`)
+  console.log(`[stage-rl] JSON out:   ${jsonOutput ?? '(none)'}`)
   console.log(`[stage-rl] Primary council section: ${STAGE_TO_COUNCIL_SECTION[stage]?.[0]}`)
 
   mkdirSync(outputDir, { recursive: true })
@@ -758,10 +778,16 @@ async function main() {
     meanScore: number
     suggestions: Array<{ what: string; reasoning: string }>
     promptContext: string   // snapshot of what prompt was used this iteration
+    councilFired: boolean
+    councilBlockersCount: number
+    promptDiffSizeLines: number
+    rlDecision: RlIterationResult['rl_decision']
   }> = []
 
   let bestIterIdx = 0
   let bestMean = -Infinity
+  // Track consecutive iterations above 8.0 for promotion gate
+  let consecutiveAbove8 = 0
 
   for (let iter = 1; iter <= iterations; iter++) {
     console.log(`\n[stage-rl] === Iteration ${iter}/${iterations} ===`)
@@ -840,6 +866,13 @@ async function main() {
       bestIterIdx = iter - 1 // 0-based index into history
     }
 
+    // Track promotion gate
+    if (meanScore >= 8.0) {
+      consecutiveAbove8++
+    } else {
+      consecutiveAbove8 = 0
+    }
+
     // Propose prompt improvements for next iteration
     const suggestions = await proposeSuggestions(
       stage,
@@ -857,22 +890,63 @@ async function main() {
       console.log(`[stage-rl] No suggestions generated.`)
     }
 
+    // ── Council review on prompt diff (if diff > 20 lines) ─────────────────
+    // In this single-iteration invocation mode, we estimate diff size from
+    // the number of suggestion lines. The bash driver controls multi-iteration
+    // state. For the TS side we compute a synthetic diff size from suggestions.
+    const promptDiffSizeLines = suggestions.length > 0
+      ? suggestions.reduce((acc, s) => acc + Math.ceil(s.what.length / 80) + Math.ceil(s.reasoning.length / 80), 0)
+      : 0
+
+    let councilResult: CouncilDiffResult = { blockerCount: 0, seatFindings: [], fired: false }
+    if (promptDiffSizeLines > 20) {
+      console.log(`[stage-rl] Prompt diff ${promptDiffSizeLines} lines > 20 — firing council review`)
+      const syntheticDiff = suggestions.map((s, i) => `+${i + 1}. ${s.what}\n  Reason: ${s.reasoning}`).join('\n')
+      councilResult = await reviewPromptDiffWithCouncil(stage, syntheticDiff, promptDiffSizeLines)
+    }
+
+    // ── RL decision for this iteration ─────────────────────────────────────
+    let rlDecision: RlIterationResult['rl_decision'] = 'PENDING'
+    if (councilResult.blockerCount >= 2) {
+      rlDecision = 'REVERT'
+      console.log(`\n[stage-rl] Council BLOCKED iteration (${councilResult.blockerCount} BLOCKERs) — decision: REVERT`)
+    } else if (meanScore >= 8.0 && consecutiveAbove8 >= 2) {
+      rlDecision = 'PROMOTE'
+      console.log(`\n[stage-rl] Promotion gate met (mean ${meanScore.toFixed(2)} >= 8.0, ${consecutiveAbove8} consecutive) — decision: PROMOTE`)
+    } else if (iter >= iterations) {
+      rlDecision = 'GIVE-UP'
+      console.log(`\n[stage-rl] Max iterations (${iterations}) reached — decision: GIVE-UP`)
+    } else {
+      rlDecision = 'ITERATE'
+    }
+
     const iterEntry = {
       iteration: iter,
       briefScores,
       meanScore,
       suggestions,
       promptContext: currentPrompt.slice(0, 500),
+      councilFired: councilResult.fired,
+      councilBlockersCount: councilResult.blockerCount,
+      promptDiffSizeLines,
+      rlDecision,
     }
     history.push(iterEntry)
 
     // Write per-iteration summary
     writeFileSync(join(iterDir, 'summary.json'), JSON.stringify(iterEntry, null, 2))
 
-    // Early exit if target reached
-    if (meanScore >= 8.0) {
-      console.log(`\n[stage-rl] Target 8/10 reached at iteration ${iter}. Stopping early.`)
+    // Early exit conditions
+    if (rlDecision === 'PROMOTE') {
+      console.log(`\n[stage-rl] PROMOTE: target reached and held. Stopping early.`)
       break
+    }
+    if (rlDecision === 'REVERT') {
+      // Council blocked — log and continue to next iteration (don't commit, don't promote)
+      console.log(`[stage-rl] REVERT: skipping to next iteration without committing prompt.`)
+      // Reset consecutive counter since this iteration's score was based on reverted prompt
+      consecutiveAbove8 = 0
+      continue
     }
   }
 
@@ -947,6 +1021,48 @@ ${(bestIter?.suggestions || []).map(s => `- **${s.what}**: ${s.reasoning}`).join
 `
 
   writeFileSync(join(outputDir, 'BEST.md'), bestMd)
+
+  // ── Write --json-output file (machine-readable for rl-driver.sh) ──────────
+  if (jsonOutput) {
+    const endedAt = new Date().toISOString()
+    const durationSeconds = Math.round(
+      (new Date(endedAt).getTime() - new Date(startedAt).getTime()) / 1000,
+    )
+
+    // Use the last completed iteration for the result payload
+    const lastEntry = history[history.length - 1]
+    const lastScored = lastEntry?.briefScores.filter(s => s.score >= 0) || []
+    const perBriefScores: Record<string, number> = {}
+    for (const bs of lastEntry?.briefScores || []) {
+      // Strip numeric prefix from slug for clean keys (e.g. "01-cgm-wearable" → "cgm-wearable")
+      const cleanSlug = bs.briefSlug.replace(/^\d+-/, '')
+      perBriefScores[cleanSlug] = bs.score
+    }
+
+    const rlResult: RlIterationResult = {
+      stage,
+      iteration_number: lastEntry?.iteration ?? 1,
+      started_at: startedAt,
+      ended_at: endedAt,
+      duration_seconds: durationSeconds,
+      briefs_run: briefs.map(b => b.slug.replace(/^\d+-/, '')),
+      per_brief_scores: perBriefScores,
+      mean_score: lastEntry?.meanScore != null && lastEntry.meanScore >= 0
+        ? parseFloat(lastEntry.meanScore.toFixed(3))
+        : null,
+      prompt_changed: (lastEntry?.suggestions?.length ?? 0) > 0 && lastEntry?.rlDecision !== 'REVERT',
+      prompt_diff_size_lines: lastEntry?.promptDiffSizeLines ?? 0,
+      council_fired: lastEntry?.councilFired ?? false,
+      council_blockers_count: lastEntry?.councilBlockersCount ?? 0,
+      committed_sha: null, // rl-driver.sh reads git log to populate this after the run
+      rl_decision: lastEntry?.rlDecision ?? 'PENDING',
+    }
+
+    const jsonOutputDir = dirname(jsonOutput)
+    mkdirSync(jsonOutputDir, { recursive: true })
+    writeFileSync(jsonOutput, JSON.stringify(rlResult, null, 2))
+    console.log(`[stage-rl] JSON output: ${jsonOutput}`)
+  }
 
   console.log(`\n[stage-rl] === Complete ===`)
   console.log(`[stage-rl] Best iteration: ${bestIter?.iteration ?? 'N/A'} (mean ${bestMean >= 0 ? bestMean.toFixed(2) : 'N/A'}/10)`)
