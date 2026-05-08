@@ -19,7 +19,7 @@
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
 | F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ✅ Approved (after fixes — 11 BLOCKERs fixed, F-9 deferred to Phase H) | 2026-05-08 |
 | G | Renderer integration with reportType | 2-3 | ✅ Done | ✅ Approved (after fixes — 4 BLOCKERs fixed, 5 NOTEDs deferred to Phase H) | 2026-05-08 |
-| H | Flip defaults, cleanup | 1-2 | ⬜ Pending | ⬜ Pending | — |
+| H | Flip defaults, cleanup | 1-2 | ✅ Done | ⚠️ Issues to fix (8 BLOCKERs — scoped council: index.ts + stage-rl-iterate.ts only) | 2026-05-08 |
 
 **Status legend:** ⬜ Pending · 🔄 In progress · ✅ Done · ⚠️ Blocked · 🚫 Skipped
 **Council legend:** ⬜ Pending · 🔄 In progress · ✅ Approved · ⚠️ Issues to fix · ❌ Rejected
@@ -1072,7 +1072,39 @@ Meta-rule applied: all 5 NOTEDs are 1 seat only — no reclassification. All def
 
 ### Council review
 
-- ⬜ Pending (main thread fires next)
+- ✅ Complete — 2026-05-08
+- **Council seats:** Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo V2.5-Pro — all 6 responded.
+- **Scope:** HIGH-RISK files only: `index.ts` (runtime getter changes) + `stage-rl-iterate.ts` (PA-aware RL framework). Deprecation markers, test files, STAGE-RL-MANIFEST not reviewed (low risk, out of scope).
+- **Status: ⚠️ Issues to fix — 8 BLOCKERs identified (≥2 seats each), 3 NOTEDs (1 seat only)**
+- **GPT-5.4 hallucination discount applied** — GPT-5.4 findings cross-checked against ≥1 other seat before counting.
+- **Default-flip safety verdict: NEEDS REWORK** — multiple issues require fixes before Phase H is safe to promote.
+
+#### BLOCKERs (≥2 seats each)
+
+| ID | Seats | File | Description | Suggested fix |
+|---|---|---|---|---|
+| H-B1 | 5 seats (GPT-5.4, Grok, GLM-5.1, Kimi, MiMo) | `stage-rl-iterate.ts` | **PA_STAGE_NAMES vs PA_STAGES_ORDERED ordering inconsistency.** Module-level `PA_STAGE_NAMES` has bom_pa before size_layout (indices 4,5). Local `PA_STAGES_ORDERED` has size_layout before bom_pa (indices 4,5). Execution follows local; parseArgs cross-path warning uses module array. Currently `includes()` only — no active bug — but a latent defect: any future index-based code using `PA_STAGE_NAMES` will compute wrong targetIdx, causing silent stage skips. | Unify: derive `PA_STAGE_NAMES` from `PA_STAGES_ORDERED` (`as const` slice) so a single source of truth controls both. |
+| H-B2 | 5 seats (Gemini, Grok, GLM-5.1, Kimi, MiMo) | `stage-rl-iterate.ts` | **bom_pa calls legacy `runBomCost()` not a PA-specific function.** `runBomCost(modules, state.dimensionSheet, {domain})` receives PA state where `dimensionSheet` came from `paMode:true` size_layout, which may have a different field structure than legacy. If `runBomCost` expects legacy fields it will silently produce wrong BOM output. Additionally `state.dimensionSheet` is `undefined` if `size_layout` soft-failed (warn only, no abort) — no guard before the call. | Either add guard (`if (!state.dimensionSheet) { skip with warn/error }`) or confirm `runBomCost` handles `undefined`/PA-shape dimensionSheet. Defer PA-specific `runBomCostPA` to Phase E. |
+| H-B3 | 3 seats (Gemini, GPT-5.4, MiMo) | `index.ts` + `stage-rl-iterate.ts` | **TOCTOU: env read per call, not snapshotted per pipeline run.** `isPaPipeline()` and `getPdfRenderer()` re-read `process.env` on every call. If `process.env.PA_PIPELINE` changes between calls mid-run (test environments, parallel Jest workers), different stage branches within a single pipeline invocation will see different values, producing hybrid PA+legacy execution. | Snapshot at pipeline entry: `const paMode = isPaPipeline(); const renderer = getPdfRenderer();` — pass or close over these for the duration of each `runPipeline()` invocation. Keep getters for top-level config resolution only. |
+| H-B4 | 2 seats (Gemini, GPT-5.4) | `index.ts` | **`getPdfRenderer()` invalid-value fallback hardcodes `'v2'` not path-appropriate default.** If `PDF_RENDERER=bad_value` with `PA_PIPELINE` unset (PA default), the warn + `return 'v2'` silently overrides the PA default to the legacy renderer instead of `'v3'`. The old code also fell back to `'v2'` but the old default was `'v2'` so it was neutral. After the flip, this actively downgrades a PA deployment with a misconfigured renderer. | Change fallback return: `return isPaPipeline() ? 'v3' : 'v2'`. Log the invalid value clearly before returning. |
+| H-B5 | 3 seats (GLM-5.1, Kimi, MiMo) | `index.ts` + `stage-rl-iterate.ts` | **`isPaPipeline()` duplicated identically in two files — divergence risk.** If logic is ever updated in one file (e.g. case-normalisation added), the other silently diverges. RL framework and live pipeline would then disagree on pipeline mode. | Extract to `src/lib/pdf-engine-v2/env.ts` (or `config.ts`) and import in both files. |
+| H-B6 | 3 seats (GLM-5.1, Kimi, MiMo) | `index.ts` + `stage-rl-iterate.ts` | **Case-sensitivity: `PA_PIPELINE=False` or `PA_PIPELINE=FALSE` silently activates PA path** (not equal to lowercase `'false'`). Old semantics (`=== 'true'`) meant non-lowercase errors always defaulted safely to legacy. New semantics (`!== 'false'`) inverts which typos are dangerous — `PA_PIPELINE=fals` activates PA instead of falling back to legacy. Operators, CI scripts, or `.env` files using `False`/`FALSE`/`0` to opt out silently end up on PA. | Normalise before comparison: `return (process.env.PA_PIPELINE ?? '').toLowerCase() !== 'false'`. Add startup warning when value is non-canonical (not `'false'`, `'true'`, or unset). |
+| H-B7 | 2 seats (Kimi, MiMo) | `stage-rl-iterate.ts` | **RL `decompose_pa` guard is stricter than live pipeline.** RL requires `parsedBrief && researchSynthesis`; live pipeline only requires `parsedBrief`. In ordered PA execution this is safe (research_synthesis always runs before decompose_pa). But for partial-state replay or trace injection, the RL will silently skip `decompose_pa` for states the live pipeline accepts — breaking replay fidelity and masking staging bugs. | Either align RL guard to match live pipeline (`parsedBrief` only), or make the stricter RL guard an explicit assertion/error so mismatches fail loudly. |
+| H-B8 | 2 seats (Kimi, MiMo) | `index.ts` | **Startup telemetry log may not fire on early-exit paths.** The `[pipeline] PA_PIPELINE=... PDF_RENDERER=...` log is placed as first statement inside `runPipeline()` body. Any parameter-destructuring exception or validation throw that occurs before the body reaches this line suppresses the telemetry — exactly when it matters most for debugging migration failures. | Move log to the very first executable line of `runPipeline()`, before any destructuring. Or wrap `runPipeline` at call site with a try/catch that logs env state before re-throwing. |
+
+#### NOTEDs (1 seat only — no reclassification warranted)
+
+| ID | Seat | Description |
+|---|---|---|
+| H-N1 | Gemini | `bom_pa` maps to `['BOM', 'Cost']` in `STAGE_TO_COUNCIL_SECTION` but the file it maps to (`4-bom-cost-suppliers.ts`) includes suppliers. Suppliers council section omitted. May under-weight supplier quality in RL scoring. Deferred to Phase E when bom_pa gets a PA-specific implementation. |
+| H-N2 | MiMo | `getPdfRenderer()` warning fires on every call if `PDF_RENDERER` is misconfigured (previously fired once at load). Low severity but log noise risk. Consider a one-time-warn guard. |
+| H-N3 | Gemini | `classifyProduct()` hoisted above PA/legacy fork — executes on all paths including PA. Reviewed: classification is cheap + deterministic; no risk. Noted for clarity only. |
+
+#### Recommendation
+
+**FIX BLOCKERs first** — do not proceed to baseline + RL launch until H-B1 through H-B8 are resolved.
+
+Priority order: H-B6 (case sensitivity, prod trap) → H-B5 (DRY/divergence) → H-B3 (TOCTOU snapshot) → H-B4 (renderer fallback) → H-B2 (bom_pa guard) → H-B1 (ordering unification) → H-B7 (RL guard) → H-B8 (telemetry position).
 
 ### Deviations from spec
 
@@ -1122,8 +1154,8 @@ For watchdog drift detection. Pending items only:
 - ❌ Phase E: unblocked, ready to start (gated on v2 BOM ≥8 baseline)
 - ✅ Phase G: COMPLETE (2026-05-08) — renderer v3 reads reportType for section/page guards; 21 new tests; all 2096 pre-existing tests pass
 - ✅ Phase G: council review COMPLETE — 4 BLOCKERs fixed (G-B1 through G-B4). 16 new tests. All 5 NOTEDs are 1 seat — deferred to Phase H. Typecheck clean in changed files.
-- ❌ Phase H: pending Phase G council review + baseline ≥8 across 10 briefs
-- ❌ All council reviews (Phase F/G/H onwards)
+- ⚠️ Phase H: council review DONE (2026-05-08) — 8 BLOCKERs found (H-B1 through H-B8), 3 NOTEDs. NEEDS REWORK before RL launch. Scoped review: index.ts + stage-rl-iterate.ts (high-risk files only; deprecation markers + tests not reviewed).
+- ❌ Phase H: 8 BLOCKERs to fix (H-B1: ordering unification, H-B2: bom_pa guard, H-B3: TOCTOU snapshot, H-B4: renderer fallback, H-B5: isPaPipeline DRY, H-B6: case sensitivity, H-B7: RL guard alignment, H-B8: telemetry position)
 
 ---
 
