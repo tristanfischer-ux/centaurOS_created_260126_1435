@@ -795,11 +795,19 @@ export async function runPipeline(
 
       // Dual-write: synthesise legacy state.research.designBrief.regulatory shape
       // so downstream stages that read state.research.designBrief.regulatory keep working.
+      //
+      // D1 council BLOCKER-D1-4 fix (2/6 seats: GLM-5.1, MiMo):
+      // The summary field previously mapped to e.applicability — same as the
+      // applicability field, so council-scorer saw identical values in both
+      // columns and lost scoring signal. Fixed: summary now derives from
+      // `standard_name (jurisdiction)` which describes WHAT the regulation is,
+      // while applicability retains WHY it applies to this specific product.
       if (state.research) {
         const legacyRegulatory = regulatoryResult.data.regulatory_entries.map(e => ({
           code: e.standard_name,
           name: e.standard_name,
-          summary: e.applicability,
+          // D1-4 fix: summary = "what the regulation is" not "why it applies"
+          summary: `${e.standard_name} (${e.jurisdiction})`,
           status: e.status,
           applicability: e.applicability,
           designImpact: e.engineering_impact,
@@ -807,7 +815,20 @@ export async function runPipeline(
           ownerRole: e.owner,
           gapAction: e.gap_action,
         }))
-        if (state.research.designBrief) {
+
+        // D1 council BLOCKER-D1-3 fix (5/6 seats: GPT-5.4, Grok, GLM-5.1, Kimi, MiMo):
+        // If state.research.designBrief is null/undefined (possible when Research
+        // Synthesis produced a shape without designBrief), the write was silently
+        // skipped. All three downstream consumers (council-scorer, score-rubric,
+        // calculators) would see zero regulatory data even though PA Stage 4 succeeded.
+        // Force-initialise designBrief with the regulatory data if it is absent.
+        if (!state.research.designBrief) {
+          console.warn(
+            '[pipeline] PA Regulatory dual-write: state.research.designBrief was null/undefined — ' +
+            'force-initialising with regulatory data. This may indicate an issue in Research Synthesis.'
+          )
+          state.research.designBrief = { regulatory: legacyRegulatory } as any
+        } else {
           state.research.designBrief.regulatory = legacyRegulatory
         }
       }
@@ -835,13 +856,41 @@ export async function runPipeline(
   if (PA_PIPELINE && state.parsedBrief) {
     // ── PA path: runDecomposePA uses PA Stage 5 prompt + schema ───────────
     console.log('[pipeline] PA path: running PA Stage 5 Module Decomposition...')
+
+    // D1 council BLOCKER-D1-7 fix (2/6 seats: GPT-5.4, MiMo):
+    // classification.productClass accessed directly — if classification were passed
+    // as a plain string at the orchestrator level (which regulatory extraction
+    // code explicitly anticipates), .productClass would be undefined, propagating
+    // "undefined" as a string to the LLM prompt. Use a shared helper to extract
+    // the product class string safely from either form.
+    const productClassStr: string = typeof classification === 'string'
+      ? classification
+      : (classification.productClass ?? 'UNKNOWN')
+
     const paResult = await runDecomposePA(
       state.parsedBrief,
-      classification.productClass,
+      productClassStr,
       state.regulatoryExtraction,
     )
-    // Cast to legacy type for unified error handling below (ModulePA extends Module)
-    decomposeResult = paResult as typeof decomposeResult
+
+    // D1 council BLOCKER-D1-9 fix (3/6 seats: GLM-5.1, Kimi, MiMo):
+    // The previous cast `paResult as typeof decomposeResult` suppressed structural
+    // divergence. If paResult.ok === false, the error shape was cast and then
+    // silently processed. Use explicit narrowing instead so each branch is typed
+    // and the ok/error/data shapes are correct for the downstream error handler.
+    if (!paResult.ok) {
+      decomposeResult = { ok: false, error: paResult.error, durationMs: paResult.durationMs }
+    } else {
+      // ModulePA structurally extends Module — the cast is intentional and the
+      // comment below documents this assumption explicitly (unlike the original
+      // cast which was silent). The PA data carries all Module fields plus extras.
+      decomposeResult = {
+        ok: true,
+        // ModulePA is a structural superset of Module — safe to widen.
+        data: paResult.data as unknown as import('./types').Module[],
+        durationMs: paResult.durationMs,
+      }
+    }
   } else {
     // ── Legacy path: unchanged ────────────────────────────────────────────
     decomposeResult = await runDecompose(state.research, {

@@ -14,7 +14,7 @@
 | A | Brief Parsing as new Stage 1 | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | B | Reorder Research to consume Brief Parsing | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | C | Drop Training Data Dump | 0.5-1 | ✅ Done | ✅ Approved (after fixes for BLOCKER-3+4) | 2026-05-08 |
-| D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ⚠️ Issues to fix (9 BLOCKERs) | 2026-05-08 |
+| D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | D2 | Sizing + Cost PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
 | F | Demote Review/Polish + Report Type Router | 2-3 | ⬜ Pending | ⬜ Pending | — |
@@ -474,7 +474,7 @@ Phase H scope explicitly covers this: "RL scripts (`brief-rl-iterate.ts`, `decom
 
 ### Council review
 
-- [x] D1 council review: findings ≥2 seats addressed ⚠️ Issues to fix — 9 BLOCKERs identified, see Phase D1 Council Review section below
+- [x] D1 council review: findings ≥2 seats addressed ✅ Approved — 9 BLOCKERs fixed + 2 NOTEDs reclassified as BLOCKERs and fixed, see Phase D1 Council Review section below
 - [x] D2 council review: findings ≥2 seats addressed ✅ Approved (after fixes) — 5 BLOCKERs fixed 2026-05-08, see Council fixes applied section below
 - [ ] Cross-cut review (D1 + D2 together) for type consistency ⬜ Pending
 
@@ -579,6 +579,36 @@ Phase H scope explicitly covers this: "RL scripts (`brief-rl-iterate.ts`, `decom
 | `z-ai/glm-5.1` | ✅ Complete | BLOCKER-D1-1, BLOCKER-D1-3, BLOCKER-D1-4 (summary≡applicability), BLOCKER-D1-5, BLOCKER-D1-6, BLOCKER-D1-8, BLOCKER-D1-9 |
 | `moonshotai/kimi-k2.6` | ✅ Complete | BLOCKER-D1-2, BLOCKER-D1-3 (WARNING), BLOCKER-D1-1, BLOCKER-D1-6, BLOCKER-D1-9 |
 | `xiaomi/mimo-v2.5-pro` | ✅ Complete | BLOCKER-D1-1, BLOCKER-D1-2, BLOCKER-D1-3, BLOCKER-D1-4, BLOCKER-D1-7, BLOCKER-D1-9 |
+
+---
+
+### Council fixes applied (2026-05-08)
+
+**Status:** ✅ All 9 BLOCKERs fixed. 2 NOTEDs reclassified as BLOCKERs (2 seats each) and fixed. 4 NOTEDs remain deferred to Phase F/H (1 seat only).
+
+**Meta-rule applied:** NOTED findings with ≥2 seats reclassified as BLOCKERs. NOTED-D1-2 (2 seats) and NOTED-D1-3 (2 seats) promoted and fixed.
+
+| ID | Fix | File(s) |
+|---|---|---|
+| D1-1 (5/6) | `validateDecomposeResultPA`: null `estimated_mass_kg`/`estimated_dimensions_mm` accepted for CONCEPTUAL maturity; rejected for PRELIMINARY/ENGINEERING. Maturity check now runs BEFORE mass/dims checks. | `stages/2-decompose.ts` |
+| D1-2 (4/6) | `runDecomposePA`: `regulatoryExtraction?.regulatory_entries ?? []` safe access. All paths safe even when Stage 4 returned undefined. | `stages/2-decompose.ts` |
+| D1-3 (5/6) | `index.ts` dual-write: if `state.research.designBrief` is null/undefined, force-initialise with `{ regulatory: legacyRegulatory }` instead of silently skipping. Adds console.warn for visibility. | `index.ts` |
+| D1-4 (2/6) | Dual-write mapping: `summary` now derives from `${e.standard_name} (${e.jurisdiction})` — describes WHAT the regulation is. `applicability` retains WHY it applies. Both fields are now distinct. | `index.ts` |
+| D1-5 (2/6) | `normaliseEntry`: added presence checks for `standard_name` and `applicability`. Logs `console.warn` when either is empty/missing. Non-fatal — coercion to `''` continues. | `stages/1b-regulatory.ts` |
+| D1-6 (4/6) | Model chain reordered: `['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3', 'xiaomi/mimo-v2.5-pro']`. Gemini leads (lowest regulatory hallucination rate). MiMo demoted to last fallback. | `stages/1b-regulatory.ts` |
+| D1-7 (2/6) | `index.ts` decompose fork: `productClassStr` extracted via `typeof classification === 'string' ? classification : (classification.productClass ?? 'UNKNOWN')` before both call sites. | `index.ts` |
+| D1-8 (2/6) | `validateDecomposeResultPA`: added checks for `purpose` (non-empty, with `technical_description` fallback), `expected_parts` (non-empty array, throws on empty/absent), `estimated_lead_time_weeks` (numeric, normalises to 12). | `stages/2-decompose.ts` |
+| D1-9 (3/6) | `index.ts`: replaced `paResult as typeof decomposeResult` with explicit narrowing — error branch returns `{ ok: false, error, durationMs }` and success branch documents the widening cast with a comment. | `index.ts` |
+| NOTED-D1-2 → BLOCKER (2 seats) | `runDecomposePA`: regulatory entry slice raised from 10 to 20. Truncation warning emitted when `regulatory_entries.length > 20`. | `stages/2-decompose.ts` |
+| NOTED-D1-3 → BLOCKER (2 seats) | Added `STAGE_TEMPERATURES.regulatory_extraction = 0.15` separate from `research = 0.7`. `1b-regulatory.ts` now uses `regulatory_extraction` key. | `llm-temperature-config.ts`, `stages/1b-regulatory.ts` |
+
+**Deferred (1 seat only — Phase F/H):**
+- NOTED-D1-1: `validateDecomposeResultPA` `failure_modes` null guard — 1 seat (Kimi). Deferred.
+- NOTED-D1-4: `normaliseRegulatoryExtraction` silent empty array fallback — 1 seat (GLM-5.1). Deferred.
+- NOTED-D1-5: PA Stage 4 non-fatal failure has no state sentinel — 1 seat (GLM-5.1). Deferred.
+- NOTED-D1-6: `max_tokens: 8192` may truncate for complex products — 1 seat (GLM-5.1). Deferred.
+
+**Tests added:** 27 new tests across `decompose-pa.test.ts`, `regulatory-extraction.test.ts`, `council-blocker-3-4.test.ts`, `council-scorer.test.ts`. Total: 530 pass (up from 503 before D1 fixes).
 
 ---
 
@@ -837,7 +867,7 @@ For watchdog drift detection. Pending items only:
 - ⏸ Phase C: BLOCKER-2 deferred to Phase H — stage-rl-iterate.ts RL scripts; Phase H covers all RL script updates
 - ✅ Phase D1: COMPLETE (2026-05-08) — Module Decomposition PA Stage 5 + Regulatory Extraction PA Stage 4; 61 new tests; 481/482 pass; typecheck clean
 - ✅ Phase D2: COMPLETE (2026-05-08) — Sizing Solver + Cost Computation PA schemas
-- ❌ Phase D1: council review ⚠️ Issues to fix — 9 BLOCKERs found (2026-05-08). Must fix before Phase E. See Phase D Council Review Results (D1) section.
+- ✅ Phase D1: council review ✅ Approved (2026-05-08) — 9 BLOCKERs fixed + 2 NOTEDs reclassified as BLOCKERs (NOTED-D1-2 and NOTED-D1-3, 2 seats each) and fixed. All 530 tests pass. Phase E unblocked.
 - ✅ Phase D2: council review ✅ Approved (after fixes) — 5 BLOCKERs fixed 2026-05-08
 - ❌ Phase E-H: unblocked, ready to start
 - ❌ All council reviews (Phase C-D onwards)

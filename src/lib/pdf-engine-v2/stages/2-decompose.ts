@@ -58,9 +58,18 @@ const VALID_INTERFACE_TYPE = new Set(['electrical', 'mechanical', 'thermal', 'da
  * PA path (PA_PIPELINE=true). Enforces:
  *   - every module has at least one interface
  *   - every failure_mode.cause is NOT "Unknown" (or case variants)
- *   - every module has estimated_mass_kg (not null) AND estimated_dimensions_mm (not null)
+ *   - every module has estimated_mass_kg (not null unless CONCEPTUAL) AND
+ *     estimated_dimensions_mm (not null unless CONCEPTUAL)
  *   - maturity is one of CONCEPTUAL | PRELIMINARY | ENGINEERING
  *   - expected_parts array present and non-empty
+ *   - name and purpose are non-empty strings
+ *   - estimated_lead_time_weeks is a number
+ *
+ * D1 council BLOCKER-D1-1 fix (5/6 seats):
+ *   The PA Stage 5 prompt declares estimated_mass_kg/estimated_dimensions_mm as
+ *   number|null, giving the LLM licence to return null for CONCEPTUAL modules.
+ *   The validator now accepts null ONLY when maturity === 'CONCEPTUAL'.
+ *   For PRELIMINARY/ENGINEERING maturity, null is still rejected.
  */
 export function validateDecomposeResultPA(data: any): ModulePA[] {
   if (!data || typeof data !== 'object') {
@@ -83,8 +92,20 @@ export function validateDecomposeResultPA(data: any): ModulePA[] {
       mod.id = mod.name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_')
     }
 
-    if (!mod.name) {
+    if (!mod.name || typeof mod.name !== 'string' || mod.name.trim() === '') {
       throw new Error(`PA validation failed: Module at index ${i} missing required field: name`)
+    }
+
+    // D1 council BLOCKER-D1-8 fix (2/6 seats: GPT-5.4, GLM-5.1):
+    // validateDecomposeResultPA did not check purpose, expected_parts non-empty,
+    // or estimated_lead_time_weeks. LLM could omit these and stage returned ok:true.
+    if (!mod.purpose || typeof mod.purpose !== 'string' || mod.purpose.trim() === '') {
+      // Attempt to backfill from technical_description before rejecting
+      if (mod.description || mod.technical_description) {
+        mod.purpose = mod.description || mod.technical_description
+      } else {
+        throw new Error(`PA validation failed: Module '${mod.name}' missing required field: purpose`)
+      }
     }
 
     // ── interfaces: every module must have at least one ──────────────────
@@ -121,26 +142,8 @@ export function validateDecomposeResultPA(data: any): ModulePA[] {
       mod.failure_modes = []
     }
 
-    // ── estimated_mass_kg: must not be null ───────────────────────────────
-    if (mod.estimated_mass_kg === null || mod.estimated_mass_kg === undefined) {
-      throw new Error(
-        `PA validation failed: Module '${mod.name}' has null estimated_mass_kg. ` +
-        `PA Stage 5 rule: provide rough estimates — null means the sizing solver cannot allocate space.`
-      )
-    }
-
-    // ── estimated_dimensions_mm: must not be null ─────────────────────────
-    if (
-      mod.estimated_dimensions_mm === null ||
-      mod.estimated_dimensions_mm === undefined
-    ) {
-      throw new Error(
-        `PA validation failed: Module '${mod.name}' has null estimated_dimensions_mm. ` +
-        `PA Stage 5 rule: provide rough estimates — null means the sizing solver cannot allocate space.`
-      )
-    }
-
-    // ── maturity: must be one of the 3 enum values ────────────────────────
+    // ── maturity: must be validated BEFORE mass/dims (D1-1 fix) ─────────────
+    // Maturity drives whether null estimates are acceptable — check it first.
     if (!VALID_MATURITY.has(mod.maturity)) {
       throw new Error(
         `PA validation failed: Module '${mod.name}' has invalid maturity '${mod.maturity}'. ` +
@@ -148,9 +151,59 @@ export function validateDecomposeResultPA(data: any): ModulePA[] {
       )
     }
 
-    // ── expected_parts: must be present ───────────────────────────────────
-    if (!Array.isArray(mod.expected_parts)) {
-      mod.expected_parts = []
+    // ── estimated_mass_kg: null only allowed for CONCEPTUAL maturity ──────
+    // D1 council BLOCKER-D1-1 fix (5/6 seats: Gemini, GPT-5.4, GLM-5.1, Kimi, MiMo):
+    // The PA Stage 5 prompt declares estimated_mass_kg as number|null, giving LLMs
+    // licence to return null for CONCEPTUAL modules. Accept null only for CONCEPTUAL;
+    // reject for PRELIMINARY and ENGINEERING (sizing solver needs real estimates).
+    if (mod.estimated_mass_kg === null || mod.estimated_mass_kg === undefined) {
+      if (mod.maturity !== 'CONCEPTUAL') {
+        throw new Error(
+          `PA validation failed: Module '${mod.name}' (maturity=${mod.maturity}) has null estimated_mass_kg. ` +
+          `PA Stage 5 rule: PRELIMINARY/ENGINEERING modules must provide a rough estimate — ` +
+          `null means the sizing solver cannot allocate space. Null is only allowed for CONCEPTUAL maturity.`
+        )
+      }
+      // CONCEPTUAL: null accepted — leave as null for sizing solver to handle
+    }
+
+    // ── estimated_dimensions_mm: null only allowed for CONCEPTUAL maturity ─
+    // Same D1-1 fix applied to estimated_dimensions_mm.
+    if (
+      mod.estimated_dimensions_mm === null ||
+      mod.estimated_dimensions_mm === undefined
+    ) {
+      if (mod.maturity !== 'CONCEPTUAL') {
+        throw new Error(
+          `PA validation failed: Module '${mod.name}' (maturity=${mod.maturity}) has null estimated_dimensions_mm. ` +
+          `PA Stage 5 rule: PRELIMINARY/ENGINEERING modules must provide rough estimates. ` +
+          `Null is only allowed for CONCEPTUAL maturity.`
+        )
+      }
+      // CONCEPTUAL: null accepted — leave as null for sizing solver to handle
+    }
+
+    // ── expected_parts: must be a non-empty array ────────────────────────
+    // D1 council BLOCKER-D1-8 fix (2/6 seats: GPT-5.4, GLM-5.1):
+    // Previously silently defaulted to []. Now validates presence and
+    // non-emptiness so the BOM stage always has part names to work with.
+    if (!Array.isArray(mod.expected_parts) || mod.expected_parts.length === 0) {
+      throw new Error(
+        `PA validation failed: Module '${mod.name}' has empty or missing expected_parts. ` +
+        `PA Stage 5 rule: every module must list at least one expected part.`
+      )
+    }
+
+    // ── estimated_lead_time_weeks: must be a number ───────────────────────
+    // D1 council BLOCKER-D1-8 fix: validate lead time is a number.
+    // The legacy default of 12 weeks (applied below) only runs after validation —
+    // LLMs that omit this field entirely should be caught here.
+    if (mod.estimated_lead_time_weeks !== undefined && typeof mod.estimated_lead_time_weeks !== 'number') {
+      console.warn(
+        `[decompose-pa] Module '${mod.name}' has non-numeric estimated_lead_time_weeks '${mod.estimated_lead_time_weeks}', ` +
+        `normalising to 12.`
+      )
+      mod.estimated_lead_time_weeks = 12
     }
 
     // ── Normalise legacy fields for backwards compat ──────────────────────
@@ -365,10 +418,27 @@ export async function runDecomposePA(
   const startTime = Date.now()
   console.log('[decompose-pa] Starting PA Stage 5: Module Decomposition...')
 
-  const regSummary = regulatoryExtraction?.regulatory_entries?.length
-    ? `\n\n[Regulatory entries from Stage 4 — ${regulatoryExtraction.regulatory_entries.length} standards identified]\n` +
-      regulatoryExtraction.regulatory_entries
-        .slice(0, 10)
+  // D1 council BLOCKER-D1-2 fix (4/6 seats: Gemini, Grok, Kimi, MiMo):
+  // Guard against undefined regulatoryExtraction (non-fatal Stage 4 failure path).
+  // The ternary condition uses optional chaining so that if regulatoryExtraction
+  // is undefined or regulatory_entries is absent, regSummary is empty string.
+  // The truthy branch is only reached when entries exist — accesses are safe.
+  //
+  // D1 council NOTED-D1-2 fix (reclassified BLOCKER, 2 seats: GLM-5.1, MiMo):
+  // Raise slice limit from 10 to 20 so products with many applicable standards
+  // (medical devices, aerospace) don't silently lose context beyond entry 10.
+  // Log a truncation warning when >20 entries exist.
+  const allEntries = regulatoryExtraction?.regulatory_entries ?? []
+  if (allEntries.length > 20) {
+    console.warn(
+      `[decompose-pa] Regulatory context truncated: ${allEntries.length} standards identified, ` +
+      `passing first 20 to decompose prompt. Standards beyond 20 are not visible to module decomposition.`
+    )
+  }
+  const regSummary = allEntries.length
+    ? `\n\n[Regulatory entries from Stage 4 — ${allEntries.length} standards identified]\n` +
+      allEntries
+        .slice(0, 20)
         .map(e => `- ${e.standard_name} (${e.jurisdiction}): ${e.engineering_impact}`)
         .join('\n')
     : ''

@@ -371,6 +371,88 @@ describe('runRegulatoryExtraction — PA Stage 4', () => {
     })
   })
 
+  // ── D1 council BLOCKER-D1-5 fix tests ────────────────────────────────────
+  // normaliseEntry must warn (not crash) when required fields are missing
+
+  describe('[D1-5] normaliseEntry required field presence checks', () => {
+    it('warns but does not crash when standard_name is empty', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      const noNameResponse = {
+        regulatory_entries: [
+          {
+            ...BESS_REGULATORY_RESPONSE.regulatory_entries[0],
+            standard_name: '',
+          },
+        ],
+      }
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: JSON.stringify(noNameResponse) } }] }),
+        text: async () => '',
+      })
+      const result = await runRegulatoryExtraction(BESS_PARSED_BRIEF, 'energy_storage')
+      expect(result.ok).toBe(true)
+      // Must have warned about missing standard_name — first argument contains the field name
+      const warnCalls = warnSpy.mock.calls
+      const warnedAboutStandardName = warnCalls.some(args =>
+        args.some(arg => typeof arg === 'string' && arg.includes('standard_name'))
+      )
+      expect(warnedAboutStandardName).toBe(true)
+      warnSpy.mockRestore()
+    })
+
+    it('warns but does not crash when applicability is empty', async () => {
+      const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+      const noApplicabilityResponse = {
+        regulatory_entries: [
+          {
+            ...BESS_REGULATORY_RESPONSE.regulatory_entries[0],
+            applicability: '',
+          },
+        ],
+      }
+      mockFetch.mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({ choices: [{ message: { content: JSON.stringify(noApplicabilityResponse) } }] }),
+        text: async () => '',
+      })
+      const result = await runRegulatoryExtraction(BESS_PARSED_BRIEF, 'energy_storage')
+      expect(result.ok).toBe(true)
+      const warnCalls = warnSpy.mock.calls
+      const warnedAboutApplicability = warnCalls.some(args =>
+        args.some(arg => typeof arg === 'string' && arg.includes('applicability'))
+      )
+      expect(warnedAboutApplicability).toBe(true)
+      warnSpy.mockRestore()
+    })
+  })
+
+  // ── D1 council BLOCKER-D1-6 fix tests ─────────────────────────────────────
+  // Model chain must lead with Gemini, not MiMo
+
+  describe('[D1-6] model chain leads with Gemini, not MiMo', () => {
+    it('sends first request to google/gemini-3.1-pro-preview', async () => {
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(BESS_REGULATORY_RESPONSE))
+
+      await runRegulatoryExtraction(BESS_PARSED_BRIEF, 'energy_storage')
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+      const [, init] = mockFetch.mock.calls[0]
+      const body = JSON.parse(init.body)
+      expect(body.model).toBe('google/gemini-3.1-pro-preview')
+    })
+
+    it('uses regulatory_extraction temperature (0.15) not research temperature (0.7)', async () => {
+      mockFetch.mockResolvedValue(makeOpenRouterResponse(BESS_REGULATORY_RESPONSE))
+
+      await runRegulatoryExtraction(BESS_PARSED_BRIEF, 'energy_storage')
+      const [, init] = mockFetch.mock.calls[0]
+      const body = JSON.parse(init.body)
+      expect(body.temperature).toBe(0.15)
+    })
+  })
+
   // ── Error handling ────────────────────────────────────────────────────────
 
   describe('error handling', () => {

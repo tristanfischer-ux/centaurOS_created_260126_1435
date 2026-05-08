@@ -28,12 +28,14 @@ import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 // ── OpenRouter call ──────────────────────────────────────────────────────────
 
 async function callOpenRouter(systemPrompt: string, userContent: string): Promise<any> {
-  // Prefer MiMo for regulatory (strong at structured compliance output).
-  // Fallback to Gemini then Grok.
+  // D1 council BLOCKER-D1-6 fix (4/6 seats: Gemini, GPT-5.4, GLM-5.1, Kimi):
+  // MiMo is a content-generation model and should not lead regulatory extraction
+  // (precision structured compliance output). Gemini leads — lowest regulatory
+  // hallucination rate. MiMo demoted to last fallback.
   const models = [
-    'xiaomi/mimo-v2.5-pro',
     'google/gemini-3.1-pro-preview',
     'x-ai/grok-4.3',
+    'xiaomi/mimo-v2.5-pro',
   ]
 
   for (const model of models) {
@@ -49,7 +51,11 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
         },
         body: JSON.stringify({
           model,
-          temperature: STAGE_TEMPERATURES.research ?? 0.3,
+          // D1 council NOTED-D1-3 fix (reclassified BLOCKER, 2 seats):
+          // Use dedicated regulatory_extraction temperature (0.15) instead of
+          // research temperature. Precision extraction does not benefit from
+          // the creative variance that research requires.
+          temperature: STAGE_TEMPERATURES.regulatory_extraction ?? 0.15,
           max_tokens: 8192,
           messages: [
             { role: 'system', content: systemPrompt },
@@ -129,8 +135,24 @@ const VALID_CLAIM_TYPE = new Set(['requirement', 'recommendation', 'guidance'])
  * - source_grade is ALWAYS 'C' regardless of what the LLM says.
  * - verification_status is ALWAYS 'UNVERIFIED' regardless of what the LLM says.
  * - status and claim_type are normalised to valid enum values.
+ *
+ * D1 council BLOCKER-D1-5 fix (2/6 seats: GLM-5.1, GPT-5.4):
+ * Validate required fields are present and non-empty (standard_name, applicability).
+ * Without these checks, normaliseEntry returns ok:true with undefined values —
+ * calculators.ts filters on r.status === 'not_started' but standard_name is
+ * the display key. Empty standard_name silently produces zero-value entries.
  */
 function normaliseEntry(raw: any): RegulatoryEntry {
+  // Required field presence checks — log warnings for missing fields so they
+  // are visible in pipeline logs. Do NOT throw (non-fatal: partial data is
+  // better than a crash). The coercion to '' below ensures a defined string.
+  if (!raw.standard_name || typeof raw.standard_name !== 'string' || raw.standard_name.trim() === '') {
+    console.warn('[regulatory] normaliseEntry: entry missing required field "standard_name" — raw:', JSON.stringify(raw).slice(0, 200))
+  }
+  if (!raw.applicability || typeof raw.applicability !== 'string' || raw.applicability.trim() === '') {
+    console.warn('[regulatory] normaliseEntry: entry missing required field "applicability" — standard_name:', raw.standard_name)
+  }
+
   const status = VALID_STATUS.has(raw.status) ? raw.status : 'not_started'
   const claim_type = VALID_CLAIM_TYPE.has(raw.claim_type) ? raw.claim_type : 'requirement'
 

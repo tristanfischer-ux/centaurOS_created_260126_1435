@@ -180,10 +180,12 @@ describe('F8: Per-judge score breakdown (council-scorer)', () => {
     const state = makeState()
     await runCouncilScoring(state)
 
-    // The three judges should be Grok, MiMo, GLM (engine-lineage excluded per SCORE-F9)
+    // B2 fix (2026-05-08): MiMo replaced by GPT-5.4 in council-scorer judges.
+    // D1-6 council BLOCKER fix: MiMo is a content generator, not precision extractor.
+    // The three judges should be Grok, GPT-5.4, GLM (engine-lineage excluded per SCORE-F9)
     const uniqueModels = [...new Set(modelsSeen)]
     expect(uniqueModels).toContain('x-ai/grok-4.3')
-    expect(uniqueModels).toContain('xiaomi/mimo-v2.5-pro')
+    expect(uniqueModels).toContain('openai/gpt-5.4')
     expect(uniqueModels).toContain('z-ai/glm-5.1')
   })
 

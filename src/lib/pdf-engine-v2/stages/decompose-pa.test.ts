@@ -170,6 +170,37 @@ describe('validateDecomposeResultPA — valid schema', () => {
       expect(modules[0].maturity).toBe(maturity)
     }
   })
+
+  // ── D1 council BLOCKER-D1-1 fix tests ─────────────────────────────────────
+  // CONCEPTUAL maturity: null mass and dims MUST pass (spec-following LLMs emit null)
+  // PRELIMINARY/ENGINEERING: null mass and dims MUST fail (sizing solver needs estimates)
+
+  it('[D1-1] CONCEPTUAL module with null estimated_mass_kg PASSES validation', () => {
+    // A spec-following LLM returns null for CONCEPTUAL modules — must not reject
+    const mod = makeValidModule({ maturity: 'CONCEPTUAL', estimated_mass_kg: null })
+    const data = makeValidModulesResponse([mod])
+    expect(() => validateDecomposeResultPA(data)).not.toThrow()
+    const modules = validateDecomposeResultPA(data)
+    expect(modules[0].estimated_mass_kg).toBeNull()
+  })
+
+  it('[D1-1] CONCEPTUAL module with null estimated_dimensions_mm PASSES validation', () => {
+    const mod = makeValidModule({ maturity: 'CONCEPTUAL', estimated_dimensions_mm: null })
+    const data = makeValidModulesResponse([mod])
+    expect(() => validateDecomposeResultPA(data)).not.toThrow()
+    const modules = validateDecomposeResultPA(data)
+    expect(modules[0].estimated_dimensions_mm).toBeNull()
+  })
+
+  it('[D1-1] CONCEPTUAL module with both null estimates PASSES validation', () => {
+    const mod = makeValidModule({
+      maturity: 'CONCEPTUAL',
+      estimated_mass_kg: null,
+      estimated_dimensions_mm: null,
+    })
+    const data = makeValidModulesResponse([mod])
+    expect(() => validateDecomposeResultPA(data)).not.toThrow()
+  })
 })
 
 // ── validateDecomposeResultPA: rejection cases ────────────────────────────────
@@ -217,14 +248,21 @@ describe('validateDecomposeResultPA — rejection cases', () => {
     expect(() => validateDecomposeResultPA(data)).toThrow(/no interfaces|interfaces/i)
   })
 
-  it('rejects a module with null estimated_mass_kg', () => {
-    const badModule = makeValidModule({ estimated_mass_kg: null })
+  it('rejects a PRELIMINARY module with null estimated_mass_kg', () => {
+    // D1-1: null is NOT allowed for PRELIMINARY/ENGINEERING maturity
+    const badModule = makeValidModule({ estimated_mass_kg: null, maturity: 'PRELIMINARY' })
     const data = makeValidModulesResponse([badModule])
     expect(() => validateDecomposeResultPA(data)).toThrow(/estimated_mass_kg/)
   })
 
-  it('rejects a module with null estimated_dimensions_mm', () => {
-    const badModule = makeValidModule({ estimated_dimensions_mm: null })
+  it('rejects an ENGINEERING module with null estimated_mass_kg', () => {
+    const badModule = makeValidModule({ estimated_mass_kg: null, maturity: 'ENGINEERING' })
+    const data = makeValidModulesResponse([badModule])
+    expect(() => validateDecomposeResultPA(data)).toThrow(/estimated_mass_kg/)
+  })
+
+  it('rejects a PRELIMINARY module with null estimated_dimensions_mm', () => {
+    const badModule = makeValidModule({ estimated_dimensions_mm: null, maturity: 'PRELIMINARY' })
     const data = makeValidModulesResponse([badModule])
     expect(() => validateDecomposeResultPA(data)).toThrow(/estimated_dimensions_mm/)
   })
@@ -245,6 +283,28 @@ describe('validateDecomposeResultPA — rejection cases', () => {
     const badModule = makeValidModule({ name: undefined })
     const data = makeValidModulesResponse([badModule])
     expect(() => validateDecomposeResultPA(data)).toThrow(/name/)
+  })
+
+  it('[D1-8] rejects a module with missing purpose and no fallback fields', () => {
+    // D1 council BLOCKER-D1-8: purpose is required. If technical_description
+    // and description are also absent, the module should be rejected.
+    const badModule = makeValidModule({
+      purpose: undefined,
+      description: undefined,
+      technical_description: undefined,
+    })
+    const data = makeValidModulesResponse([badModule])
+    expect(() => validateDecomposeResultPA(data)).toThrow(/purpose/)
+  })
+
+  it('[D1-8] accepts a module where purpose is absent but technical_description provides a fallback', () => {
+    // purpose is absent but technical_description can backfill it
+    const mod = makeValidModule({
+      purpose: undefined,
+      technical_description: 'Technical description used as purpose fallback.',
+    })
+    const data = makeValidModulesResponse([mod])
+    expect(() => validateDecomposeResultPA(data)).not.toThrow()
   })
 })
 
@@ -270,11 +330,19 @@ describe('validateDecomposeResultPA — normalisation', () => {
     expect(Array.isArray(modules[0].failure_modes)).toBe(true)
   })
 
-  it('initialises empty expected_parts array when absent', () => {
+  it('rejects a module with absent expected_parts (D1-8 fix: required non-empty)', () => {
+    // D1 council BLOCKER-D1-8 fix: expected_parts must be a non-empty array.
+    // Previously the validator silently defaulted to [] — now it rejects so
+    // downstream BOM stage always has part names to work with.
     const mod = makeValidModule({ expected_parts: undefined })
     const data = makeValidModulesResponse([mod])
-    const modules = validateDecomposeResultPA(data)
-    expect(Array.isArray(modules[0].expected_parts)).toBe(true)
+    expect(() => validateDecomposeResultPA(data)).toThrow(/expected_parts/)
+  })
+
+  it('rejects a module with empty expected_parts array (D1-8 fix)', () => {
+    const mod = makeValidModule({ expected_parts: [] })
+    const data = makeValidModulesResponse([mod])
+    expect(() => validateDecomposeResultPA(data)).toThrow(/expected_parts/)
   })
 })
 
@@ -347,6 +415,57 @@ describe('runDecomposePA — PA Stage 5 orchestration', () => {
     const body = JSON.parse(init.body)
     const userContent = body.messages[1].content as string
     expect(userContent).toContain('IEC 62619:2022')
+  })
+
+  it('[NOTED-D1-2 reclassified BLOCKER] logs truncation warning when >20 regulatory entries', async () => {
+    // D1 council NOTED-D1-2 fix (reclassified BLOCKER, 2 seats: GLM-5.1, MiMo):
+    // Regulatory context was truncated at 10 entries. Raised to 20. When >20
+    // entries exist, a truncation warning is emitted.
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {})
+    const validResponse = makeValidModulesResponse([makeValidModule()])
+    mockFetch.mockResolvedValue(makeOpenRouterResponse(validResponse))
+
+    // Create 21 regulatory entries (exceeds the 20-entry slice limit)
+    const manyEntries = Array.from({ length: 21 }, (_, i) => ({
+      standard_name: `ISO ${1000 + i}`,
+      version_date: '2023',
+      jurisdiction: 'UK',
+      owner: 'Engineer',
+      status: 'not_started' as const,
+      claim_type: 'requirement' as const,
+      applicability: 'Applies to product.',
+      engineering_impact: 'Design impact.',
+      evidence_required: 'Test report.',
+      gap_action: 'Engage lab.',
+      source_grade: 'C' as const,
+      verification_status: 'UNVERIFIED' as const,
+      verification_note: 'Review required.',
+    }))
+
+    await runDecomposePA(BESS_PARSED_BRIEF, 'energy_storage', { regulatory_entries: manyEntries })
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('truncated'))
+    warnSpy.mockRestore()
+  })
+
+  it('[D1-2] runDecomposePA with regulatoryExtraction=undefined does NOT crash (TypeError guard)', async () => {
+    // D1 council BLOCKER-D1-2 fix (4/6 seats): PA Stage 4 failure is non-fatal —
+    // regulatoryExtraction may be undefined when Stage 4 failed. This must not
+    // cause a TypeError in runDecomposePA when building regSummary.
+    const validResponse = makeValidModulesResponse([makeValidModule()])
+    mockFetch.mockResolvedValue(makeOpenRouterResponse(validResponse))
+
+    // Pass explicit undefined to simulate Stage 4 non-fatal failure
+    const result = await runDecomposePA(BESS_PARSED_BRIEF, 'energy_storage', undefined)
+    expect(result.ok).toBe(true)
+    expect(result.error).toBeUndefined()
+  })
+
+  it('[D1-2] runDecomposePA with empty regulatory_entries does NOT crash', async () => {
+    const validResponse = makeValidModulesResponse([makeValidModule()])
+    mockFetch.mockResolvedValue(makeOpenRouterResponse(validResponse))
+
+    const result = await runDecomposePA(BESS_PARSED_BRIEF, 'energy_storage', { regulatory_entries: [] })
+    expect(result.ok).toBe(true)
   })
 
   it('returns ok=false when API call fails', async () => {
