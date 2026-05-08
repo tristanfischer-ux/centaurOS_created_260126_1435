@@ -240,7 +240,7 @@ async function callLLM(model: string, system: string, user: string, maxTokens: n
         { role: 'user', content: user },
       ],
     }),
-    signal: AbortSignal.timeout(120000),
+    signal: AbortSignal.timeout(180000),
   })
   
   if (!response.ok) throw new Error(`API ${response.status}`)

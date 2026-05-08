@@ -116,7 +116,7 @@ export async function runBriefGeneration(
           { role: 'user', content: `FOUNDER BRIEF:\n${rawBriefText}\n\nPRODUCT CLASS: ${productClass}` },
         ],
       }),
-      signal: AbortSignal.timeout(120000),
+      signal: AbortSignal.timeout(180000),
     })
 
     if (!response.ok) {
