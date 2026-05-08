@@ -28,8 +28,11 @@ export interface BriefConstraints {
   unitCostCeilingGbp?: number
   costCeilings?: Array<{ type: string; gbp: number; source: string }>
   maxMassKg?: number
-  batchSize?: number
+  batchSize?: number | string
   markets?: string[]
+  jurisdiction?: string
+  envelope?: string
+  operatingTemperature?: string
 }
 
 export interface RegulatoryItem {
@@ -315,6 +318,26 @@ export interface ResearchConstraints {
 export interface PipelineState {
   projectId: string
   briefText?: string
+  generatedBrief?: {
+    briefText: string
+    fields: {
+      projectName: string
+      purpose: string
+      objectives: string[]
+      requirements: string[]
+      constraints: string[]
+      inScope: string
+      outOfScope: string[]
+      successCriteria: string[]
+      costCeiling: number | null
+      maxMass: number | null
+      productionVolume: string | null
+      jurisdiction: string | null
+      envelope: string | null
+      operatingTemp: string | null
+      standards: string[]
+    }
+  }
   briefExpansion?: {
     originalBrief: string
     expandedFields: Record<string, unknown>

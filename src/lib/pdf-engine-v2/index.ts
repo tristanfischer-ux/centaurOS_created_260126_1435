@@ -9,7 +9,7 @@
 import { writeFileSync } from 'fs'
 import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
-import { runBriefExpansion, shouldExpandBrief } from './stages/0.5-brief-expansion'
+import { runBriefGeneration } from './stages/0-brief-generation'
 import { runResearch, extractResearchConstraints } from './stages/1-research'
 import { runDecompose } from './stages/2-decompose'
 import { runSizeLayout } from './stages/3-size-layout'
@@ -33,7 +33,7 @@ import { validateBrief } from './brief-validator'
 import { determineFeasibility } from './feasibility-gate'
 import { scoreSection, type SectionAudit } from './universal-scorer'
 import { loadAllGroundingData } from './db-queries'
-import type { PipelineState, StageResult } from './types'
+import type { PipelineState, StageResult, BriefConstraints } from './types'
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 
 export interface EngineResult {
@@ -220,21 +220,21 @@ export async function runPipeline(
     console.warn('[pipeline] Failed to load supplier database:', (err as Error).message)
   }
 
-  // ── Stage 0: Training Data Knowledge Dump ──────────────────────────
-  console.log('\n[pipeline] === Stage 0: Training Data Dump ===')
+  // ── Stage 1: Training Data Knowledge Dump ──────────────────────────
+  console.log('\n[pipeline] === Stage 1: Training Data Dump ===')
   let trainingDossier: string | undefined
   try {
-    const stage0Result = await runTrainingDataDump(briefText)
-    trackStage('training_data', stage0Result)
-    if (stage0Result.ok && stage0Result.data) {
-      trainingDossier = (stage0Result.data as any).dossier
+    const stage1Result = await runTrainingDataDump(briefText)
+    trackStage('training_data', stage1Result)
+    if (stage1Result.ok && stage1Result.data) {
+      trainingDossier = (stage1Result.data as any).dossier
     }
   } catch (err) {
-    console.log('[pipeline] Stage 0 failed, continuing without dossier:', (err as Error).message)
+    console.log('[pipeline] Training data failed, continuing without dossier:', (err as Error).message)
   }
 
-  // ── Stage 1: Research ──────────────────────────────────────────────
-  console.log('\n[pipeline] === Stage 1: Research ===')
+  // ── Stage 2: Research (uses raw founder text + training data) ──────
+  console.log('\n[pipeline] === Stage 2: Research ===')
   const researchResult = await runResearch(briefText, {
     trainingDataDossier: trainingDossier || options?.trainingDataDossier,
   })
@@ -277,38 +277,59 @@ export async function runPipeline(
   )
   state.researchConstraints = constraintsResult
   console.log(`[pipeline] Extracted research constraints: ${constraintsResult.benchmarkPrices.length} benchmarks, ${constraintsResult.materialCosts.length} materials, ${constraintsResult.regulatoryCosts.length} regs, ${constraintsResult.competitorSpecs.length} competitors`)
-  
+
+  // ── Stage 3: Brief Generation (research-informed, not speculative) ─
+  console.log('\n[pipeline] === Stage 3: Brief Generation ===')
+  const briefGenResult = await runBriefGeneration(briefText, classification.productClass)
+  trackStage('brief_generation', briefGenResult)
+  if (briefGenResult.ok && briefGenResult.data) {
+    state.generatedBrief = briefGenResult.data
+    console.log(`[pipeline] Brief generated: ${briefGenResult.data.briefText.length} chars, ${briefGenResult.data.fields.objectives.length} objectives`)
+    
+    // SYNC: Brief fields become the source of truth for downstream stages.
+    // Overwrite designBrief with the Brief's structured interpretation so that
+    // Feasibility, Decompose, BOM, Cost, Suppliers all use the "good brief" data.
+    if (state.research) {
+      const bf = briefGenResult.data.fields
+      const existing = state.research.designBrief
+      const mergedConstraints: BriefConstraints = {
+        ...existing?.constraints,
+        unitCostCeilingGbp: bf.costCeiling ?? existing?.constraints?.unitCostCeilingGbp,
+        maxMassKg: bf.maxMass ?? existing?.constraints?.maxMassKg,
+        batchSize: bf.productionVolume || existing?.constraints?.batchSize,
+        jurisdiction: bf.jurisdiction || existing?.constraints?.jurisdiction,
+        envelope: bf.envelope || existing?.constraints?.envelope,
+        operatingTemperature: bf.operatingTemp || existing?.constraints?.operatingTemperature,
+      }
+      state.research.designBrief = {
+        useCase: bf.objectives?.join('. ') || existing?.useCase || '',
+        targetProcess: bf.requirements?.find(r => r.toLowerCase().includes('process')) || existing?.targetProcess || '',
+        targetMaterial: bf.requirements?.find(r => r.toLowerCase().includes('material')) || existing?.targetMaterial || '',
+        toleranceTarget: bf.requirements?.find(r => r.toLowerCase().includes('tolerance')) || existing?.toleranceTarget || '',
+        quantityTarget: bf.productionVolume || existing?.quantityTarget || '',
+        complianceNotes: existing?.complianceNotes || '',
+        mission: bf.purpose || existing?.mission,
+        targetCustomers: existing?.targetCustomers,
+        whyNow: existing?.whyNow,
+        constraints: mergedConstraints,
+        regulatory: existing?.regulatory,
+        sources: existing?.sources,
+        competitors: existing?.competitors,
+      }
+      console.log(`[pipeline] Brief fields synced to designBrief: cost=£${bf.costCeiling || '?'}, mass=${bf.maxMass || '?'}kg, volume=${bf.productionVolume || '?'}`)
+    }
+  } else {
+    console.warn('[pipeline] Brief generation failed, using raw text:', briefGenResult.error)
+  }
+
   state.sourceAttributions.push(
-    { section: 'Research', source: 'llm', detail: 'Gemini 3.1 Pro via OpenRouter' },
+    { section: 'Research', source: 'llm', detail: 'MiMo V2.5-Pro via OpenRouter' },
     { section: 'Research', source: 'user', detail: 'Founder brief text' },
-    { section: 'Regulatory', source: 'llm', detail: 'Gemini 3.1 Pro — standards extraction' },
+    { section: 'Regulatory', source: 'llm', detail: 'MiMo V2.5-Pro — standards extraction' },
   )
   state.llmAttributions.push(
-    { section: 'Research', model: 'google/gemini-3.1-pro-preview', provider: 'OpenRouter' },
+    { section: 'Research', model: 'xiaomi/mimo-v2.5-pro', provider: 'OpenRouter' },
   )
-
-  // ── Stage 0.5: Brief Expansion ─────────────────────────────────────
-  if (shouldExpandBrief(briefText, state.research?.designBrief)) {
-    console.log('\n[pipeline] === Stage 0.5: Brief Expansion ===')
-    const expansionResult = await runBriefExpansion(briefText, classification.productClass, classification)
-    trackStage('brief_expansion', expansionResult)
-    if (expansionResult.ok && expansionResult.data) {
-      state.briefExpansion = expansionResult.data
-      // Merge expanded fields into designBrief so downstream stages and validators can use them
-      if (state.research && state.research.designBrief) {
-        state.research.designBrief = {
-          ...state.research.designBrief,
-          ...expansionResult.data.expandedFields,
-        }
-      }
-      state.sourceAttributions.push(
-        { section: 'Brief Interpretation', source: 'llm', detail: 'DeepSeek V4 Flash — brief expansion' }
-      )
-      state.llmAttributions.push(
-        { section: 'Brief Expansion', model: 'deepseek/deepseek-v4-flash', provider: 'OpenRouter' }
-      )
-    }
-  }
 
   // ── Product Specs Extraction (deterministic) ───────────────────────
   // Per-cell qty realism (2026-05-06): pull canonical specs out of the
