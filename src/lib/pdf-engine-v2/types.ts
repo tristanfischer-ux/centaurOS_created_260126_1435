@@ -211,6 +211,84 @@ export interface Module {
   status: string
 }
 
+// === PA Stage 5 Module Decomposition ===
+// Added Phase D1. Fields extend the PA Stage 5 schema. Separate from the
+// legacy Module interface above — the PA path uses ModulePA; legacy path
+// uses Module. Both coexist behind the PA_PIPELINE flag.
+
+export interface ModulePAExpectedPart {
+  name: string
+  quantity: string
+  role: string
+}
+
+export interface ModulePAInterface {
+  type: 'electrical' | 'mechanical' | 'thermal' | 'data' | 'fluid'
+  connects_to: string
+  description: string
+}
+
+export interface ModulePAFailureMode {
+  mode: string
+  /** "Unknown" is NOT acceptable per PA Stage 5 rules — validation rejects it */
+  cause: string
+  local_effect: string
+  system_effect: string
+}
+
+export interface ModulePA extends Module {
+  // PA Stage 5 additional fields
+  expected_parts: ModulePAExpectedPart[]
+  interfaces: ModulePAInterface[]
+  failure_modes: ModulePAFailureMode[]
+  open_questions: string[]
+  estimated_mass_kg: number | null
+  estimated_dimensions_mm: { w: number; d: number; h: number } | null
+  estimated_lead_time_weeks: number
+  maturity: 'CONCEPTUAL' | 'PRELIMINARY' | 'ENGINEERING'
+  /** PA prompt uses why_it_matters; maps to legacy whyItMatters */
+  why_it_matters?: string
+  /** PA prompt uses technical_description; maps to legacy description */
+  technical_description?: string
+}
+
+// === PA Stage 4 Regulatory Extraction ===
+// Added Phase D1. Separate from legacy RegulatoryItem embedded in DesignBrief.
+// Runs as a new stage after Research Synthesis on PA_PIPELINE=true.
+
+export interface RegulatoryEntry {
+  standard_name: string
+  /** e.g. "Edition 2 (2022)" */
+  version_date: string
+  /** e.g. "UK / EU", "International" */
+  jurisdiction: string
+  /** Engineering role responsible */
+  owner: string
+  status: 'not_started' | 'in_progress' | 'complete'
+  claim_type: 'requirement' | 'recommendation' | 'guidance'
+  /** WHY this standard applies (specific to this product, not generic restatement of scope) */
+  applicability: string
+  /** HOW it affects the design — specific consequences, test types, costs, scheduling constraints */
+  engineering_impact: string
+  /** WHAT documentation/testing is needed — exact document type and standard clause */
+  evidence_required: string
+  /** NEXT STEP with a verb — concrete action to close the compliance gap */
+  gap_action: string
+  /** Always 'C' — based on published standard text, not yet verified against design */
+  source_grade: 'C'
+  /** Always 'UNVERIFIED' — verification requires a compliance engineer to review the design */
+  verification_status: 'UNVERIFIED'
+  /** What verification would require */
+  verification_note: string
+}
+
+export interface RegulatoryExtraction {
+  regulatory_entries: RegulatoryEntry[]
+}
+
+// === end PA Stage 4 Regulatory Extraction ===
+// === end PA Stage 5 Module Decomposition ===
+
 export interface ModuleSpecs {
   powerW?: number
   voltageV?: number
@@ -320,6 +398,53 @@ export interface CostBreakdown {
   rawBomCostGbp?: number
 }
 
+// === PA Stage 7b Cost extended fields ===
+// All optional — legacy renderer does not read these and must not crash on absent fields.
+
+export interface CostOverheadLine {
+  /** Human-readable label, e.g. "Assembly Labour (15% of BOM)" */
+  label: string
+  /** Amount in GBP */
+  gbp: number
+}
+
+export interface NreItem {
+  /** Human-readable label, e.g. "UL 9540A system-level fire test" */
+  label: string
+  /** Cost in GBP */
+  gbp: number
+  /** Duration in weeks */
+  durationWeeks: number
+  /** Source grade — 'C' for published industry benchmark costs */
+  grade: 'A' | 'B' | 'C' | 'D' | 'E'
+}
+
+export interface CostReductionPath {
+  /** Description of the cost reduction option */
+  option: string
+  /** Estimated saving, e.g. "~£55,000" */
+  savingGbp: string
+  /** Prose description of the engineering trade-off */
+  tradeoff: string
+  /** Feasibility assessment */
+  feasible: 'Yes' | 'No' | 'Maybe' | 'At volume'
+}
+
+/** Extends CostBreakdown with PA Stage 7b fields for the BESS-style renderer. */
+export interface CostBreakdownPA extends CostBreakdown {
+  /** Explicit named overhead lines (assembly, test, shipping, overheads, contingency) */
+  overheadLines?: CostOverheadLine[]
+  /** Per-module perModule array extended with pctOfBom and grade */
+  perModulePA?: Array<{ moduleName: string; totalGbp: number; pctOfBom: number; grade: string }>
+  /** Named NRE activities (one per regulatory standard that requires testing) */
+  nreItems?: NreItem[]
+  /** Cost reduction options for the renderer */
+  reductionPaths?: CostReductionPath[]
+  /** Populated when unit cost exceeds the brief ceiling; null/absent when within ceiling */
+  ceilingExceededBanner?: string | null
+}
+// === end PA Stage 7b Cost extended fields ===
+
 export interface SpecialistReview {
   specialistId: string
   specialistName: string
@@ -365,6 +490,45 @@ export interface DimensionSheet {
   conflicts: string[]
   recommendations: string[]
 }
+
+// === PA Stage 7a Sizing extended fields ===
+// All optional — legacy renderer does not read these and must not crash on absent fields.
+
+export interface SizingZone {
+  /** e.g. "Battery Zone", "BMS Zone", "Power Electronics Zone" */
+  name: string
+  /** Zone length in mm */
+  lengthMm: number
+  /** Zone volume in m³ */
+  volumeM3: number
+  /** Allocated mass in kg */
+  massKg: number
+  /** Prose list of what lives in the zone, e.g. "8× CATL 280Ah rack modules" */
+  contents: string
+}
+
+/** Extends DimensionSheet with PA Stage 7a fields for the BESS-style renderer. */
+export interface DimensionSheetPA extends DimensionSheet {
+  /** Named zones with length, volume, mass, and contents — surfaced from iso_container_layout */
+  zones?: SizingZone[]
+  /** Volume utilisation as a percentage, e.g. 92 */
+  volumeUtilisationPct?: number
+  /** Mass utilisation as a percentage, e.g. 96 */
+  massUtilisationPct?: number
+  /** Outer container envelope */
+  externalDimensionsMm?: { w: number; d: number; h: number }
+  /** Inner usable envelope after insulation / structural clearances */
+  internalDimensionsMm?: { w: number; d: number; h: number }
+  /** Container tare mass in kg */
+  tareMassKg?: number
+  /** Max payload = total mass budget minus tare */
+  availablePayloadMassKg?: number
+  /** Prose description of aisles, cable routes, and access clearances */
+  clearanceNotes?: string
+  /** Tight-margin warning text for ActionCallout, or null when margin is acceptable */
+  massMarginNote?: string | null
+}
+// === end PA Stage 7a Sizing extended fields ===
 
 export interface SupplierMatch {
   partId: string
@@ -464,6 +628,8 @@ export interface PipelineState {
   parsedBrief?: StructuredBriefJSON
   /** PA path only (Phase B+): structured research synthesis from runResearchSynthesis() */
   researchSynthesis?: ResearchSynthesis
+  /** PA path only (Phase D1+): structured regulatory extraction from runRegulatoryExtraction() */
+  regulatoryExtraction?: RegulatoryExtraction
   productClass?: string
   pipelineError?: {
     stage: string

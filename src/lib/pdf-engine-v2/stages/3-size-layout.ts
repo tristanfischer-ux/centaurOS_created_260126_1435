@@ -1,4 +1,4 @@
-import type { Module, DimensionSheet, StageResult, Envelope, ModuleDimensions } from '../types'
+import type { Module, DimensionSheet, DimensionSheetPA, SizingZone, StageResult, Envelope, ModuleDimensions } from '../types'
 
 // A5 FIX (2026-05-06): The research stage produces industryDomain values from
 // the LLM (e.g. "thermal_system", "energy_storage", "bess") while the sizing
@@ -343,12 +343,133 @@ function buildSpatialPlan(
   return { placements };
 }
 
+// ── PA Stage 7a — extend DimensionSheet with renderer fields ─────────────────
+//
+// All new fields are optional on DimensionSheetPA so the legacy renderer is
+// unaffected when PA_PIPELINE=false.  The iso_container_layout zone allocation
+// that already runs internally is surfaced as dimensionSheet.zones[].
+
+/**
+ * ISO 40ft container physical constants.
+ * Source: ISO 668:2020 Series 1 freight containers.
+ */
+const ISO_40FT = {
+  external_w_mm:  2438,
+  external_d_mm: 12192,
+  external_h_mm:  2896,
+  tare_kg:        3750,
+  max_payload_kg: 27_230,
+  // The interior dims are already in the solver; these are the external dims.
+} as const
+
+/**
+ * Derive the PA-shape extension fields from an existing DimensionSheet when
+ * the domain is battery_energy_storage (iso_container_layout).
+ *
+ * Called inside runSizeLayout only when PA_PIPELINE=true.
+ */
+function extendSizingSheetPA(
+  sheet: DimensionSheet,
+  modules: Module[],
+): DimensionSheetPA {
+  const env = sheet.envelope
+
+  // ── Utilisation percentages ───────────────────────────────────────────────
+  let allocatedVolumeM3 = 0
+  let allocatedMassKg = 0
+
+  for (const mod of modules) {
+    const dim = sheet.module_dimensions[mod.id]
+    if (dim) {
+      allocatedVolumeM3 += (dim.w_mm * dim.d_mm * dim.h_mm) / 1_000_000_000
+    }
+    if (typeof mod.estimatedMassKg === 'number' && mod.estimatedMassKg > 0) {
+      allocatedMassKg += mod.estimatedMassKg
+    }
+  }
+
+  const totalVolumeM3 = env.interior_volume_m3 || 1
+  const volumeUtilisationPct = Math.min(100, Math.round((allocatedVolumeM3 / totalVolumeM3) * 100))
+
+  // Available payload = ISO max payload minus container tare.
+  const availablePayloadMassKg = ISO_40FT.max_payload_kg
+  const tareMassKg = ISO_40FT.tare_kg
+  const massUtilisationPct = availablePayloadMassKg > 0
+    ? Math.min(100, Math.round((allocatedMassKg / availablePayloadMassKg) * 100))
+    : 0
+
+  // ── Zone allocation ───────────────────────────────────────────────────────
+  // Group modules into functional zones based on name heuristics.
+  const ZONE_KEYWORDS: Array<{ regex: RegExp; zone: string }> = [
+    { regex: /battery|cell|rack|pack|lfp|bms|management/i, zone: 'Battery Zone' },
+    { regex: /power.?electron|pcs|inverter|converter|transformer|switchgear/i, zone: 'Power Electronics Zone' },
+    { regex: /thermal|cooling|hvac|heat.?exchanger/i, zone: 'Thermal Management Zone' },
+    { regex: /control|monitor|sensor|comms|communication|hmi|scada/i, zone: 'Controls & Monitoring Zone' },
+    { regex: /fire|suppression|safety|detection/i, zone: 'Fire Safety Zone' },
+  ]
+
+  const zoneMap = new Map<string, { modules: Module[]; dims: ModuleDimensions[] }>()
+
+  for (const mod of modules) {
+    let zoneName = 'Ancillary Zone'
+    for (const { regex, zone } of ZONE_KEYWORDS) {
+      if (regex.test(mod.name)) {
+        zoneName = zone
+        break
+      }
+    }
+    if (!zoneMap.has(zoneName)) zoneMap.set(zoneName, { modules: [], dims: [] })
+    const entry = zoneMap.get(zoneName)!
+    entry.modules.push(mod)
+    const dim = sheet.module_dimensions[mod.id]
+    if (dim) entry.dims.push(dim)
+  }
+
+  const zones: SizingZone[] = []
+  for (const [name, { modules: zmods, dims }] of zoneMap.entries()) {
+    const zoneVolumeM3 = dims.reduce((s, d) => s + (d.w_mm * d.d_mm * d.h_mm) / 1_000_000_000, 0)
+    const zoneMassKg = zmods.reduce((s, m) => s + (m.estimatedMassKg || 0), 0)
+    // Length is approximate: sum the depth (d_mm) of all modules in the zone.
+    const zoneLengthMm = dims.reduce((s, d) => s + d.d_mm, 0) || Math.round(env.interior_d_mm / zoneMap.size)
+    const contents = zmods.map(m => m.name).join(', ')
+    zones.push({ name, lengthMm: zoneLengthMm, volumeM3: Number(zoneVolumeM3.toFixed(3)), massKg: Number(zoneMassKg.toFixed(1)), contents })
+  }
+
+  // ── Clearance and mass-margin notes ──────────────────────────────────────
+  const massMarginKg = availablePayloadMassKg - allocatedMassKg
+  const massMarginPct = availablePayloadMassKg > 0 ? (massMarginKg / availablePayloadMassKg) * 100 : 100
+
+  const clearanceNotes =
+    `Container clear aisle width: ≥600 mm along the longitudinal axis for maintenance access. ` +
+    `End-panel clearance: 300 mm minimum for cable entry. ` +
+    `Top clearance to roof: ${Math.max(0, env.interior_h_mm - 2200)} mm available for overhead cable trays.`
+
+  const massMarginNote: string | null = massMarginPct < 5
+    ? `Total allocated mass: ${allocatedMassKg.toFixed(0)} kg. ` +
+      `Remaining mass budget: ${massMarginKg.toFixed(0)} kg (${massMarginPct.toFixed(1)}% margin for cables, fasteners, and contingency). ` +
+      `This is tight — detailed cable harness mass estimation is required before design freeze.`
+    : null
+
+  return {
+    ...sheet,
+    zones,
+    volumeUtilisationPct,
+    massUtilisationPct,
+    externalDimensionsMm: { w: ISO_40FT.external_w_mm, d: ISO_40FT.external_d_mm, h: ISO_40FT.external_h_mm },
+    internalDimensionsMm: { w: env.interior_w_mm, d: env.interior_d_mm, h: env.interior_h_mm },
+    tareMassKg,
+    availablePayloadMassKg,
+    clearanceNotes,
+    massMarginNote,
+  }
+}
+
 // Run sizing + layout as a subprocess
 // Calls the existing sizing solver which is pure physics (no pipeline coupling)
 export async function runSizeLayout(
   modules: Module[],
-  options?: { domain?: string; targets?: Record<string, number> }
-): Promise<StageResult<DimensionSheet & { spatialPlan: { placements: Array<{ moduleId: string; x: number; y: number; w: number; d: number }> } }>> {
+  options?: { domain?: string; targets?: Record<string, number>; paMode?: boolean }
+): Promise<StageResult<(DimensionSheet | DimensionSheetPA) & { spatialPlan: { placements: Array<{ moduleId: string; x: number; y: number; w: number; d: number }> } }>> {
   const start = Date.now()
   try {
     const rawDomain = options?.domain || 'unknown'
@@ -360,10 +481,22 @@ export async function runSizeLayout(
     const domain = normaliseDomain(rawDomain)
     console.log(`[size-layout] raw domain "${rawDomain}" → normalised "${domain}"`)
     const targets = options?.targets || {}
-    
+
     const dimensionSheet = solveSizing(modules, domain, targets)
     const spatialPlan = buildSpatialPlan(dimensionSheet, modules)
-    
+
+    // PA Stage 7a: extend with renderer fields when paMode=true.
+    // Only for iso_container_layout (battery_energy_storage) — other domains
+    // get the base sheet unchanged (zones = undefined, etc.).
+    if (options?.paMode && domain === 'battery_energy_storage') {
+      const paSheet = extendSizingSheetPA(dimensionSheet, modules)
+      return {
+        ok: true,
+        data: { ...paSheet, spatialPlan },
+        durationMs: Date.now() - start,
+      }
+    }
+
     return {
       ok: true,
       data: { ...dimensionSheet, spatialPlan },

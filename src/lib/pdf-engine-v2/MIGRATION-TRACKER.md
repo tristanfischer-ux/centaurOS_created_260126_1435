@@ -336,7 +336,7 @@ Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouc
 
 ### Actual
 
-**Commit:** TBD (commit created at end of this file update)
+**Commit:** `5478ecc5`
 **Files changed:**
 - `src/lib/pdf-engine-v2/index.ts` — gated `runTrainingDataDump()` call with `if (!PA_PIPELINE)`; `trainingDossier` defaults to `undefined` on PA path; legacy path unchanged
 - `src/lib/pdf-engine-v2/stages/0-training-data.ts` — added `@deprecated` JSDoc at file top and on `runTrainingDataDump()` function export
@@ -354,7 +354,7 @@ Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouc
 
 ## Phase D — Restructure Modules / Sizing / BOM / Cost to PA Schemas
 
-**Status:** ⬜ Pending (blocked on B)
+**Status:** 🔄 In progress — D2 ✅ Done, D1 ⬜ Pending
 **Two parallel sonnets:** D1 (Module + Regulatory) + D2 (Sizing + Cost)
 
 ### D1 — Module Decomposition + Regulatory Extraction
@@ -370,13 +370,28 @@ Set `PA_PIPELINE=false` (or unset env var). Existing `runResearch()` path untouc
 
 ### D2 — Sizing Solver + Cost Computation
 
+**Status: ✅ Done (2026-05-08)**
+
 | Sub-item | Status |
 |---|---|
-| Extend `DimensionSheet` with 14 new fields per RENDERER-REDESIGN.md §3.4 | ⬜ |
-| Surface `iso_container_layout` zones as `DimensionSheet.zones[]` | ⬜ |
-| Extend `CostBreakdown` with `overheadLines[]`, `nreItems[]`, `reductionPaths[]`, `perModule[].pctOfBom`, `perModule[].grade`, `ceilingExceededBanner` | ⬜ |
-| Update `cost-model.ts` and `lib/nre-from-regulatory.ts` to populate new fields | ⬜ |
-| All new fields optional and null-safe | ⬜ |
+| Extend `DimensionSheet` with 14 new fields per RENDERER-REDESIGN.md §3.4 | ✅ |
+| Surface `iso_container_layout` zones as `DimensionSheet.zones[]` | ✅ |
+| Extend `CostBreakdown` with `overheadLines[]`, `nreItems[]`, `reductionPaths[]`, `perModule[].pctOfBom`, `perModule[].grade`, `ceilingExceededBanner` | ✅ |
+| Update `cost-model.ts` and `lib/nre-from-regulatory.ts` to populate new fields | ✅ |
+| All new fields optional and null-safe | ✅ |
+
+### D2 Actual
+
+- Files changed:
+  - `types.ts` — `SizingZone`, `DimensionSheetPA` (§ PA Stage 7a), `CostOverheadLine`, `NreItem`, `CostReductionPath`, `CostBreakdownPA` (§ PA Stage 7b); all optional, delimited blocks; D1 sections untouched
+  - `stages/3-size-layout.ts` — `extendSizingSheetPA()` helper; `runSizeLayout()` gains `paMode?` option; only fires on `domain === 'battery_energy_storage' && paMode=true`
+  - `cost-model.ts` — `calculateCostPA()` + `_buildOverheadLines()` + `_buildReductionPaths()`; legacy `calculateCost()` untouched
+  - `lib/nre-from-regulatory.ts` — `computeNreItemsFromRegulatory()` → `NreItem[]` (Grade C); legacy function untouched
+  - `stages/sizing-pa.test.ts` — new, 19 tests
+  - `cost-model-pa.test.ts` — new, 29 tests
+- Test result: 48/48 new tests pass. All 1936 pre-existing tests pass. 2 pre-existing failures (council-scorer, 03-enrichment) unchanged.
+- Typecheck: 0 new errors in D2-changed files.
+- Council review: ⬜ Pending
 
 ### Verification
 

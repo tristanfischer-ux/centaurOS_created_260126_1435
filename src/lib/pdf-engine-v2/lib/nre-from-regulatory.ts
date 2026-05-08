@@ -1,3 +1,5 @@
+import type { NreItem } from '../types'
+
 // INTENT: Compute non-recurring engineering cost by summing per-standard
 // estimates from the project's regulatory matrix, rather than using a flat
 // domain-based figure.  Each recognised standard is matched to a cost and
@@ -6,6 +8,10 @@
 //
 // The classification is deterministic (regex matching on standard codes/names)
 // with no LLM calls, so it can run at render time without latency.
+//
+// PA Stage 7b: also exports computeNreItemsFromRegulatory() which returns the
+// new NreItem[] shape for the BESS-style renderer.  All costs are Grade C
+// (published industry benchmarks for UK-accredited test-house programmes).
 
 export interface NreLineItem {
   standardCode: string
@@ -268,4 +274,77 @@ export function computeNreFromRegulatory(
     items,
     method: 'regulatory_sum',
   }
+}
+
+// ── PA Stage 7b — NreItem[] output for the BESS-style renderer ───────────────
+
+/**
+ * PA Stage 7b variant: returns the new NreItem[] shape expected by the
+ * BESS-style renderer (CostBreakdownPA.nreItems).  Each regulatory standard
+ * that requires testing becomes one NreItem.  All items carry grade='C'
+ * (published industry benchmark pricing).
+ *
+ * Unlike computeNreFromRegulatory(), this function never collapses multiple
+ * standards into a single total — each entry is preserved as a distinct line
+ * so the Cost section renderer can list them individually.
+ */
+export function computeNreItemsFromRegulatory(
+  regulatory: Array<{
+    code?: string
+    name?: string
+    summary?: string
+    applicability?: string
+  }>,
+  productClass: string,
+): NreItem[] {
+  // No regulatory data → fall back to product-class defaults as individual items.
+  if (!regulatory || regulatory.length === 0) {
+    const flat = PRODUCT_CLASS_NRE[productClass] || DEFAULT_FLAT_NRE
+    return [{
+      label: `${productClass || 'General product'} — domain-average NRE`,
+      gbp: flat.costGbp,
+      durationWeeks: flat.weeks,
+      grade: 'C',
+    }]
+  }
+
+  const result: NreItem[] = []
+
+  for (const entry of regulatory) {
+    const key = entry.code || entry.name || ''
+    const trimmedKey = key.trim()
+
+    const stdMatch = matchStandard(trimmedKey)
+    if (stdMatch) {
+      result.push({
+        label: stdMatch.label,
+        gbp: stdMatch.costGbp,
+        durationWeeks: stdMatch.weeks,
+        grade: 'C',
+      })
+      continue
+    }
+
+    const searchText = [entry.code, entry.name, entry.summary].filter(Boolean).join(' ')
+    const catMatch = matchCategory(searchText)
+    if (catMatch) {
+      result.push({
+        label: catMatch.label,
+        gbp: catMatch.costGbp,
+        durationWeeks: catMatch.weeks,
+        grade: 'C',
+      })
+      continue
+    }
+
+    // Generic default — unknown standard.
+    result.push({
+      label: entry.name || trimmedKey || 'Unidentified standard',
+      gbp: 15_000,
+      durationWeeks: 6,
+      grade: 'C',
+    })
+  }
+
+  return result
 }
