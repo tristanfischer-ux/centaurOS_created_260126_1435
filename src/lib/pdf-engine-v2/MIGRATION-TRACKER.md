@@ -17,7 +17,7 @@
 | D1 | Module + Regulatory PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | D2 | Sizing + Cost PA schemas | 3-4 | ✅ Done | ✅ Approved (after fixes) | 2026-05-08 |
 | E | Cut over integrated BOM/Suppliers | 2-3 | ⬜ Pending (gated on v2 BOM ≥8 baseline) | ⬜ Pending | — |
-| F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ⬜ Pending | 2026-05-08 |
+| F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ⚠️ Issues to fix (12 BLOCKERs — fix before Phase H) | 2026-05-08 |
 | G | Renderer integration with reportType | 2-3 | ⬜ Pending | ⬜ Pending | — |
 | H | Flip defaults, cleanup | 1-2 | ⬜ Pending | ⬜ Pending | — |
 
@@ -780,8 +780,11 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 ### Council review
 
-- [ ] Findings ≥2 seats addressed
-- [ ] State-machine audit (PA Stage 9 routing logic) — use GLM-5.1 + Grok 4.3 + Kimi K2.6 council per coding-council.md
+- [x] State-machine audit complete — all 6 seats fired 2026-05-08
+- [x] ≥2-seat findings classified as BLOCKERs per synthesis rule
+- [ ] BLOCKERs addressed (see notes below — FIX BLOCKERs before Phase H flip)
+
+**Result: ⚠️ Issues to fix — 12 BLOCKERs, 1 NOTED**
 
 ### Actual
 
@@ -803,7 +806,44 @@ New tests added: 13 across `stages/sizing-pa.test.ts` (8 tests: BLOCKER-D2-3 ×3
 
 ### Council review notes
 
-- Council review: ⬜ Pending
+**Council fired:** 2026-05-08. 6 seats: Gemini 3.1 Pro, GPT-5.4, Grok 4.3, GLM-5.1, Kimi K2.6, MiMo v2.5 Pro. All 6 responded. 0 truncations. GPT-5.4 hallucination discount applied.
+
+**Seat count → classification (seat count first, then classify):**
+
+#### BLOCKERs (≥2 seats)
+
+| ID | Seats | File | Description |
+|---|---|---|---|
+| BLOCKER-F-1 | 5 seats (Gemini, GPT-5.4, GLM, Kimi, MiMo) | `report-type-router.ts` / `normaliseStatus()` | `UNREVIEWED` and any unknown string defaults to `PASS` — fail-open. An errored/pending feasibility silently routes to FULL_REPORT with zero banners. Fix: map unknown to `WARN` or throw; remove `UNREVIEWED → PASS`. |
+| BLOCKER-F-2 | 5 seats (Gemini, GPT-5.4, GLM, Kimi, MiMo) | `index.ts` | Council Scoring skip uses `console.log` only — no `trackSkippedStage` call. Review and Polish skips both use `trackSkippedStage`. Telemetry blind spot for council-scoring omissions. Fix: add `trackSkippedStage('council_scoring', ...)` in else branch. |
+| BLOCKER-F-3 | 4 seats (Gemini, GPT-5.4, GLM, Kimi, MiMo) | `report-type-router.ts` | `WARN/AMBER` + ≥2 blockers falls through all rules to Default → FULL_REPORT with no banners. Spec defines WARN+0 and WARN+1 explicitly; WARN+>1 is a routing hole. Fix: add explicit `if (normStatus === 'WARN' && failCount > 1)` branch → FEASIBILITY_EXCEPTION (or FULL_REPORT with all-blocker banners per spec decision). |
+| BLOCKER-F-4 | 3 seats (GLM, MiMo, Kimi) | `report-type-router.ts` | `FAIL` + 0 blockers (failCount === 0) falls through to Default → FULL_REPORT. FAIL status with no enumerated blockers is a data inconsistency — should never silently produce a full report. Fix: explicit guard returning FEASIBILITY_EXCEPTION or throwing. |
+| BLOCKER-F-5 | 3 seats (Kimi, GPT-5.4, Grok) | `report-type-router.ts` / Rule 4b | `FAIL` + exactly 1 blocker → FULL_REPORT via Rule 4b (`failCount === 1` fires regardless of normStatus). A FAIL/RED status producing a full report contradicts semantics. Fix: add `&& normStatus !== 'FAIL'` to Rule 4b gate, or route FAIL+1 → FEASIBILITY_EXCEPTION. |
+| BLOCKER-F-6 | 3 seats (Gemini, GPT-5.4, Kimi) | `report-type-router.ts` / Rule 1 | `parsedBrief.missing_mandatory_fields.length` throws TypeError if array is undefined/null. Defensive access missing. Fix: `(parsedBrief.missing_mandatory_fields ?? []).length > 5`. |
+| BLOCKER-F-7 | 4 seats (Gemini, GPT-5.4, GLM, Grok) | `report-type-router.ts` / Rule 3 | Rule 3 (`normStatus === 'PASS'`) fires without checking `failCount`. PASS + blockers>0 would silently drop blockers → FULL_REPORT. Fix: add `&& failCount === 0` to Rule 3, or add defensive blocker-drop warning. |
+| BLOCKER-F-8 | 4 seats (Gemini, GLM, Kimi, MiMo) | `index.ts` | `(feasibility as any).reportType` and `(state as any).reportTypeRouterResult` — two `as any` casts bypass type system. `reportTypeRouterResult` not in PipelineState interface. Fix: add `reportTypeRouterResult?: ReportTypeRouterResult` to PipelineState in types.ts; remove both `as any` casts. |
+| BLOCKER-F-9 | 5 seats (Gemini, GPT-5.4, Grok, Kimi, MiMo) | `index.ts` | `PA_PIPELINE` is a module-level load-time constant. Requires `jest.isolateModules` in tests; risk in long-lived workers where env changes post-load. Fix tracked for Phase H: convert to runtime getter `() => process.env.PA_PIPELINE === 'true'`. Severity: lower risk in Next.js/Vercel (build-time env), so Phase H is acceptable timeline, but is a BLOCKER per 2+ seat rule. |
+| BLOCKER-F-10 | 2 seats (GPT-5.4, MiMo) | `index.ts` | While loop checks raw status strings (`RED`, `AMBER`) but router uses normalised values. If a PA-native feasibility gate emits `FAIL`/`WARN`, revision loop never runs despite router treating those as failure/warning. State-machine mismatch. Fix: normalise status before loop condition check using `normaliseStatus()`. |
+| BLOCKER-F-11 | 3 seats (GLM, Kimi, MiMo) | `report-type-router.ts` | `maxPages: 0` for FULL_REPORT is semantically ambiguous — a renderer interpreting 0 as "zero pages" would produce an empty PDF. Fix: define `const UNLIMITED_PAGES = 0` with JSDoc explaining the convention; or use `Infinity`/`-1` and update Phase G renderer accordingly. |
+| BLOCKER-F-12 | 3 seats (GPT-5.4, Kimi, MiMo) | `index.ts` | `_paRevisionEnabled` is computed once from preliminary route. If revision #1 improves feasibility from FAIL+2→WARN+1 (route becomes FULL_REPORT), loop may run a wasted second iteration because the boolean stays true. Fix: re-evaluate route inside loop after each feasibility rerun; break when `routeReportType().reportType !== 'FEASIBILITY_EXCEPTION'`. |
+
+#### NOTEDs (1 seat only — do not block)
+
+| ID | Seat | File | Description |
+|---|---|---|---|
+| NOTED-F-1 | Gemini | `report-type-router.ts` / Rule 4b | warningBanners in Rule 4b ignores concurrent warnings[] — only first blocker surfaced. Low-impact for now; Phase G renderer decides how many banners to show. |
+
+#### Invalidated findings (hallucination / superseded)
+
+- Grok: "BRIEF_INCOMPLETE_EXCLUDED/FEASIBILITY_EXCEPTION_EXCLUDED undefined" — both arrays defined at lines 56/69 in the actual file. Diff excerpt was truncated; Grok hallucinated. Discarded.
+- Kimi: "_paRouterResult undeclared" — declared at line 775 in index.ts with `let`. Hallucination. Discarded.
+- Multi-seat "excludedSections is dead data" — superseded by Phase G (commit `0a839698`) which wires `excludedSections` into the renderer. Was accurate at Phase F commit time; Phase G closes the gap.
+
+#### BLOCKER priority for Phase G patch commit
+
+**Fix immediately (logic correctness):** F-3, F-4, F-5, F-6, F-7 (routing holes + null safety)
+**Fix before Phase H flip:** F-1, F-2, F-8, F-10, F-11, F-12 (telemetry, type safety, runtime)
+**Phase H scope:** F-9 (PA_PIPELINE runtime getter — acceptable as load-time constant for now in Next.js/Vercel)
 
 ---
 
@@ -912,7 +952,7 @@ For watchdog drift detection. Pending items only:
 - ✅ Phase D1: council review ✅ Approved (2026-05-08) — 9 BLOCKERs fixed + 2 NOTEDs reclassified as BLOCKERs (NOTED-D1-2 and NOTED-D1-3, 2 seats each) and fixed. All 530 tests pass. Phase E unblocked.
 - ✅ Phase D2: council review ✅ Approved (after fixes) — 5 BLOCKERs fixed 2026-05-08
 - ✅ Phase F: COMPLETE (2026-05-08) — Report Type Router (PA Stage 9), Polish dropped on PA path, Review + Council Scoring FULL_REPORT-only guard; 33 new tests (21 unit + 12 integration); 563/563 pass
-- ❌ Phase F: council review PENDING
+- ⚠️ Phase F: council review COMPLETE — 12 BLOCKERs to fix before Phase H flip. Fix priority: F-3/F-4/F-5/F-6/F-7 (routing correctness) first, then F-1/F-2/F-8/F-10/F-11/F-12 (telemetry/type safety). F-9 (PA_PIPELINE runtime) deferred to Phase H.
 - ❌ Phase E: unblocked, ready to start (gated on v2 BOM ≥8 baseline)
 - ✅ Phase G: COMPLETE (2026-05-08) — renderer v3 reads reportType for section/page guards; 21 new tests; all 2096 pre-existing tests pass
 - ❌ Phase G: council review PENDING
