@@ -1179,6 +1179,7 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           manufacturer_hint?: string | null
           llm_mpn?: string | null
           bestDistributor?: { sku: string; unitPriceGbp: number; source: string } | null
+          quantity_calculation_basis?: string | null
         }> = (state as any).integratedBomLines ?? []
 
         const findIntegrated = (p: Part) =>
@@ -1235,11 +1236,18 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           const statusText = isVerified ? '✓ VERIFIED' : '~ ESTIMATE'
           const statusColour = isVerified ? BESS_GREEN : BESS_AMBER
 
+          // quantity_calculation_basis: show derivation formula as small italic note
+          // below the qty number (e.g. "3,500 kWh / 0.8 DoD / (3.2V × 280Ah) = 4,896")
+          const calcBasis = (il as any)?.quantity_calculation_basis ?? null
+          // Truncate to ~60 chars to avoid overflowing the narrow Qty column
+          const calcNote = calcBasis ? String(calcBasis).slice(0, 60) : null
+          const qtyText = calcNote ? `${qty}\n${calcNote}` : `${qty}`
+
           return [
             { text: statusText, bold: true, colour: statusColour },
             { text: dash(p.name), bold: true },
             { text: mpnText },
-            { text: `${qty}`, align: 'right' as const },
+            { text: qtyText, align: 'right' as const, style: calcNote ? { fontSize: 6, color: '#6B7280' } : undefined },
             { text: isNoPrice ? 'TBD' : fmtGbp(unitCost), align: 'right' as const },
             { text: isNoPrice ? 'TBD' : fmtGbp(extCost), align: 'right' as const },
             { text: mb },

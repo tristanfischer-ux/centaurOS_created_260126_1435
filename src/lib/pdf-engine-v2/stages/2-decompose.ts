@@ -194,6 +194,28 @@ export function validateDecomposeResultPA(data: any): ModulePA[] {
       )
     }
 
+    // ── expected_parts: normalise quantity_per_assembly ───────────────────
+    // 2026-05-09 fix: the updated prompt emits quantity_per_assembly (integer)
+    // instead of quantity (string). Normalise both cases so downstream
+    // consumers always see quantity_per_assembly: number. Backwards compatible:
+    // if the LLM still emits legacy `quantity: "1"`, we parse and promote it.
+    for (const ep of mod.expected_parts) {
+      if (typeof ep.quantity_per_assembly !== 'number') {
+        // Try to parse from legacy `quantity` string field
+        const legacyQty = typeof ep.quantity === 'string'
+          ? parseInt(ep.quantity.trim().replace(/[^0-9]/g, ''), 10)
+          : typeof ep.quantity === 'number' ? ep.quantity : NaN
+        ep.quantity_per_assembly = Number.isFinite(legacyQty) && legacyQty > 0 ? legacyQty : 1
+        if (!Number.isFinite(legacyQty) || legacyQty <= 0) {
+          console.warn(
+            `[decompose-pa] Module '${mod.name}' part '${ep.name}': could not parse quantity_per_assembly, defaulting to 1.`
+          )
+        }
+      }
+      // Keep legacy quantity field in sync (string version) for any consumers still reading it
+      if (ep.quantity === undefined) ep.quantity = String(ep.quantity_per_assembly)
+    }
+
     // ── estimated_lead_time_weeks: must be a number ───────────────────────
     // D1 council BLOCKER-D1-8 fix: validate lead time is a number.
     // The legacy default of 12 weeks (applied below) only runs after validation —

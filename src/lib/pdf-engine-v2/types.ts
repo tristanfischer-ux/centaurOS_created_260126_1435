@@ -229,7 +229,23 @@ export interface Module {
 
 export interface ModulePAExpectedPart {
   name: string
-  quantity: string
+  /**
+   * Authoritative count needed for ONE finished unit assembly.
+   * Derived from brief specs (energy, power, voltage, dimensions) — NOT defaulted to 1
+   * unless the part is genuinely a single instance (e.g. one main controller).
+   * Renamed from the legacy `quantity: string` field. Legacy consumers that read `quantity`
+   * should be updated to read `quantity_per_assembly` (numeric).
+   */
+  quantity_per_assembly: number
+  /**
+   * The verbatim formula or reasoning the LLM used to derive quantity_per_assembly.
+   * Examples: "3,500 kWh / 0.8 DoD × 1000 / (3.2 V × 280 Ah) = 4,880 → 4,896 (16-string aligned)"
+   * Must never be a generic string like "derived from brief".
+   * Optional/null when the part has a trivially obvious count (e.g. 1 container).
+   */
+  quantity_calculation_basis?: string | null
+  /** Legacy field — kept for backwards compatibility with older LLM outputs that still emit `quantity: string`. */
+  quantity?: string
   role: string
   /** LLM's best guess at a manufacturer part number (null when unknown). */
   mpn?: string | null

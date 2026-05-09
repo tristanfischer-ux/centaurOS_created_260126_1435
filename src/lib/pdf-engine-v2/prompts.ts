@@ -264,7 +264,8 @@ Required output schema:
       "expected_parts": [
         {
           "name": string,
-          "quantity": string,
+          "quantity_per_assembly": integer,
+          "quantity_calculation_basis": string,
           "role": string,
           "mpn": string|null,
           "manufacturer": string|null,
@@ -300,6 +301,16 @@ Rules:
 - For each module, estimate mass and dimensions even if rough. These estimates feed the sizing solver. A rough estimate is infinitely better than null, because null means the solver cannot allocate space for this module.
 - Set maturity based on how much data you can provide: CONCEPTUAL = name and purpose only, no parts or dimensions. PRELIMINARY = some parts, rough dimensions, estimated mass. ENGINEERING = full parts list, firm dimensions, mass, interfaces.
 - Aim for 6-12 modules for a complex product. Fewer than 6 means modules are too coarse for useful engineering analysis. More than 12 means you've probably split things too finely.
+
+QUANTITY DERIVATION — MANDATORY:
+- quantity_per_assembly is the actual count needed for ONE finished unit assembly. Do NOT default to 1 unless the part is genuinely a single instance per assembly (e.g. one main controller, one container enclosure).
+- quantity_calculation_basis is the verbatim formula or reasoning used to derive the count. Examples:
+    "3,500 kWh usable / 0.80 DoD = 4,375 kWh nominal; 4,375 × 1,000 / (3.2 V × 280 Ah) = 4,880 cells → 4,896 (16-string aligned)"
+    "14 racks × 24 slave boards per rack = 336 BMS slave boards"
+    "1 per system — single master controller per containerised BESS"
+- For energy-storage cells, battery cells, contactors, busbars, fasteners, BMS slave boards, and any part whose count depends on system energy/power/voltage/dimensional constraints — derive the count from the brief's specifications. Do NOT write "1" for a battery cell in a MWh-scale system.
+- Use the brief's energy/power/voltage/dimensional data. For LFP prismatic cells: count = ceil(usable_kWh / DoD × 1000 / (cell_V × cell_Ah)), rounded up to the nearest multiple of 16 for string alignment.
+- quantity_calculation_basis MUST show the formula. A string like "derived from brief" or "see brief" is NOT acceptable.
 
 USER:
 [Structured brief JSON from Stage 1]

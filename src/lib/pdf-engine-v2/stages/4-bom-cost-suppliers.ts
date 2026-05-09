@@ -209,6 +209,14 @@ export interface IntegratedBomLine {
   matchedProcessName?: string | null
   qtyDeterministic?: boolean
   qtyRule?: string
+
+  /**
+   * Verbatim formula the LLM used to derive quantity_per_assembly in the Module
+   * Decomposition stage. Propagated here for procurement audit and PDF rendering.
+   * Examples: "3,500 kWh / 0.8 DoD × 1000 / (3.2 V × 280 Ah) = 4,880 → 4,896 (16-string aligned)"
+   * Null when the count is trivially obvious (e.g. 1 container).
+   */
+  quantity_calculation_basis?: string | null
 }
 
 /**
@@ -888,6 +896,8 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       mpn: string | null
       manufacturer: string | null
       confidence: string | null
+      quantity_per_assembly: number | null
+      quantity_calculation_basis: string | null
     }
     const expectedPartsMeta = new Map<string, ExpectedPartMeta>()
     for (const mod of modules) {
@@ -895,11 +905,18 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       if (Array.isArray(ep)) {
         for (const p of ep) {
           if (p.name) {
+            // Support both new field (quantity_per_assembly: number) and legacy (quantity: string)
+            const qpa: number | null =
+              typeof p.quantity_per_assembly === 'number' ? p.quantity_per_assembly
+              : typeof p.quantity === 'string' && /^\d+$/.test(p.quantity.trim()) ? parseInt(p.quantity.trim(), 10)
+              : null
             expectedPartsMeta.set(String(p.name).toLowerCase(), {
               part_class: p.part_class ?? null,
               mpn: p.mpn ?? null,
               manufacturer: p.manufacturer ?? null,
               confidence: p.confidence ?? null,
+              quantity_per_assembly: qpa,
+              quantity_calculation_basis: p.quantity_calculation_basis ?? null,
             })
           }
         }
@@ -1010,6 +1027,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       const partClass = epMeta?.part_class ?? null
       const llmMpn = epMeta?.mpn ?? null
       const manufacturerHint = epMeta?.manufacturer ?? null
+      const quantityCalculationBasis = epMeta?.quantity_calculation_basis ?? null
 
       // Determine regime
       const isDeterministic = (p as any).priceSource === 'distributor'
@@ -1067,6 +1085,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
         matchedProcessName: (p as any).matchedProcessName,
         qtyDeterministic: (p as any).qtyDeterministic,
         qtyRule: (p as any).qtyRule,
+        quantity_calculation_basis: quantityCalculationBasis,
       }
     })
 
