@@ -18,6 +18,7 @@ import { runBomCost } from './stages/4-bom-cost'
 import { runSuppliers } from './stages/5-suppliers'
 import { runBomCostSuppliers } from './stages/4-bom-cost-suppliers'
 import { runReview } from './stages/6-review'
+import { runFmeaGeneration } from './stages/6b-fmea-generation'
 import PdfRenderer from './stages/7-pdf'
 import PdfRendererV3 from './stages/7-pdf-v3'
 
@@ -1307,6 +1308,35 @@ export async function runPipeline(
   } else {
     trackSkippedStage('review', `PA path: skipped on ${state.reportType} — Review is FULL_REPORT-only (Phase F)`)
     console.log(`[pipeline] Review SKIPPED — PA path, reportType=${state.reportType}`)
+  }
+
+  // ── Stage 6b: FMEA Generation ──────────────────────────────────────
+  // Runs after Review so the Fang per-module reviews are done. Non-fatal —
+  // if FMEA generation fails, the renderer falls back to module riskMatrix rows.
+  // On the PA path, modules carry failure_modes (not riskMatrix), so without
+  // this stage the FMEA section would be empty.
+  const _shouldRunFmea = !paMode || state.reportType === 'FULL_REPORT'
+  if (_shouldRunFmea && state.modules.length > 0) {
+    console.log('\n[pipeline] === Stage 6b: FMEA Generation ===')
+    const fmeaResult = await runFmeaGeneration(
+      state.modules,
+      state.briefText || '',
+      (state as any).productClass || undefined,
+    )
+    trackStage('fmea_generation', fmeaResult)
+    if (fmeaResult.ok && fmeaResult.data && fmeaResult.data.length >= 4) {
+      ;(state as any).fmea = fmeaResult.data
+      console.log(`[pipeline] FMEA Generation complete: ${fmeaResult.data.length} rows stored.`)
+      state.sourceAttributions.push({
+        section: 'Risk Register (FMEA)',
+        source: 'llm',
+        detail: 'Gemini 3.1 Pro — domain-specific FMEA with S/O/D/RPN columns',
+      })
+    } else {
+      console.warn(`[pipeline] FMEA Generation returned insufficient rows — renderer will fall back to module riskMatrix.`)
+    }
+  } else {
+    console.log('[pipeline] FMEA Generation SKIPPED — no modules or non-FULL_REPORT path.')
   }
 
   // ── Council Scoring (the improvement engine) ───────────────────────

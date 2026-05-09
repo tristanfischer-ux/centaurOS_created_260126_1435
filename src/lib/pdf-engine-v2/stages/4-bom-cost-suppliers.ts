@@ -898,6 +898,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       confidence: string | null
       quantity_per_assembly: number | null
       quantity_calculation_basis: string | null
+      estimated_unit_price_gbp: number | null
     }
     const expectedPartsMeta = new Map<string, ExpectedPartMeta>()
     for (const mod of modules) {
@@ -917,6 +918,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
               confidence: p.confidence ?? null,
               quantity_per_assembly: qpa,
               quantity_calculation_basis: p.quantity_calculation_basis ?? null,
+              estimated_unit_price_gbp: typeof p.estimated_unit_price_gbp === 'number' ? p.estimated_unit_price_gbp : null,
             })
           }
         }
@@ -1028,6 +1030,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       const llmMpn = epMeta?.mpn ?? null
       const manufacturerHint = epMeta?.manufacturer ?? null
       const quantityCalculationBasis = epMeta?.quantity_calculation_basis ?? null
+      const llmUnitPriceGbp = epMeta?.estimated_unit_price_gbp ?? null
 
       // Determine regime
       const isDeterministic = (p as any).priceSource === 'distributor'
@@ -1047,7 +1050,10 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       if (partClass === 'oem_subsystem') regime = 'named_manufacturer_reseller'
 
       // Initial cost (will be overwritten by distributor or estimate below)
-      const unitCostGbp = p.estimatedUnitCostGbp ?? 0
+      // Bug B fix: use LLM-estimated unit price from expected_parts as fallback when
+      // the part has no catalogue cost (OEM-direct parts like CATL cells).
+      const rawUnitCost = p.estimatedUnitCostGbp ?? 0
+      const unitCostGbp = rawUnitCost > 0 ? rawUnitCost : (llmUnitPriceGbp ?? 0)
       let costSource: IntegratedBomLine['costSource'] = 'estimated'
       if ((p as any).priceSource === 'database') costSource = 'database'
       else if ((p as any).priceSource === 'distributor') costSource = 'mouser'
@@ -1061,12 +1067,19 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       const initVerificationStatus: 'verified' | 'estimated' =
         (isDeterministic && (p as any).priceSource === 'distributor') ? 'verified' : 'estimated'
 
+      // Bug A fix: quantity priority order:
+      // 1. epMeta.quantity_per_assembly (authoritative LLM derivation from brief)
+      // 2. BOM line quantity from mergedBomLines (includes deterministic overrides)
+      // 3. Default 1
+      const epQty = epMeta?.quantity_per_assembly ?? null
+      const resolvedQty = epQty != null && epQty > 0 ? epQty : resolveQty(pn)
+
       return {
         id: p.id || pn,
         partNumber: pn,
         name: p.name,
         sourceModuleId: p.sourceModuleId || '',
-        quantity: resolveQty(pn),
+        quantity: resolvedQty,
         partRegime,
         regime,
         massKg: p.massKg,
@@ -1086,6 +1099,10 @@ Return ALL four sub-task results in the JSON structure specified in the system p
         qtyDeterministic: (p as any).qtyDeterministic,
         qtyRule: (p as any).qtyRule,
         quantity_calculation_basis: quantityCalculationBasis,
+        // Internal-only: LLM unit price for Bug C fallback in distributor rejection path.
+        // Stored as a plain property on the line object; cast via any to avoid polluting
+        // the IntegratedBomLine interface with an internal field.
+        ...(llmUnitPriceGbp != null ? { _llmUnitPriceGbp: llmUnitPriceGbp } as any : {}),
       }
     })
 
@@ -1139,8 +1156,23 @@ Return ALL four sub-task results in the JSON structure specified in the system p
           line.unitCostGbp = qty1 ?? line.unitCostGbp
           line.costSource = best.source as 'mouser' | 'farnell' | 'digikey' | 'lcsc'
           line.llmSubTask = 'CLASSIFY_MAKE_BUY'
-          // Distributor returned a real price → VERIFIED tier
-          line.verification_status = 'verified'
+          // Bug C fix: only accept distributor matches as VERIFIED when the part class
+          // is electronic_cots or mechanical_cots. OEM subsystems, structural fabricated,
+          // and software IP cannot be stocked by distributors — any match is a false positive
+          // (e.g. Mouser fuzzy-matching "LF280K" to a passive component package code).
+          const canBeVerified = line.part_class === 'electronic_cots' || line.part_class === 'mechanical_cots' || line.part_class == null
+          line.verification_status = canBeVerified ? 'verified' : 'estimated'
+          if (!canBeVerified) {
+            // Reject the distributor match — revert to LLM unit price if available
+            const llmPrice = (line as any)._llmUnitPriceGbp as number | null | undefined
+            if (llmPrice != null && llmPrice > 0) {
+              line.unitCostGbp = llmPrice
+              line.costSource = 'estimated'
+            }
+            line.bestDistributor = undefined
+            line.distributors = undefined
+            console.log(`[bom-v2] Rejected distributor match for "${line.name}" (part_class=${line.part_class}) — kept as ESTIMATE`)
+          }
         } catch (err) {
           console.warn(`[bom-v2] Distributor lookup failed for ${line.partNumber}: ${(err as Error).message}`)
         }

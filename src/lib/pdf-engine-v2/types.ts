@@ -262,6 +262,14 @@ export interface ModulePAExpectedPart {
   part_class?: 'electronic_cots' | 'mechanical_cots' | 'structural_fabricated' | 'oem_subsystem' | 'software_ip' | null
   /** How confident the LLM is about the mpn/manufacturer. */
   confidence?: 'high' | 'medium' | 'low' | null
+  /**
+   * LLM-estimated per-unit market price in GBP for parts where the LLM has
+   * reasonable knowledge of market price (battery cells, contactors, transformers,
+   * etc.). Used as fallback unit cost when distributor lookup returns nothing and
+   * verification_status is 'estimated'.
+   * Set to null when the LLM does not have reliable price knowledge.
+   */
+  estimated_unit_price_gbp?: number | null
 }
 
 export interface ModulePAInterface {

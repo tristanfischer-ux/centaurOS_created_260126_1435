@@ -270,7 +270,8 @@ Required output schema:
           "mpn": string|null,
           "manufacturer": string|null,
           "part_class": "electronic_cots"|"mechanical_cots"|"structural_fabricated"|"oem_subsystem"|"software_ip",
-          "confidence": "high"|"medium"|"low"
+          "confidence": "high"|"medium"|"low",
+          "estimated_unit_price_gbp": number|null
         }
       ],
       "interfaces": [
@@ -311,6 +312,13 @@ QUANTITY DERIVATION — MANDATORY:
 - For energy-storage cells, battery cells, contactors, busbars, fasteners, BMS slave boards, and any part whose count depends on system energy/power/voltage/dimensional constraints — derive the count from the brief's specifications. Do NOT write "1" for a battery cell in a MWh-scale system.
 - Use the brief's energy/power/voltage/dimensional data. For LFP prismatic cells: count = ceil(usable_kWh / DoD × 1000 / (cell_V × cell_Ah)), rounded up to the nearest multiple of 16 for string alignment.
 - quantity_calculation_basis MUST show the formula. A string like "derived from brief" or "see brief" is NOT acceptable.
+
+UNIT PRICE ESTIMATION — MANDATORY:
+- estimated_unit_price_gbp is the per-unit market price in GBP for parts where you have reliable knowledge of real-world pricing. Use 2025 UK market price for industrial/B2B procurement.
+- For OEM subsystems and named-manufacturer parts (battery cells, contactors, power electronics, transformers, inverters, compressors, BMS units): provide a realistic price. Examples: CATL LFP 280Ah prismatic cell ≈ £45–75 each; Sungrow SG250HX PCS ≈ £8,000–12,000 per unit; ABB SACE Emax 2 contactor (3200A) ≈ £800–2,000 each.
+- For commodity electronic COTS (passives, connectors, sensors): provide realistic distributor-level prices.
+- Set to null ONLY when you genuinely have no price knowledge. Do NOT default to null for well-known parts. Do NOT guess wildly for obscure parts — set null instead.
+- This value is used as the fallback when distributor APIs return nothing (OEM-direct parts). It will be labelled ESTIMATE in the report.
 
 USER:
 [Structured brief JSON from Stage 1]

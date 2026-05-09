@@ -1251,7 +1251,10 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           { label: 'Source', width: '12%' },
         ]
 
-        const bomRows = modParts.map(p => {
+        // Bug D fix: build bomData as typed tuples {cells, calcBasis} so we can
+        // render the calc basis as a full-width italic note BELOW the part row,
+        // not crammed inside the narrow Qty cell.
+        const bomData = modParts.map(p => {
           const bomLine = state.bomLines?.find(
             bl => bl.childPartId === p.partNumber || bl.childPartId === p.id
           )
@@ -1290,23 +1293,22 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           const statusText = isVerified ? '✓ VERIFIED' : '~ ESTIMATE'
           const statusColour = isVerified ? BESS_GREEN : BESS_AMBER
 
-          // quantity_calculation_basis: show derivation formula as small italic note
-          // below the qty number (e.g. "3,500 kWh / 0.8 DoD / (3.2V × 280Ah) = 4,896")
-          const calcBasis = (il as any)?.quantity_calculation_basis ?? null
-          // Truncate to ~60 chars to avoid overflowing the narrow Qty column
-          const calcNote = calcBasis ? String(calcBasis).slice(0, 60) : null
-          const qtyText = calcNote ? `${qty}\n${calcNote}` : `${qty}`
+          // Bug D: calcBasis extracted separately — rendered as spanning row below, NOT inside Qty cell
+          const calcBasis = il?.quantity_calculation_basis ?? null
 
-          return [
-            { text: statusText, bold: true, colour: statusColour },
-            { text: dash(p.name), bold: true },
-            { text: mpnText },
-            { text: qtyText, align: 'right' as const, style: calcNote ? { fontSize: 6, color: '#6B7280' } : undefined },
-            { text: isNoPrice ? 'TBD' : fmtGbp(unitCost), align: 'right' as const },
-            { text: isNoPrice ? 'TBD' : fmtGbp(extCost), align: 'right' as const },
-            { text: mb },
-            { text: sourceText, colour: isVerified ? BESS_GREEN : BESS_AMBER },
-          ]
+          return {
+            cells: [
+              { text: statusText, bold: true, colour: statusColour },
+              { text: dash(p.name), bold: true },
+              { text: mpnText },
+              { text: String(qty), align: 'right' as const },
+              { text: isNoPrice ? 'TBD' : fmtGbp(unitCost), align: 'right' as const },
+              { text: isNoPrice ? 'TBD' : fmtGbp(extCost), align: 'right' as const },
+              { text: mb },
+              { text: sourceText, colour: isVerified ? BESS_GREEN : BESS_AMBER },
+            ] as Array<{ text: string; bold?: boolean; colour?: string; align?: 'left' | 'right' | 'center' }>,
+            calcBasis: calcBasis ? String(calcBasis) : null,
+          }
         })
 
         // Module total
@@ -1346,7 +1348,47 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
             )}
 
             <TealH2>Bill of Materials</TealH2>
-            <DarkHeaderTable cols={bomCols} rows={bomRows} />
+            {/* Bug D: render BOM table inline so calc-basis spans all columns below each row */}
+            <View style={s.darkTable}>
+              <View style={s.darkTHead}>
+                {bomCols.map((col, ci) => (
+                  <Text key={ci} style={[s.darkTHC, { width: col.width, textAlign: col.align || 'left' }]}>
+                    {col.label}
+                  </Text>
+                ))}
+              </View>
+              {bomData.map((row, ri) => (
+                <View key={ri} wrap={false}>
+                  <View style={ri % 2 === 0 ? s.tRow : s.tRowAlt}>
+                    {row.cells.map((cell, ci) => (
+                      <Text
+                        key={ci}
+                        style={[
+                          s.tC,
+                          { width: bomCols[ci]?.width || 'auto', textAlign: (cell.align ?? bomCols[ci]?.align) || 'left' },
+                          cell.bold ? { fontFamily: 'Helvetica-Bold' } : {},
+                          cell.colour ? { color: cell.colour } : {},
+                        ]}
+                      >
+                        {cell.text}
+                      </Text>
+                    ))}
+                  </View>
+                  {row.calcBasis && (
+                    <View style={[ri % 2 === 0 ? s.tRow : s.tRowAlt, { paddingTop: 0, paddingBottom: 4 }]}>
+                      <Text style={[s.tC, { width: '100%', fontSize: 7.5, color: '#6B7280', fontFamily: 'Helvetica-Oblique', paddingTop: 0, paddingLeft: 14 }]}>
+                        {row.calcBasis}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              ))}
+              {bomData.length === 0 && (
+                <View style={s.tRow}>
+                  <Text style={[s.tC, { width: '100%', color: '#9CA3AF', fontFamily: 'Helvetica-Oblique' }]}>No parts for this module.</Text>
+                </View>
+              )}
+            </View>
 
             {/* Module total row */}
             {modParts.length > 0 && (
