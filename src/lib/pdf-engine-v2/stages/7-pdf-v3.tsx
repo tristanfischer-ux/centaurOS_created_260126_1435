@@ -931,19 +931,46 @@ const BriefPages = ({ state }: { state: PipelineState }) => {
     { label: 'Jurisdiction', value: dash((b?.constraints as any)?.jurisdiction) },
   ].filter(r => r.value !== '—')
 
-  const sources = b?.sources ?? []
+  // Fix B (2026-05-09): single source of truth for Research Sources.
+  // Page-3 table reads from state.sourceAttributions (same data as page-43 Source
+  // Attribution table) when b?.sources is empty, so the two tables are consistent.
+  // Priority: b.sources (user-provided) → state.sourceAttributions → empty.
+  const briefSources = b?.sources ?? []
+  const sourceAttribsForBrief = (state.sourceAttributions ?? [])
   const sourceCols = [
     { label: 'Source', width: '40%' },
     { label: 'Type', width: '20%' },
     { label: 'Grade', width: '10%' },
     { label: 'Relevance', width: '30%' },
   ]
-  const sourceRows = sources.map(src => [
-    { text: dash(src.title), bold: true },
-    { text: dash(src.type) },
-    { text: (src as any).sourceGrade ? gradeTag((src as any).sourceGrade) : '[?]' },
-    { text: dash(src.relevance) },
-  ])
+
+  // Build rows: prefer b.sources rows; fall back to sourceAttributions mirrored rows.
+  let sourceRows: Array<Array<{ text: string; bold?: boolean }>>
+  if (briefSources.length > 0) {
+    sourceRows = briefSources.map(src => [
+      { text: dash(src.title), bold: true },
+      { text: dash(src.type) },
+      { text: (src as any).sourceGrade ? gradeTag((src as any).sourceGrade) : '[?]' },
+      { text: dash(src.relevance) },
+    ])
+  } else if (sourceAttribsForBrief.length > 0) {
+    // Mirror page-43 attributions: map to the same 4-col schema.
+    sourceRows = sourceAttribsForBrief.map(attr => {
+      const gradeForRow = attr.source === 'deterministic' ? 'B'
+        : attr.source === 'database' ? 'C'
+        : attr.source === 'search' ? 'C'
+        : attr.source === 'user' ? 'A'
+        : 'D'
+      return [
+        { text: dash(attr.section), bold: true },
+        { text: dash(attr.source) },
+        { text: gradeTag(gradeForRow) },
+        { text: dash(attr.detail || attr.source) },
+      ]
+    })
+  } else {
+    sourceRows = []
+  }
 
   return (
     <>
