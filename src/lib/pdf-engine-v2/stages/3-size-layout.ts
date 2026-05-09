@@ -554,14 +554,39 @@ function extendSizingSheetPA(
       `Domain-specific clearance requirements should be verified against applicable standards.`
   }
 
-  const massMarginNote: string | null = massMarginPct < 5
-    ? `Total allocated mass: ${allocatedMassKg.toFixed(0)} kg. ` +
+  // A3 FIX (2026-05-09): check allocated mass against payload budget.
+  // For container-class domains (BESS, AUV, edge AI pod) where ISO_CONTAINER_SPECS
+  // applies, flip layoutFeasible=false and generate a remediation note when the
+  // allocated zone mass exceeds the container's rated max_payload_kg.
+  // Previously the sizing solver only checked floor-area utilisation, so BESS
+  // could report "Layout Feasible: YES" despite 34,650 kg > 27,230 kg payload.
+  const massOverrun = containerSpec && allocatedMassKg > availablePayloadMassKg
+  const massOverrunKg = massOverrun ? allocatedMassKg - availablePayloadMassKg : 0
+
+  // Build mass margin note: always show when tight (<5%), and add overrun info.
+  let massMarginNote: string | null = null
+  if (massOverrun && containerSpec) {
+    massMarginNote =
+      `MASS BUDGET EXCEEDED: Allocated mass ${allocatedMassKg.toFixed(0)} kg exceeds container payload limit ` +
+      `${availablePayloadMassKg.toFixed(0)} kg by ${massOverrunKg.toFixed(0)} kg. ` +
+      `Layout Feasible: NO (mass overrun). ` +
+      `Remediation options: (1) select a 45-ft HC container (max_payload_kg ≈ 29,500 kg), ` +
+      `(2) switch to a lighter cell chemistry (e.g. LFP prismatic → cylindrical 21700), ` +
+      `or (3) reduce system capacity.`
+  } else if (massMarginPct < 5) {
+    massMarginNote =
+      `Total allocated mass: ${allocatedMassKg.toFixed(0)} kg. ` +
       `Remaining mass budget: ${massMarginKg.toFixed(0)} kg (${massMarginPct.toFixed(1)}% margin for cables, fasteners, and contingency). ` +
       `This is tight — detailed cable harness mass estimation is required before design freeze.`
-    : null
+  }
+
+  // When mass is over budget, flip the feasible flag so every downstream
+  // consumer (gate check, sizing section, cover verdict) sees the correct status.
+  const layoutFeasible = massOverrun ? false : sheet.feasible
 
   return {
     ...sheet,
+    feasible: layoutFeasible,
     zones,
     volumeUtilisationPct: volumeUtilisationPct ?? undefined,
     massUtilisationPct,
