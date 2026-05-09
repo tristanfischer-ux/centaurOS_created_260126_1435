@@ -9,8 +9,8 @@ set -eo pipefail
 
 MAX_CONCURRENT=4
 REPO_ROOT="/Users/tristanfischer/Developer/CentaurOS created 260126 1435"
-EVIDENCE_ROOT="$HOME/Downloads/engine-evidence/pa-baseline-71c6133c"
-LABEL="pa-baseline-71c6133c"
+EVIDENCE_ROOT="$HOME/Downloads/engine-evidence/pa-baseline-v2-bom-20260509T0719"
+LABEL="pa-baseline-v2-bom-20260509T0719"
 
 DRY_RUN=0
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=1
