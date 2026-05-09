@@ -358,7 +358,26 @@ Rules:
 - Keep the BOM product-agnostic. Do NOT assume the product is a heat pump or any specific category — read the modules carefully and derive the BOM from them.
 - Deduplicate common parts across modules where it makes sense (fasteners, connectors).
 - bomLines describes the assembly tree: { parentPartNumber, childPartNumber, quantity }. Top-level parts have parentPartNumber = null.
-- Return ONLY valid JSON. No markdown fences, no commentary.`
+- Return ONLY valid JSON. No markdown fences, no commentary.
+
+PRICING FLOOR (mandatory — B2 fix 2026-05-09):
+Never output estimatedUnitCostGbp below the floors listed below for safety-critical system components.
+"Safety-critical" means: battery management system (BMS) controller or master unit, fire suppression
+cylinder or panel, pressure relief device, high-voltage contactor or isolator, arc flash detection
+sensor, emergency shutdown relay, sterility filter (bioreactor class), parachute/recovery system
+(HAPS class), pressure hull penetrator (AUV class), flight controller (drone class).
+Minimum price floors (2024 market data, UK pricing):
+  - BMS master controller / BMS unit: £1,500 minimum
+  - Fire suppression cylinder (Novec/CO2/FM-200): £800 minimum per cylinder
+  - High-voltage contactor / DC isolator: £200 minimum
+  - Arc flash detection sensor: £400 minimum
+  - Sterility filter (bioreactor): £150 minimum per filter
+  - Parachute recovery system (HAPS): £5,000 minimum
+  - Pressure hull penetrator (AUV): £250 minimum per penetrator
+  - Flight controller (drone): £180 minimum
+  - Emergency shutdown relay: £120 minimum
+If a safety-critical part has no real market price data, use the floor above and set confidence to "medium".
+Do NOT output £0, £1, or any placeholder below these floors for safety-critical components.`
 
 // ─── Source Grading Rules ──────────────────────────────────────────────────
 

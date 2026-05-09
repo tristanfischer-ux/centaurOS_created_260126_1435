@@ -275,8 +275,39 @@ export async function runPipeline(
     sectionScores: [],
   }
 
+  // B1 FIX (2026-05-09): stage source labels for AuditLogSection.
+  // Maps stage name → human-readable source label used in the Duration column.
+  const STAGE_SOURCE_MAP: Record<string, string> = {
+    brief_parsing: 'Deterministic + LLM',
+    training_data: 'LLM',
+    research: 'LLM',
+    brief_generation: 'LLM',
+    size_layout: 'Deterministic',
+    decompose: 'LLM',
+    bom_cost: 'LLM + Deterministic',
+    bom_cost_suppliers: 'LLM + Deterministic',
+    suppliers: 'Corpus + API',
+    regulatory_extraction: 'LLM',
+    review: 'LLM',
+    fmea_generation: 'LLM',
+    council_scoring: 'LLM',
+    pdf: 'Deterministic',
+  }
+
   function trackStage(name: string, result: StageResult<unknown>) {
     stages.push({ name, ok: result.ok, durationMs: result.durationMs, error: result.error })
+    // B1 FIX (2026-05-09): mirror each stage record to pipelineTrace so the
+    // AuditLogSection can show real Duration values instead of always "—".
+    // Previously trackStage only wrote to stages[] which was never connected to
+    // the renderer's (state as any).pipelineTrace fallback path.
+    if (!(state as any).pipelineTrace) (state as any).pipelineTrace = []
+    ;(state as any).pipelineTrace.push({
+      step: name,
+      status: result.ok ? 'Complete' : 'BLOCKED',
+      durationMs: result.durationMs,
+      source: STAGE_SOURCE_MAP[name] || 'LLM',
+      notes: result.error || `${name} stage complete`,
+    })
     if (name !== 'pdf') llmCalls++
     console.log(`[pipeline] ${name}: ${result.ok ? 'OK' : 'FAILED'} (${result.durationMs}ms)${result.error ? ` — ${result.error}` : ''}`)
   }
