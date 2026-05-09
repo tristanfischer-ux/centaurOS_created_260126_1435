@@ -667,183 +667,35 @@ export async function runPipeline(
     // Skip all stages, go straight to PDF
   } else {
   // ─────────────────────────────────────────────────────────────────────────
-  // REORDER 2026-05-09: Brief → Sizing → Feasibility Gate → Brief Revision
+  // REORDER 2026-05-09: align pipeline order with PDF render order
   //
-  // New architecturally-correct execution order (PA path):
-  //   PA Stage 4 Regulatory → PA Stage 5 Decompose → Sizing → Feasibility Gate
-  //   → Brief Revision loop (if FAIL/WARN) → Router → BOM/Cost/Assembly
+  // Architecturally-correct execution order (PA path):
+  //   Sizing → Feasibility Gate → Brief Revision loop (if FAIL/WARN)
+  //   → Router → PA Stage 5 Decompose → BOM/Cost/Assembly
+  //   → PA Stage 4 Regulatory (AFTER BOM, references real materials)
+  //   → Review → Council Scoring → PDF
   //
-  // Sizing now runs BEFORE the Feasibility Gate so the gate sees the actual
-  // solver verdict (feasible/INFEASIBLE) instead of the stale null placeholder.
-  // Brief Revision fires AFTER the Gate, per spec.
+  // Rationale:
+  //   1. Sizing runs BEFORE the Feasibility Gate so the gate sees the solver verdict.
+  //   2. The Brief Revision loop fires AFTER the Gate; Decompose is expensive and
+  //      should NOT run if the brief needs revising first.
+  //   3. Regulatory runs AFTER BOM so it can reference real materials/processes
+  //      rather than brief-level guesses.
   // ─────────────────────────────────────────────────────────────────────────
 
   // BENCH-L1: stamp productClass on state so the PDF renderer can do
   // benchmark lookups without re-classifying.
   state.productClass = classification.productClass
 
-  // ── PA Stage 4: Regulatory Extraction (PA_PIPELINE=true only) ────────────
-  // Runs after Research Synthesis lands, before Module Decomposition.
-  // Produces state.regulatoryExtraction (RegulatoryExtraction with source_grade='C',
-  // verification_status='UNVERIFIED'). Dual-writes to state.research.designBrief.regulatory
-  // so downstream stages that read the legacy shape keep working.
-  // Legacy path: regulatory remains embedded in Research output.
-  if (paMode && state.parsedBrief) {
-    console.log('\n[pipeline] === PA Stage 4: Regulatory Extraction ===')
-    const regulatoryResult = await runRegulatoryExtraction(state.parsedBrief, classification)
-    trackStage('regulatory_extraction', regulatoryResult)
-
-    if (regulatoryResult.ok && regulatoryResult.data) {
-      state.regulatoryExtraction = regulatoryResult.data
-
-      // Dual-write: synthesise legacy state.research.designBrief.regulatory shape
-      // so downstream stages that read state.research.designBrief.regulatory keep working.
-      //
-      // D1 council BLOCKER-D1-4 fix (2/6 seats: GLM-5.1, MiMo):
-      // The summary field previously mapped to e.applicability — same as the
-      // applicability field, so council-scorer saw identical values in both
-      // columns and lost scoring signal. Fixed: summary now derives from
-      // `standard_name (jurisdiction)` which describes WHAT the regulation is,
-      // while applicability retains WHY it applies to this specific product.
-      if (state.research) {
-        const legacyRegulatory = regulatoryResult.data.regulatory_entries.map(e => ({
-          code: e.standard_name,
-          name: e.standard_name,
-          // D1-4 fix: summary = "what the regulation is" not "why it applies"
-          summary: `${e.standard_name} (${e.jurisdiction})`,
-          status: e.status,
-          applicability: e.applicability,
-          designImpact: e.engineering_impact,
-          evidenceRequired: e.evidence_required,
-          ownerRole: e.owner,
-          gapAction: e.gap_action,
-        }))
-
-        // D1 council BLOCKER-D1-3 fix (5/6 seats: GPT-5.4, Grok, GLM-5.1, Kimi, MiMo):
-        // If state.research.designBrief is null/undefined (possible when Research
-        // Synthesis produced a shape without designBrief), the write was silently
-        // skipped. All three downstream consumers (council-scorer, score-rubric,
-        // calculators) would see zero regulatory data even though PA Stage 4 succeeded.
-        // Force-initialise designBrief with the regulatory data if it is absent.
-        if (!state.research.designBrief) {
-          console.warn(
-            '[pipeline] PA Regulatory dual-write: state.research.designBrief was null/undefined — ' +
-            'force-initialising with regulatory data. This may indicate an issue in Research Synthesis.'
-          )
-          state.research.designBrief = { regulatory: legacyRegulatory } as any
-        } else {
-          state.research.designBrief.regulatory = legacyRegulatory
-        }
-      }
-
-      console.log(
-        `[pipeline] PA Regulatory Extraction complete: ${regulatoryResult.data.regulatory_entries.length} entries. ` +
-        `All source_grade=C, verification_status=UNVERIFIED. Dual-wrote to state.research.designBrief.regulatory.`
-      )
-    } else {
-      // Non-fatal: log warning and continue. Decompose will proceed without regulatory context.
-      console.warn(
-        `[pipeline] PA Regulatory Extraction failed: ${regulatoryResult.error}. ` +
-        `Continuing without regulatoryExtraction — module decomposition will not have regulatory context.`
-      )
-    }
-  }
-
-  // ── Stage 2: Decompose ─────────────────────────────────────────────
-  // Phase D1: on PA path, use runDecomposePA() (PA Stage 5 schema).
-  // On legacy path (PA_PIPELINE=false), use the legacy runDecompose() — unchanged.
-  console.log('\n[pipeline] === Stage 2: Decompose ===')
-
-  let decomposeResult: Awaited<ReturnType<typeof runDecompose>>
-
-  if (paMode && state.parsedBrief) {
-    // ── PA path: runDecomposePA uses PA Stage 5 prompt + schema ───────────
-    console.log('[pipeline] PA path: running PA Stage 5 Module Decomposition...')
-
-    // D1 council BLOCKER-D1-7 fix (2/6 seats: GPT-5.4, MiMo):
-    // classification.productClass accessed directly — if classification were passed
-    // as a plain string at the orchestrator level (which regulatory extraction
-    // code explicitly anticipates), .productClass would be undefined, propagating
-    // "undefined" as a string to the LLM prompt. Use a shared helper to extract
-    // the product class string safely from either form.
-    const productClassStr: string = typeof classification === 'string'
-      ? classification
-      : (classification.productClass ?? 'UNKNOWN')
-
-    const paResult = await runDecomposePA(
-      state.parsedBrief,
-      productClassStr,
-      state.regulatoryExtraction,
-    )
-
-    // D1 council BLOCKER-D1-9 fix (3/6 seats: GLM-5.1, Kimi, MiMo):
-    // The previous cast `paResult as typeof decomposeResult` suppressed structural
-    // divergence. If paResult.ok === false, the error shape was cast and then
-    // silently processed. Use explicit narrowing instead so each branch is typed
-    // and the ok/error/data shapes are correct for the downstream error handler.
-    if (!paResult.ok) {
-      decomposeResult = { ok: false, error: paResult.error, durationMs: paResult.durationMs }
-    } else {
-      // ModulePA structurally extends Module — the cast is intentional and the
-      // comment below documents this assumption explicitly (unlike the original
-      // cast which was silent). The PA data carries all Module fields plus extras.
-      decomposeResult = {
-        ok: true,
-        // ModulePA is a structural superset of Module — safe to widen.
-        data: paResult.data as unknown as import('./types').Module[],
-        durationMs: paResult.durationMs,
-      }
-    }
-  } else {
-    // ── Legacy path: unchanged ────────────────────────────────────────────
-    decomposeResult = await runDecompose(state.research, {
-      trainingDataDossier: trainingDossier || options?.trainingDataDossier,
-    })
-  }
-
-  trackStage('decompose', decomposeResult)
-  if (!decomposeResult.ok || !decomposeResult.data) {
-    // A4: decompose is critical — without modules we can't make a BOM or
-    // cost. Record the failure and produce an honest error PDF.
-    state.pipelineError = {
-      stage: 'decompose',
-      message: decomposeResult.error || 'Decompose stage returned no modules',
-      occurredAt: new Date().toISOString(),
-      recoverable: false,
-    }
-    console.error(`[pipeline] Decompose failed: ${decomposeResult.error}. Producing error PDF.`)
-    // J1a: emit scoring record so the dashboard shows this run as failed.
-    try {
-      recordScoringRun({
-        timestamp: new Date().toISOString(),
-        projectId: state.projectId,
-        briefLabel: deriveBriefLabel(state.projectId),
-        compound: -1,
-        rubric: -1,
-        councilAvg: null,
-        councilScored: 0,
-        councilFailed: 0,
-        sections: [],
-        formulaVersion: 'f7',
-        status: 'PIPELINE_ERROR',
-      })
-    } catch { /* scoring history is non-critical */ }
-    return await generateErrorPdf(state, stages, llmCalls, startTime)
-  }
-  state.modules = decomposeResult.data
-
-  state.sourceAttributions.push(
-    { section: 'Modules', source: 'llm', detail: 'Gemini 3.1 Pro — module decomposition' },
-  )
-  state.llmAttributions.push(
-    { section: 'Decompose', model: 'google/gemini-3.1-pro-preview', provider: 'OpenRouter' },
-  )
-
   // ── Stage 3: Size + Layout ─────────────────────────────────────────
   // Runs BEFORE Feasibility Gate so the gate sees the actual solver verdict.
+  // On the PA path, state.modules is empty at this point (Decompose runs after
+  // the gate). The solver uses domain-derived envelopes and brief constraints;
+  // the module-level placement detail is filled in after Decompose runs.
   console.log('\n[pipeline] === Stage 3: Size + Layout ===')
   const sizeResult = await runSizeLayout(state.modules, {
     domain: options?.domain || state.research.industryDomain,
+    paMode,
   })
   trackStage('size_layout', sizeResult)
   if (sizeResult.ok && sizeResult.data) {
@@ -1016,8 +868,9 @@ export async function runPipeline(
   gateResults = []
 
   // If RED (or sizing INFEASIBLE which now folds into RED via sizingResult above),
-  // skip BOM/cost/assembly stages and go straight to a short blocked report.
-  // Regulatory + Decompose + Sizing already ran above (data is in state).
+  // skip Decompose, BOM, Regulatory, and all downstream stages — go straight to
+  // a short blocked report. Decompose now runs inside the non-RED else branch so
+  // we never waste LLM tokens if the brief is infeasible.
   if (feasibility.status === 'RED') {
     console.log('[pipeline] FEASIBILITY RED — generating short blocked report')
     console.log(`[pipeline] Blocked reasons: ${feasibility.blockers.join('; ')}`)
@@ -1037,8 +890,106 @@ export async function runPipeline(
         status: 'INFEASIBLE',
       })
     } catch { /* scoring history is non-critical */ }
-    // Skip: BOM, cost, assembly, review — go straight to PDF with decision page
+    // Skip: Decompose, BOM, Regulatory, cost, assembly, review — go straight to PDF with decision page
   } else {
+    // ── Stage 2: Decompose ─────────────────────────────────────────────
+    // Runs AFTER the Feasibility Gate (and any Brief Revision loop) so we only
+    // spend LLM tokens on module decomposition once the brief is confirmed feasible.
+    //
+    // Phase D1: on PA path, use runDecomposePA() (PA Stage 5 schema).
+    // On legacy path (PA_PIPELINE=false), use the legacy runDecompose() — unchanged.
+    // Note: state.regulatoryExtraction is NOT yet populated at this point (Regulatory
+    // runs AFTER BOM per the corrected pipeline order). runDecomposePA receives
+    // undefined for the regulatory parameter — it handles this gracefully (optional arg).
+    console.log('\n[pipeline] === Stage 2: Decompose ===')
+
+    let decomposeResult: Awaited<ReturnType<typeof runDecompose>>
+
+    if (paMode && state.parsedBrief) {
+      // ── PA path: runDecomposePA uses PA Stage 5 prompt + schema ───────────
+      console.log('[pipeline] PA path: running PA Stage 5 Module Decomposition...')
+
+      // D1 council BLOCKER-D1-7 fix (2/6 seats: GPT-5.4, MiMo):
+      // classification.productClass accessed directly — if classification were passed
+      // as a plain string at the orchestrator level (which regulatory extraction
+      // code explicitly anticipates), .productClass would be undefined, propagating
+      // "undefined" as a string to the LLM prompt. Use a shared helper to extract
+      // the product class string safely from either form.
+      const productClassStr: string = typeof classification === 'string'
+        ? classification
+        : (classification.productClass ?? 'UNKNOWN')
+
+      // state.regulatoryExtraction is undefined here — Regulatory runs AFTER BOM.
+      // runDecomposePA accepts it as optional; passing undefined is intentional.
+      const paResult = await runDecomposePA(
+        state.parsedBrief,
+        productClassStr,
+        undefined,  // regulatory not yet available — runs after BOM per corrected order
+      )
+
+      // D1 council BLOCKER-D1-9 fix (3/6 seats: GLM-5.1, Kimi, MiMo):
+      // The previous cast `paResult as typeof decomposeResult` suppressed structural
+      // divergence. If paResult.ok === false, the error shape was cast and then
+      // silently processed. Use explicit narrowing instead so each branch is typed
+      // and the ok/error/data shapes are correct for the downstream error handler.
+      if (!paResult.ok) {
+        decomposeResult = { ok: false, error: paResult.error, durationMs: paResult.durationMs }
+      } else {
+        // ModulePA structurally extends Module — the cast is intentional and the
+        // comment below documents this assumption explicitly (unlike the original
+        // cast which was silent). The PA data carries all Module fields plus extras.
+        decomposeResult = {
+          ok: true,
+          // ModulePA is a structural superset of Module — safe to widen.
+          data: paResult.data as unknown as import('./types').Module[],
+          durationMs: paResult.durationMs,
+        }
+      }
+    } else {
+      // ── Legacy path: unchanged ────────────────────────────────────────────
+      decomposeResult = await runDecompose(state.research, {
+        trainingDataDossier: trainingDossier || options?.trainingDataDossier,
+      })
+    }
+
+    trackStage('decompose', decomposeResult)
+    if (!decomposeResult.ok || !decomposeResult.data) {
+      // A4: decompose is critical — without modules we can't make a BOM or
+      // cost. Record the failure and produce an honest error PDF.
+      state.pipelineError = {
+        stage: 'decompose',
+        message: decomposeResult.error || 'Decompose stage returned no modules',
+        occurredAt: new Date().toISOString(),
+        recoverable: false,
+      }
+      console.error(`[pipeline] Decompose failed: ${decomposeResult.error}. Producing error PDF.`)
+      // J1a: emit scoring record so the dashboard shows this run as failed.
+      try {
+        recordScoringRun({
+          timestamp: new Date().toISOString(),
+          projectId: state.projectId,
+          briefLabel: deriveBriefLabel(state.projectId),
+          compound: -1,
+          rubric: -1,
+          councilAvg: null,
+          councilScored: 0,
+          councilFailed: 0,
+          sections: [],
+          formulaVersion: 'f7',
+          status: 'PIPELINE_ERROR',
+        })
+      } catch { /* scoring history is non-critical */ }
+      return await generateErrorPdf(state, stages, llmCalls, startTime)
+    }
+    state.modules = decomposeResult.data
+
+    state.sourceAttributions.push(
+      { section: 'Modules', source: 'llm', detail: 'Gemini 3.1 Pro — module decomposition' },
+    )
+    state.llmAttributions.push(
+      { section: 'Decompose', model: 'google/gemini-3.1-pro-preview', provider: 'OpenRouter' },
+    )
+
     // ── Stage 4: BOM + Cost (+ Suppliers when BOM_PIPELINE=v2) ───────────
   // Feature flag: BOM_PIPELINE=v2 routes to the integrated stage (4-bom-cost-suppliers.ts).
   // Default (v1) keeps the existing 3-stage flow: 4-bom-cost → gate → 5-suppliers.
@@ -1244,6 +1195,73 @@ export async function runPipeline(
   )
 
   } // end else USE_INTEGRATED_BOM (v1 BOM pipeline)
+
+  // ── PA Stage 4: Regulatory Extraction (PA_PIPELINE=true only) ────────────
+  // Runs AFTER BOM so it can reference real materials and processes from the BOM.
+  // Produces state.regulatoryExtraction (RegulatoryExtraction with source_grade='C',
+  // verification_status='UNVERIFIED'). Dual-writes to state.research.designBrief.regulatory
+  // so downstream stages that read the legacy shape keep working.
+  // Legacy path: regulatory remains embedded in Research output.
+  if (paMode && state.parsedBrief) {
+    console.log('\n[pipeline] === PA Stage 4: Regulatory Extraction ===')
+    const regulatoryResult = await runRegulatoryExtraction(state.parsedBrief, classification)
+    trackStage('regulatory_extraction', regulatoryResult)
+
+    if (regulatoryResult.ok && regulatoryResult.data) {
+      state.regulatoryExtraction = regulatoryResult.data
+
+      // Dual-write: synthesise legacy state.research.designBrief.regulatory shape
+      // so downstream stages that read state.research.designBrief.regulatory keep working.
+      //
+      // D1 council BLOCKER-D1-4 fix (2/6 seats: GLM-5.1, MiMo):
+      // The summary field previously mapped to e.applicability — same as the
+      // applicability field, so council-scorer saw identical values in both
+      // columns and lost scoring signal. Fixed: summary now derives from
+      // `standard_name (jurisdiction)` which describes WHAT the regulation is,
+      // while applicability retains WHY it applies to this specific product.
+      if (state.research) {
+        const legacyRegulatory = regulatoryResult.data.regulatory_entries.map(e => ({
+          code: e.standard_name,
+          name: e.standard_name,
+          // D1-4 fix: summary = "what the regulation is" not "why it applies"
+          summary: `${e.standard_name} (${e.jurisdiction})`,
+          status: e.status,
+          applicability: e.applicability,
+          designImpact: e.engineering_impact,
+          evidenceRequired: e.evidence_required,
+          ownerRole: e.owner,
+          gapAction: e.gap_action,
+        }))
+
+        // D1 council BLOCKER-D1-3 fix (5/6 seats: GPT-5.4, Grok, GLM-5.1, Kimi, MiMo):
+        // If state.research.designBrief is null/undefined (possible when Research
+        // Synthesis produced a shape without designBrief), the write was silently
+        // skipped. All three downstream consumers (council-scorer, score-rubric,
+        // calculators) would see zero regulatory data even though PA Stage 4 succeeded.
+        // Force-initialise designBrief with the regulatory data if it is absent.
+        if (!state.research.designBrief) {
+          console.warn(
+            '[pipeline] PA Regulatory dual-write: state.research.designBrief was null/undefined — ' +
+            'force-initialising with regulatory data. This may indicate an issue in Research Synthesis.'
+          )
+          state.research.designBrief = { regulatory: legacyRegulatory } as any
+        } else {
+          state.research.designBrief.regulatory = legacyRegulatory
+        }
+      }
+
+      console.log(
+        `[pipeline] PA Regulatory Extraction complete: ${regulatoryResult.data.regulatory_entries.length} entries. ` +
+        `All source_grade=C, verification_status=UNVERIFIED. Dual-wrote to state.research.designBrief.regulatory.`
+      )
+    } else {
+      // Non-fatal: log warning and continue. Review will proceed without regulatory context.
+      console.warn(
+        `[pipeline] PA Regulatory Extraction failed: ${regulatoryResult.error}. ` +
+        `Continuing without regulatoryExtraction — risk register will not have regulatory context.`
+      )
+    }
+  }
 
   // ── Stage 6: Review ────────────────────────────────────────────────
   // Phase F: on PA path, Review only runs when reportType === 'FULL_REPORT'.
