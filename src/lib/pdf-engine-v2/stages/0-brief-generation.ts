@@ -356,7 +356,7 @@ export async function runBriefParsing(
       },
       body: JSON.stringify({
         model: 'google/gemini-3.1-pro-preview',
-        max_tokens: 4096,
+        max_tokens: 16384,
         temperature: 0.1,
         messages: [
           { role: 'system', content: BRIEF_PARSING_SYSTEM_PROMPT },

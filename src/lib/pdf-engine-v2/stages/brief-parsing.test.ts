@@ -195,6 +195,13 @@ describe('runBriefParsing — PA Stage 1', () => {
       expect(body.messages[1].content).toContain(BESS_BRIEF)
     })
 
+    it('sends max_tokens: 16384 to prevent truncation of rich briefs', async () => {
+      await runBriefParsing(BESS_BRIEF)
+      const [, init] = mockFetch.mock.calls[0]
+      const body = JSON.parse(init.body)
+      expect(body.max_tokens).toBe(16384)
+    })
+
     it('strips markdown fences if model wraps JSON in code block', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
