@@ -509,7 +509,17 @@ export async function runPipeline(
     // Research on the PA path), using the same vocabulary as runResearch().
     state.research = {
       report: legacyReport,
-      sources: synthesis.research_sources.map(s => ({ uri: '', title: s.title })),
+      // E FIX (2026-05-09): propagate all rich fields from ResearchSource to the
+      // legacy sources[] shape so BriefPages Research Sources table can render
+      // type, sourceGrade, and relevance instead of [?] for every row.
+      // Previously only title was mapped, leaving type/sourceGrade/relevance undefined.
+      sources: synthesis.research_sources.map(s => ({
+        uri: '',
+        title: s.title,
+        type: s.type,
+        sourceGrade: s.source_grade,
+        relevance: s.relevance,
+      })),
       designBrief: preservedDesignBrief as any,
       industryDomain: mapProductClassToIndustryDomain(classification.productClass),
     }

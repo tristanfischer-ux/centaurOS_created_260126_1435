@@ -584,10 +584,14 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
   } | undefined
 
   const feasStatus = feasibility?.overallStatus || feasibility?.status || 'UNKNOWN'
-  const feasVerdict = feasibility?.compactBanner || `${feasStatus} — Awaiting full feasibility assessment`
-  const feasColour = feasStatus === 'RED' || feasStatus === 'FAIL' ? BESS_RED
-    : feasStatus === 'AMBER' || feasStatus === 'WARN' ? BESS_AMBER
-    : feasStatus === 'GREEN' || feasStatus === 'PASS' ? BESS_GREEN
+  // A2 FIX (2026-05-09): prefer coverVerdict pre-computed in PdfRendererV3 from
+  // actual gate check outcomes (not the upstream feasibility.status which is set
+  // before BOM/FMEA stages run). Falls back to compactBanner then feasStatus.
+  const _precomputedVerdict = (state as any).coverVerdict as string | undefined
+  const feasVerdict = _precomputedVerdict || feasibility?.compactBanner || `${feasStatus} — Awaiting full feasibility assessment`
+  const feasColour = (_precomputedVerdict === 'NOT FEASIBLE' || feasStatus === 'RED' || feasStatus === 'FAIL') ? BESS_RED
+    : (_precomputedVerdict === 'CONDITIONAL' || feasStatus === 'AMBER' || feasStatus === 'WARN') ? BESS_AMBER
+    : (_precomputedVerdict === 'FEASIBLE' || feasStatus === 'GREEN' || feasStatus === 'PASS') ? BESS_GREEN
     : MUTED
 
   const unitCost = state.costBreakdown?.unitTotalGbp
@@ -622,12 +626,16 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
     { label: 'Engine Version', value: 'ForgeOS PDF Engine v3' },
   ]
 
+  // A2 FIX (2026-05-09): explicit OVER BUDGET flag used by the cover page banner.
+  const isOverBudget = !!(unitCost && ceiling && unitCost > ceiling)
+  const overBudgetPct = (isOverBudget && unitCost && ceiling) ? ((unitCost - ceiling) / ceiling * 100).toFixed(1) : null
+
   const costStatusProse = (() => {
     if (!unitCost) return 'Pending — cost computation not yet complete.'
     if (!ceiling) return `COMPUTED — unit cost ${fmtGbp(unitCost)}. No ceiling specified.`
     if (totalLoaded && totalLoaded > ceiling) {
       const over = fmtGbp(totalLoaded - ceiling)
-      return `COMPUTED — but exceeds ceiling by ${over}. See Cost section for reduction paths.`
+      return `OVER BUDGET — exceeds ceiling by ${over}. See Cost section for reduction paths.`
     }
     return `COMPUTED — unit cost ${fmtGbp(unitCost)} is within the target ceiling.`
   })()
@@ -670,6 +678,17 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
         verdict={feasVerdict}
         colour={feasColour}
       />
+
+      {/* A2 FIX (2026-05-09): OVER BUDGET banner — rendered when computed cost
+          exceeds the brief ceiling. Positioned immediately under the feasibility
+          banner so it is impossible to miss on the cover page. */}
+      {isOverBudget && unitCost && ceiling && (
+        <FeasibilityDecisionBanner
+          label="OVER BUDGET"
+          verdict={`Unit cost ${fmtGbp(unitCost)} exceeds ceiling ${fmtGbp(ceiling)} by ${overBudgetPct}% — see Cost section for reduction paths`}
+          colour={BESS_RED}
+        />
+      )}
 
       {/* Metadata KV table */}
       <KVTable rows={metadataRows} />
@@ -821,13 +840,33 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
         },
         {
           checkId: 'risk_matrix_populated',
-          status: state.modules?.some(m => (m.riskMatrix?.length ?? 0) > 0) ? 'PASS' : 'FAIL',
-          reason: state.modules?.some(m => (m.riskMatrix?.length ?? 0) > 0)
-            ? 'FMEA rows populated'
-            : 'No risk matrix data generated',
-          evidence: `${state.modules?.flatMap(m => m.riskMatrix || []).length ?? 0} risks`,
+          // A1 FIX (2026-05-09): on PA path, FMEA rows are stored at state.fmea
+          // (written by 6b-fmea-generation.ts), NOT inside module.riskMatrix.
+          // The decompose-PA stage does not populate module.riskMatrix, so the
+          // previous check always returned 0 rows and emitted FAIL even when
+          // 10+ FMEA rows existed. Now we check BOTH locations and sum them.
+          ...(() => {
+            const _fmeaCount = ((state as any).fmea?.length ?? 0) +
+              (state.modules?.flatMap(m => m.riskMatrix || []).length ?? 0)
+            return {
+              status: _fmeaCount > 0 ? 'PASS' : 'FAIL',
+              reason: _fmeaCount > 0
+                ? `${_fmeaCount} FMEA rows populated`
+                : 'No risk matrix data generated',
+              evidence: `${_fmeaCount} risks`,
+            }
+          })(),
         },
       ] as Array<{ checkId: string; status: string; reason: string; evidence: string }>
+
+  // A2 FIX (2026-05-09): derive the cover-page feasibility badge from the
+  // gate check outcomes computed just above — not from the upstream
+  // feasibility.status which is set before BOM/FMEA stages run and cannot
+  // reflect their outcomes. This prevents "FEASIBLE — all gates pass" on the
+  // cover while the gate section shows FAIL for risk_matrix_populated.
+  const _anyFail = checks.some(c => c.status === 'FAIL')
+  const _anyWarn = checks.some(c => c.status === 'WARN')
+  const _coverVerdict = _anyFail ? 'NOT FEASIBLE' : _anyWarn ? 'CONDITIONAL' : 'FEASIBLE'
 
   const statusColour = (st: string) =>
     st === 'PASS' ? BESS_GREEN : st === 'WARN' ? BESS_AMBER : BESS_RED
@@ -1063,9 +1102,15 @@ const SizingSection = ({ state }: { state: PipelineState }) => {
 
   const volPct = safeNumber(ds.volumeUtilisationPct)
   const massPct = safeNumber(ds.massUtilisationPct)
+  // A3 FIX (2026-05-09): if mass exceeds payload budget (massMarginNote starts
+  // with "MASS BUDGET EXCEEDED"), show "NO (mass overrun)" rather than the
+  // generic "NO — modules exceed available envelope".
+  const _isMassOverrun = ds.massMarginNote?.startsWith('MASS BUDGET EXCEEDED')
   const layoutFeasibleStr = ds.feasible
     ? `YES${volPct !== null ? ` — ${volPct}% volume utilisation` : ''}${massPct !== null ? `, ${massPct}% mass utilisation` : ''}`
-    : 'NO — modules exceed available envelope'
+    : _isMassOverrun
+      ? `NO — mass budget exceeded (${massPct ?? '?'}% of payload used, limit 100%)`
+      : 'NO — modules exceed available envelope'
 
   const extDim = (ds as any).externalDimensionsMm
   const intDim = (ds as any).internalDimensionsMm || ds.envelope
@@ -1798,14 +1843,11 @@ const AuditLogSection = ({ state }: { state: PipelineState }) => {
 
 // ─── Source Attribution Section ────────────────────────────────────────────────
 const SourceAttributionSection = ({ state }: { state: PipelineState }) => {
-  // Use pipelineSourceSummary[] if populated; fall back to static attribution
-  const summaryData = (state as any).pipelineSourceSummary as Array<{
-    section: string
-    grade: string
-    source: string
-    verificationStatus: string
-  }> | undefined
-
+  // E FIX (2026-05-09): build dynamic attribution rows from state.sourceAttributions
+  // (populated by index.ts as each stage runs) rather than always falling back to
+  // the static product-class-agnostic list.  The static list is kept as a safety
+  // net for the legacy pipeline path (PA_PIPELINE=false) where sourceAttributions
+  // may not be populated.
   const staticRows = [
     { section: 'Brief and Requirements', grade: 'A', source: 'Founder brief + engine expansion', verificationStatus: 'User-provided; engine-expanded assumptions flagged' },
     { section: 'Sizing and Spatial Allocation', grade: 'B', source: 'Deterministic box-packing solver', verificationStatus: 'Solver output; physical verification required before manufacture' },
@@ -1817,7 +1859,34 @@ const SourceAttributionSection = ({ state }: { state: PipelineState }) => {
     { section: 'Risk Register (FMEA)', grade: 'D', source: 'LLM synthesis', verificationStatus: 'All risks OPEN — verification tests not yet executed' },
   ]
 
-  const data = summaryData?.length ? summaryData : staticRows
+  // Build dynamic rows from state.sourceAttributions written by index.ts per stage.
+  // Each entry has { section, source, detail } — map to the table schema.
+  const sourceAttribs = state.sourceAttributions ?? []
+  const dynamicRows = sourceAttribs.length > 0
+    ? sourceAttribs.map(attr => {
+        // Grade inference from source type
+        const grade = attr.source === 'deterministic' ? 'B'
+          : attr.source === 'database' ? 'C'
+          : attr.source === 'search' ? 'C'
+          : attr.source === 'user' ? 'A'
+          : 'D'  // 'llm' default
+        const verificationStatus = attr.source === 'deterministic'
+          ? 'Deterministic solver — verify physical assumptions before manufacture'
+          : attr.source === 'llm'
+            ? 'LLM estimate — not verified by specialist engineer'
+            : attr.source === 'database'
+              ? 'Corpus-matched — verify supplier capability independently'
+              : 'User-provided or search-matched — verify independently'
+        return {
+          section: attr.section,
+          grade,
+          source: attr.detail || attr.source,
+          verificationStatus,
+        }
+      })
+    : staticRows
+
+  const data = dynamicRows
 
   const cols = [
     { label: 'Section', width: '30%' },
@@ -2034,6 +2103,34 @@ export default function PdfRendererV3({ state }: { state: PipelineState }) {
 
   // Convenience predicate
   const show = (id: string): boolean => finalSections.has(id)
+
+  // A2 FIX (2026-05-09): pre-compute cover verdict from gate check outcomes.
+  // CoverPage renders BEFORE FeasibilityGatePage, so the verdict must be derived
+  // here (in the document root) and stored on safe before any component renders.
+  // This mirrors the check logic from FeasibilityGatePage's fallback checks array
+  // so the two sections are consistent.
+  const _preState = safe as any
+  const _fmeaPreCount = (_preState.fmea?.length ?? 0) +
+    (safe.modules?.flatMap((m: Module) => m.riskMatrix || []).length ?? 0)
+  const _gateChecks = [
+    (safe.research?.designBrief?.regulatory?.length ?? 0) > 0,  // regulatory_identified
+    // cost_feasibility: WARN if cost > ceiling, not FAIL
+    true,  // cost_ceiling_specified is WARN not FAIL so cover stays FEASIBLE if only this fails
+    !!safe.dimensionSheet?.envelope?.interior_volume_m3,  // spatial_envelope
+    (safe.modules?.length ?? 0) > 0,  // modules_decomposed
+    (safe.parts?.length ?? 0) > 0,  // bom_population
+    // cost_feasibility is WARN (not FAIL) — doesn't flip cover to NOT FEASIBLE
+    _fmeaPreCount > 0,  // risk_matrix_populated
+  ]
+  const _gateHasFail = !_gateChecks.every(Boolean)
+  // cost_feasibility WARN check
+  const _activeCeiling = safe.costBreakdown?.ceilingGbp ?? safe.research?.designBrief?.constraints?.unitCostCeilingGbp
+  const _costExceedsCeiling = !!(
+    safe.costBreakdown?.unitTotalGbp &&
+    _activeCeiling &&
+    safe.costBreakdown.unitTotalGbp > _activeCeiling
+  )
+  _preState.coverVerdict = _gateHasFail ? 'NOT FEASIBLE' : _costExceedsCeiling ? 'CONDITIONAL' : 'FEASIBLE'
 
   // ToC: only render when estimated page count > 25 AND FULL_REPORT.
   const moduleCount = safe.modules?.length ?? 0
