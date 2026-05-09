@@ -1462,6 +1462,11 @@ const CostSection = ({ state }: { state: PipelineState }) => {
     perModule?: Array<{ moduleName: string; totalGbp: number; pctOfBom?: number; grade?: string }>
   } | null
 
+  // D FIX (2026-05-09): read narrative from costWaterfall (populated by v2 BOM stage)
+  // The narrative explains cost drivers and volume reduction paths — previously absent.
+  const costWaterfall = (state as any).costWaterfall as { narrativeMarkdown?: string } | undefined
+  const costNarrative = costWaterfall?.narrativeMarkdown || null
+
   const brief = state.research?.designBrief
   const unitCost = cb?.unitTotalGbp
   const ceiling = cb?.ceilingGbp ?? brief?.constraints?.unitCostCeilingGbp ?? null
@@ -1569,8 +1574,24 @@ const CostSection = ({ state }: { state: PipelineState }) => {
         <Text style={[s.para, { color: MUTED }]}>Cost computation pending — requires completed BOM and sizing data.</Text>
       ) : (
         <>
+          {/* D FIX (2026-05-09): cost driver narrative paragraph */}
+          {costNarrative && (
+            <>
+              <TealH2>Cost Summary</TealH2>
+              <Text style={s.para}>{costNarrative.replace(/\*\*/g, '')}</Text>
+            </>
+          )}
+
           <TealH2>BOM Cost by Module</TealH2>
           <DarkHeaderTable cols={perModuleCols} rows={perModuleRows} />
+          {/* D FIX (2026-05-09): BOM subtotal row under the per-module table */}
+          {(cb?.perModule?.length ?? 0) > 0 && (
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: -10, marginBottom: 12 }} wrap={false}>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold' }}>
+                BOM Subtotal: {fmtGbp(cb!.perModule!.reduce((s, m) => s + m.totalGbp, 0))} (100% = loaded BOM)
+              </Text>
+            </View>
+          )}
 
           <TealH2>Overhead and Assembly Costs</TealH2>
           <KVTable rows={overheadLines} />

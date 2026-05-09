@@ -245,6 +245,8 @@ export interface CostWaterfall {
     buyGbp: number
     makeGbp: number
     lineCount: number
+    // D FIX (2026-05-09): percentage of grand total for "% of BOM" column
+    pctOfBom?: number
   }>
   narrativeMarkdown: string
   quotedCostFraction: number
@@ -1327,13 +1329,21 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       })
     }
 
-    const perModule: CostWaterfall['perModule'] = Array.from(moduleMap.entries()).map(([moduleId, m]) => ({
+    // D FIX (2026-05-09): compute pctOfBom for each module so the CostSection
+    // "% of BOM" column is populated instead of always showing "—".
+    // grandTotalGbp is the sum of all per-module loaded costs (overhead applied).
+    const _perModuleRaw = Array.from(moduleMap.entries()).map(([moduleId, m]) => ({
       moduleId,
       moduleName: m.moduleName,
       totalGbp: (m.buyGbp + m.makeGbp) * overhead.multiplier,
       buyGbp: m.buyGbp,
       makeGbp: m.makeGbp,
       lineCount: m.lineCount,
+    }))
+    const _grandTotalModuleGbp = _perModuleRaw.reduce((sum, m) => sum + m.totalGbp, 0)
+    const perModule: CostWaterfall['perModule'] = _perModuleRaw.map(m => ({
+      ...m,
+      pctOfBom: _grandTotalModuleGbp > 0 ? (m.totalGbp / _grandTotalModuleGbp) * 100 : 0,
     }))
 
     // ── Phase 6: WRITE_COST_NARRATIVE (with real cost view) ──────────────
@@ -1403,6 +1413,8 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       perModule: costWaterfall.perModule.map(m => ({
         moduleName: m.moduleName,
         totalGbp: m.totalGbp,
+        // D FIX (2026-05-09): pass through pctOfBom so CostSection renders "% of BOM" column
+        pctOfBom: m.pctOfBom,
       })),
     }
 
