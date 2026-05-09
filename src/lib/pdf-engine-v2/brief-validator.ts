@@ -38,17 +38,49 @@ export function validateBrief(
 ): BriefValidation {
   // ── PA path: use parsedBrief.missing_mandatory_fields as the authoritative source ──
   if (parsedBrief) {
-    const missingRequired = [...parsedBrief.missing_mandatory_fields]
-    const blockedReasons = missingRequired.map(f => `Missing mandatory field: ${f}`)
-    const canProceed = missingRequired.length === 0
+    const missingRequired = [...(parsedBrief.missing_mandatory_fields ?? [])]
+
+    // core_constraints_present: the brief must have at least a project_id,
+    // a product_description, and one physical/cost anchor before the pipeline
+    // can do any useful work.  Without these the LLM stages cannot be steered.
+    const hasProjectId = Boolean(parsedBrief.project_id?.trim())
+    const hasProductDesc = Boolean(parsedBrief.product_description?.trim())
+    const hasOneAnchor =
+      (parsedBrief.constraints?.unit_cost_ceiling?.value != null) ||
+      (parsedBrief.constraints?.max_mass_kg?.value != null) ||
+      (parsedBrief.constraints?.max_dimensions_mm?.w != null ||
+       parsedBrief.constraints?.max_dimensions_mm?.d != null ||
+       parsedBrief.constraints?.max_dimensions_mm?.h != null)
+    const coreConstraintsPresent = hasProjectId && hasProductDesc && hasOneAnchor
+
+    // Only block when the brief is truly unparseable (no core constraints).
+    // HIGH/MEDIUM/LOW confidence with missing optional fields is NOT a block —
+    // the report-type router (PA Stage 9) decides report length based on
+    // confidence + missing_mandatory_fields count.  The validator's only job
+    // here is to prevent completely empty briefs from entering the pipeline.
+    const canProceed = coreConstraintsPresent
+
+    const blockedReasons: string[] = canProceed
+      ? []
+      : [
+          !hasProjectId ? 'Brief has no project_id — cannot identify the project' : '',
+          !hasProductDesc ? 'Brief has no product_description — pipeline cannot be steered' : '',
+          !hasOneAnchor ? 'Brief has no physical/cost anchor (unit_cost_ceiling, max_mass_kg, or max_dimensions_mm) — at least one is required' : '',
+        ].filter(Boolean)
+
+    const warnings: string[] = []
+    if (parsedBrief.confidence === 'LOW') {
+      warnings.push('Brief confidence is LOW — consider providing more detail')
+    }
+    if (missingRequired.length > 0) {
+      warnings.push(`${missingRequired.length} mandatory field(s) missing: ${missingRequired.join(', ')} — report-type router will decide report length`)
+    }
 
     return {
       isValid: canProceed,
       missingRequired,
       missingRecommended: [],
-      warnings: parsedBrief.confidence === 'LOW'
-        ? ['Brief confidence is LOW — consider providing more detail']
-        : [],
+      warnings,
       classification: productClass,
       requiredFields,
       canProceedToFullReport: canProceed,
