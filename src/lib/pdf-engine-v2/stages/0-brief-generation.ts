@@ -294,44 +294,9 @@ export async function runBriefGeneration(
 
 // ── PA Stage 1: Brief Parsing ─────────────────────────────────────────────────
 //
-// System prompt copied verbatim from prompt_architecture.pdf pages 4-5.
-// DO NOT paraphrase. The anti-invention rules in this prompt are load-bearing.
-
-const BRIEF_PARSING_SYSTEM_PROMPT = `You are a hardware product brief parser. Your job is to extract structured engineering constraints from a natural-language product description. You must extract every constraint the user states, infer reasonable defaults for unstated fields where possible, and clearly mark which fields are user-stated vs inferred.
-
-Output ONLY valid JSON. No preamble, no markdown fences.
-
-Required output schema:
-{
-  "project_id": string,
-  "product_description": string (1-2 sentences),
-  "mission_statement": string,
-  "target_customers": string,
-  "why_now": string,
-  "constraints": {
-    "unit_cost_ceiling": { "value": number|null, "currency": "GBP"|"USD"|"EUR", "source": "user"|"inferred" },
-    "max_mass_kg": { "value": number|null, "source": "user"|"inferred" },
-    "max_dimensions_mm": { "w": number|null, "d": number|null, "h": number|null, "source": "user"|"inferred" },
-    "target_performance": { "key_metric": string|null, "value": number|null, "unit": string|null, "source": "user"|"inferred" },
-    "target_process": { "value": string|null, "source": "user"|"inferred" },
-    "target_material": { "value": string|null, "source": "user"|"inferred" },
-    "batch_size": { "value": number|null, "source": "user"|"inferred" },
-    "design_life": { "value": string|null, "source": "user"|"inferred" },
-    "operating_environment": { "temp_min_c": number|null, "temp_max_c": number|null, "source": "user"|"inferred" },
-    "safety_standards": [{ "standard": string, "source": "user"|"inferred" }],
-    "additional_constraints": [{ "description": string, "source": "user"|"inferred" }]
-  },
-  "missing_mandatory_fields": [string],  // Fields the user did not state AND you cannot infer
-  "confidence": "HIGH"|"MEDIUM"|"LOW"
-}
-
-Rules:
-- If the user states a constraint explicitly, source = "user".
-- If you infer a constraint from context (e.g. ISO container dimensions from "40ft container"), source = "inferred".
-- If a field is genuinely unknown and cannot be reasonably inferred, set value to null and add to missing_mandatory_fields.
-- NEVER invent performance numbers. If the user says "efficient" but doesn't give a COP or efficiency target, the value is null. Example: { "key_metric": "efficiency", "value": null, "unit": "COP", "source": "inferred" }
-- Dimensions: always in mm. Mass: always in kg. Cost: preserve the user's stated currency.
-- operating_environment temps may be null if the user gives no operating range; do not invent a range.`
+// Single source of truth: BRIEF_PARSING_SYSTEM in ../prompts.ts
+// Do NOT duplicate the prompt here — import it.
+import { BRIEF_PARSING_SYSTEM as BRIEF_PARSING_SYSTEM_PROMPT } from '../prompts'
 
 /**
  * PA Stage 1 — Brief Parsing.
