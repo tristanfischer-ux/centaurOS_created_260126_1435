@@ -1279,6 +1279,8 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           llm_mpn?: string | null
           bestDistributor?: { sku: string; unitPriceGbp: number; source: string } | null
           quantity_calculation_basis?: string | null
+          /** Set by Grade D fallback (Phase 4c). Non-null = table estimate, badge "~ EST D". */
+          gradeD_estimate_basis?: string | null
         }> = (state as any).integratedBomLines ?? []
 
         const findIntegrated = (p: Part) =>
@@ -1312,6 +1314,8 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           const il = findIntegrated(p)
           const verStatus = il?.verification_status ?? (p.isPurchased ? 'estimated' : 'estimated')
           const isVerified = verStatus === 'verified'
+          // Hierarchy: VERIFIED > LLM ESTIMATE > GRADE D > DATA GAP
+          const isGradeD = !isVerified && Boolean(il?.gradeD_estimate_basis)
 
           // MPN: use best distributor SKU if verified, else LLM MPN hint, else —
           const mpnText = isVerified
@@ -1322,7 +1326,9 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           const manufacturerHint = il?.manufacturer_hint
           const sourceText = isVerified
             ? (il?.bestDistributor?.source || 'Distributor')
-            : (manufacturerHint ? `Est. — ${manufacturerHint}` : 'OEM estimate')
+            : isGradeD
+              ? 'Grade D table'
+              : (manufacturerHint ? `Est. — ${manufacturerHint}` : 'OEM estimate')
 
           const priceSource = (p as any).priceSource as string | undefined
           const grade = isNoPrice ? '—'
@@ -1335,7 +1341,8 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           const mb = p.isPurchased ? 'Buy' : 'Make'
 
           // Status badge text and colour
-          const statusText = isVerified ? '✓ VERIFIED' : '~ ESTIMATE'
+          // Hierarchy: VERIFIED > LLM ESTIMATE > GRADE D > DATA GAP  (isGradeD declared above)
+          const statusText = isVerified ? '✓ VERIFIED' : isGradeD ? '~ EST D' : '~ ESTIMATE'
           const statusColour = isVerified ? BESS_GREEN : BESS_AMBER
 
           // Bug D: calcBasis extracted separately — rendered as spanning row below, NOT inside Qty cell

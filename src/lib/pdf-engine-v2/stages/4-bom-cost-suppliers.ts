@@ -217,6 +217,17 @@ export interface IntegratedBomLine {
    * Null when the count is trivially obvious (e.g. 1 container).
    */
   quantity_calculation_basis?: string | null
+
+  /**
+   * Grade D lookup estimate basis string.
+   * Non-null when the unit cost was filled by the GRADE_D_SUBSYSTEM_ESTIMATES_GBP
+   * table (not from a distributor, not from an LLM ESTIMATE_MAKE_COST call).
+   *
+   * Hierarchy: VERIFIED > LLM ESTIMATE > GRADE D > DATA GAP
+   *
+   * The PDF renderer shows "~ EST D" (not "~ ESTIMATE") when this field is set.
+   */
+  gradeD_estimate_basis?: string | null
 }
 
 /**
@@ -772,6 +783,93 @@ The narrative MUST:
 Output: narrativeMarkdown — 3 to 5 paragraphs, no section headers, British English spelling.
 <!-- END SUBTASK: WRITE_COST_NARRATIVE -->`
 
+// ── Grade D subsystem estimate table ─────────────────────────────────────────
+//
+// Indicative Grade D estimates for common subsystems (UK 2025 market).
+// These are deliberately wide ranges; sourced from public catalogue averages.
+// Marked clearly as Grade D = "rough order of magnitude, ±50%"
+// Used only when verification_status === 'estimated' AND unitCostGbp === 0.
+//
+// Hierarchy: VERIFIED > LLM ESTIMATE > GRADE D > DATA GAP
+
+const GRADE_D_SUBSYSTEM_ESTIMATES_GBP: Record<string, {
+  min: number
+  typical: number
+  max: number
+  basis: string
+}> = {
+  bms_master_controller: { min: 2000, typical: 4500, max: 8000, basis: 'BMS master with cell monitoring up to 256 cells' },
+  bms_slave_board: { min: 200, typical: 400, max: 700, basis: '16-cell slave board with thermistor inputs' },
+  fire_suppression_system: { min: 8000, typical: 18000, max: 35000, basis: 'Aerosol or clean-agent panel for ~30 m³ container' },
+  fire_detection_heads: { min: 500, typical: 1200, max: 3000, basis: 'Multi-point smoke/heat detection heads for container enclosure' },
+  thermal_management_liquid: { min: 15000, typical: 35000, max: 60000, basis: 'Liquid cooling loop with chiller for 1 MW heat load' },
+  thermal_management_air: { min: 5000, typical: 12000, max: 25000, basis: 'Forced-air ventilation with redundant fans' },
+  ems_controller: { min: 8000, typical: 18000, max: 35000, basis: 'Energy management system with grid-tie SCADA' },
+  pcs_inverter_1mw: { min: 60000, typical: 95000, max: 150000, basis: '1 MW grid-tie PCS, IEC 62920 / G99 certified' },
+  step_up_transformer_lv_to_hv: { min: 12000, typical: 22000, max: 40000, basis: '1 MVA cast-resin or oil-filled, ONAN' },
+  main_dc_contactor_2000a: { min: 600, typical: 1200, max: 2500, basis: '1500 V DC, 2000 A continuous' },
+  switchgear_acb_3200a: { min: 3500, typical: 6500, max: 12000, basis: 'Air circuit breaker, 3200 A, draw-out, IEC 61439' },
+  heat_pump_compressor: { min: 3000, typical: 7000, max: 15000, basis: 'Scroll or rotary compressor for commercial heat pump' },
+  drone_motor_esc: { min: 200, typical: 600, max: 1500, basis: 'Brushless motor + ESC pair for commercial drone' },
+  auv_thruster: { min: 1500, typical: 4000, max: 9000, basis: 'Brushless DC thruster, 100–500 W for AUV' },
+  thermal_insulation_panel: { min: 200, typical: 600, max: 1500, basis: 'Mineral wool or PIR insulation panel set for container' },
+  cooling_loop_pump: { min: 500, typical: 1200, max: 3000, basis: 'Circulating pump for liquid cooling loop' },
+}
+
+/**
+ * Fuzzy-classify a BOM line name to a GRADE_D_SUBSYSTEM_ESTIMATES_GBP key.
+ * Returns null if no match is confident enough (score < 2 keyword hits).
+ */
+function classifySubsystemForGradeD(name: string): string | null {
+  const n = name.toLowerCase()
+
+  // BMS
+  if ((n.includes('bms') || n.includes('battery management')) && n.includes('master')) return 'bms_master_controller'
+  if ((n.includes('bms') || n.includes('battery management')) && (n.includes('slave') || n.includes('board'))) return 'bms_slave_board'
+  if (n.includes('bms') || n.includes('battery management system')) return 'bms_master_controller'
+
+  // Fire detection and suppression
+  if (n.includes('fire') && (n.includes('suppression') || n.includes('extinguish') || n.includes('aerosol') || n.includes('agent'))) return 'fire_suppression_system'
+  if (n.includes('fire') && (n.includes('detection') || n.includes('detect') || n.includes('sensor') || n.includes('smoke') || n.includes('heat detector'))) return 'fire_detection_heads'
+  if (n.includes('fds') && (n.includes('fire') || n.includes('detect') || n.includes('suppress'))) return 'fire_suppression_system'
+  if (n.includes('fire detection') || n.includes('fire suppression')) return 'fire_suppression_system'
+
+  // Thermal management
+  if ((n.includes('thermal') || n.includes('cooling')) && (n.includes('liquid') || n.includes('water') || n.includes('glycol') || n.includes('chiller'))) return 'thermal_management_liquid'
+  if ((n.includes('thermal') || n.includes('cooling')) && (n.includes('air') || n.includes('fan') || n.includes('ventil'))) return 'thermal_management_air'
+  if (n.includes('tms') && (n.includes('thermal') || n.includes('cooling'))) return 'thermal_management_liquid'
+  if (n.includes('thermal management') || n.includes('cooling loop') || n.includes('cooling system')) return 'thermal_management_liquid'
+  if (n.includes('thermal insulation') || n.includes('insulation panel')) return 'thermal_insulation_panel'
+
+  // EMS
+  if (n.includes('ems') || n.includes('energy management system')) return 'ems_controller'
+
+  // PCS / inverter
+  if (n.includes('pcs') || (n.includes('power conversion') && n.includes('system'))) return 'pcs_inverter_1mw'
+  if (n.includes('inverter') && (n.includes('grid') || n.includes('pcs') || n.includes('1 mw') || n.includes('1mw'))) return 'pcs_inverter_1mw'
+
+  // Transformer
+  if (n.includes('transformer') && (n.includes('step') || n.includes('lv') || n.includes('hv') || n.includes('mva') || n.includes('kva'))) return 'step_up_transformer_lv_to_hv'
+
+  // Contactors
+  if (n.includes('contactor') && (n.includes('dc') || n.includes('2000') || n.includes('main'))) return 'main_dc_contactor_2000a'
+
+  // Switchgear / breaker
+  if (n.includes('switchgear') || (n.includes('circuit breaker') && (n.includes('air') || n.includes('acb')))) return 'switchgear_acb_3200a'
+
+  // Heat pump
+  if (n.includes('compressor') && (n.includes('heat pump') || n.includes('scroll') || n.includes('rotary'))) return 'heat_pump_compressor'
+
+  // Drone / AUV
+  if ((n.includes('esc') || n.includes('electronic speed control')) && n.includes('motor')) return 'drone_motor_esc'
+  if (n.includes('thruster') && (n.includes('auv') || n.includes('rov') || n.includes('underwater'))) return 'auv_thruster'
+
+  // Cooling loop pump
+  if (n.includes('cooling') && n.includes('pump')) return 'cooling_loop_pump'
+
+  return null
+}
+
 // ── Main stage ────────────────────────────────────────────────────────────────
 
 export async function runBomCostSuppliers(
@@ -1244,6 +1342,38 @@ Return ALL four sub-task results in the JSON structure specified in the system p
           line.llmSubTask = 'ESTIMATE_MAKE_COST'
         }
         line.needsSourcingReview = true
+      }
+    }
+
+    // ── Phase 4c: Grade D fallback for zero-cost estimated lines ─────────
+    // After distributor lookup (4a) and supplier search (4b), any line that
+    // remains at unitCostGbp === 0 with verification_status === 'estimated'
+    // is a DATA GAP.  We apply a Grade D table estimate for known subsystem
+    // classes so the BOM total remains structurally consistent.
+    //
+    // Hierarchy applied: VERIFIED > LLM ESTIMATE > GRADE D > DATA GAP
+    {
+      let gradeDApplied = 0
+      for (const line of integratedLines) {
+        if (line.unitCostGbp > 0) continue  // already costed
+        if (line.verification_status === 'verified') continue  // distributor price — should never be 0 but guard anyway
+        if (line.costSource === 'mouser' || line.costSource === 'farnell' || line.costSource === 'digikey' || line.costSource === 'lcsc') continue
+
+        const subsystemKey = classifySubsystemForGradeD(line.name)
+        if (!subsystemKey) continue
+
+        const entry = GRADE_D_SUBSYSTEM_ESTIMATES_GBP[subsystemKey]
+        if (!entry) continue
+
+        line.unitCostGbp = entry.typical
+        line.gradeD_estimate_basis = `${entry.basis} (Grade D ±50%, typical of range £${entry.min.toLocaleString()}–£${entry.max.toLocaleString()})`
+        line.costSource = 'estimated'
+        // Keep verification_status as 'estimated' — Grade D is not VERIFIED
+        gradeDApplied++
+        console.log(`[bom-v2] Grade D fallback for "${line.name}" → ${subsystemKey}: £${entry.typical.toLocaleString()} (${entry.basis})`)
+      }
+      if (gradeDApplied > 0) {
+        console.log(`[bom-v2] Grade D fallback applied to ${gradeDApplied} zero-cost lines`)
       }
     }
 
