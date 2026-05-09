@@ -189,12 +189,27 @@ Required output schema:
 }
 Rules:
 - Identify 5-10 standards. Prioritise by impact on the design.
-- For each standard, the applicability must explain WHY it applies to THIS specific product — not just restate the standard's general scope.
-- The engineering_impact must describe SPECIFIC design consequences — not vague statements like "requires testing". Say what kind of test, how long it takes, how much it costs, and what design decisions it constrains.
-- The evidence_required must specify the exact document type — not just "test report" but "independent test report from a UKAS-accredited laboratory, testing to clause X.Y.Z of the standard".
-- The gap_action must be a concrete next step with a verb — "Engage a test house" not "Testing should be considered".
-- NEVER claim a standard is met or complied with. All entries are UNVERIFIED at this stage. Verification requires a compliance engineer to review the actual design against the standard text.
-- Use REAL standard numbers and versions. Do not invent standards.`
+
+APPLICABILITY — name the product parameter that triggers this standard:
+- State the specific design attribute (voltage class, mass, energy capacity, product category, hazardous substance, intended environment) that explains WHY it applies to THIS specific product. Do not restate the standard's general scope. Example: "Applies because the product operates at 800 V DC, which exceeds the 75 V DC threshold in Annex I of the Low Voltage Directive" — not "This standard covers electrical equipment."
+
+ENGINEERING_IMPACT — be specific about cost, time, and design constraint:
+- Name the specific test method and clause (e.g. "thermal abuse test per IEC 62619 Clause 7.2.3, conducted at 130 °C for 30 min"). Estimate realistic test cost (e.g. "approximately £8,000–£15,000 at a UKAS-accredited lab") and calendar duration (e.g. "8–14 weeks including sample preparation"). State the design decision it forces (e.g. "requires cell-level fusing and module-level CID before testing"). Generic phrases like "requires testing" or "design must comply" are REJECTED.
+
+EVIDENCE_REQUIRED — name the exact document, not the category:
+- Specify accreditation body (UKAS, NRTL, DAkkS, etc.), the standard clause number being tested to, and the sample quantity required. Example: "Independent test report from a UKAS-accredited laboratory demonstrating thermal-abuse compliance to IEC 62619 Clause 7.2.3, covering 3 cells per chemistry lot." Generic "test report" is REJECTED.
+
+GAP_ACTION — a concrete next step with a verb, naming the next concrete action:
+- Use verbs: "Engage", "Commission", "Submit", "Appoint", "Obtain", "Register", "Schedule". Name the specific organisation type (e.g. "UKAS-accredited test house", "Notified Body under MDR", "Approved Body for PED"). Example: "Engage a UKAS-accredited EMC test house to conduct pre-compliance EN 55032 scan; budget 4 weeks and £3,000 before formal submission." Passive phrases like "testing should be considered" are REJECTED.
+
+CERTIFICATION PATH — include sequencing and dependencies:
+- In the verification_note field, state the mandatory sequencing: which certification must be obtained before another can start, and which tests can run in parallel. Example: "UN 38.3 transport testing must complete before shipping samples for UL 9540A; IEC 62619 cell-level tests can run in parallel with EMC chamber work." If no dependency exists, state that explicitly.
+
+SAFETY GAP ANALYSIS — flag product-relevant hazard categories:
+- Scan the brief for hazard-relevant features: energy storage (battery chemistry, capacity), flammable substances (refrigerants, solvents), pressure systems, biological contact, high voltage, ionising or non-ionising radiation, autonomous operation. For each hazard category present, name the specific gap the product faces — not a generic description of the standard's scope. If a hazard category is not present in this product, do not mention it.
+
+NEVER claim a standard is met or complied with. All entries are UNVERIFIED at this stage. Verification requires a compliance engineer to review the actual design against the standard text.
+Use REAL standard numbers and versions. Do not invent standards.`
 
 // ─── Stage 5: Module Decomposition ─────────────────────────────────────────
 
