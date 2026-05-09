@@ -71,8 +71,35 @@ Each iteration appends to this section. Format:
 
 ---
 
+## Baseline against PA pipeline (post-migration)
+
+**Run:** `pa-baseline-4a18538f` (after PA Stage 3 newline parser fix)
+**Wall time:** ~4h with 4-way parallel
+**Result:** mixed — 4 full pipelines, 4 short-form (router decision), 2 truncated mid-Stage-1
+
+| Brief | Status | PDF | Notes |
+|---|---|---|---|
+| r1-cgm | ✅ full | 101 KB | 21 min, all gates passed |
+| r1-drone | ✅ full | 127 KB | 33 min |
+| r1-auv | ✅ full | 116 KB | 28 min |
+| r1-bess | ✅ full | 111 KB | 33 min |
+| r1-edge-ai | ⚠️ short | 31 KB | router → BRIEF_INCOMPLETE (PA Stage 1 LOW confidence) |
+| r1-ev-charger | ⚠️ short | 31 KB | router → BRIEF_INCOMPLETE |
+| r1-haps | ⚠️ short | 33 KB | router → BRIEF_INCOMPLETE |
+| r1-heatpump | ⚠️ short | 30 KB | router → BRIEF_INCOMPLETE |
+| r1-bioreactor | ❌ truncated | — | PA Stage 1 hit max_tokens mid-string ("Unterminated string at position 580") |
+| r1-farm | ❌ truncated (likely) | — | same root cause |
+
+**Action:** PA Stage 1 max_tokens bump in flight (sonnet `ad513a69a2e35816e`). After landing, re-run bioreactor + farm.
+
+**For RL Round 1:** the 4 short-form briefs ARE the test cases — Round 1 (PA Stage 1 prompt RL) targets lifting those LOW-confidence verdicts to HIGH so the router doesn't shorten them.
+
+---
+
 ## Missing-only recap (for watchdog)
 
-- ❌ All 6 rounds pending
-- ❌ Driver not yet launched (waiting on migration Phase H to land)
-- ❌ Baseline against PA pipeline not yet run
+- 🔄 PA Stage 1 max_tokens fix in flight (sonnet `ad513a69a2e35816e`)
+- ⬜ Re-run r1-bioreactor + r1-farm after fix lands (mechanical retry)
+- ⬜ Round 1: PA Stage 1 Brief Parsing — start when fix verified
+- ⬜ Rounds 2-6 pending (per ladder above)
+- ⬜ Driver not yet launched
