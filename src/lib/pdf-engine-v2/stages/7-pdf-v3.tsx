@@ -1169,15 +1169,31 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
               m.specs?.energyKwh ? { label: 'Energy', value: fmtNum(m.specs.energyKwh, ' kWh') } : null,
             ].filter((x): x is { label: string; value: string } => x !== null)
 
-        // BOM table columns — BESS order: Part, Qty, Unit £, Total £, M/B, Supplier, Gr.
+        // ── Two-tier BOM: look up IntegratedBomLine for each part ──────────
+        // integratedBomLines stored on state by the integrated BOM stage (v2).
+        const integratedBomLines: Array<{
+          partNumber: string
+          name: string
+          verification_status?: 'verified' | 'estimated'
+          part_class?: string | null
+          manufacturer_hint?: string | null
+          llm_mpn?: string | null
+          bestDistributor?: { sku: string; unitPriceGbp: number; source: string } | null
+        }> = (state as any).integratedBomLines ?? []
+
+        const findIntegrated = (p: Part) =>
+          integratedBomLines.find(il => il.partNumber === p.partNumber || il.name === p.name) ?? null
+
+        // BOM table columns — two-tier version: Status | Part | MPN | Qty | Unit £ | Total £ | M/B | Gr.
         const bomCols = [
-          { label: 'Part', width: '28%' },
-          { label: 'Qty', width: '8%', align: 'right' as const },
-          { label: 'Unit £', width: '12%', align: 'right' as const },
-          { label: 'Total £', width: '12%', align: 'right' as const },
+          { label: 'Status', width: '14%' },
+          { label: 'Part', width: '26%' },
+          { label: 'MPN', width: '14%' },
+          { label: 'Qty', width: '6%', align: 'right' as const },
+          { label: 'Unit £', width: '10%', align: 'right' as const },
+          { label: 'Total £', width: '10%', align: 'right' as const },
           { label: 'M/B', width: '8%' },
-          { label: 'Supplier', width: '20%' },
-          { label: 'Gr.', width: '12%' },
+          { label: 'Source', width: '12%' },
         ]
 
         const bomRows = modParts.map(p => {
@@ -1189,12 +1205,25 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           const extCost = unitCost * qty
           const isNoPrice = (p as any).priceSource === 'manifest_no_price'
 
-          const supMatch = state.suppliers?.find(s => s.partId === p.id || s.partName === p.name)
-          const topSup = supMatch?.suppliers?.[0]
-          const supplierName = topSup?.name || '—'
+          // Look up the integrated line for two-tier status
+          const il = findIntegrated(p)
+          const verStatus = il?.verification_status ?? (p.isPurchased ? 'estimated' : 'estimated')
+          const isVerified = verStatus === 'verified'
+
+          // MPN: use best distributor SKU if verified, else LLM MPN hint, else —
+          const mpnText = isVerified
+            ? (il?.bestDistributor?.sku || il?.llm_mpn || '—')
+            : (il?.llm_mpn || '—')
+
+          // Source / manufacturer hint for estimates
+          const manufacturerHint = il?.manufacturer_hint
+          const sourceText = isVerified
+            ? (il?.bestDistributor?.source || 'Distributor')
+            : (manufacturerHint ? `Est. — ${manufacturerHint}` : 'OEM estimate')
 
           const priceSource = (p as any).priceSource as string | undefined
           const grade = isNoPrice ? '—'
+            : isVerified ? 'B'
             : priceSource === 'database' || priceSource === 'search' ? 'C'
             : priceSource === 'llm' ? 'D'
             : priceSource === 'heuristic' ? 'E'
@@ -1202,14 +1231,19 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
 
           const mb = p.isPurchased ? 'Buy' : 'Make'
 
+          // Status badge text and colour
+          const statusText = isVerified ? '✓ VERIFIED' : '~ ESTIMATE'
+          const statusColour = isVerified ? BESS_GREEN : BESS_AMBER
+
           return [
+            { text: statusText, bold: true, colour: statusColour },
             { text: dash(p.name), bold: true },
+            { text: mpnText },
             { text: `${qty}`, align: 'right' as const },
             { text: isNoPrice ? 'TBD' : fmtGbp(unitCost), align: 'right' as const },
             { text: isNoPrice ? 'TBD' : fmtGbp(extCost), align: 'right' as const },
             { text: mb },
-            { text: supplierName },
-            { text: grade },
+            { text: sourceText, colour: isVerified ? BESS_GREEN : BESS_AMBER },
           ]
         })
 

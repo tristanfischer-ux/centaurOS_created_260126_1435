@@ -262,7 +262,15 @@ Required output schema:
       "why_it_matters": string (why the system fails without it),
       "technical_description": string (2-3 paragraphs of engineering detail — materials, methods, operating principles),
       "expected_parts": [
-        { "name": string, "quantity": string, "role": string }
+        {
+          "name": string,
+          "quantity": string,
+          "role": string,
+          "mpn": string|null,
+          "manufacturer": string|null,
+          "part_class": "electronic_cots"|"mechanical_cots"|"structural_fabricated"|"oem_subsystem"|"software_ip",
+          "confidence": "high"|"medium"|"low"
+        }
       ],
       "interfaces": [
         { "type": "electrical"|"mechanical"|"thermal"|"data"|"fluid",
@@ -307,6 +315,15 @@ Your output is a JSON object with two arrays: parts and bomLines.
 For each module's keyParts, produce one or more BOM rows with:
 - partNumber: unique string (e.g. "PN-MOD-001")
 - name: a SPECIFIC component name. Prefer naming a real manufacturer and model when the part is a purchased component (e.g. "Copeland ZP38K5 scroll compressor", not "compressor"). For fabricated parts, name the geometry and material (e.g. "Top chassis plate, 6061-T6 aluminium, 3 mm").
+- mpn: the manufacturer part number if you know it with confidence (e.g. "LF280K" for CATL 280Ah LFP cell, "SKM400GB176D" for a SEMIKRON module). Set to null when unknown. Do NOT invent MPNs.
+- manufacturer: the manufacturer name (e.g. "CATL", "Sungrow", "TE Connectivity", "Danfoss"). Set to null for generic/custom parts.
+- part_class: classify each part using exactly one of the 5 classes:
+    "electronic_cots" → ICs, sensors, connectors, passives, PCBs, battery cells (purchasable from distributors like Mouser/Digi-Key)
+    "mechanical_cots" → standard fasteners, pneumatic fittings, bearings, off-the-shelf mechanical parts
+    "structural_fabricated" → custom enclosures, machined brackets, welded frames, sheet-metal panels, custom busbars
+    "oem_subsystem" → complete subsystems from a named OEM (inverter/PCS unit, chiller module, transformer, EMS system)
+    "software_ip" → embedded firmware, SCADA, licence, algorithm — no physical part to source
+- confidence: "high" if mpn/manufacturer is well-known and you are certain; "medium" if you know the manufacturer but not the exact model; "low" if guessing from product description.
 - sourceModuleId: must exactly match one of the module ids you were given
 - process: choose from the process catalogue in the user message when possible (e.g. "cnc_turning", "cnc_milling", "sheet_metal", "laser_cutting", "welding"). Use "purchased_cots" for off-the-shelf components.
 - material: choose from the materials catalogue in the user message when possible (use the material_code, e.g. "6061-T6", "304SS"). Use "cots" for purchased components where the material is not relevant.

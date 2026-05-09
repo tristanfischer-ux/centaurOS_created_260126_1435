@@ -23,6 +23,7 @@ import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 import Database from 'better-sqlite3'
+import { MODULE_DECOMPOSITION_SYSTEM_PA } from './prompts'
 
 // ─── Read the brief ──────────────────────────────────────────────────────────
 
@@ -32,56 +33,8 @@ const BRIEF_PATH = join(
 )
 const bessBrief = readFileSync(BRIEF_PATH, 'utf-8')
 
-// ─── MODULE_DECOMPOSITION_SYSTEM_PA prompt (verbatim from prompts.ts) ────────
-
-const MODULE_DECOMPOSITION_SYSTEM_PA = `You are a systems engineer decomposing a hardware product into physical modules. Each module must be a real, buildable subsystem — not an abstract concept.
-
-Output ONLY valid JSON. No preamble, no markdown fences.
-
-Required output schema:
-{
-  "modules": [
-    {
-      "name": string,
-      "purpose": string (1-2 sentences — what this module does),
-      "why_it_matters": string (why the system fails without it),
-      "technical_description": string (2-3 paragraphs of engineering detail — materials, methods, operating principles),
-      "expected_parts": [
-        { "name": string, "quantity": string, "role": string }
-      ],
-      "interfaces": [
-        { "type": "electrical"|"mechanical"|"thermal"|"data"|"fluid",
-          "connects_to": string, "description": string }
-      ],
-      "failure_modes": [
-        {
-          "mode": string,
-          "cause": string,
-          "local_effect": string,
-          "system_effect": string
-        }
-      ],
-      "open_questions": [string],
-      "estimated_mass_kg": number|null,
-      "estimated_dimensions_mm": { "w": number, "d": number, "h": number }|null,
-      "estimated_lead_time_weeks": number,
-      "maturity": "CONCEPTUAL"|"PRELIMINARY"|"ENGINEERING"
-    }
-  ]
-}
-
-Rules:
-- Decompose along PHYSICAL and FUNCTIONAL boundaries, not abstract ones. A "module" is something you could point at, pick up, or buy from a supplier. "Software" is not a module unless it runs on a specific physical board.
-- Every module MUST have at least one interface with at least one other module. If a module has no interfaces, it is not part of the system.
-- Failure modes MUST have causes. "Unknown" is not acceptable. If you cannot identify a cause, describe the most likely cause and mark the failure mode's source_grade as E.
-- For each module, estimate mass and dimensions even if rough. These estimates feed the sizing solver. A rough estimate is infinitely better than null, because null means the solver cannot allocate space for this module.
-- Set maturity based on how much data you can provide: CONCEPTUAL = name and purpose only, no parts or dimensions. PRELIMINARY = some parts, rough dimensions, estimated mass. ENGINEERING = full parts list, firm dimensions, mass, interfaces.
-- Aim for 6-12 modules for a complex product. Fewer than 6 means modules are too coarse for useful engineering analysis. More than 12 means you've probably split things too finely.
-
-USER:
-[Structured brief JSON from Stage 1]
-[Product classification from Stage 2]
-[Regulatory entries from Stage 4 — these constrain module design]`
+// MODULE_DECOMPOSITION_SYSTEM_PA is imported from prompts.ts (single source of truth).
+// Do NOT maintain a local copy — this file previously had a stale duplicate.
 
 // Strip the trailing "USER:\n[...]" template placeholder from the system prompt
 // (that placeholder is a formatting hint in the source file, not part of the live prompt).
@@ -94,10 +47,10 @@ const CLEANED_MODULE_DECOMP_SYSTEM = MODULE_DECOMPOSITION_SYSTEM_PA
 // ─── 4 lowest-hallucinating LLMs (per coding-council.md) ────────────────────
 
 const LLM_SEATS = [
-  { id: 'xiaomi/mimo-v2.5-pro', label: 'MiMo-V2.5-Pro', nonHallucinationPct: 75 },
-  { id: 'x-ai/grok-4.3', label: 'Grok-4.3', nonHallucinationPct: 75 },
-  { id: 'z-ai/glm-5.1', label: 'GLM-5.1', nonHallucinationPct: 74 },
-  { id: 'moonshotai/kimi-k2.6', label: 'Kimi-K2.6', nonHallucinationPct: 61 },
+  { id: 'xiaomi/mimo-v2.5-pro', label: 'MiMo-V2.5-Pro', nonHallucinationPct: 75, maxTokens: 32768, timeoutMs: 600_000 },
+  { id: 'x-ai/grok-4.3', label: 'Grok-4.3', nonHallucinationPct: 75, maxTokens: 8192, timeoutMs: 600_000 },
+  { id: 'z-ai/glm-5.1', label: 'GLM-5.1', nonHallucinationPct: 74, maxTokens: 32768, timeoutMs: 600_000 },
+  { id: 'moonshotai/kimi-k2.6', label: 'Kimi-K2.6', nonHallucinationPct: 61, maxTokens: 32768, timeoutMs: 600_000 },
 ]
 
 // ─── OpenRouter call ─────────────────────────────────────────────────────────
@@ -144,6 +97,7 @@ async function callOpenRouter(
   systemPrompt: string,
   userMessage: string,
   maxTokens = 8192,
+  timeoutMs = 600_000,
 ): Promise<LLMCallResult> {
   const key = process.env.OPENROUTER_API_KEY
   if (!key) throw new Error('OPENROUTER_API_KEY not set')
@@ -169,7 +123,7 @@ async function callOpenRouter(
         max_tokens: maxTokens,
         temperature: 0.1,
       }),
-      signal: AbortSignal.timeout(240_000),
+      signal: AbortSignal.timeout(timeoutMs),
     })
 
     const durationMs = Date.now() - t0
@@ -723,8 +677,8 @@ async function main() {
         seat.label,
         CLEANED_MODULE_DECOMP_SYSTEM,
         userMessage,
-        // Kimi uses reasoning tokens — need larger budget
-        seat.id.includes('kimi') ? 16384 : 8192,
+        seat.maxTokens,
+        seat.timeoutMs,
       ),
     ),
   )

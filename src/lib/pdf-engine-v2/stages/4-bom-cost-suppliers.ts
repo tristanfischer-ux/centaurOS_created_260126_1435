@@ -173,6 +173,33 @@ export interface IntegratedBomLine {
   /** True when corpus returned fewer than 3 suppliers even after threshold-loosening. */
   needsSourcingReview?: boolean
 
+  // ── Two-tier BOM verification ─────────────────────────────────────────────
+  /**
+   * "verified"  → real distributor MPN + price returned from Mouser/Digi-Key/Farnell.
+   * "estimated" → OEM estimate or LLM-only price; manufacturer hint surfaced in PDF.
+   */
+  verification_status: 'verified' | 'estimated'
+
+  /**
+   * 5-class part taxonomy (from MODULE_DECOMPOSITION_SYSTEM_PA expected_parts).
+   * electronic_cots / mechanical_cots → distributor lookup → verified if found.
+   * structural_fabricated / oem_subsystem / software_ip → always estimated.
+   */
+  part_class?: 'electronic_cots' | 'mechanical_cots' | 'structural_fabricated' | 'oem_subsystem' | 'software_ip' | null
+
+  /**
+   * Manufacturer hint from the LLM (e.g. "CATL", "Sungrow").
+   * Shown in ESTIMATE rows as "Contact: <manufacturer>".
+   */
+  manufacturer_hint?: string | null
+
+  /**
+   * LLM-supplied MPN from MODULE_DECOMPOSITION_SYSTEM_PA expected_parts.
+   * Used as the primary lookup key for distributor APIs when part_class is
+   * electronic_cots or mechanical_cots.
+   */
+  llm_mpn?: string | null
+
   // ── RL sub-task attribution ───────────────────────────────────────────────
   llmSubTask: 'PROPOSE_PARTS' | 'CLASSIFY_MAKE_BUY' | 'ESTIMATE_MAKE_COST' | 'deterministic'
 
@@ -532,17 +559,36 @@ async function embedBatch(texts: string[]): Promise<number[][]> {
 // ── Section text generators ───────────────────────────────────────────────────
 
 function buildSectionBom(lines: IntegratedBomLine[]): string {
-  const rows = lines.map(l => {
+  const verified = lines.filter(l => l.verification_status === 'verified')
+  const estimated = lines.filter(l => l.verification_status === 'estimated')
+
+  const formatRows = (bLines: IntegratedBomLine[]) => bLines.map(l => {
     const regime = l.partRegime === 'buy' ? 'Buy' : 'Make'
     const cost = l.unitCostGbp != null ? `£${l.unitCostGbp.toFixed(2)}` : '—'
     const total = l.unitCostGbp != null ? `£${(l.unitCostGbp * l.quantity).toFixed(2)}` : '—'
-    return `| ${l.partNumber} | ${l.name} | ${l.quantity} | ${regime} | ${cost} | ${total} | ${l.costSource} |`
+    const mpn = l.bestDistributor?.sku || l.llm_mpn || '—'
+    const source = l.verification_status === 'verified' ? l.costSource : (l.manufacturer_hint ? `Estimate — ${l.manufacturer_hint}` : 'OEM estimate')
+    return `| ${l.partNumber} | ${l.name} | ${l.quantity} | ${regime} | ${mpn} | ${cost} | ${total} | ${source} |`
   })
-  return [
-    '| Part # | Name | Qty | Regime | Unit Cost | Line Total | Source |',
-    '|--------|------|-----|--------|-----------|------------|--------|',
-    ...rows,
-  ].join('\n')
+
+  const header = '| Part # | Name | Qty | Regime | MPN | Unit Cost | Line Total | Source |'
+  const divider = '|--------|------|-----|--------|-----|-----------|------------|--------|'
+
+  const sections: string[] = []
+  if (verified.length > 0) {
+    sections.push('### ✓ VERIFIED — Real Mouser/Digi-Key/Farnell data')
+    sections.push(header)
+    sections.push(divider)
+    sections.push(...formatRows(verified))
+  }
+  if (estimated.length > 0) {
+    sections.push('')
+    sections.push('### ~ OEM ESTIMATE — Manufacturer hint only, pending RFQ')
+    sections.push(header)
+    sections.push(divider)
+    sections.push(...formatRows(estimated))
+  }
+  return sections.join('\n')
 }
 
 function buildSectionCost(waterfall: CostWaterfall): string {
@@ -833,6 +879,34 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       }
     }
 
+    // ── Build expected_parts lookup from MODULE_DECOMPOSITION_SYSTEM_PA output ──
+    // Keyed by normalised part name (lowercase) → { part_class, mpn, manufacturer, confidence }
+    // This allows the BOM stage to inherit part_class and mpn hints from the
+    // decompose stage without a separate LLM call.
+    interface ExpectedPartMeta {
+      part_class: string | null
+      mpn: string | null
+      manufacturer: string | null
+      confidence: string | null
+    }
+    const expectedPartsMeta = new Map<string, ExpectedPartMeta>()
+    for (const mod of modules) {
+      const ep = (mod as any).expected_parts
+      if (Array.isArray(ep)) {
+        for (const p of ep) {
+          if (p.name) {
+            expectedPartsMeta.set(String(p.name).toLowerCase(), {
+              part_class: p.part_class ?? null,
+              mpn: p.mpn ?? null,
+              manufacturer: p.manufacturer ?? null,
+              confidence: p.confidence ?? null,
+            })
+          }
+        }
+      }
+    }
+    console.log(`[bom-v2] Loaded ${expectedPartsMeta.size} expected_parts meta entries from modules`)
+
     // ── Merge deterministic + LLM parts ──────────────────────────────────
     const MASS_LOOKUP: Record<string, number> = {
       compressor: 25, scroll: 25, evaporator: 15, condenser: 12, bphe: 8,
@@ -928,14 +1002,31 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       const pn = p.partNumber || p.id || ''
       const clsEntry = classificationMap.get(pn)
 
+      // ── Look up expected_parts meta by part name ──────────────────────
+      const epMeta = expectedPartsMeta.get(p.name.toLowerCase())
+        ?? expectedPartsMeta.get(pn.toLowerCase())
+        ?? null
+
+      const partClass = epMeta?.part_class ?? null
+      const llmMpn = epMeta?.mpn ?? null
+      const manufacturerHint = epMeta?.manufacturer ?? null
+
       // Determine regime
       const isDeterministic = (p as any).priceSource === 'distributor'
       let partRegime: 'buy' | 'make' | 'service' = p.isPurchased ? 'buy' : 'make'
       if (clsEntry) partRegime = clsEntry.partRegime
 
+      // 5-class taxonomy overrides: structural_fabricated/oem_subsystem/software_ip
+      // are always estimated regardless of isPurchased flag.
+      if (partClass === 'structural_fabricated' || partClass === 'oem_subsystem' || partClass === 'software_ip') {
+        partRegime = partClass === 'oem_subsystem' ? 'buy' : 'make'
+      }
+
       // Determine detailed regime
       let regime: IntegratedBomLine['regime'] = partRegime === 'buy' ? 'buy_electronic' : 'make_custom_fab'
       if (partRegime === 'service') regime = 'service_certification'
+      if (partClass === 'mechanical_cots') regime = 'buy_mechanical_industrial'
+      if (partClass === 'oem_subsystem') regime = 'named_manufacturer_reseller'
 
       // Initial cost (will be overwritten by distributor or estimate below)
       const unitCostGbp = p.estimatedUnitCostGbp ?? 0
@@ -945,6 +1036,12 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       else if ((p as any).priceSource === 'llm') costSource = 'estimated'
 
       const makeCostEstimate = makeEstimateMap.get(pn)
+
+      // Initial verification_status — will be upgraded to 'verified' if distributor returns a match
+      const needsDistributorLookup = partClass === 'electronic_cots' || partClass === 'mechanical_cots'
+        || (partClass === null && partRegime === 'buy')
+      const initVerificationStatus: 'verified' | 'estimated' =
+        (isDeterministic && (p as any).priceSource === 'distributor') ? 'verified' : 'estimated'
 
       return {
         id: p.id || pn,
@@ -960,6 +1057,10 @@ Return ALL four sub-task results in the JSON structure specified in the system p
         costSource,
         unitCostGbp,
         makeCostEstimateGbp: makeCostEstimate,
+        verification_status: initVerificationStatus,
+        part_class: partClass as IntegratedBomLine['part_class'],
+        manufacturer_hint: manufacturerHint,
+        llm_mpn: llmMpn,
         llmSubTask: isDeterministic ? 'deterministic' : 'PROPOSE_PARTS',
         priceSource: (p as any).priceSource,
         matchedMaterialCode: (p as any).matchedMaterialCode,
@@ -970,13 +1071,25 @@ Return ALL four sub-task results in the JSON structure specified in the system p
     })
 
     // ── Phase 4a: Distributor lookups for Buy parts (parallel) ────────────
-    const buyLines = integratedLines.filter(l => l.partRegime === 'buy' && l.costSource !== 'mouser')
-    console.log(`[bom-v2] Distributor lookup for ${buyLines.length} Buy parts (parallel)...`)
+    // Eligible: electronic_cots, mechanical_cots, and legacy buy parts with no part_class.
+    // Excluded: oem_subsystem and software_ip (no distributor SKU exists).
+    // structural_fabricated also excluded (custom parts, no distributor SKU).
+    const buyLines = integratedLines.filter(l => {
+      if (l.costSource === 'mouser') return false  // already resolved
+      const pc = l.part_class
+      if (pc === 'structural_fabricated' || pc === 'oem_subsystem' || pc === 'software_ip') return false
+      return l.partRegime === 'buy' || pc === 'electronic_cots' || pc === 'mechanical_cots'
+    })
+    console.log(`[bom-v2] Distributor lookup for ${buyLines.length} Buy parts (parallel, 5-class routed)...`)
 
     await Promise.all(
       buyLines.map(async (line) => {
         try {
-          const result: AggregateResult | null = await findSkuForPart(line.partNumber)
+          // Prefer the LLM-supplied MPN from MODULE_DECOMPOSITION_SYSTEM_PA.
+          // Fall back to the part number generated by the BOM LLM (rarely a real MPN).
+          const lookupKey = line.llm_mpn || line.partNumber
+          console.log(`[bom-v2] Distributor lookup: "${line.name}" → key="${lookupKey}"${line.llm_mpn ? ' (llm_mpn)' : ' (partNumber fallback)'}`)
+          const result: AggregateResult | null = await findSkuForPart(lookupKey)
           if (!result) return
 
           const best = result.best
@@ -1007,6 +1120,8 @@ Return ALL four sub-task results in the JSON structure specified in the system p
           line.unitCostGbp = qty1 ?? line.unitCostGbp
           line.costSource = best.source as 'mouser' | 'farnell' | 'digikey' | 'lcsc'
           line.llmSubTask = 'CLASSIFY_MAKE_BUY'
+          // Distributor returned a real price → VERIFIED tier
+          line.verification_status = 'verified'
         } catch (err) {
           console.warn(`[bom-v2] Distributor lookup failed for ${line.partNumber}: ${(err as Error).message}`)
         }
@@ -1240,8 +1355,11 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       })),
     }
 
+    const verifiedCount = integratedLines.filter(l => l.verification_status === 'verified').length
+    const estimatedCount = integratedLines.filter(l => l.verification_status === 'estimated').length
     console.log(
       `[bom-v2] Complete: ${integratedLines.length} lines, ` +
+      `${verifiedCount} VERIFIED + ${estimatedCount} ESTIMATED, ` +
       `${buyLines.length} Buy (${buyDistributorGbp > 0 ? 'some distributor-quoted' : 'all estimated'}), ` +
       `${makeLines.length} Make, ` +
       `£${unitTotalGbp.toFixed(2)} total`

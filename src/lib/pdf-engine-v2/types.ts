@@ -231,6 +231,21 @@ export interface ModulePAExpectedPart {
   name: string
   quantity: string
   role: string
+  /** LLM's best guess at a manufacturer part number (null when unknown). */
+  mpn?: string | null
+  /** Manufacturer name, e.g. "CATL", "Sungrow", "TE Connectivity" (null when unknown). */
+  manufacturer?: string | null
+  /**
+   * 5-class taxonomy used for distributor/corpus routing in the BOM stage.
+   * - electronic_cots  → Mouser/Digi-Key/Farnell lookup
+   * - mechanical_cots  → Mouser lookup (v1; McMaster/Misumi future work)
+   * - structural_fabricated → corpus supplier search
+   * - oem_subsystem    → OEM estimate, manufacturer hint in PDF
+   * - software_ip      → OEM estimate, no distributor lookup
+   */
+  part_class?: 'electronic_cots' | 'mechanical_cots' | 'structural_fabricated' | 'oem_subsystem' | 'software_ip' | null
+  /** How confident the LLM is about the mpn/manufacturer. */
+  confidence?: 'high' | 'medium' | 'low' | null
 }
 
 export interface ModulePAInterface {
