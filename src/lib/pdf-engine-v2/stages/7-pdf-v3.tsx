@@ -723,11 +723,65 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
         },
         {
           checkId: 'spatial_envelope',
-          status: state.dimensionSheet?.envelope?.interior_volume_m3 ? 'PASS' : 'WARN',
-          reason: state.dimensionSheet?.envelope?.interior_volume_m3
-            ? 'Spatial envelope established'
-            : 'No envelope dimensions provided',
-          evidence: fmtNum(state.dimensionSheet?.envelope?.interior_volume_m3, ' m³'),
+          status: (() => {
+            const ds = state.dimensionSheet as typeof state.dimensionSheet & {
+              zones?: Array<{ name: string; massKg?: number }>
+              volumeUtilisationPct?: number | null
+              massUtilisationPct?: number
+              availablePayloadMassKg?: number
+            } | null
+            if (!ds?.envelope?.interior_volume_m3) return 'FAIL'
+            // If we have zone data AND utilisation figures, give a richer verdict
+            const hasZones = Array.isArray((ds as any).zones) && (ds as any).zones.length > 0
+            const volPct = (ds as any).volumeUtilisationPct
+            const massPct = (ds as any).massUtilisationPct
+            if (hasZones && volPct != null && volPct > 0) {
+              // Mass budget check: if allocated mass > 90% of payload, warn
+              if (massPct != null && massPct > 90) return 'WARN'
+              return 'PASS'
+            }
+            // Envelope established but no zone breakdown yet (first pass only)
+            return 'PASS'
+          })(),
+          reason: (() => {
+            const ds = state.dimensionSheet as typeof state.dimensionSheet & {
+              zones?: Array<{ name: string; massKg?: number }>
+              volumeUtilisationPct?: number | null
+              massUtilisationPct?: number
+              availablePayloadMassKg?: number
+            } | null
+            if (!ds?.envelope?.interior_volume_m3) return 'No spatial envelope established'
+            const hasZones = Array.isArray((ds as any).zones) && (ds as any).zones.length > 0
+            const zoneCount = hasZones ? (ds as any).zones.length : 0
+            const volPct = (ds as any).volumeUtilisationPct
+            const massPct = (ds as any).massUtilisationPct
+            const payload = (ds as any).availablePayloadMassKg
+            const parts: string[] = [
+              `${ds.envelope.label ?? 'Envelope'} — ${fmtNum(ds.envelope.interior_volume_m3, ' m³')} internal volume`
+            ]
+            if (zoneCount > 0) parts.push(`${zoneCount} functional zones allocated`)
+            if (volPct != null && volPct > 0) parts.push(`${volPct}% volume utilisation`)
+            if (massPct != null) {
+              parts.push(`${massPct}% mass budget used`)
+              if (massPct > 90) parts.push(`WARN: mass margin tight — ${100 - massPct}% remaining vs ${fmtNum(payload, ' kg')} payload`)
+            }
+            if (!hasZones) parts.push('Zone allocation pending module decomposition')
+            return parts.join('; ')
+          })(),
+          evidence: (() => {
+            const ds = state.dimensionSheet as typeof state.dimensionSheet & {
+              zones?: Array<unknown>
+              volumeUtilisationPct?: number | null
+              massUtilisationPct?: number
+            } | null
+            if (!ds) return '—'
+            const parts: string[] = [fmtNum(ds.envelope?.interior_volume_m3, ' m³')]
+            const zoneCount = Array.isArray((ds as any).zones) ? (ds as any).zones.length : 0
+            if (zoneCount > 0) parts.push(`${zoneCount} zones`)
+            const volPct = (ds as any).volumeUtilisationPct
+            if (volPct != null && volPct > 0) parts.push(`${volPct}% vol`)
+            return parts.join(', ')
+          })(),
         },
         {
           checkId: 'modules_decomposed',

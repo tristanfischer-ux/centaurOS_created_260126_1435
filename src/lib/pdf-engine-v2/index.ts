@@ -13,7 +13,7 @@ import { runBriefGeneration, runBriefParsing } from './stages/0-brief-generation
 import { runResearch, runResearchSynthesis, extractResearchConstraints } from './stages/1-research'
 import { runDecompose, runDecomposePA } from './stages/2-decompose'
 import { runRegulatoryExtraction } from './stages/1b-regulatory'
-import { runSizeLayout } from './stages/3-size-layout'
+import { runSizeLayout, runSizingSecondPass } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
 import { runSuppliers } from './stages/5-suppliers'
 import { runBomCostSuppliers } from './stages/4-bom-cost-suppliers'
@@ -982,6 +982,29 @@ export async function runPipeline(
       return await generateErrorPdf(state, stages, llmCalls, startTime)
     }
     state.modules = decomposeResult.data
+
+    // ── Sizing Second Pass ─────────────────────────────────────────────────
+    // The first sizing pass (Stage 3, above) ran on empty modules so that the
+    // Feasibility Gate could see the envelope verdict before spending LLM tokens
+    // on Decompose.  Now that modules are populated, re-derive zone allocation,
+    // volume/mass utilisation, and mass budget from the real module list.
+    //
+    // runSizingSecondPass is a pure deterministic function (<5 ms) — no LLM,
+    // no network, no separate stage entry in `stages`.  It merges the correct
+    // envelope constants from the first-pass sheet with the newly computed
+    // per-module dimensions and zone groupings.
+    if (paMode && state.dimensionSheet) {
+      console.log('[pipeline] Sizing second pass: re-computing zone allocation from real modules')
+      try {
+        const secondPassSheet = runSizingSecondPass(state.dimensionSheet, state.modules)
+        state.dimensionSheet = secondPassSheet
+        console.log(`[pipeline] Sizing second pass OK: ${secondPassSheet.zones?.length ?? 0} zones, ` +
+          `vol=${secondPassSheet.volumeUtilisationPct ?? '—'}%, mass=${secondPassSheet.massUtilisationPct ?? '—'}%`)
+      } catch (secondPassErr) {
+        // Non-fatal: keep the first-pass sheet rather than crashing the pipeline.
+        console.warn(`[pipeline] Sizing second pass failed (non-fatal): ${(secondPassErr as Error).message}`)
+      }
+    }
 
     state.sourceAttributions.push(
       { section: 'Modules', source: 'llm', detail: 'Gemini 3.1 Pro — module decomposition' },

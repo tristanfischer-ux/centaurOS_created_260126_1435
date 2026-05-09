@@ -574,6 +574,45 @@ function extendSizingSheetPA(
   }
 }
 
+/**
+ * Second-pass sizing: re-derives zone allocation and utilisation from real
+ * modules after Decompose completes.
+ *
+ * The first sizing pass (runSizeLayout) runs BEFORE Decompose so the
+ * Feasibility Gate sees the envelope verdict.  At that point state.modules is
+ * empty, so zones[] and utilisation % come out as zero.  This second pass
+ * accepts the first-pass DimensionSheet (which already has the correct
+ * envelope, tare, and payload figures) and the now-populated modules list,
+ * then calls extendSizingSheetPA to rebuild zones and utilisation in-place.
+ *
+ * The returned DimensionSheetPA merges all first-pass fields with the newly
+ * computed zones / utilisation so the renderer gets a complete picture.
+ */
+export function runSizingSecondPass(
+  existingSheet: DimensionSheet,
+  modules: Module[],
+): DimensionSheetPA {
+  const domain = existingSheet.rules_domain || 'generic'
+  // Re-run module dimensions for the real modules using the same domain logic.
+  // We re-call solveSizing with the real modules so module_dimensions are
+  // populated correctly before extendSizingSheetPA aggregates them into zones.
+  const refreshedSheet = solveSizing(modules, domain, existingSheet.target || {})
+  // Preserve the first-pass envelope constants (which were set from domain
+  // constants, not module data) so the renderer keeps the correct 40ft
+  // container dimensions.  Merge module_dimensions from the refreshed sheet.
+  const mergedSheet: DimensionSheet = {
+    ...existingSheet,
+    module_dimensions: refreshedSheet.module_dimensions,
+    // feasible may have changed now that real modules are placed — use the
+    // refreshed verdict (still conservative: if any module busts the budget,
+    // it's INFEASIBLE).
+    feasible: refreshedSheet.feasible,
+    conflicts: refreshedSheet.conflicts,
+    recommendations: refreshedSheet.recommendations,
+  }
+  return extendSizingSheetPA(mergedSheet, modules, domain)
+}
+
 // Run sizing + layout as a subprocess
 // Calls the existing sizing solver which is pure physics (no pipeline coupling)
 export async function runSizeLayout(
