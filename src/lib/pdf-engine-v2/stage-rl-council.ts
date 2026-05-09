@@ -33,6 +33,8 @@ export interface RlIterationResult {
   council_blockers_count: number
   committed_sha: string | null
   rl_decision: 'PROMOTE' | 'ITERATE' | 'GIVE-UP' | 'REVERT' | 'PENDING'
+  /** Curriculum phase: 1 = fast loop (3 briefs), 2 = validation (10 briefs). */
+  phase: 1 | 2
 }
 
 // ── Council diff review ──────────────────────────────────────────────────────

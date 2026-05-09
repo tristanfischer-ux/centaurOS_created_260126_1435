@@ -12,6 +12,10 @@
  * 8. RlIterationResult rl_decision accepts all valid enum values
  * 9. CouncilDiffResult interface contract (no-fire and fire shapes)
  * 10. mean_score can be null
+ * 11. Curriculum: phase field is 1 or 2
+ * 12. Curriculum: slug → filename mapping covers all 10 canonical briefs
+ * 13. Curriculum: Phase 1 default brief set is cgm, drone, bess
+ * 14. Curriculum: Phase 2 brief set is all 10
  */
 
 import type { RlIterationResult, CouncilDiffResult } from './stage-rl-council'
@@ -63,6 +67,7 @@ describe('RlIterationResult schema', () => {
       council_blockers_count: 0,
       committed_sha: 'abc12345',
       rl_decision: 'ITERATE',
+      phase: 1,
     }
 
     expect(typeof result.stage).toBe('string')
@@ -79,6 +84,7 @@ describe('RlIterationResult schema', () => {
     expect(typeof result.council_blockers_count).toBe('number')
     expect(result.committed_sha === null || typeof result.committed_sha === 'string').toBe(true)
     expect(['PROMOTE', 'ITERATE', 'GIVE-UP', 'REVERT', 'PENDING']).toContain(result.rl_decision)
+    expect([1, 2]).toContain(result.phase)
   })
 
   it('mean_score can be null (no briefs scored)', () => {
@@ -97,6 +103,7 @@ describe('RlIterationResult schema', () => {
       council_blockers_count: 0,
       committed_sha: null,
       rl_decision: 'PENDING',
+      phase: 1,
     }
     expect(result.mean_score).toBeNull()
     expect(result.committed_sha).toBeNull()
@@ -222,6 +229,7 @@ describe('RlIterationResult rl_decision enum', () => {
       council_blockers_count: 0,
       committed_sha: null,
       rl_decision: decision,
+      phase: 1,
     }
     expect(validDecisions).toContain(result.rl_decision)
   })
@@ -281,7 +289,161 @@ describe('RlIterationResult per_brief_scores', () => {
   })
 })
 
-// ── 10. Driver dry-run: council seat model identifiers ────────────────────────
+// ── 11. Curriculum: phase field ───────────────────────────────────────────────
+describe('RlIterationResult curriculum phase field', () => {
+  it('phase 1 represents the fast loop (3 briefs)', () => {
+    const result: RlIterationResult = {
+      stage: 'brief_parsing',
+      iteration_number: 1,
+      started_at: '2026-05-09T00:00:00Z',
+      ended_at: '2026-05-09T00:25:00Z',
+      duration_seconds: 1500,
+      briefs_run: ['cgm', 'drone', 'bess'],
+      per_brief_scores: { cgm: 7.5, drone: 7.8, bess: 8.1 },
+      mean_score: 7.8,
+      prompt_changed: true,
+      prompt_diff_size_lines: 12,
+      council_fired: false,
+      council_blockers_count: 0,
+      committed_sha: null,
+      rl_decision: 'ITERATE',
+      phase: 1,
+    }
+    expect(result.phase).toBe(1)
+    expect(result.briefs_run).toHaveLength(3)
+    expect(result.briefs_run).toEqual(expect.arrayContaining(['cgm', 'drone', 'bess']))
+  })
+
+  it('phase 2 represents the validation pass (10 briefs)', () => {
+    const allTen = ['cgm', 'drone', 'edge-ai', 'heatpump', 'ev-charger', 'bioreactor', 'farm', 'auv', 'bess', 'haps']
+    const result: RlIterationResult = {
+      stage: 'brief_parsing',
+      iteration_number: 4,
+      started_at: '2026-05-09T02:00:00Z',
+      ended_at: '2026-05-09T03:10:00Z',
+      duration_seconds: 4200,
+      briefs_run: allTen,
+      per_brief_scores: Object.fromEntries(allTen.map(s => [s, 8.2])),
+      mean_score: 8.2,
+      prompt_changed: false,
+      prompt_diff_size_lines: 0,
+      council_fired: false,
+      council_blockers_count: 0,
+      committed_sha: null,
+      rl_decision: 'PROMOTE',
+      phase: 2,
+    }
+    expect(result.phase).toBe(2)
+    expect(result.briefs_run).toHaveLength(10)
+  })
+
+  it('phase only accepts 1 or 2 (type-level constraint)', () => {
+    const validPhases: Array<1 | 2> = [1, 2]
+    for (const p of validPhases) {
+      expect([1, 2]).toContain(p)
+    }
+  })
+})
+
+// ── 12. Curriculum: slug → filename mapping ───────────────────────────────────
+describe('Curriculum slug → filename mapping', () => {
+  // This mapping must match SLUG_TO_FILENAME in stage-rl-iterate.ts parseArgs().
+  // Validated here without importing the module (avoids __dirname SyntaxError in Jest).
+  const SLUG_TO_FILENAME: Record<string, string> = {
+    'cgm':        '01-cgm-wearable.md',
+    'drone':      '02-drone-prosumer.md',
+    'edge-ai':    '03-edge-ai-server.md',
+    'heatpump':   '04-heatpump-30kw.md',
+    'ev-charger': '05-dc-fast-ev-charger.md',
+    'bioreactor': '06-pharma-bioreactor.md',
+    'farm':       '07-vertical-farm.md',
+    'auv':        '08-auv-coastal.md',
+    'bess':       '09-bess-container.md',
+    'haps':       '10-haps-stratospheric.md',
+  }
+
+  it('covers all 10 canonical brief slugs', () => {
+    const slugs = Object.keys(SLUG_TO_FILENAME)
+    expect(slugs).toHaveLength(10)
+  })
+
+  it('Phase 1 default slugs (cgm, drone, bess) are all in the mapping', () => {
+    const phase1Slugs = ['cgm', 'drone', 'bess']
+    for (const slug of phase1Slugs) {
+      expect(SLUG_TO_FILENAME).toHaveProperty(slug)
+    }
+  })
+
+  it('Phase 2 slugs (all 10) are all in the mapping', () => {
+    const phase2Slugs = ['cgm', 'drone', 'edge-ai', 'heatpump', 'ev-charger', 'bioreactor', 'farm', 'auv', 'bess', 'haps']
+    for (const slug of phase2Slugs) {
+      expect(SLUG_TO_FILENAME).toHaveProperty(slug)
+    }
+    expect(phase2Slugs).toHaveLength(10)
+  })
+
+  it('each slug maps to a .md file with correct numeric prefix', () => {
+    const prefixes = Object.values(SLUG_TO_FILENAME).map(f => parseInt(f.split('-')[0], 10))
+    const expectedPrefixes = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+    expect(prefixes.sort((a, b) => a - b)).toEqual(expectedPrefixes)
+  })
+})
+
+// ── 13. Curriculum logic: Phase 1 → Phase 2 transition rules ─────────────────
+describe('Curriculum transition logic', () => {
+  // These tests encode the promotion rules without running the actual driver.
+  // The driver bash logic is tested at the shell level (bash -n syntax check).
+
+  it('Phase 1 → Phase 2: requires mean >= 8.0 AND 2 consecutive iterations above 8', () => {
+    // Simulate tracking consecutive_above_8
+    function shouldPromoteToPhase2(
+      meanScore: number,
+      consecutiveAbove8: number,
+    ): boolean {
+      return meanScore >= 8.0 && consecutiveAbove8 >= 2
+    }
+
+    // One iteration above 8 — not enough
+    expect(shouldPromoteToPhase2(8.2, 1)).toBe(false)
+    // Two consecutive — promote
+    expect(shouldPromoteToPhase2(8.2, 2)).toBe(true)
+    // High score but only once
+    expect(shouldPromoteToPhase2(9.5, 1)).toBe(false)
+    // Exactly 8.0 with 2 consecutive
+    expect(shouldPromoteToPhase2(8.0, 2)).toBe(true)
+    // 7.9 — below threshold
+    expect(shouldPromoteToPhase2(7.9, 5)).toBe(false)
+  })
+
+  it('Phase 2 PROMOTE: mean >= 8.0 across all 10 briefs', () => {
+    function shouldPromoteRound(meanScore: number): boolean {
+      return meanScore >= 8.0
+    }
+
+    expect(shouldPromoteRound(8.0)).toBe(true)
+    expect(shouldPromoteRound(8.5)).toBe(true)
+    expect(shouldPromoteRound(7.9)).toBe(false)
+  })
+
+  it('Phase 2 fail: identifies briefs scoring < 8.0 to add back to Phase 1 set', () => {
+    const perBriefScores: Record<string, number> = {
+      cgm: 8.5, drone: 8.1, 'edge-ai': 6.2,
+      heatpump: 7.8, 'ev-charger': 8.0, bioreactor: 8.3,
+      farm: 5.9, auv: 8.1, bess: 8.4, haps: 7.5,
+    }
+    const failingBriefs = Object.entries(perBriefScores)
+      .filter(([, score]) => score < 8.0)
+      .map(([slug]) => slug)
+
+    expect(failingBriefs).toEqual(expect.arrayContaining(['edge-ai', 'heatpump', 'farm', 'haps']))
+    expect(failingBriefs).toHaveLength(4)
+    // These get added back to Phase 1 set
+    const updatedPhase1 = [...new Set(['cgm', 'drone', 'bess', ...failingBriefs])]
+    expect(updatedPhase1).toHaveLength(7)
+  })
+})
+
+// ── 14. Driver dry-run: council seat model identifiers ────────────────────────
 describe('reviewPromptDiffWithCouncil — council seat models', () => {
   it('calls the correct 6 council models per coding-council.md spec', async () => {
     const modelsSeen: string[] = []

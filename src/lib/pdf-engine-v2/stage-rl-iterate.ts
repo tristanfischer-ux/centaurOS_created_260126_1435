@@ -148,6 +148,21 @@ function parseArgs() {
   const label = get('--label') || `rl-stage-${stage}-${timestamp}`
   const output = get('--output') || join(process.env.HOME || '~', 'Downloads', 'engine-evidence', label)
 
+  // Slug → filename mapping for --briefs slug list (e.g. --briefs cgm,drone,bess)
+  // Maps the short curriculum slug to the baseline-10 filename prefix.
+  const SLUG_TO_FILENAME: Record<string, string> = {
+    'cgm':        '01-cgm-wearable.md',
+    'drone':      '02-drone-prosumer.md',
+    'edge-ai':    '03-edge-ai-server.md',
+    'heatpump':   '04-heatpump-30kw.md',
+    'ev-charger': '05-dc-fast-ev-charger.md',
+    'bioreactor': '06-pharma-bioreactor.md',
+    'farm':       '07-vertical-farm.md',
+    'auv':        '08-auv-coastal.md',
+    'bess':       '09-bess-container.md',
+    'haps':       '10-haps-stratospheric.md',
+  }
+
   // Resolve brief file list
   let briefFiles: string[] = []
   if (briefsArg === 'all') {
@@ -162,8 +177,11 @@ function parseArgs() {
   } else {
     briefFiles = briefsArg.split(',').map(b => {
       const trimmed = b.trim()
-      // Accept absolute paths, relative paths, or bare filenames
+      // Accept absolute paths
       if (trimmed.startsWith('/')) return trimmed
+      // Try slug → filename mapping first (e.g. "cgm" → "01-cgm-wearable.md")
+      if (SLUG_TO_FILENAME[trimmed]) return join(BRIEFS_DIR, SLUG_TO_FILENAME[trimmed])
+      // Accept bare filename (with or without .md)
       if (existsSync(join(BRIEFS_DIR, trimmed))) return join(BRIEFS_DIR, trimmed)
       if (existsSync(join(BRIEFS_DIR, trimmed + '.md'))) return join(BRIEFS_DIR, trimmed + '.md')
       return trimmed // will fail later with a clear error
@@ -173,7 +191,11 @@ function parseArgs() {
   // --json-output <path>: if provided, write a machine-readable result JSON at the end.
   const jsonOutput = get('--json-output') || null
 
-  return { stage, iterations, briefFiles, label, outputDir: output, jsonOutput }
+  // --phase <1|2>: curriculum phase for JSON output. Default 1 (fast loop).
+  const phaseRaw = get('--phase')
+  const phase: 1 | 2 = phaseRaw === '2' ? 2 : 1
+
+  return { stage, iterations, briefFiles, label, outputDir: output, jsonOutput, phase }
 }
 
 // ─── Per-brief pipeline run up to target stage ────────────────────────────────
@@ -740,11 +762,12 @@ function extractJSON(text: string): any {
 // ─── Main ──────────────────────────────────────────────────────────────────────
 
 async function main() {
-  const { stage, iterations, briefFiles, label, outputDir, jsonOutput } = parseArgs()
+  const { stage, iterations, briefFiles, label, outputDir, jsonOutput, phase } = parseArgs()
   const startedAt = new Date().toISOString()
 
   console.log(`\n[stage-rl] === Stage RL Iterate ===`)
   console.log(`[stage-rl] Stage:      ${stage}`)
+  console.log(`[stage-rl] Phase:      ${phase} (${phase === 1 ? 'fast loop' : 'validation'})`)
   console.log(`[stage-rl] Iterations: ${iterations}`)
   console.log(`[stage-rl] Briefs:     ${briefFiles.length} files`)
   console.log(`[stage-rl] Label:      ${label}`)
@@ -1056,6 +1079,7 @@ ${(bestIter?.suggestions || []).map(s => `- **${s.what}**: ${s.reasoning}`).join
       council_blockers_count: lastEntry?.councilBlockersCount ?? 0,
       committed_sha: null, // rl-driver.sh reads git log to populate this after the run
       rl_decision: lastEntry?.rlDecision ?? 'PENDING',
+      phase,
     }
 
     const jsonOutputDir = dirname(jsonOutput)

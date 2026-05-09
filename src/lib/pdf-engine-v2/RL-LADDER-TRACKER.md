@@ -9,26 +9,56 @@
 
 ## RL ladder
 
-In execution order. Each round runs 10 baseline briefs through stages 0..N (PA architecture), scores stage N's output via the production council (commit `52bc2e61` scorer), iterates the prompt for stage N until ≥8/10 across all 10 briefs.
+In execution order. Each round iterates the prompt for stage N until ≥8/10 across all 10 briefs, using curriculum learning (see below).
 
-| Round | Target stage | Stages run before it (live, every iteration) | Status | Best mean score | Iterations | Frozen at |
-|---|---|---|---|---|---|---|
-| 1 | PA Stage 1 — Brief Parsing | (founder text only) | ⬜ Pending (iter 1 REVERT — scorer mis-calibration fixed) | 2 | 1 | — |
-| 2 | PA Stage 3 — Research Synthesis | Stage 1 | ⬜ Pending | — | 0 | — |
-| 3 | PA Stage 4 — Regulatory Extraction | Stages 1+3 | ⬜ Pending | — | 0 | — |
-| 4 | PA Stage 5 — Module Decomposition | Stages 1+3+4 | ⬜ Pending | — | 0 | — |
-| 5 | PA Stage 6 — BOM Generation | Stages 1+3+4+5 | ⬜ Pending (gated on Phase E cut-over) | — | 0 | — |
-| 6 | Post-pipeline Review (Risks) | All preceding (FULL_REPORT only) | ⬜ Pending | — | 0 | — |
+| Round | Target stage | Stages run before it (live, every iteration) | Phase | Status | Best mean score | Iterations | Frozen at |
+|---|---|---|---|---|---|---|---|
+| 1 | PA Stage 1 — Brief Parsing | (founder text only) | Phase 1: 0/8 iterations | ⬜ Pending (iter 1 REVERT — scorer mis-calibration fixed) | 2 | 1 | — |
+| 2 | PA Stage 3 — Research Synthesis | Stage 1 | Phase 1: 0/8 iterations | ⬜ Pending | — | 0 | — |
+| 3 | PA Stage 4 — Regulatory Extraction | Stages 1+3 | Phase 1: 0/8 iterations | ⬜ Pending | — | 0 | — |
+| 4 | PA Stage 5 — Module Decomposition | Stages 1+3+4 | Phase 1: 0/8 iterations | ⬜ Pending | — | 0 | — |
+| 5 | PA Stage 6 — BOM Generation | Stages 1+3+4+5 | Phase 1: 0/8 iterations | ⬜ Pending (gated on Phase E cut-over) | — | 0 | — |
+| 6 | Post-pipeline Review (Risks) | All preceding (FULL_REPORT only) | Phase 1: 0/8 iterations | ⬜ Pending | — | 0 | — |
 
 **Status legend:** ⬜ Pending · 🔄 RL in progress · ✅ Frozen (≥8/10 across 10) · ⏸ Max iterations hit (logged, moved on with current best) · ⚠️ Stalled (no improvement N rounds) · ❌ Failed
 
 ---
 
+## Curriculum learning mechanic
+
+Per Tristan's directive (2026-05-09):
+
+**Phase 1 — fast loop on 3 diverse briefs:**
+- Default briefs: `cgm`, `drone`, `bess` (biomedical / aerospace / energy storage — three different product class lineages, all known to produce full PDFs)
+- Configurable via `RL_PHASE1_BRIEFS` env var (comma-separated slugs)
+- Each iteration runs only these 3 briefs (~25 min wall vs ~70 min for 10-brief validation)
+- Condition to advance: mean score across these 3 ≥8.0 AND held for 2 consecutive iterations
+
+**Phase 2 — full validation (all 10 briefs):**
+- Briefs: `cgm drone edge-ai heatpump ev-charger bioreactor farm auv bess haps`
+- Single validation iteration
+- If mean ≥8.0 across all 10 → PROMOTE round (✅ frozen), move to next round
+- If mean <8.0 across all 10 → identify failing brief(s), ADD them to Phase 1 set, return to Phase 1 with expanded set
+
+**Brief slug → filename mapping (for `--briefs` CLI arg):**
+| Slug | File |
+|---|---|
+| cgm | 01-cgm-wearable.md |
+| drone | 02-drone-prosumer.md |
+| edge-ai | 03-edge-ai-server.md |
+| heatpump | 04-heatpump-30kw.md |
+| ev-charger | 05-dc-fast-ev-charger.md |
+| bioreactor | 06-pharma-bioreactor.md |
+| farm | 07-vertical-farm.md |
+| auv | 08-auv-coastal.md |
+| bess | 09-bess-container.md |
+| haps | 10-haps-stratospheric.md |
+
 ## Promotion gate
 
-Per Tristan's choice (option a, 2026-05-08 night):
-- **≥8/10 mean across all 10 baseline briefs** on the production council scorer
-- **AND best score has held for at least 2 consecutive iterations** (avoids a noise-driven false positive)
+Per Tristan's choice (option a, 2026-05-08 night) — now curriculum-gated:
+- **Phase 1:** ≥8/10 mean across 3 fast-loop briefs for 2 consecutive iterations → advance to Phase 2
+- **Phase 2:** ≥8/10 mean across all 10 baseline briefs on the production council scorer → PROMOTE
 - THEN: stage promoted to ✅ Frozen, prompt committed, RL moves to next round
 
 ## Max-iterations escape hatch
