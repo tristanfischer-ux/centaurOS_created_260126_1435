@@ -1345,19 +1345,19 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       }
     }
 
-    // ── Phase 4c: Grade D fallback for zero-cost estimated lines ─────────
+    // ── Phase 4c: Grade D fallback for zero-cost lines ───────────────────
     // After distributor lookup (4a) and supplier search (4b), any line that
-    // remains at unitCostGbp === 0 with verification_status === 'estimated'
-    // is a DATA GAP.  We apply a Grade D table estimate for known subsystem
-    // classes so the BOM total remains structurally consistent.
+    // remains at unitCostGbp === 0 is a DATA GAP — whether VERIFIED or ESTIMATED.
+    // A VERIFIED £0 is a false-positive distributor match (e.g. Mouser fuzzy-
+    // matching "Battery Management System" to a passive part).  We apply a
+    // Grade D table estimate for known subsystem classes so the BOM total is
+    // structurally consistent and the council can see real indicative costs.
     //
-    // Hierarchy applied: VERIFIED > LLM ESTIMATE > GRADE D > DATA GAP
+    // Hierarchy applied: VERIFIED (non-zero) > LLM ESTIMATE (non-zero) > GRADE D > DATA GAP
     {
       let gradeDApplied = 0
       for (const line of integratedLines) {
-        if (line.unitCostGbp > 0) continue  // already costed
-        if (line.verification_status === 'verified') continue  // distributor price — should never be 0 but guard anyway
-        if (line.costSource === 'mouser' || line.costSource === 'farnell' || line.costSource === 'digikey' || line.costSource === 'lcsc') continue
+        if (line.unitCostGbp > 0) continue  // already costed — leave alone
 
         const subsystemKey = classifySubsystemForGradeD(line.name)
         if (!subsystemKey) continue
@@ -1368,7 +1368,12 @@ Return ALL four sub-task results in the JSON structure specified in the system p
         line.unitCostGbp = entry.typical
         line.gradeD_estimate_basis = `${entry.basis} (Grade D ±50%, typical of range £${entry.min.toLocaleString()}–£${entry.max.toLocaleString()})`
         line.costSource = 'estimated'
-        // Keep verification_status as 'estimated' — Grade D is not VERIFIED
+        // Demote verification_status: a Grade D is NOT VERIFIED, even if a
+        // distributor returned a match with qty1=0 (false-positive lookup).
+        line.verification_status = 'estimated'
+        // Clear any false-positive distributor data so the renderer shows Grade D table, not distributor name
+        line.bestDistributor = undefined
+        line.distributors = undefined
         gradeDApplied++
         console.log(`[bom-v2] Grade D fallback for "${line.name}" → ${subsystemKey}: £${entry.typical.toLocaleString()} (${entry.basis})`)
       }
