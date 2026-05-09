@@ -1,16 +1,23 @@
 // ── PA Stage 1 — Brief Parsing types ─────────────────────────────────────────
 
+/** Source provenance tag for brief constraint fields.
+ *  "user"    = value explicitly stated in founder text.
+ *  "inferred" = value derivable from a stated fact.
+ *  "missing"  = founder text is silent; value MUST be null and field listed in missing_mandatory_fields.
+ */
+export type BriefSourceTag = 'user' | 'inferred' | 'missing'
+
 export interface StructuredBriefConstraintValue<T = number | null> {
   value: T
   currency?: 'GBP' | 'USD' | 'EUR'
-  source: 'user' | 'inferred'
+  source: BriefSourceTag
 }
 
 export interface StructuredBriefDimensions {
   w: number | null
   d: number | null
   h: number | null
-  source: 'user' | 'inferred'
+  source: BriefSourceTag
 }
 
 // BLOCKER-6 fix: flattened single shape with nullable value — no discriminated
@@ -20,18 +27,22 @@ export interface StructuredBriefPerformance {
   key_metric: string | null
   value: number | null
   unit: string | null
-  source: 'user' | 'inferred'
+  source: BriefSourceTag
 }
 
 // BLOCKER-4 fix: temp values are nullable — LLM must not invent them.
 export interface StructuredBriefOperatingEnvironment {
   temp_min_c: number | null
   temp_max_c: number | null
-  source: 'user' | 'inferred'
+  source: BriefSourceTag
 }
 
 export interface StructuredBriefSafetyStandard {
   standard: string
+  /** The standard number / code (e.g. "IEC 62619:2022"). Used by council-scorer display. */
+  code?: string
+  /** Source grade: A = official body, B = industry body, C = LLM-inferred. Used by council-scorer rubric. */
+  source_grade?: 'A' | 'B' | 'C'
   source: 'user' | 'inferred'
 }
 
@@ -50,30 +61,30 @@ export interface StructuredBriefJSON {
     unit_cost_ceiling: {
       value: number | null
       currency: 'GBP' | 'USD' | 'EUR'
-      source: 'user' | 'inferred'
+      source: BriefSourceTag
     }
     max_mass_kg: {
       value: number | null
-      source: 'user' | 'inferred'
+      source: BriefSourceTag
     }
     max_dimensions_mm: StructuredBriefDimensions
     // BLOCKER-6 fix: single flat type, no union. value is nullable — anti-invention rule.
     target_performance: StructuredBriefPerformance
     target_process: {
       value: string | null
-      source: 'user' | 'inferred'
+      source: BriefSourceTag
     }
     target_material: {
       value: string | null
-      source: 'user' | 'inferred'
+      source: BriefSourceTag
     }
     batch_size: {
       value: number | null
-      source: 'user' | 'inferred'
+      source: BriefSourceTag
     }
     design_life: {
       value: string | null
-      source: 'user' | 'inferred'
+      source: BriefSourceTag
     }
     operating_environment: StructuredBriefOperatingEnvironment
     safety_standards: StructuredBriefSafetyStandard[]
