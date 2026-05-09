@@ -215,3 +215,156 @@ describe('F8: Per-judge score breakdown (council-scorer)', () => {
     }
   })
 })
+
+// ── SCORE-BP1: Brief section uses parsedBrief (StructuredBriefJSON) when present ──
+//
+// Regression test for scorer mis-calibration discovered in RL Round 1 Iteration 1
+// (2026-05-09). The scorer was reading state.research.designBrief (seeded with only
+// useCase + 2 constraints from brief_parsing) instead of state.parsedBrief (the actual
+// StructuredBriefJSON output). Judges saw 9 near-empty fields and scored 2/10, which
+// was not the brief_parsing prompt's fault — it was a data extraction bug.
+describe('SCORE-BP1: Brief section extraction with parsedBrief', () => {
+  it('includes parsedBrief fields in Brief section when parsedBrief is present', async () => {
+    const capturedPrompts: string[] = []
+
+    mockFetch.mockImplementation((_url: string, opts: any) => {
+      const body = JSON.parse(opts.body)
+      if (body.messages) {
+        capturedPrompts.push(...body.messages.map((m: any) => m.content as string))
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: JSON.stringify({
+            criteria_scores: [],
+            overall_score: 7,
+            overall_reasons: ['good'],
+            code_change_recommendations: [],
+            source_attributions: [],
+          }) } }],
+        }),
+      })
+    })
+
+    const parsedBrief = {
+      project_id: 'test-cgm',
+      product_description: 'A disposable CGM patch for continuous glucose monitoring.',
+      mission_statement: 'Enable real-time glucose tracking for diabetic patients.',
+      target_customers: 'Type 1 diabetics seeking non-invasive monitoring.',
+      why_now: 'FDA cleared comparable devices in 2025, opening market window.',
+      confidence: 'HIGH' as const,
+      missing_mandatory_fields: ['operating_environment.max_temperature_c'],
+      constraints: {
+        unit_cost_ceiling: { value: 15.00, currency: 'GBP' as const, source: 'user' as const },
+        max_mass_kg: { value: 0.05, source: 'user' as const },
+        max_dimensions_mm: { length_mm: 40, width_mm: 30, depth_mm: 5, source: 'user' as const },
+        target_performance: { metric: 'MARD', value: '10%', source: 'inferred' as const },
+        target_process: { value: 'roll-to-roll screen printing', source: 'inferred' as const },
+        target_material: { value: 'medical-grade adhesive', source: 'inferred' as const },
+        batch_size: { value: 100000, source: 'inferred' as const },
+        design_life: { value: '14 days', source: 'user' as const },
+        operating_environment: {
+          min_temperature_c: 10,
+          max_temperature_c: 40,
+          max_humidity_pct: 95,
+          ingress_protection: 'IP22',
+          source: 'inferred' as const,
+        },
+        safety_standards: [
+          { code: 'ISO 13485', name: 'Medical devices QMS', source_grade: 'A' as const },
+          { code: 'IEC 60601-1', name: 'Medical electrical equipment', source_grade: 'A' as const },
+        ],
+        additional_constraints: [
+          { name: 'biocompatibility', value: 'ISO 10993', source: 'inferred' as const },
+        ],
+      },
+    }
+
+    // State with parsedBrief but sparse designBrief (mirrors what brief_parsing produces)
+    const state = makeState({
+      parsedBrief,
+      research: {
+        report: '',
+        sources: [],
+        designBrief: {
+          useCase: parsedBrief.product_description,
+          constraints: { unitCostCeilingGbp: 15.00, maxMassKg: 0.05 },
+        },
+      } as any,
+    } as any)
+
+    await runCouncilScoring(state)
+
+    // Check that the Brief judge prompt contains parsedBrief fields, not just empty designBrief fields
+    const briefPrompts = capturedPrompts.filter(p => p.includes('product_description'))
+    expect(briefPrompts.length).toBeGreaterThan(0)
+
+    const briefPrompt = briefPrompts[0]
+    // Should contain rich StructuredBriefJSON fields
+    expect(briefPrompt).toContain('product_description')
+    expect(briefPrompt).toContain('mission_statement')
+    expect(briefPrompt).toContain('target_customers')
+    expect(briefPrompt).toContain('why_now')
+    expect(briefPrompt).toContain('source_grade')
+    expect(briefPrompt).toContain('ISO 13485')
+    expect(briefPrompt).toContain('IEC 60601-1')
+    expect(briefPrompt).toContain('missing_mandatory_fields')
+    expect(briefPrompt).toContain('CGM patch') // product_description content
+    // Should NOT use the empty designBrief Mission/Process/Material proxy fields
+    expect(briefPrompt).not.toContain('Mission: \nUse Case:')
+  })
+
+  it('falls back to designBrief when parsedBrief is absent (legacy path)', async () => {
+    const capturedPrompts: string[] = []
+
+    mockFetch.mockImplementation((_url: string, opts: any) => {
+      const body = JSON.parse(opts.body)
+      if (body.messages) {
+        capturedPrompts.push(...body.messages.map((m: any) => m.content as string))
+      }
+      return Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({
+          choices: [{ message: { content: JSON.stringify({
+            criteria_scores: [],
+            overall_score: 6,
+            overall_reasons: ['ok'],
+            code_change_recommendations: [],
+            source_attributions: [],
+          }) } }],
+        }),
+      })
+    })
+
+    // State WITHOUT parsedBrief (legacy path) but WITH designBrief
+    const state = makeState({
+      research: {
+        report: 'Legacy research report text with content here.',
+        sources: [],
+        designBrief: {
+          mission: 'Build a heat pump',
+          useCase: 'Residential heating',
+          targetCustomers: 'UK homeowners',
+          whyNow: 'Net zero',
+          targetProcess: 'CNC',
+          targetMaterial: 'Copper',
+          toleranceTarget: '±0.1mm',
+          quantityTarget: '1000',
+          complianceNotes: 'BS EN 378',
+          constraints: { unitCostCeilingGbp: 5000, maxMassKg: 80 },
+        },
+      } as any,
+    })
+    // Ensure parsedBrief is absent
+    delete (state as any).parsedBrief
+
+    await runCouncilScoring(state)
+
+    // Brief prompt should use legacy designBrief fields
+    const briefPrompts = capturedPrompts.filter(p => p.includes('Use Case:'))
+    expect(briefPrompts.length).toBeGreaterThan(0)
+    expect(briefPrompts[0]).toContain('Mission:')
+    expect(briefPrompts[0]).toContain('Use Case:')
+    expect(briefPrompts[0]).toContain('Residential heating')
+  })
+})

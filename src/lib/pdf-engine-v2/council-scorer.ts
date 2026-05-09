@@ -111,9 +111,15 @@ const SECTION_ENGINEERING_CRITERIA: Record<string, string[]> = {
     'Completeness — are all major sections represented in summary form?',
   ],
   'Brief': [
-    'Constraint Capture — are all physical limits (mass, dimensions, cost) explicitly stated?',
-    'Feasibility Pre-check — do the targets align with physics and market reality?',
-    'Requirement Traceability — can every requirement be traced to a specific module?',
+    // SCORE-BP1 (2026-05-09): rubric updated for StructuredBriefJSON (PA Stage 1 output).
+    // Previous criteria were written for prose brief text (legacy path). PA Stage 1
+    // outputs structured field extraction — judge field completeness and anti-invention
+    // discipline, not prose narrative quality.
+    'Constraint Completeness — are unit_cost_ceiling, max_mass_kg, batch_size, design_life, target_process, target_material, and operating_environment all populated or explicitly null (never invented)?',
+    'Source-Grading Discipline — are constraint values correctly tagged source=user (explicitly stated by founder) vs source=inferred (derived from product class) — no cross-contamination?',
+    'Anti-Invention Compliance — are fields that are genuinely missing from the founder text left as null rather than guessed? (missing_mandatory_fields should be honest)',
+    'Safety Standards Coverage — are applicable safety standards listed with correct source_grade (A=official body, B=industry body, C=LLM-inferred)?',
+    'Narrative Field Quality — are product_description, mission_statement, target_customers, and why_now concise, grounded in the founder text, and free of hallucinated specifics?',
   ],
   'Feasibility': [
     'Verdict Accuracy — is the feasibility verdict (GREEN/AMBER/RED) justified by the constraints?',
@@ -530,21 +536,65 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   }
 
   // Brief
-  const b = state.research?.designBrief
-  if (b) {
+  // SCORE-BP1 (2026-05-09): When brief_parsing (PA Stage 1) has run, use
+  // state.parsedBrief (StructuredBriefJSON — the actual stage output) as the
+  // primary data source. The legacy designBrief proxy is seeded with only two
+  // fields (useCase + two constraints) from parsedBrief, leaving mission,
+  // target_customers, why_now, safety_standards, and all constraint source-tags
+  // blank. Judges legitimately score this near-empty template at 2/10. This is
+  // a scorer mis-calibration bug, not a prompt quality problem.
+  //
+  // Rubric for brief_parsing: evaluate structured field extraction quality —
+  // constraint completeness, source-grading discipline, anti-invention rules
+  // (null values where source is 'user'), missing_mandatory_fields honesty.
+  const pb = (state as any).parsedBrief
+  if (pb) {
+    const c = pb.constraints || {}
+    const safetyStds = (c.safety_standards || [])
+      .map((s: any) => `${s.code} (${s.source_grade || '?'})`)
+      .join(', ') || 'none'
+    const addlConstraints = (c.additional_constraints || [])
+      .map((a: any) => `${a.name}: ${a.value} (src=${a.source})`)
+      .join('; ') || 'none'
+    const missing = (pb.missing_mandatory_fields || []).join(', ') || 'none'
     sections['Brief'] = [
-      `Mission: ${b.mission || ''}`,
-      `Use Case: ${b.useCase || ''}`,
-      `Target Customers: ${b.targetCustomers || ''}`,
-      `Why Now: ${b.whyNow || ''}`,
-      `Process: ${b.targetProcess || ''}`,
-      `Material: ${b.targetMaterial || ''}`,
-      `Tolerance: ${b.toleranceTarget || ''}`,
-      `Quantity: ${b.quantityTarget || ''}`,
-      `Compliance: ${b.complianceNotes || ''}`,
-      `Cost Ceiling: ${b.constraints?.unitCostCeilingGbp || 'not set'}`,
-      `Max Mass: ${b.constraints?.maxMassKg || 'not set'}`,
+      `product_description: ${pb.product_description || ''}`,
+      `mission_statement: ${pb.mission_statement || ''}`,
+      `target_customers: ${pb.target_customers || ''}`,
+      `why_now: ${pb.why_now || ''}`,
+      `confidence: ${pb.confidence || ''}`,
+      `missing_mandatory_fields: ${missing}`,
+      `constraints.unit_cost_ceiling: ${c.unit_cost_ceiling?.value ?? 'null'} ${c.unit_cost_ceiling?.currency || ''} (src=${c.unit_cost_ceiling?.source || '?'})`,
+      `constraints.max_mass_kg: ${c.max_mass_kg?.value ?? 'null'} (src=${c.max_mass_kg?.source || '?'})`,
+      `constraints.max_dimensions_mm: ${JSON.stringify(c.max_dimensions_mm || {})}`,
+      `constraints.target_process: ${c.target_process?.value ?? 'null'} (src=${c.target_process?.source || '?'})`,
+      `constraints.target_material: ${c.target_material?.value ?? 'null'} (src=${c.target_material?.source || '?'})`,
+      `constraints.batch_size: ${c.batch_size?.value ?? 'null'} (src=${c.batch_size?.source || '?'})`,
+      `constraints.design_life: ${c.design_life?.value ?? 'null'} (src=${c.design_life?.source || '?'})`,
+      `constraints.operating_environment: ${JSON.stringify(c.operating_environment || {})}`,
+      `constraints.target_performance: ${JSON.stringify(c.target_performance || {})}`,
+      `constraints.safety_standards: ${safetyStds}`,
+      `constraints.additional_constraints: ${addlConstraints}`,
     ].join('\n')
+  } else {
+    // Fallback for non-PA path or states where brief_parsing has not run:
+    // use the legacy designBrief proxy.
+    const b = state.research?.designBrief
+    if (b) {
+      sections['Brief'] = [
+        `Mission: ${b.mission || ''}`,
+        `Use Case: ${b.useCase || ''}`,
+        `Target Customers: ${b.targetCustomers || ''}`,
+        `Why Now: ${b.whyNow || ''}`,
+        `Process: ${b.targetProcess || ''}`,
+        `Material: ${b.targetMaterial || ''}`,
+        `Tolerance: ${b.toleranceTarget || ''}`,
+        `Quantity: ${b.quantityTarget || ''}`,
+        `Compliance: ${b.complianceNotes || ''}`,
+        `Cost Ceiling: ${b.constraints?.unitCostCeilingGbp || 'not set'}`,
+        `Max Mass: ${b.constraints?.maxMassKg || 'not set'}`,
+      ].join('\n')
+    }
   }
 
   // Regulatory
