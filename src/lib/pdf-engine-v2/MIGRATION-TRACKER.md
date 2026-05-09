@@ -20,9 +20,16 @@
 | F | Demote Review/Polish + Report Type Router | 2-3 | ✅ Done | ✅ Approved (after fixes — 11 BLOCKERs fixed, F-9 deferred to Phase H) | 2026-05-08 |
 | G | Renderer integration with reportType | 2-3 | ✅ Done | ✅ Approved (after fixes — 4 BLOCKERs fixed, 5 NOTEDs deferred to Phase H) | 2026-05-08 |
 | H | Flip defaults, cleanup | 1-2 | ✅ Done | ✅ Approved (after fixes — 8 BLOCKERs fixed, 3 NOTEDs 1-seat deferred) | 2026-05-08 |
+| I | Section reorder + Assembly Shortlist rename | 0.5 | ✅ Done | — | 2026-05-09 |
 
 **Status legend:** ⬜ Pending · 🔄 In progress · ✅ Done · ⚠️ Blocked · 🚫 Skipped
 **Council legend:** ⬜ Pending · 🔄 In progress · ✅ Approved · ⚠️ Issues to fix · ❌ Rejected
+
+**Phase I — Section reorder + Assembly Shortlist rename (2026-05-09)**
+- New PDF section order: Brief → Sizing → Feasibility Gate → Modules → Assembly Shortlist → Cost → Regulatory → FMEA → Audit Log → Source Attribution
+- Pipeline reorder: Regulatory → Decompose → Sizing → Feasibility Gate (gate now sees real sizing result) → Brief Revision → BOM/Cost/Assembly
+- "Supplier Shortlist" renamed → "Assembly Shortlist" in all user-facing text. Scorer key `Suppliers` unchanged.
+- rl-status-html.sh SECTIONS config updated. council-scorer.ts criteria updated to assembly semantics.
 
 **Q1-Q6 defaults (Tristan agreed 2026-05-08):**
 - Q1: preserve brief revision loop as conditional (FEASIBILITY_EXCEPTION only)

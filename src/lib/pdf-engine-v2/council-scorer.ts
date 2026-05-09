@@ -157,10 +157,14 @@ const SECTION_ENGINEERING_CRITERIA: Record<string, string[]> = {
     'Severity Calibration — are ratings calibrated to real consequences?',
     'Mitigation Specificity — are mitigations actionable and verifiable?',
   ],
+  // Scorer key 'Suppliers' is kept for backwards-compatibility with QA JSON files.
+  // The visible PDF section is now "Assembly Shortlist" (renamed 2026-05-09).
+  // These criteria evaluate assembly partners (who can build the full product),
+  // not per-part distributors (which are embedded in BOM lines).
   'Suppliers': [
-    'Supplier Capability — do the suppliers actually make these components?',
-    'Geographic Viability — are suppliers accessible from the UK?',
-    'Domain Experience — do suppliers have experience with the specific materials and processes required for this product class?',
+    'Assembly Capability — do the listed partners actually assemble products of this class?',
+    'Geographic Viability — are assembly partners accessible from the UK?',
+    'Domain Experience — do partners have experience with the specific processes and materials required for this product class?',
   ],
   'Research': [
     'Technical Depth — does the research demonstrate understanding of the product?',

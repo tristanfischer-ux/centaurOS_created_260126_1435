@@ -666,196 +666,21 @@ export async function runPipeline(
     } catch { /* scoring history is non-critical */ }
     // Skip all stages, go straight to PDF
   } else {
-  // ── Feasibility Gate ───────────────────────────────────────────────
-  console.log('\n[pipeline] === Feasibility Gate ===')
-  const sizingResult = { feasible: null as boolean | null }  // Will be updated after sizing
-  const feasibility = determineFeasibility(
-    briefValidationPost,
-    sizingResult,
-    null,  // cost not yet computed
-    classification.productClass,
-  )
-  ;(state as any).feasibility = feasibility
+  // ─────────────────────────────────────────────────────────────────────────
+  // REORDER 2026-05-09: Brief → Sizing → Feasibility Gate → Brief Revision
+  //
+  // New architecturally-correct execution order (PA path):
+  //   PA Stage 4 Regulatory → PA Stage 5 Decompose → Sizing → Feasibility Gate
+  //   → Brief Revision loop (if FAIL/WARN) → Router → BOM/Cost/Assembly
+  //
+  // Sizing now runs BEFORE the Feasibility Gate so the gate sees the actual
+  // solver verdict (feasible/INFEASIBLE) instead of the stale null placeholder.
+  // Brief Revision fires AFTER the Gate, per spec.
+  // ─────────────────────────────────────────────────────────────────────────
+
   // BENCH-L1: stamp productClass on state so the PDF renderer can do
   // benchmark lookups without re-classifying.
   state.productClass = classification.productClass
-  console.log(`[pipeline] Feasibility: ${feasibility.status} — ${feasibility.reason}`)
-  console.log(`[pipeline] Allowed sections: ${feasibility.allowedSections.join(', ')}`)
-
-  // ── Feasibility → Brief Feedback Loop ───────────────────────────────
-  // When Feasibility finds impossible constraints, revise the Brief with
-  // feasible alternatives and re-run Feasibility. Max 2 revisions.
-  //
-  // Phase F (Q1 decision): on PA path, the revision loop only fires when a
-  // preliminary route indicates FEASIBILITY_EXCEPTION. This prevents the loop
-  // from running on BRIEF_INCOMPLETE paths (where revision is futile — the
-  // brief is too thin) and FULL_REPORT paths (where revision is unnecessary).
-  // After the loop completes, the router runs again with the updated feasibility.
-  const MAX_REVISIONS = 2
-  let revisionCount = 0
-  const rejectedConstraints: string[] = []
-
-  // PA path: compute preliminary route to decide whether to run the revision loop.
-  // This is a cheap deterministic call (no LLM) — the final authoritative route
-  // runs after the loop below.
-  const _prelimRoute = paMode ? routeReportType(feasibility, state.parsedBrief) : null
-  const _paRevisionEnabled = !paMode || _prelimRoute?.reportType === 'FEASIBILITY_EXCEPTION'
-
-  // F-10 fix (2 seats): use normalised status in loop condition so PA-native
-  // FAIL/WARN statuses are handled identically to legacy RED/AMBER.
-  // Previously the loop checked raw status strings, so PA-native `FAIL`/`WARN`
-  // never triggered revisions even when the router treated them as failure/warning.
-  while (
-    _paRevisionEnabled &&
-    (normaliseStatus(feasibility.status) === 'FAIL' || normaliseStatus(feasibility.status) === 'WARN') &&
-    revisionCount < MAX_REVISIONS
-  ) {
-    revisionCount++
-    console.log(`\n[pipeline] === Brief Revision ${revisionCount}/${MAX_REVISIONS} (Feasibility: ${feasibility.status}) ===`)
-    
-    const feasText = feasibility.reason || feasibility.blockers?.join('; ') || 'Infeasible constraints found'
-    
-    const revisionResult = await runBriefRevision(
-      briefText,
-      state.generatedBrief?.briefText || briefText,
-      feasText,
-      classification.productClass,
-    )
-    
-    if (revisionResult.ok && revisionResult.data?.hasRevisions) {
-      const rev = revisionResult.data
-      console.log(`[pipeline] Brief revised: ${rev.changes.length} constraints updated`)
-      
-      // Log what changed
-      for (const change of rev.changes) {
-        console.log(`[pipeline]   ${change.constraint}: ${change.original} → ${change.revised} (${change.reasoning})`)
-        rejectedConstraints.push(`${change.constraint}: ${change.original}`)
-      }
-      
-      // Update the Brief's constraint VALUES (not text)
-      if (state.generatedBrief?.fields) {
-        for (const change of rev.changes) {
-          const field = change.constraint.toLowerCase()
-          if (field.includes('cost') || field.includes('price')) {
-            const match = change.revised.match(/[\d,]+/)
-            if (match) state.generatedBrief.fields.costCeiling = parseInt(match[0].replace(/,/g, ''))
-          } else if (field.includes('mass') || field.includes('weight')) {
-            const match = change.revised.match(/[\d,.]+/)
-            if (match) state.generatedBrief.fields.maxMass = parseFloat(match[0].replace(/,/g, ''))
-          } else if (field.includes('volume') || field.includes('production')) {
-            state.generatedBrief.fields.productionVolume = change.revised
-          }
-        }
-      }
-      
-      // Sync revised constraints back to designBrief
-      if (state.research?.designBrief && state.generatedBrief?.fields) {
-        const bf = state.generatedBrief.fields
-        state.research.designBrief.constraints = {
-          ...state.research.designBrief.constraints,
-          unitCostCeilingGbp: bf.costCeiling ?? state.research.designBrief.constraints?.unitCostCeilingGbp,
-          maxMassKg: bf.maxMass ?? state.research.designBrief.constraints?.maxMassKg,
-        }
-      }
-      
-      // Store revision on state for PDF rendering
-      ;(state as any).briefRevisions = [...((state as any).briefRevisions || []), rev]
-
-      // BLOCKER-3 fix: on PA path, re-parse the revised brief text so
-      // state.parsedBrief reflects the revision.  validateBrief reads
-      // missing_mandatory_fields from parsedBrief — without this update the
-      // PA validator keeps seeing the stale pre-revision missing fields.
-      if (paMode) {
-        const revisedBriefText = state.generatedBrief?.briefText || briefText
-        const reparseResult = await runBriefParsing(revisedBriefText)
-        if (reparseResult.ok && reparseResult.data) {
-          state.parsedBrief = reparseResult.data
-          console.log(`[pipeline] PA: re-parsed brief after revision ${revisionCount} — missing=${reparseResult.data.missing_mandatory_fields.length}`)
-        } else {
-          console.warn(`[pipeline] PA: re-parse after revision ${revisionCount} failed: ${reparseResult.error}. Using stale parsedBrief.`)
-        }
-      }
-
-      // Re-run Feasibility with updated constraints
-      const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, paMode ? state.parsedBrief : null)
-      const newFeasibility = determineFeasibility(newBriefValidation, sizingResult, null, classification.productClass)
-
-      // Update feasibility
-      Object.assign(feasibility, newFeasibility)
-      ;(state as any).feasibility = feasibility
-      console.log(`[pipeline] Feasibility after revision ${revisionCount}: ${feasibility.status}`)
-
-      // F-12 fix (3 seats): re-evaluate route inside the loop after each revision.
-      // If revision improved feasibility from FAIL+2 → WARN+1 (route is now
-      // FULL_REPORT), break immediately rather than running a wasted 2nd iteration.
-      // Previously _paRevisionEnabled was pre-computed once from the preliminary
-      // route and never updated, so the loop always ran to MAX_REVISIONS even after
-      // the route resolved.
-      if (paMode) {
-        const midLoopRoute = routeReportType(feasibility, state.parsedBrief)
-        if (midLoopRoute.reportType !== 'FEASIBILITY_EXCEPTION') {
-          console.log(`[pipeline] PA: route resolved to ${midLoopRoute.reportType} after revision ${revisionCount} — breaking loop early`)
-          break
-        }
-      }
-    } else {
-      console.log('[pipeline] No revisions proposed — breaking loop')
-      break
-    }
-  }
-  
-  // Log final state
-  if (revisionCount > 0) {
-    console.log(`\n[pipeline] Brief revision complete: ${revisionCount} iterations, ${rejectedConstraints.length} constraints revised`)
-    console.log(`[pipeline] Rejected constraints: ${rejectedConstraints.join(', ')}`)
-  }
-
-  // ── PA Stage 9: Report Type Router (PA_PIPELINE=true only) ───────────────
-  // Runs after the feasibility gate (and any revision loop) to determine the
-  // report type and page budget. On PA_PIPELINE=false this block is skipped
-  // entirely — downstream behaviour is unchanged on the legacy path.
-  let _paRouterResult: ReportTypeRouterResult | null = null
-  if (paMode) {
-    _paRouterResult = routeReportType(feasibility, state.parsedBrief)
-    state.reportType = _paRouterResult.reportType
-    // F-8 fix (4 seats): `reportTypeRouterResult` is now a typed field on PipelineState
-    // (added to types.ts). `(feasibility as any).reportType` cast removed — feasibility
-    // is still a FeasibilityResult (which already has `reportType?: ReportType` from
-    // feasibility-gate.ts Phase F addition), so direct assignment is safe.
-    feasibility.reportType = _paRouterResult.reportType
-    state.reportTypeRouterResult = _paRouterResult
-    console.log(
-      `[pipeline] PA Stage 9 Router: ${_paRouterResult.reportType} ` +
-      `(maxPages=${_paRouterResult.maxPages}, excluded=${_paRouterResult.excludedSections.length} sections) — ${_paRouterResult.reason}`
-    )
-  }
-
-  // gateResults declared at function scope (see A1 fix above). Reset here.
-  gateResults = []
-
-  // If RED, skip heavy stages and go straight to a short blocked report
-  if (feasibility.status === 'RED') {
-    console.log('[pipeline] FEASIBILITY RED — generating short blocked report')
-    console.log(`[pipeline] Blocked reasons: ${feasibility.blockers.join('; ')}`)
-    // J1a: emit scoring record so the dashboard shows this run as failed.
-    try {
-      recordScoringRun({
-        timestamp: new Date().toISOString(),
-        projectId: state.projectId,
-        briefLabel: deriveBriefLabel(state.projectId),
-        compound: -1,
-        rubric: -1,
-        councilAvg: null,
-        councilScored: 0,
-        councilFailed: 0,
-        sections: [],
-        formulaVersion: 'f7',
-        status: 'INFEASIBLE',
-      })
-    } catch { /* scoring history is non-critical */ }
-    // Skip: decompose, sizing, BOM, cost, suppliers, review
-    // Go straight to PDF with decision page
-  } else {
 
   // ── PA Stage 4: Regulatory Extraction (PA_PIPELINE=true only) ────────────
   // Runs after Research Synthesis lands, before Module Decomposition.
@@ -1006,7 +831,7 @@ export async function runPipeline(
     return await generateErrorPdf(state, stages, llmCalls, startTime)
   }
   state.modules = decomposeResult.data
-  
+
   state.sourceAttributions.push(
     { section: 'Modules', source: 'llm', detail: 'Gemini 3.1 Pro — module decomposition' },
   )
@@ -1015,6 +840,7 @@ export async function runPipeline(
   )
 
   // ── Stage 3: Size + Layout ─────────────────────────────────────────
+  // Runs BEFORE Feasibility Gate so the gate sees the actual solver verdict.
   console.log('\n[pipeline] === Stage 3: Size + Layout ===')
   const sizeResult = await runSizeLayout(state.modules, {
     domain: options?.domain || state.research.industryDomain,
@@ -1023,11 +849,178 @@ export async function runPipeline(
   if (sizeResult.ok && sizeResult.data) {
     state.dimensionSheet = sizeResult.data
   }
-  // Continue even if sizing fails (infeasible is a valid outcome)
+  // Continue even if sizing fails (infeasible is a valid outcome — Gate will catch it)
 
-  const isInfeasible = sizeResult.ok && sizeResult.data && !sizeResult.data.feasible
-  if (isInfeasible) {
-    console.log('[pipeline] Sizing INFEASIBLE — skipping all downstream stages')
+  // Real sizing verdict for the Feasibility Gate (no longer a null placeholder).
+  const sizingResult = {
+    feasible: (sizeResult.ok && sizeResult.data) ? (sizeResult.data.feasible ?? null) : null,
+  }
+
+  // ── Feasibility Gate ───────────────────────────────────────────────
+  // Runs AFTER Sizing so it incorporates the real solver verdict.
+  // If gate FAILS/WARNS → Brief Revision loop fires (max 2 iterations).
+  console.log('\n[pipeline] === Feasibility Gate ===')
+  const feasibility = determineFeasibility(
+    briefValidationPost,
+    sizingResult,
+    null,  // cost not yet computed
+    classification.productClass,
+  )
+  ;(state as any).feasibility = feasibility
+  console.log(`[pipeline] Feasibility: ${feasibility.status} — ${feasibility.reason}`)
+  console.log(`[pipeline] Allowed sections: ${feasibility.allowedSections.join(', ')}`)
+
+  // ── Feasibility → Brief Feedback Loop ───────────────────────────────
+  // Fires AFTER Feasibility Gate when it FAILS/WARNS. Max 2 iterations.
+  // On PA path, only runs when the preliminary route is FEASIBILITY_EXCEPTION.
+  const MAX_REVISIONS = 2
+  let revisionCount = 0
+  const rejectedConstraints: string[] = []
+
+  // PA path: compute preliminary route to decide whether to run the revision loop.
+  // This is a cheap deterministic call (no LLM) — the final authoritative route
+  // runs after the loop below.
+  const _prelimRoute = paMode ? routeReportType(feasibility, state.parsedBrief) : null
+  const _paRevisionEnabled = !paMode || _prelimRoute?.reportType === 'FEASIBILITY_EXCEPTION'
+
+  // F-10 fix (2 seats): use normalised status in loop condition so PA-native
+  // FAIL/WARN statuses are handled identically to legacy RED/AMBER.
+  // Previously the loop checked raw status strings, so PA-native `FAIL`/`WARN`
+  // never triggered revisions even when the router treated them as failure/warning.
+  while (
+    _paRevisionEnabled &&
+    (normaliseStatus(feasibility.status) === 'FAIL' || normaliseStatus(feasibility.status) === 'WARN') &&
+    revisionCount < MAX_REVISIONS
+  ) {
+    revisionCount++
+    console.log(`\n[pipeline] === Brief Revision ${revisionCount}/${MAX_REVISIONS} (Feasibility: ${feasibility.status}) ===`)
+
+    const feasText = feasibility.reason || feasibility.blockers?.join('; ') || 'Infeasible constraints found'
+
+    const revisionResult = await runBriefRevision(
+      briefText,
+      state.generatedBrief?.briefText || briefText,
+      feasText,
+      classification.productClass,
+    )
+
+    if (revisionResult.ok && revisionResult.data?.hasRevisions) {
+      const rev = revisionResult.data
+      console.log(`[pipeline] Brief revised: ${rev.changes.length} constraints updated`)
+
+      // Log what changed
+      for (const change of rev.changes) {
+        console.log(`[pipeline]   ${change.constraint}: ${change.original} → ${change.revised} (${change.reasoning})`)
+        rejectedConstraints.push(`${change.constraint}: ${change.original}`)
+      }
+
+      // Update the Brief's constraint VALUES (not text)
+      if (state.generatedBrief?.fields) {
+        for (const change of rev.changes) {
+          const field = change.constraint.toLowerCase()
+          if (field.includes('cost') || field.includes('price')) {
+            const match = change.revised.match(/[\d,]+/)
+            if (match) state.generatedBrief.fields.costCeiling = parseInt(match[0].replace(/,/g, ''))
+          } else if (field.includes('mass') || field.includes('weight')) {
+            const match = change.revised.match(/[\d,.]+/)
+            if (match) state.generatedBrief.fields.maxMass = parseFloat(match[0].replace(/,/g, ''))
+          } else if (field.includes('volume') || field.includes('production')) {
+            state.generatedBrief.fields.productionVolume = change.revised
+          }
+        }
+      }
+
+      // Sync revised constraints back to designBrief
+      if (state.research?.designBrief && state.generatedBrief?.fields) {
+        const bf = state.generatedBrief.fields
+        state.research.designBrief.constraints = {
+          ...state.research.designBrief.constraints,
+          unitCostCeilingGbp: bf.costCeiling ?? state.research.designBrief.constraints?.unitCostCeilingGbp,
+          maxMassKg: bf.maxMass ?? state.research.designBrief.constraints?.maxMassKg,
+        }
+      }
+
+      // Store revision on state for PDF rendering
+      ;(state as any).briefRevisions = [...((state as any).briefRevisions || []), rev]
+
+      // BLOCKER-3 fix: on PA path, re-parse the revised brief text so
+      // state.parsedBrief reflects the revision.  validateBrief reads
+      // missing_mandatory_fields from parsedBrief — without this update the
+      // PA validator keeps seeing the stale pre-revision missing fields.
+      if (paMode) {
+        const revisedBriefText = state.generatedBrief?.briefText || briefText
+        const reparseResult = await runBriefParsing(revisedBriefText)
+        if (reparseResult.ok && reparseResult.data) {
+          state.parsedBrief = reparseResult.data
+          console.log(`[pipeline] PA: re-parsed brief after revision ${revisionCount} — missing=${reparseResult.data.missing_mandatory_fields.length}`)
+        } else {
+          console.warn(`[pipeline] PA: re-parse after revision ${revisionCount} failed: ${reparseResult.error}. Using stale parsedBrief.`)
+        }
+      }
+
+      // Re-run Feasibility with updated constraints (sizing result unchanged)
+      const newBriefValidation = validateBrief(briefText, state.research?.designBrief as any || null, classification.productClass, requiredFields, paMode ? state.parsedBrief : null)
+      const newFeasibility = determineFeasibility(newBriefValidation, sizingResult, null, classification.productClass)
+
+      // Update feasibility
+      Object.assign(feasibility, newFeasibility)
+      ;(state as any).feasibility = feasibility
+      console.log(`[pipeline] Feasibility after revision ${revisionCount}: ${feasibility.status}`)
+
+      // F-12 fix (3 seats): re-evaluate route inside the loop after each revision.
+      // If revision improved feasibility from FAIL+2 → WARN+1 (route is now
+      // FULL_REPORT), break immediately rather than running a wasted 2nd iteration.
+      // Previously _paRevisionEnabled was pre-computed once from the preliminary
+      // route and never updated, so the loop always ran to MAX_REVISIONS even after
+      // the route resolved.
+      if (paMode) {
+        const midLoopRoute = routeReportType(feasibility, state.parsedBrief)
+        if (midLoopRoute.reportType !== 'FEASIBILITY_EXCEPTION') {
+          console.log(`[pipeline] PA: route resolved to ${midLoopRoute.reportType} after revision ${revisionCount} — breaking loop early`)
+          break
+        }
+      }
+    } else {
+      console.log('[pipeline] No revisions proposed — breaking loop')
+      break
+    }
+  }
+
+  // Log final state
+  if (revisionCount > 0) {
+    console.log(`\n[pipeline] Brief revision complete: ${revisionCount} iterations, ${rejectedConstraints.length} constraints revised`)
+    console.log(`[pipeline] Rejected constraints: ${rejectedConstraints.join(', ')}`)
+  }
+
+  // ── PA Stage 9: Report Type Router (PA_PIPELINE=true only) ───────────────
+  // Runs after the feasibility gate (and any revision loop) to determine the
+  // report type and page budget. On PA_PIPELINE=false this block is skipped
+  // entirely — downstream behaviour is unchanged on the legacy path.
+  let _paRouterResult: ReportTypeRouterResult | null = null
+  if (paMode) {
+    _paRouterResult = routeReportType(feasibility, state.parsedBrief)
+    state.reportType = _paRouterResult.reportType
+    // F-8 fix (4 seats): `reportTypeRouterResult` is now a typed field on PipelineState
+    // (added to types.ts). `(feasibility as any).reportType` cast removed — feasibility
+    // is still a FeasibilityResult (which already has `reportType?: ReportType` from
+    // feasibility-gate.ts Phase F addition), so direct assignment is safe.
+    feasibility.reportType = _paRouterResult.reportType
+    state.reportTypeRouterResult = _paRouterResult
+    console.log(
+      `[pipeline] PA Stage 9 Router: ${_paRouterResult.reportType} ` +
+      `(maxPages=${_paRouterResult.maxPages}, excluded=${_paRouterResult.excludedSections.length} sections) — ${_paRouterResult.reason}`
+    )
+  }
+
+  // gateResults declared at function scope (see A1 fix above). Reset here.
+  gateResults = []
+
+  // If RED (or sizing INFEASIBLE which now folds into RED via sizingResult above),
+  // skip BOM/cost/assembly stages and go straight to a short blocked report.
+  // Regulatory + Decompose + Sizing already ran above (data is in state).
+  if (feasibility.status === 'RED') {
+    console.log('[pipeline] FEASIBILITY RED — generating short blocked report')
+    console.log(`[pipeline] Blocked reasons: ${feasibility.blockers.join('; ')}`)
     // J1a: emit scoring record so the dashboard shows this run as failed.
     try {
       recordScoringRun({
@@ -1044,7 +1037,7 @@ export async function runPipeline(
         status: 'INFEASIBLE',
       })
     } catch { /* scoring history is non-critical */ }
-    // Skip to PDF generation directly (skips BOM, cost, suppliers, review, polish)
+    // Skip: BOM, cost, assembly, review — go straight to PDF with decision page
   } else {
     // ── Stage 4: BOM + Cost (+ Suppliers when BOM_PIPELINE=v2) ───────────
   // Feature flag: BOM_PIPELINE=v2 routes to the integrated stage (4-bom-cost-suppliers.ts).
@@ -1413,7 +1406,6 @@ export async function runPipeline(
     trackSkippedStage('polish', 'dropped on PA path per PA principle (Phase F) — see stages/7-polish.ts @deprecated')
   }
 
-  } // end else (not infeasible)
   } // end else (feasibility not RED)
   } // end else (brief is valid)
 

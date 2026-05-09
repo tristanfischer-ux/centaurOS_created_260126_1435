@@ -544,16 +544,17 @@ const TableOfContents = ({ show }: { show: boolean }) => {
   if (!show) return <></>
   const items = [
     '1. Cover Page',
-    '2. Feasibility Gate',
-    '3. Brief and Requirements',
-    '4. Regulatory and Compliance',
-    '5. Sizing and Spatial Allocation',
-    '6. System Modules and Architecture',
-    '7. Cost Waterfall and Economics',
-    '8. Supplier Shortlist',
-    '9. Risk Register (FMEA)',
-    '10. Audit Log',
-    '11. Source Attribution',
+    '2. Brief and Requirements',
+    '3. Sizing and Spatial Allocation',
+    '4. Feasibility Gate',
+    '5. System Modules and Architecture',
+    '6. Bill of Materials',
+    '7. Assembly Shortlist',
+    '8. Cost Waterfall and Economics',
+    '9. Regulatory and Compliance',
+    '10. Risk Register (FMEA)',
+    '11. Audit Log',
+    '12. Source Attribution',
   ]
   return (
     <Page size="A4" style={s.page}>
@@ -1454,9 +1455,9 @@ const SupplierAppendix = ({ state }: { state: PipelineState }) => {
   return (
     <Page size="A4" style={s.page}>
       <PageHeader projectId={dash(state.projectId)} revision="Rev A" />
-      <Text style={s.h1}>Supplier Shortlist</Text>
+      <Text style={s.h1}>Assembly Shortlist</Text>
       <Text style={[s.para, { color: MUTED }]}>
-        Appendix — supplier data sourced from distributor APIs and local corpus. Verify independently before procurement.
+        Companies capable of assembling the complete product — sourced from Nightshift corpus and live search. Verify independently before engagement.
       </Text>
 
       {buyParts.length > 0 && (
@@ -1488,7 +1489,7 @@ const SupplierAppendix = ({ state }: { state: PipelineState }) => {
       )}
 
       {parts.length === 0 && (
-        <Text style={[s.para, { color: MUTED }]}>No parts data available — supplier shortlist pending BOM completion.</Text>
+        <Text style={[s.para, { color: MUTED }]}>No assembly partner data available — assembly shortlist pending BOM completion.</Text>
       )}
 
       <PageFooter />
@@ -1620,7 +1621,7 @@ const AuditLogSection = ({ state }: { state: PipelineState }) => {
         { step: 'Module Decomposition', status: (state.modules?.length ?? 0) > 0 ? 'Complete' : 'BLOCKED', durationMs: null, source: 'LLM', notes: `${state.modules?.length ?? 0} modules created` },
         { step: 'Sizing Solver', status: state.dimensionSheet ? (state.dimensionSheet.feasible ? 'FEASIBLE' : 'INFEASIBLE') : 'BLOCKED', durationMs: null, source: 'Deterministic', notes: state.dimensionSheet?.feasible ? 'Feasible layout' : 'No layout data' },
         { step: 'BOM and Cost', status: (state.parts?.length ?? 0) > 0 ? 'Complete' : 'BLOCKED', durationMs: null, source: 'LLM + Deterministic', notes: `${state.parts?.length ?? 0} BOM lines, total ${fmtGbp(state.costBreakdown?.unitTotalGbp)}` },
-        { step: 'Supplier Matching', status: (state.suppliers?.length ?? 0) > 0 ? 'Complete' : 'WARN', durationMs: null, source: 'Corpus + API', notes: `${state.suppliers?.length ?? 0} supplier matches` },
+        { step: 'Assembly Shortlist', status: (state.suppliers?.length ?? 0) > 0 ? 'Complete' : 'WARN', durationMs: null, source: 'Corpus + API', notes: `${state.suppliers?.length ?? 0} assembly partner matches` },
         { step: 'Feasibility Gate', status: 'Complete', durationMs: null, source: 'Deterministic', notes: 'Gate checks evaluated' },
         { step: 'PDF Generation', status: 'Complete', durationMs: null, source: 'ForgeOS PDF Engine v3', notes: 'BESS-style renderer' },
       ]
@@ -1669,10 +1670,12 @@ const SourceAttributionSection = ({ state }: { state: PipelineState }) => {
 
   const staticRows = [
     { section: 'Brief and Requirements', grade: 'A', source: 'Founder brief + engine expansion', verificationStatus: 'User-provided; engine-expanded assumptions flagged' },
-    { section: 'Regulatory and Compliance', grade: 'C/D', source: 'LLM knowledge base + regulatory corpus', verificationStatus: 'Unverified — certificate not yet obtained' },
     { section: 'Sizing and Spatial Allocation', grade: 'B', source: 'Deterministic box-packing solver', verificationStatus: 'Solver output; physical verification required before manufacture' },
+    { section: 'Feasibility Gate', grade: 'B', source: 'Deterministic checks on brief + sizing result', verificationStatus: 'Rules-based; informed by real solver output' },
     { section: 'System Modules and Architecture', grade: 'D', source: 'LLM decomposition', verificationStatus: 'Engineering estimate — not verified by specialist' },
-    { section: 'Cost Waterfall and Economics', grade: 'C/D', source: 'Arithmetic model + LLM cost estimates', verificationStatus: 'Unverified — cross-check with supplier quotes before committing' },
+    { section: 'Assembly Shortlist', grade: 'C', source: 'Nightshift corpus + live search', verificationStatus: 'Unverified — verify assembly capability independently before engagement' },
+    { section: 'Cost Waterfall and Economics', grade: 'C/D', source: 'Arithmetic model + distributor API prices', verificationStatus: 'Unverified — cross-check with assembly partner quotes before committing' },
+    { section: 'Regulatory and Compliance', grade: 'C/D', source: 'LLM knowledge base + regulatory corpus', verificationStatus: 'Unverified — certificate not yet obtained' },
     { section: 'Risk Register (FMEA)', grade: 'D', source: 'LLM synthesis', verificationStatus: 'All risks OPEN — verification tests not yet executed' },
   ]
 
@@ -1714,20 +1717,24 @@ const SourceAttributionSection = ({ state }: { state: PipelineState }) => {
 // ─── Section inclusion helpers (Phase G) ─────────────────────────────────────
 
 /**
- * Section ID → section name mapping (matches PA Stage 9 router output):
- *   'feasibility'  → FeasibilityGatePage
- *   'regulatory'   → RegulatoryOverviewSection + per-standard blocks
- *   'sizing'       → SizingSection
- *   'modules'      → ModuleOverviewTable + ModuleDetailSection
- *   'bom'          → BOM is embedded in module detail; 'bom' guard is a subset of 'modules'
- *   'cost'         → CostSection
- *   'suppliers'    → SupplierAppendix
- *   'risks'        → FMEASection
- *   'research'     → research is embedded in Brief (not a separate rendered section)
- *   'audit_log'    → AuditLogSection
+ * Section ID → section name mapping (matches PA Stage 9 router output).
+ *
+ * New render order (2026-05-09):
+ *   §1  Cover        (always rendered)
+ *   §2  Brief        → BriefPages (always rendered)
+ *   §3  'sizing'     → SizingSection
+ *   §4  'feasibility'→ FeasibilityGatePage (now AFTER Sizing)
+ *   §5  'modules'    → ModuleOverviewTable + ModuleDetailSection
+ *   §6  'bom'        → BOM embedded in module detail; 'bom' guard is subset of 'modules'
+ *   §7  'suppliers'  → SupplierAppendix (renamed "Assembly Shortlist" in UI)
+ *   §8  'cost'       → CostSection
+ *   §9  'regulatory' → RegulatoryOverviewSection + per-standard blocks
+ *   §10 'risks'      → FMEASection
+ *   §11 'audit_log'  → AuditLogSection
+ *   §12 'source_attrib' → SourceAttributionSection
+ *   'research' is embedded in Brief (not a separate rendered section)
  *
  * Cover and BriefPages are ALWAYS rendered (never excluded).
- * SourceAttributionSection is ALWAYS rendered (provenance disclosure).
  */
 
 /**
@@ -1914,68 +1921,70 @@ export default function PdfRendererV3({ state }: { state: PipelineState }) {
         </SafeSection>
       )}
 
-      {/* Feasibility Gate — excluded on BRIEF_INCOMPLETE */}
-      {show('feasibility') && (
-        <SafeSection name="FeasibilityGate">
-          <FeasibilityGatePage state={safe} />
-        </SafeSection>
-      )}
-
-      {/* Brief and Requirements — always rendered */}
+      {/* Brief and Requirements — always rendered (§2 in new order) */}
       <SafeSection name="Brief">
         <BriefPages state={safe} />
       </SafeSection>
 
-      {/* Regulatory Overview — excluded on BRIEF_INCOMPLETE */}
-      {show('regulatory') && (
-        <SafeSection name="RegulatoryOverview">
-          <RegulatoryOverviewSection state={safe} />
-        </SafeSection>
-      )}
-
-      {/* Per-standard regulatory detail pages — excluded on BRIEF_INCOMPLETE */}
-      {show('regulatory') && regs.slice(0, 10).map((reg, idx) => (
-        <SafeSection key={`reg-${idx}`} name={`Reg:${reg.code}`}>
-          <RegulatoryStandardBlock reg={reg} idx={idx} />
-        </SafeSection>
-      ))}
-
-      {/* Sizing — excluded on BRIEF_INCOMPLETE */}
+      {/* Sizing and Spatial Allocation — excluded on BRIEF_INCOMPLETE (§3) */}
       {show('sizing') && (
         <SafeSection name="Sizing">
           <SizingSection state={safe} />
         </SafeSection>
       )}
 
-      {/* Module overview table — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
+      {/* Feasibility Gate — excluded on BRIEF_INCOMPLETE (§4, now AFTER Sizing) */}
+      {show('feasibility') && (
+        <SafeSection name="FeasibilityGate">
+          <FeasibilityGatePage state={safe} />
+        </SafeSection>
+      )}
+
+      {/* Module overview table — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION (§5) */}
       {show('modules') && (
         <SafeSection name="ModuleOverview">
           <ModuleOverviewTable state={safe} />
         </SafeSection>
       )}
 
-      {/* Per-module detail pages — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
+      {/* Per-module detail pages — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION (§5 cont.) */}
       {show('modules') && (
         <SafeSection name="ModuleDetail">
           <ModuleDetailSection state={safe} />
         </SafeSection>
       )}
 
-      {/* Cost — excluded on BRIEF_INCOMPLETE */}
+      {/* Assembly Shortlist — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION (§7) */}
+      {/* Renamed from "Supplier Appendix": section covers who can ASSEMBLE the product, */}
+      {/* not per-component distributors (those live inside BOM lines). */}
+      {show('suppliers') && (
+        <SafeSection name="AssemblyShortlist">
+          <SupplierAppendix state={safe} />
+        </SafeSection>
+      )}
+
+      {/* Cost Waterfall and Economics — excluded on BRIEF_INCOMPLETE (§8) */}
       {show('cost') && (
         <SafeSection name="Cost">
           <CostSection state={safe} />
         </SafeSection>
       )}
 
-      {/* Supplier Appendix — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
-      {show('suppliers') && (
-        <SafeSection name="SupplierAppendix">
-          <SupplierAppendix state={safe} />
+      {/* Regulatory Overview — excluded on BRIEF_INCOMPLETE (§9) */}
+      {show('regulatory') && (
+        <SafeSection name="RegulatoryOverview">
+          <RegulatoryOverviewSection state={safe} />
         </SafeSection>
       )}
 
-      {/* FMEA / Risk Register — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION */}
+      {/* Per-standard regulatory detail pages — excluded on BRIEF_INCOMPLETE (§9 cont.) */}
+      {show('regulatory') && regs.slice(0, 10).map((reg, idx) => (
+        <SafeSection key={`reg-${idx}`} name={`Reg:${reg.code}`}>
+          <RegulatoryStandardBlock reg={reg} idx={idx} />
+        </SafeSection>
+      ))}
+
+      {/* FMEA / Risk Register — excluded on BRIEF_INCOMPLETE and FEASIBILITY_EXCEPTION (§10) */}
       {show('risks') && (
         <SafeSection name="FMEA">
           <FMEASection state={safe} />
