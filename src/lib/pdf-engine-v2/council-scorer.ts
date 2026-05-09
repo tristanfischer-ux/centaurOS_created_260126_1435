@@ -522,10 +522,97 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   const sections: Record<string, string> = {}
 
   // ExecutiveSummary
+  // SCORE-ES1 (2026-05-09): PA path writes rich synthesis data to
+  // state.researchSynthesis, state.parsedBrief, state.regulatoryExtraction,
+  // state.costBreakdown, and state.dimensionSheet. The legacy 5-line stub
+  // only read unitTotalGbp + feasible + module count — judges correctly
+  // scored this as an "insufficient data" skeleton (2/10). On PA path,
+  // synthesise a richer summary that covers all major section outcomes.
   const execCost = state.costBreakdown?.unitTotalGbp || 'unknown'
   const execFeasible = state.dimensionSheet?.feasible ?? 'unknown'
   const execModules = state.modules?.length || 0
-  if (state.projectId) {
+
+  const rsSynthesis = (state as any).researchSynthesis
+  const reParsed = (state as any).parsedBrief
+  const reExtraction = (state as any).regulatoryExtraction
+
+  if (state.projectId && (rsSynthesis || reParsed)) {
+    // PA path: synthesise rich executive summary from all available stage outputs
+    const pb = reParsed
+    const rs = rsSynthesis
+
+    const costLine = state.costBreakdown
+      ? `Unit cost: £${state.costBreakdown.unitTotalGbp.toFixed(2)} (ceiling: ${state.costBreakdown.ceilingGbp != null ? `£${state.costBreakdown.ceilingGbp}` : 'none'}, NRE: £${state.costBreakdown.nreTotalGbp.toFixed(0)})`
+      : 'Cost: not computed'
+
+    const sizingLine = state.dimensionSheet
+      ? `Sizing: ${state.dimensionSheet.feasible ? 'FEASIBLE' : 'INFEASIBLE'} — ${state.dimensionSheet.envelope?.kind || 'unknown'} envelope ${state.dimensionSheet.envelope?.interior_w_mm || '?'}x${state.dimensionSheet.envelope?.interior_d_mm || '?'}x${state.dimensionSheet.envelope?.interior_h_mm || '?'}mm`
+      : 'Sizing: not computed'
+
+    // PA DimensionSheetPA extended fields
+    const dsPA = state.dimensionSheet as any
+    const sizingPALines: string[] = []
+    if (dsPA?.volumeUtilisationPct != null) sizingPALines.push(`Volume utilisation: ${dsPA.volumeUtilisationPct}%`)
+    if (dsPA?.massUtilisationPct != null) sizingPALines.push(`Mass utilisation: ${dsPA.massUtilisationPct}%`)
+    if (dsPA?.massMarginNote) sizingPALines.push(`Mass margin: ${dsPA.massMarginNote}`)
+    if (dsPA?.zones?.length) sizingPALines.push(`Zones: ${dsPA.zones.map((z: any) => `${z.name} (${z.volumeM3?.toFixed(3)} m³, ${z.massKg} kg)`).join('; ')}`)
+
+    const briefLines = pb ? [
+      `Product: ${pb.product_description || ''}`,
+      `Mission: ${pb.mission_statement || ''}`,
+      `Customers: ${pb.target_customers || ''}`,
+      `Why now: ${pb.why_now || ''}`,
+      `Confidence: ${pb.confidence || ''}`,
+      `Missing fields: ${(pb.missing_mandatory_fields || []).join(', ') || 'none'}`,
+      pb.constraints?.unit_cost_ceiling?.value != null
+        ? `Cost ceiling: ${pb.constraints.unit_cost_ceiling.value} ${pb.constraints.unit_cost_ceiling.currency} (${pb.constraints.unit_cost_ceiling.source})`
+        : '',
+      pb.constraints?.max_mass_kg?.value != null
+        ? `Mass limit: ${pb.constraints.max_mass_kg.value} kg (${pb.constraints.max_mass_kg.source})`
+        : '',
+    ].filter(Boolean) : []
+
+    const researchLines = rs ? [
+      `Market context: ${(rs.market_context || '').slice(0, 500)}`,
+      `Why now (market): ${(rs.why_now || '').slice(0, 200)}`,
+      `Competitors: ${(rs.competitors || []).map((c: any) => `${c.company} — ${c.product} (${c.pricing})`).join('; ')}`,
+      `Claims requiring verification: ${(rs.claims_requiring_verification || []).join('; ')}`,
+    ].filter(Boolean) : []
+
+    const regLines = reExtraction?.regulatory_entries?.length
+      ? [`Regulatory standards (${reExtraction.regulatory_entries.length}): ${reExtraction.regulatory_entries.slice(0, 5).map((e: any) => `${e.standard_name} (${e.jurisdiction})`).join(', ')}`]
+      : []
+
+    const moduleLines = (state.modules || []).slice(0, 6).map(m =>
+      `Module: ${m.name} — ${m.purpose}. Parts: ${(m.keyParts || []).join(', ')}. Risks: ${(m.riskMatrix || []).length}.`
+    )
+
+    const perModuleCost = state.costBreakdown?.perModule?.length
+      ? `Per-module costs: ${state.costBreakdown.perModule.map(m => `${m.moduleName}: £${m.totalGbp}`).join(', ')}`
+      : ''
+
+    sections['ExecutiveSummary'] = [
+      `Project: ${state.projectId}`,
+      costLine,
+      perModuleCost,
+      sizingLine,
+      ...sizingPALines,
+      `Modules: ${execModules} | Parts: ${state.parts?.length || 0} | Suppliers: ${state.suppliers?.length || 0}`,
+      '',
+      '--- BRIEF ---',
+      ...briefLines,
+      '',
+      '--- MARKET RESEARCH ---',
+      ...researchLines,
+      '',
+      '--- REGULATORY ---',
+      ...regLines,
+      '',
+      '--- MODULES ---',
+      ...moduleLines,
+    ].filter(l => l !== undefined).join('\n')
+  } else if (state.projectId) {
+    // Legacy path: minimal summary
     sections['ExecutiveSummary'] = [
       `Project: ${state.projectId}`,
       `Cost: ${execCost}`,
@@ -598,31 +685,84 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   }
 
   // Regulatory
-  const reg = state.research?.designBrief?.regulatory || []
-  if (reg.length > 0) {
-    sections['Regulatory'] = reg.map(r =>
-      `${r.code}: ${r.name}. ${r.summary}. Applicability: ${r.applicability || 'none'}. Design Impact: ${r.designImpact || 'none'}. Evidence: ${r.evidenceRequired || 'none'}. Owner: ${r.ownerRole || 'none'}. Gap Action: ${r.gapAction || 'none'}.`
-    ).join('\n')
+  // SCORE-REG1 (2026-05-09): PA Stage 4 writes state.regulatoryExtraction
+  // (RegulatoryExtraction with rich engineering_impact, evidence_required,
+  // gap_action, etc.). The scorer was only reading the legacy
+  // state.research.designBrief.regulatory shape. On PA path, prefer
+  // regulatoryExtraction for richer content. Legacy fallback unchanged.
+  const paReg = (state as any).regulatoryExtraction
+  if (paReg?.regulatory_entries?.length > 0) {
+    sections['Regulatory'] = paReg.regulatory_entries.map((e: any) =>
+      [
+        `Standard: ${e.standard_name} ${e.version_date ? `(${e.version_date})` : ''}`,
+        `Jurisdiction: ${e.jurisdiction || 'unknown'} | Owner: ${e.owner || 'unknown'} | Status: ${e.status || 'not_started'}`,
+        `Claim type: ${e.claim_type || 'requirement'}`,
+        `Applicability: ${e.applicability || 'none'}`,
+        `Engineering impact: ${e.engineering_impact || 'none'}`,
+        `Evidence required: ${e.evidence_required || 'none'}`,
+        `Gap action: ${e.gap_action || 'none'}`,
+        `Source grade: ${e.source_grade || 'C'} | Verification: ${e.verification_status || 'UNVERIFIED'}`,
+        e.verification_note ? `Verification note: ${e.verification_note}` : '',
+      ].filter(Boolean).join('\n')
+    ).join('\n\n')
   } else {
-    // Fallback: extract from research report text
-    const report = state.research?.report || ''
-    const standardMatches = report.match(/(?:IEC|BS EN|ISO|UL|EASA|DNV|MDR|G99|F-Gas|RoHS|CE|UKCA)[^\n.,]{0,80}/gi) || []
-    const regulatoryText = standardMatches.length > 0
-      ? `Regulatory standards identified in research:\n${standardMatches.join('\n')}`
-      : 'No regulatory data available in research output.'
-    sections['Regulatory'] = regulatoryText
+    const reg = state.research?.designBrief?.regulatory || []
+    if (reg.length > 0) {
+      sections['Regulatory'] = reg.map(r =>
+        `${r.code}: ${r.name}. ${r.summary}. Applicability: ${r.applicability || 'none'}. Design Impact: ${r.designImpact || 'none'}. Evidence: ${r.evidenceRequired || 'none'}. Owner: ${r.ownerRole || 'none'}. Gap Action: ${r.gapAction || 'none'}.`
+      ).join('\n')
+    } else {
+      // Fallback: extract from research report text
+      const report = state.research?.report || ''
+      const standardMatches = report.match(/(?:IEC|BS EN|ISO|UL|EASA|DNV|MDR|G99|F-Gas|RoHS|CE|UKCA)[^\n.,]{0,80}/gi) || []
+      const regulatoryText = standardMatches.length > 0
+        ? `Regulatory standards identified in research:\n${standardMatches.join('\n')}`
+        : 'No regulatory data available in research output.'
+      sections['Regulatory'] = regulatoryText
+    }
   }
 
   // Sizing
+  // SCORE-SZ1 (2026-05-09): PA Stage 7a (DimensionSheetPA) adds zones[],
+  // volumeUtilisationPct, massUtilisationPct, externalDimensionsMm,
+  // internalDimensionsMm, clearanceNotes, massMarginNote. The legacy
+  // extraction only read the base DimensionSheet fields (4 lines), so judges
+  // scored 2/10 for "only geometric assertions with no engineering content".
+  // Now extract all PA-extended fields when present.
   const ds = state.dimensionSheet
   if (ds) {
-    sections['Sizing'] = [
+    const dsPA = ds as any  // DimensionSheetPA — PA-extended fields, all optional
+    const baseLines = [
       `Feasible: ${ds.feasible}`,
-      `Envelope: ${ds.envelope?.kind} ${ds.envelope?.interior_w_mm}x${ds.envelope?.interior_d_mm}x${ds.envelope?.interior_h_mm}mm`,
-      `Floor budget: ${ds.floor_budget_m2} m2`,
-      `Module dimensions: ${Object.entries(ds.module_dimensions || {}).map(([k, v]) => `${k}: ${v.w_mm}x${v.d_mm}x${v.h_mm}mm, ${v.floor_m2}m2`).join('; ')}`,
+      `Rules domain: ${ds.rules_domain || 'unknown'}`,
+      `Envelope type: ${ds.envelope?.kind || 'unknown'}`,
+      `Envelope interior: ${ds.envelope?.interior_w_mm || '?'}mm W x ${ds.envelope?.interior_d_mm || '?'}mm D x ${ds.envelope?.interior_h_mm || '?'}mm H`,
+      `Interior volume: ${ds.envelope?.interior_volume_m3 != null ? `${ds.envelope.interior_volume_m3.toFixed(3)} m³` : 'unknown'}`,
+      `Interior floor area: ${ds.envelope?.interior_floor_m2 != null ? `${ds.envelope.interior_floor_m2} m²` : 'unknown'}`,
+      `Floor budget: ${ds.floor_budget_m2} m²`,
+      `Module dimensions: ${Object.entries(ds.module_dimensions || {}).map(([k, v]) => `${k}: ${v.w_mm}x${v.d_mm}x${v.h_mm}mm (${v.floor_m2}m², mount=${v.mount || '?'})`).join('; ')}`,
       `Conflicts: ${ds.conflicts?.join('; ') || 'none'}`,
-    ].join('\n')
+      `Recommendations: ${ds.recommendations?.join('; ') || 'none'}`,
+    ]
+
+    // PA-extended DimensionSheetPA fields
+    const paLines: string[] = []
+    if (dsPA.externalDimensionsMm) paLines.push(`External envelope: ${dsPA.externalDimensionsMm.w}x${dsPA.externalDimensionsMm.d}x${dsPA.externalDimensionsMm.h}mm`)
+    if (dsPA.internalDimensionsMm) paLines.push(`Internal usable: ${dsPA.internalDimensionsMm.w}x${dsPA.internalDimensionsMm.d}x${dsPA.internalDimensionsMm.h}mm`)
+    if (dsPA.tareMassKg != null) paLines.push(`Tare mass: ${dsPA.tareMassKg} kg`)
+    if (dsPA.availablePayloadMassKg != null) paLines.push(`Available payload: ${dsPA.availablePayloadMassKg} kg`)
+    if (dsPA.volumeUtilisationPct != null) paLines.push(`Volume utilisation: ${dsPA.volumeUtilisationPct}%`)
+    if (dsPA.massUtilisationPct != null) paLines.push(`Mass utilisation: ${dsPA.massUtilisationPct}%`)
+    if (dsPA.massMarginNote) paLines.push(`Mass margin note: ${dsPA.massMarginNote}`)
+    if (dsPA.clearanceNotes) paLines.push(`Clearance/access notes: ${dsPA.clearanceNotes}`)
+    if (dsPA.zones?.length) {
+      paLines.push(`Zones (${dsPA.zones.length}):`)
+      for (const z of dsPA.zones) {
+        paLines.push(`  ${z.name}: length=${z.lengthMm}mm, volume=${z.volumeM3?.toFixed(3)}m³, mass=${z.massKg}kg — ${z.contents}`)
+      }
+    }
+
+    sections['Sizing'] = [...baseLines, ...(paLines.length ? ['', '--- PA Extended Sizing ---', ...paLines] : [])].join('\n')
   }
 
   // Modules
@@ -648,28 +788,173 @@ function extractSectionData(state: PipelineState): Record<string, string> {
   }
 
   // Risks
-  sections['Risks'] = (state.modules || []).flatMap(m =>
-    (m.riskMatrix || []).map(r =>
-      `${m.name} > ${r.hazard}: S${r.severity}xL${r.likelihood}=${r.severity * r.likelihood}. Cause: ${r.cause || 'none'}. Mitigation: ${r.mitigation || 'none'}. Owner: ${r.owner || 'none'}.`
-    )
-  ).join('\n')
+  // SCORE-RK1 (2026-05-09): The previous extraction only pulled hazard/severity/
+  // likelihood/cause/mitigation/owner from riskMatrix — on PA path all judges
+  // unanimously scored 1/10 with "Section has insufficient data to evaluate"
+  // because riskMatrix rows are often sparse on the legacy Module shape.
+  //
+  // PA Stage 5 (runDecomposePA) populates ModulePA.failure_modes[] — a richer
+  // FMEA format with mode, cause, local_effect, system_effect. The RiskRow type
+  // also carries consequence, existingControls, verificationTest, residualSeverity,
+  // residualLikelihood, residualDetection — none were extracted before.
+  //
+  // Fix: extract BOTH riskMatrix (with all RiskRow fields) AND failure_modes.
+  const risksLines: string[] = []
+  for (const m of state.modules || []) {
+    const mPA = m as any  // ModulePA — may have failure_modes[], open_questions[], maturity
+    const moduleName = m.name
+
+    // Base riskMatrix rows (RiskRow) — extract ALL fields, not just 3
+    for (const r of m.riskMatrix || []) {
+      const rpn = r.severity * r.likelihood * (r.detection ?? 5)
+      risksLines.push(
+        `${moduleName} | RISK: ${r.hazard} (id=${r.id || '?'})` +
+        ` | Severity=${r.severity} Likelihood=${r.likelihood} Detection=${r.detection ?? '?'} RPN=${rpn}` +
+        ` | Cause: ${r.cause || 'none'}` +
+        ` | Consequence: ${r.consequence || 'none'}` +
+        ` | Existing controls: ${r.existingControls || 'none'}` +
+        ` | Mitigation: ${r.mitigation || 'none'}` +
+        ` | Verification test: ${r.verificationTest || 'none'}` +
+        ` | Owner: ${r.owner || 'none'}` +
+        (r.residualSeverity != null ? ` | Residual: S${r.residualSeverity}xL${r.residualLikelihood ?? '?'}xD${r.residualDetection ?? '?'}` : '')
+      )
+    }
+
+    // PA-path ModulePA.failure_modes[] — FMEA format
+    for (const fm of mPA.failure_modes || []) {
+      risksLines.push(
+        `${moduleName} | FMEA: ${fm.mode}` +
+        ` | Cause: ${fm.cause || 'unknown'}` +
+        ` | Local effect: ${fm.local_effect || 'none'}` +
+        ` | System effect: ${fm.system_effect || 'none'}`
+      )
+    }
+
+    // PA module open questions surfaced to risk register
+    if (mPA.open_questions?.length) {
+      risksLines.push(`${moduleName} | Open questions: ${mPA.open_questions.join('; ')}`)
+    }
+
+    // Legacy failureModes string array (non-PA path)
+    if (!mPA.failure_modes && m.failureModes?.length) {
+      risksLines.push(`${moduleName} | Failure modes: ${m.failureModes.join('; ')}`)
+    }
+  }
+  sections['Risks'] = risksLines.join('\n')
 
   // Suppliers
-  sections['Suppliers'] = (state.suppliers || []).map(s =>
-    `${s.partName}: ${s.suppliers?.map(sup => `${sup.name} (${sup.score}%)`).join(', ') || 'no suppliers'}`
-  ).join('\n')
+  // SCORE-SUP1 (2026-05-09): On v2 BOM path (BOM_PIPELINE=v2), the integrated
+  // stage builds a rich sectionSuppliers markdown string stored at
+  // (state as any).sectionSuppliers. This includes supplier names, scores,
+  // URLs, countries, processMatch verification, and sourcing-review flags.
+  //
+  // The legacy extraction only read state.suppliers[].suppliers[].name + score —
+  // judges saw fabricated probability strings with no engineering content (2/10).
+  //
+  // Fix: prefer sectionSuppliers (v2 markdown) when present. On legacy path,
+  // enrich with reason, country, certifications, processes, processMatch.
+  const sectionSuppliersV2 = (state as any).sectionSuppliers as string | undefined
+  if (sectionSuppliersV2 && sectionSuppliersV2.length > 10) {
+    // v2 BOM path: use the pre-built rich markdown section
+    sections['Suppliers'] = sectionSuppliersV2
+  } else {
+    // Legacy path or v1 BOM: enrich SupplierMatch extraction
+    const supplierLines = (state.suppliers || []).map(s => {
+      if (!s.suppliers?.length) return `${s.partName}: no suppliers matched`
+      const supList = s.suppliers.map(sup =>
+        `  - ${sup.name} (score=${sup.score}%${sup.country ? `, ${sup.country}` : ''})` +
+        (sup.processMatch && sup.processMatch !== 'unverified' ? ` [verified: ${sup.processMatch}]` : ' [unverified]') +
+        (sup.url ? ` — ${sup.url}` : '') +
+        (sup.reason ? `\n    Reason: ${sup.reason.slice(0, 200)}` : '') +
+        (sup.certifications?.length ? `\n    Certifications: ${sup.certifications.join(', ')}` : '') +
+        (sup.processes?.length ? `\n    Processes: ${sup.processes.join(', ')}` : '')
+      ).join('\n')
+      return `${s.partName}:\n${supList}`
+    })
+    sections['Suppliers'] = supplierLines.join('\n\n')
+  }
 
   // Feasibility
+  // SCORE-FE1 (2026-05-09): The FeasibilityResult has rich structured data —
+  // blockers[], warnings[], decisionPageData (biggestBlocker, missingInputs,
+  // commercialWarning, engineeringWarning, nextActions), compactBanner —
+  // none of which were extracted before. Judges scored 1-2/10 for "bare
+  // verdict and constraint list with no engineering content."
+  //
+  // Also: on PA path, parsedBrief.constraints has the structured constraint
+  // values with source-grading. Extract those directly instead of JSON.stringify
+  // of the legacy designBrief.constraints blob (which often has undefined fields).
   const feas = (state as any).feasibility
   const dsFeas = state.dimensionSheet
-  const briefFeas = state.research?.designBrief
-  const feasText = [
-    feas ? `Verdict: ${feas.status || feas.verdict || 'unknown'}` : '',
-    feas?.blockers?.length ? `Blockers: ${feas.blockers.join(', ')}` : '',
-    feas?.reason ? `Reason: ${feas.reason}` : '',
-    dsFeas ? `Sizing feasible: ${dsFeas.feasible}` : '',
-    briefFeas?.constraints ? `Constraints: ${JSON.stringify(briefFeas.constraints)}` : '',
-  ].filter(Boolean).join('\n')
+
+  const feasLines: string[] = []
+
+  if (feas) {
+    feasLines.push(`Verdict: ${feas.status || feas.verdict || 'unknown'}`)
+    if (feas.compactBanner) feasLines.push(`Summary: ${feas.compactBanner}`)
+    feasLines.push(`Can generate full report: ${feas.canGenerateFullReport ?? 'unknown'}`)
+    feasLines.push(`Reason: ${feas.reason || 'none'}`)
+
+    if (feas.blockers?.length) {
+      feasLines.push(`Blockers (${feas.blockers.length}):`)
+      feas.blockers.forEach((b: string) => feasLines.push(`  BLOCKER: ${b}`))
+    } else {
+      feasLines.push('Blockers: none')
+    }
+
+    if (feas.warnings?.length) {
+      feasLines.push(`Warnings (${feas.warnings.length}):`)
+      feas.warnings.forEach((w: string) => feasLines.push(`  WARNING: ${w}`))
+    } else {
+      feasLines.push('Warnings: none')
+    }
+
+    const dp = feas.decisionPageData
+    if (dp) {
+      feasLines.push(`Decision: ${dp.verdict || 'unknown'}`)
+      if (dp.biggestBlocker) feasLines.push(`Biggest blocker: ${dp.biggestBlocker}`)
+      if (dp.missingInputs?.length) feasLines.push(`Missing inputs: ${dp.missingInputs.join(', ')}`)
+      if (dp.commercialWarning) feasLines.push(`Commercial warning: ${dp.commercialWarning}`)
+      if (dp.engineeringWarning) feasLines.push(`Engineering warning: ${dp.engineeringWarning}`)
+      if (dp.nextActions?.length) feasLines.push(`Next actions: ${dp.nextActions.join('; ')}`)
+    }
+
+    if (feas.reportType) feasLines.push(`Report type (PA router): ${feas.reportType}`)
+    if (feas.allowedSections?.length) feasLines.push(`Allowed sections: ${feas.allowedSections.join(', ')}`)
+  }
+
+  // Sizing feasibility
+  if (dsFeas) {
+    feasLines.push(`Sizing feasible: ${dsFeas.feasible}`)
+    if (dsFeas.conflicts?.length) feasLines.push(`Sizing conflicts: ${dsFeas.conflicts.join('; ')}`)
+    if (dsFeas.recommendations?.length) feasLines.push(`Sizing recommendations: ${dsFeas.recommendations.join('; ')}`)
+  }
+
+  // PA path: structured constraints from parsedBrief (richer than designBrief proxy)
+  const pbFeas = (state as any).parsedBrief
+  if (pbFeas?.constraints) {
+    const c = pbFeas.constraints
+    feasLines.push('--- PA Constraints (source-graded) ---')
+    if (c.unit_cost_ceiling?.value != null) feasLines.push(`  Cost ceiling: ${c.unit_cost_ceiling.value} ${c.unit_cost_ceiling.currency} (${c.unit_cost_ceiling.source})`)
+    if (c.max_mass_kg?.value != null) feasLines.push(`  Max mass: ${c.max_mass_kg.value} kg (${c.max_mass_kg.source})`)
+    if (c.batch_size?.value != null) feasLines.push(`  Batch size: ${c.batch_size.value} units (${c.batch_size.source})`)
+    if (c.design_life?.value != null) feasLines.push(`  Design life: ${c.design_life.value} (${c.design_life.source})`)
+    if (c.target_process?.value) feasLines.push(`  Target process: ${c.target_process.value} (${c.target_process.source})`)
+    if (c.target_material?.value) feasLines.push(`  Target material: ${c.target_material.value} (${c.target_material.source})`)
+    if (c.operating_environment?.temp_min_c != null || c.operating_environment?.temp_max_c != null) {
+      feasLines.push(`  Operating temp: ${c.operating_environment.temp_min_c ?? '?'}°C to ${c.operating_environment.temp_max_c ?? '?'}°C`)
+    }
+    const safetyStds = (c.safety_standards || []).map((s: any) => s.standard || s.code).filter(Boolean)
+    if (safetyStds.length) feasLines.push(`  Safety standards: ${safetyStds.join(', ')}`)
+  } else {
+    // Legacy path: use designBrief constraints
+    const briefFeas = state.research?.designBrief
+    if (briefFeas?.constraints) {
+      feasLines.push(`Constraints: cost_ceiling=£${briefFeas.constraints.unitCostCeilingGbp || '?'} max_mass=${briefFeas.constraints.maxMassKg || '?'}kg batch=${briefFeas.constraints.batchSize || '?'}`)
+    }
+  }
+
+  const feasText = feasLines.join('\n')
   if (feasText.length >= 10) {
     sections['Feasibility'] = feasText
   }
