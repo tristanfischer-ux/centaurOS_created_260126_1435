@@ -1200,3 +1200,58 @@ For watchdog drift detection. Pending items only:
 | 2026-05-08 | Q4 split Regulatory as PA Stage 4 | Compliance is high-stakes, distinct expertise; +4 hrs worth it |
 | 2026-05-08 | Q5 keep Suppliers as FULL_REPORT-only section | 3 suppliers per Make is hard rule, must render somewhere |
 | 2026-05-08 | Q6 incremental RL manifest updates per phase | Avoids stale doc + final batch task |
+| 2026-05-09 | ADOPT_LATER: next-action hints (Idea 1) | 2-1 majority LATER vs NOW; defer until empirical blocker repetition observed |
+| 2026-05-09 | ADOPT_NEVER: worktree lanes (Idea 3) | Unanimous — pure infrastructure overhead, zero quality impact |
+| 2026-05-09 | ADOPT_LATER: doctor pre-flight (Idea 2) | 2-1 majority LATER; env failures are already fast-fail, not £20-burn risk |
+
+---
+
+## Council on codex-autoresearch ideas (2026-05-09)
+
+**Council:** Gemini 3.1 Pro (lead reasoner) + Kimi K2.6 (scientific coder) + Grok 4.3 (adversarial)
+**Context:** Baseline run in flight (10 briefs, 4-way parallel). RL driver built but not launched. Spend £160/£400.
+**Fiddling cost weighted explicitly per Tristan's instruction.**
+
+### Idea 1 — Next-action hints in iteration JSON
+
+| Seat | Verdict | Needle probability |
+|---|---|---|
+| Gemini 3.1 Pro | ADOPT_NOW | HIGH |
+| Kimi K2.6 | ADOPT_LATER | MEDIUM |
+| Grok 4.3 | ADOPT_LATER | MEDIUM |
+
+**Majority verdict: ADOPT_LATER (2-1)**
+
+Gemini argues this turns the RL loop from a blind random-walk into guided gradient descent and the 2-hour baseline window is the right moment. Kimi and Grok counter that instrumenting an unlaunched RL driver before baseline results are in hand is premature — if blocker repetition doesn't actually occur at scale, the £3 spend and 30-min context switch bought nothing. Grok's failure mode: the RL agent re-samples near-identical prompt mutations that council has already rejected. The correct trigger to revisit is: observe repeated blocker violations during Phase 1 curriculum.
+
+### Idea 2 — Doctor pre-flight script
+
+| Seat | Verdict | Needle probability |
+|---|---|---|
+| Gemini 3.1 Pro | ADOPT_NEVER | LOW |
+| Kimi K2.6 | ADOPT_LATER | LOW |
+| Grok 4.3 | ADOPT_NOW | HIGH |
+
+**Majority verdict: ADOPT_LATER (split; 1 NOW / 1 LATER / 1 NEVER → centre verdict wins)**
+
+Grok's case for NOW: £1 cost, zero ongoing overhead, directly protects remaining £240 budget from trivial env failures. Gemini's case against: missing API key or disk full already triggers a fast-fail crash in seconds — not a £20 burn. Kimi agrees it's low-leverage plumbing. Failure mode without it: nuisance restart, not catastrophic spend. Build it after the outcome milestone.
+
+### Idea 3 — Exploratory vs committed lanes via git worktrees
+
+| Seat | Verdict | Needle probability |
+|---|---|---|
+| Gemini 3.1 Pro | ADOPT_NEVER | LOW |
+| Kimi K2.6 | ADOPT_NEVER | LOW |
+| Grok 4.3 | ADOPT_NEVER | LOW |
+
+**Majority verdict: ADOPT_NEVER (unanimous)**
+
+All 3 seats agree: the safety property git worktrees provide is already covered by the quality watchdog and council review gates. The £8 implementation cost plus perpetual per-iteration wall-time overhead is pure infrastructure overhead with zero quality impact. The failure mode without it (a reverted prompt stays in git history briefly) is cosmetic, not functional.
+
+### Stop-fiddling assessment
+
+All 3 seats: `stop_fiddling_assessment: true`
+
+**Meta-verdict: stop fiddling and run the RL ladder.**
+
+Overall recommendation (synthesised): Do not pause for any of these three ideas. The baseline is live, the RL driver is built, the curriculum ladder is ready. Launch Phase 1 after baseline completes. Revisit Idea 1 only if empirical evidence shows repeated blocker violations stalling convergence during the RL run.
