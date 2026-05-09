@@ -13,7 +13,7 @@ In execution order. Each round runs 10 baseline briefs through stages 0..N (PA a
 
 | Round | Target stage | Stages run before it (live, every iteration) | Status | Best mean score | Iterations | Frozen at |
 |---|---|---|---|---|---|---|
-| 1 | PA Stage 1 — Brief Parsing | (founder text only) | ⬜ Pending | — | 0 | — |
+| 1 | PA Stage 1 — Brief Parsing | (founder text only) | ⬜ Pending (iter 1 REVERT — scorer mis-calibration fixed) | 2 | 1 | — |
 | 2 | PA Stage 3 — Research Synthesis | Stage 1 | ⬜ Pending | — | 0 | — |
 | 3 | PA Stage 4 — Regulatory Extraction | Stages 1+3 | ⬜ Pending | — | 0 | — |
 | 4 | PA Stage 5 — Module Decomposition | Stages 1+3+4 | ⬜ Pending | — | 0 | — |
@@ -103,3 +103,14 @@ Each iteration appends to this section. Format:
 - ⬜ Round 1: PA Stage 1 Brief Parsing — start when fix verified
 - ⬜ Rounds 2-6 pending (per ladder above)
 - ⬜ Driver not yet launched
+
+## Round 1 · Iteration 1 · 2026-05-09 05:10:22
+- Stage: brief_parsing
+- Prompt diff size: 29 lines
+- Council fired: true
+- Council BLOCKERs: 6
+- Mean score (10 briefs): 2/10
+- Per-brief: cgm-wearable=2 drone-prosumer=2 edge-ai-server=2 heatpump-30kw=2 dc-fast-ev-charger=3 pharma-bioreactor=2 vertical-farm=1 auv-coastal=2 bess-container=2 haps-stratospheric=2
+- Decision: REVERT
+- Commit: 1df636a5
+- Cost ticked: pipeline_runs += 10
