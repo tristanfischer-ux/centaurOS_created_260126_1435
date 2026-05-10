@@ -1,0 +1,544 @@
+{
+  "meta": {
+    "product": "50 m Wingspan Solar-Electric HAPS — 30-day stratospheric persistence, ISR / comms relay",
+    "bom_source": "Engineering knowledge construction from brief baseline-10/10-haps-stratospheric.md. Representative 25-line BoM: CFRP main spar + secondary spars, ultralight Mylar wing skin, monocoque fuselage pod (CFRP), 2 × brushless pusher motors + variable-pitch hubs, 4 × control surface servos, 55 m² c-Si solar array (panels + MPPT), lithium-sulphur or high-specific-energy Li-ion battery pack (40 kWh) + BMS, flight control computer with redundant IMUs + GPS, Ka-band communications payload + steerable antenna, Iridium backup telemetry, de-icing + heater pads, radiation-shielded electronics, payload bay compartments.",
+    "bom_line_count": 25,
+    "library_state_at_entry": {
+      "radicals": 21,
+      "characters": 111,
+      "archetypes": 214,
+      "note": "Post-AUV: 21 radicals (20 post-Week-4 + acoustic_wave_function); characters +13 from AUV = 111; archetypes +25 = 214."
+    },
+    "post_auv_radical_inventory": [
+      "steel", "copper", "polymer_thermoplastic", "electrical_conducting_function", "solid_state_of_matter",
+      "lithium_iron_phosphate_chemistry", "electrochemical_energy_function", "silicon_semiconductor_function",
+      "magnetic_coupling_function", "electromechanical_switching_function", "thermal_transfer_function",
+      "fluid_flow_state", "mineral_fibre_material", "pressure_vessel_function", "chemical_suppressant_material",
+      "chemical_sensing_function", "optical_sensing_function", "photon_emission_function",
+      "composite_fibre_material", "bioprocess_chemistry_function", "acoustic_wave_function"
+    ],
+    "council_prediction": "0-1 new radicals. photovoltaic_energy_function possibly needed for solar cells. Test: does optical_sensing_function + electrical_conducting_function + silicon_semiconductor_function cover photovoltaic conversion without a new radical?",
+    "decomposition_methodology": "Manual. Post-AUV library (21 radicals) applies. Library grows incrementally.",
+    "decomposition_date": "2026-05-10"
+  },
+  "new_radicals_added_this_product": [
+    {
+      "id": "photovoltaic_energy_function",
+      "category": "function",
+      "rationale": "Crystalline silicon solar cells convert photons to electrical current via the photovoltaic effect (p-n junction carrier separation). This function is irreducible to existing radicals: optical_sensing_function converts photons to a signal (detection), not a power output; electrical_conducting_function is a transport radical, not a conversion radical; silicon_semiconductor_function describes material function (transistors, gates) but not the photovoltaic power conversion mechanism. The radical is needed for the 55 m² solar array (c-Si panels), the MPPT charge controllers (which derive their purpose from the photovoltaic source), and any future PV product (flexible thin-film, CPV, etc.). This is a physically irreducible new radical: photon-to-electron conversion with nonzero efficiency."
+    }
+  ],
+  "new_radicals_rationale": "1 new radical added: photovoltaic_energy_function. All other 24 HAPS lines decompose from the 21-radical post-AUV library. Key test cases resolved: (1) Solar cells (c-Si panel) — requires photovoltaic_energy_function. Could not be covered by optical_sensing_function (sensing, not power generation) or silicon_semiconductor_function (material class, not conversion function). (2) MPPT charge controller — reuses photovoltaic_energy_function (it exists to extract maximum power from a PV source) + existing power_converter + silicon_semiconductor_function. (3) CFRP spar + wing structure — composite_fibre_material covers all CFRP structural elements, same as drone week 4. (4) Variable-pitch propeller hub — electromechanical_switching_function + composite_fibre_material + fluid_flow_state covers; no new radical. (5) Stratospheric de-icing heater pad — electrical_conducting_function + thermal_transfer_function; existing electric_heater_element character suffices. (6) Ka-band steerable antenna — silicon_semiconductor_function + electrical_conducting_function covers GaN PA + feed network; satellite_comms_antenna character already exists from AUV. (7) Lithium-sulphur battery — electrochemical_energy_function covers all secondary cell chemistries (radical is chemistry-agnostic); new character for Li-S pack.",
+  "bom_lines": [
+    {
+      "line_id": 1,
+      "name": "CFRP Main Wing Spar (50 m span, T800/M21 prepreg, 4.5 kg)",
+      "module": "airframe_structure",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "axial_fan_blade",
+        "radicals_reused": ["composite_fibre_material", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "cfrp_wing_spar",
+        "modifiers_needed": ["T800_M21_grade", "50m_span_grade", "HAPS_structural_grade"],
+        "new_modifiers_needed": ["T800_M21_grade", "50m_span_grade", "HAPS_structural_grade"],
+        "new_archetype_needed": "cfrp_wing_spar_50m_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "composite_fibre_material covers T800/M21 CFRP prepreg. Wing spar is a distinct character from axial_fan_blade (different structural function: bending load carrier vs. fluid-coupled rotating airfoil). No new radical."
+      }
+    },
+    {
+      "line_id": 2,
+      "name": "CFRP Secondary Spars + Ribs (leading/trailing edge structure)",
+      "module": "airframe_structure",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "cfrp_wing_spar",
+        "radicals_reused": ["composite_fibre_material", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["secondary_spar_grade", "LE_TE_grade"],
+        "new_modifiers_needed": ["secondary_spar_grade", "LE_TE_grade"],
+        "new_archetype_needed": "cfrp_secondary_spars_ribs_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 3,
+      "name": "Ultralight Mylar Wing Skin (biaxially oriented PET film, 12 µm, heat-shrink tensioned)",
+      "module": "airframe_structure",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "diffusion_membrane",
+        "radicals_reused": ["polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "ultralight_film_skin",
+        "modifiers_needed": ["biaxial_PET_grade", "12um_grade", "heat_shrink_grade", "UV_stable_grade"],
+        "new_modifiers_needed": ["biaxial_PET_grade", "12um_grade", "heat_shrink_grade", "UV_stable_grade"],
+        "new_archetype_needed": "mylar_wing_skin_12um_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Ultralight Mylar film (12 µm biaxially oriented PET) is polymer_thermoplastic. New character needed: it is a thin aerodynamic covering (distinct from diffusion_membrane's mass-transport function). No new radical."
+      }
+    },
+    {
+      "line_id": 4,
+      "name": "CFRP Monocoque Fuselage Pod (avionics + battery bay, 3 m length, 0.3 m dia)",
+      "module": "airframe_structure",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "cfrp_wing_spar",
+        "radicals_reused": ["composite_fibre_material", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "cfrp_fuselage_pod",
+        "modifiers_needed": ["monocoque_grade", "3m_length_grade", "avionics_bay_grade"],
+        "new_modifiers_needed": ["monocoque_grade", "avionics_bay_grade"],
+        "new_archetype_needed": "cfrp_monocoque_fuselage_3m_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 5,
+      "name": "Crystalline Silicon Solar Panels — 55 m² array (24% efficiency, 2 × 27.5 m wing arrays)",
+      "module": "power_generation",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": null,
+        "radicals_reused": ["photovoltaic_energy_function", "silicon_semiconductor_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": ["photovoltaic_energy_function"],
+        "new_character_needed": "csi_solar_panel",
+        "modifiers_needed": ["24pct_efficiency_grade", "55m2_grade", "haps_lightweight_grade", "UV_stable_grade"],
+        "new_modifiers_needed": ["24pct_efficiency_grade", "55m2_grade", "haps_lightweight_grade"],
+        "new_archetype_needed": "csi_solar_panel_24pct_haps",
+        "growth": "new_radical+character+modifier+archetype",
+        "reuse_level": "none",
+        "coverage": "decomposed",
+        "rationale": "Crystalline silicon PV cell: photovoltaic_energy_function is the irreducible new radical. silicon_semiconductor_function covers the Si wafer material; polymer_thermoplastic covers the encapsulant and backsheet. A new character csi_solar_panel is needed."
+      }
+    },
+    {
+      "line_id": 6,
+      "name": "MPPT Charge Controllers (8 × distributed, 400W per string)",
+      "module": "power_generation",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["photovoltaic_energy_function", "silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "mppt_charge_controller",
+        "modifiers_needed": ["400W_grade", "distributed_grade", "MPPT_algorithm_grade"],
+        "new_modifiers_needed": ["MPPT_algorithm_grade", "distributed_grade"],
+        "new_archetype_needed": "mppt_controller_400w_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "MPPT controller is distinct from generic power_converter — its primary function is maximum power point tracking from a PV source (photovoltaic_energy_function). New character; no new radical (photovoltaic_energy_function added at line 5)."
+      }
+    },
+    {
+      "line_id": 7,
+      "name": "Lithium-Sulphur Battery Pack (40 kWh, >350 Wh/kg, stratospheric rated −40°C)",
+      "module": "energy_storage",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "lfp_prismatic_cell",
+        "radicals_reused": ["electrochemical_energy_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "lithium_sulphur_cell",
+        "modifiers_needed": ["40kWh_grade", "350_Whkg_grade", "minus40C_grade", "stratospheric_grade"],
+        "new_modifiers_needed": ["350_Whkg_grade", "minus40C_grade", "stratospheric_grade"],
+        "new_archetype_needed": "li_sulphur_40kwh_stratospheric_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Li-S is a distinct cell chemistry from LFP (different electrode chemistry). electrochemical_energy_function is chemistry-agnostic — covers all secondary cells. No new radical; new character needed to encode Li-S specific energy and low-temperature rating."
+      }
+    },
+    {
+      "line_id": 8,
+      "name": "Battery Management System — thermal + SOC management (stratospheric)",
+      "module": "energy_storage",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["BMS_grade", "stratospheric_rated_grade", "SOC_thermal_grade"],
+        "new_modifiers_needed": ["stratospheric_rated_grade", "SOC_thermal_grade"],
+        "new_archetype_needed": "bms_stratospheric_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 9,
+      "name": "Brushless Pusher Motors — 2 × (500W continuous, stratospheric optimised)",
+      "module": "propulsion",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "brushless_thruster_motor",
+        "radicals_reused": ["electromechanical_switching_function", "magnetic_coupling_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["pusher_grade", "500W_grade", "stratospheric_altitude_grade"],
+        "new_modifiers_needed": ["pusher_grade", "stratospheric_altitude_grade"],
+        "new_archetype_needed": "brushless_pusher_500w_stratospheric_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "brushless_thruster_motor from AUV reused — same electromechanical function, different environment. Modifiers encode pusher orientation and stratospheric rating."
+      }
+    },
+    {
+      "line_id": 10,
+      "name": "Variable-Pitch Propeller Hubs — 2 × (CFRP blades, 2.5 m dia, pitch range 10-35°)",
+      "module": "propulsion",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "axial_fan_blade",
+        "radicals_reused": ["composite_fibre_material", "fluid_flow_state", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "variable_pitch_propeller",
+        "modifiers_needed": ["2p5m_dia_grade", "variable_pitch_grade", "stratospheric_grade"],
+        "new_modifiers_needed": ["variable_pitch_grade", "2p5m_dia_grade"],
+        "new_archetype_needed": "cfrp_variable_pitch_prop_2p5m_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Variable-pitch propeller is distinct from axial_fan_blade (fixed pitch). electromechanical_switching_function covers the pitch-change mechanism (servo actuator in hub). composite_fibre_material covers CFRP blades. fluid_flow_state covers aerodynamic thrust generation. No new radical."
+      }
+    },
+    {
+      "line_id": 11,
+      "name": "ESC — 2 × (500W, sensorless BLDC, conformal-coated, −75°C rated)",
+      "module": "propulsion",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["ESC_grade", "500W_grade", "conformal_coated_grade", "minus75C_grade"],
+        "new_modifiers_needed": ["conformal_coated_grade", "minus75C_grade"],
+        "new_archetype_needed": "esc_500w_minus75c_conformal_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 12,
+      "name": "Control Surface Servos — 4 × (ruddervator + spoilers + flaperons, lightweight BLDC)",
+      "module": "control_surfaces",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "control_surface_servo",
+        "radicals_reused": ["electromechanical_switching_function", "magnetic_coupling_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["lightweight_grade", "stratospheric_grade", "BLDC_servo_grade"],
+        "new_modifiers_needed": ["lightweight_grade", "stratospheric_grade"],
+        "new_archetype_needed": "servo_bldc_lightweight_stratospheric_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "control_surface_servo from AUV reused. Modifiers encode lightweight and stratospheric rating."
+      }
+    },
+    {
+      "line_id": 13,
+      "name": "Flight Control Computer — redundant (2 × Kintex-7 FPGA + GR716 LEON3 MCU)",
+      "module": "avionics",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "radiation_hardened_fcc",
+        "modifiers_needed": ["redundant_grade", "FPGA_grade", "radiation_tolerant_grade", "stratospheric_grade"],
+        "new_modifiers_needed": ["radiation_tolerant_grade", "FPGA_grade"],
+        "new_archetype_needed": "fcc_redundant_fpga_rad_tolerant_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Radiation-tolerant FCC is distinct from generic pcb_controller — it uses radiation-hardened silicon (Kintex-7, GR716 LEON3). silicon_semiconductor_function covers the die. New character for the triple-redundant architecture. No new radical."
+      }
+    },
+    {
+      "line_id": 14,
+      "name": "Redundant MEMS IMU Cluster (2 × tactical-grade IMU, conformal-coated)",
+      "module": "avionics",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "ins_imu_module",
+        "radicals_reused": ["chemical_sensing_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["tactical_grade_ins", "MEMS_grade", "conformal_coated_grade", "redundant_grade"],
+        "new_modifiers_needed": ["redundant_grade"],
+        "new_archetype_needed": "imu_tactical_redundant_conformal_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "ins_imu_module from AUV reused directly — same MEMS IMU technology."
+      }
+    },
+    {
+      "line_id": 15,
+      "name": "GNSS Receiver (dual-constellation GPS/Galileo, radiation-tolerant, L1/L2)",
+      "module": "avionics",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "satellite_comms_antenna",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["GPS_Galileo_grade", "L1_L2_grade", "radiation_tolerant_grade"],
+        "new_modifiers_needed": ["GPS_Galileo_grade", "L1_L2_grade", "radiation_tolerant_grade"],
+        "new_archetype_needed": "gnss_gps_galileo_radtol_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 16,
+      "name": "Ka-Band Communications Payload + Steerable Phased-Array Antenna",
+      "module": "payload_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "satellite_comms_antenna",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "phased_array_antenna",
+        "modifiers_needed": ["Ka_band_grade", "steerable_grade", "GaN_PA_grade"],
+        "new_modifiers_needed": ["Ka_band_grade", "steerable_grade", "GaN_PA_grade"],
+        "new_archetype_needed": "ka_band_phased_array_haps",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Ka-band phased-array antenna is distinct from satellite_comms_antenna (omnidirectional patch). It has electronic beam steering and a GaN power amplifier. silicon_semiconductor_function covers GaN PA + phase shifter ICs. No new radical."
+      }
+    },
+    {
+      "line_id": 17,
+      "name": "Iridium Backup Telemetry Transceiver (emergency + command uplink)",
+      "module": "payload_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "satellite_comms_antenna",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["Iridium_SBD_grade", "emergency_uplink_grade"],
+        "new_modifiers_needed": ["Iridium_SBD_grade", "emergency_uplink_grade"],
+        "new_archetype_needed": "iridium_sbd_backup_telemetry_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 18,
+      "name": "De-icing Heater Pads — leading edge + battery bay (PTC silicone, 150W total)",
+      "module": "thermal_management",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "electric_heater_element",
+        "radicals_reused": ["electrical_conducting_function", "thermal_transfer_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["PTC_silicone_grade", "150W_grade", "leading_edge_grade", "stratospheric_grade"],
+        "new_modifiers_needed": ["PTC_silicone_grade", "leading_edge_grade"],
+        "new_archetype_needed": "ptc_deicing_pad_leading_edge_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "electric_heater_element reused directly — de-icing pad is a resistive/PTC heater in flexible silicone substrate. Same character, new modifiers for PTC behaviour and stratospheric application."
+      }
+    },
+    {
+      "line_id": 19,
+      "name": "Radiation-Shielded Electronics Bay (Al alloy, 3 mm equivalent shielding)",
+      "module": "avionics",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "steel_chassis_enclosure",
+        "radicals_reused": ["solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["aluminium_alloy_grade", "radiation_shielded_grade", "3mm_Al_equivalent_grade"],
+        "new_modifiers_needed": ["radiation_shielded_grade", "3mm_Al_equivalent_grade"],
+        "new_archetype_needed": "al_radiation_shielded_bay_3mm_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 20,
+      "name": "Power Distribution Bus — 48V DC regulated (solar + battery bus merge)",
+      "module": "power_distribution",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["48V_DC_grade", "solar_battery_bus_grade", "conformal_coated_grade"],
+        "new_modifiers_needed": ["48V_DC_grade", "solar_battery_bus_grade"],
+        "new_archetype_needed": "power_dist_48v_solar_battery_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 21,
+      "name": "Internal Wiring Harness — ultra-lightweight Litz wire + Kapton tape (total <500g)",
+      "module": "interconnects",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "wiring_harness",
+        "radicals_reused": ["electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["Litz_wire_grade", "Kapton_tape_grade", "500g_max_grade"],
+        "new_modifiers_needed": ["Litz_wire_grade", "Kapton_tape_grade", "500g_max_grade"],
+        "new_archetype_needed": "litz_kapton_harness_500g_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 22,
+      "name": "Modular Payload Bay Compartments — wet + dry (CFRP box, EMC shielded)",
+      "module": "payload_bay",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "payload_bay_module",
+        "radicals_reused": ["composite_fibre_material", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["EMC_shielded_grade", "wet_dry_grade"],
+        "new_modifiers_needed": ["EMC_shielded_grade", "wet_dry_grade"],
+        "new_archetype_needed": "cfrp_payload_bay_emc_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "payload_bay_module from AUV reused — same CFRP modular compartment function. AUV was wet-mate; HAPS is EMC-shielded."
+      }
+    },
+    {
+      "line_id": 23,
+      "name": "Control Surface Actuators — carbon-fibre control horns + pushrods (ultralight)",
+      "module": "control_surfaces",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "cfrp_wing_spar",
+        "radicals_reused": ["composite_fibre_material", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["control_horn_grade", "pushrod_grade", "ultralight_grade"],
+        "new_modifiers_needed": ["control_horn_grade", "pushrod_grade", "ultralight_grade"],
+        "new_archetype_needed": "cfrp_control_horn_pushrod_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 24,
+      "name": "Motor Mounting Pylons + Prop Shaft Bearings (CFRP, titanium bearings)",
+      "module": "propulsion",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "cfrp_wing_spar",
+        "radicals_reused": ["composite_fibre_material", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["motor_pylon_grade", "titanium_bearing_grade"],
+        "new_modifiers_needed": ["motor_pylon_grade", "titanium_bearing_grade"],
+        "new_archetype_needed": "cfrp_motor_pylon_ti_bearing_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 25,
+      "name": "Ground Station — spectrum + airspace management workstation (COTS ruggedised)",
+      "module": "ground_station",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["COTS_ruggedised_grade", "spectrum_management_grade", "airspace_management_grade"],
+        "new_modifiers_needed": ["COTS_ruggedised_grade", "spectrum_management_grade", "airspace_management_grade"],
+        "new_archetype_needed": "cots_ground_station_spectrum_haps",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    }
+  ],
+  "growth_accounting": {
+    "new_radicals": {
+      "count": 1,
+      "entries": ["photovoltaic_energy_function"],
+      "cap": 4,
+      "pass": true
+    },
+    "new_characters": {
+      "count": 9,
+      "entries": [
+        "cfrp_wing_spar", "ultralight_film_skin", "cfrp_fuselage_pod",
+        "csi_solar_panel", "mppt_charge_controller", "lithium_sulphur_cell",
+        "radiation_hardened_fcc", "variable_pitch_propeller", "phased_array_antenna"
+      ]
+    },
+    "new_archetypes": {
+      "count": 25,
+      "note": "One per BoM line"
+    }
+  },
+  "reuse_rates": {
+    "radical_reuse": {
+      "definition": "Lines where all radicals were already in library at time of decomposition",
+      "lines_with_full_radical_reuse": [1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
+      "count": 24,
+      "lines_needing_new_radical": [5],
+      "rate_pct": 96.0,
+      "note": "Line 5 (c-Si solar panel) triggers photovoltaic_energy_function. Line 6 (MPPT) then reuses it."
+    },
+    "character_reuse": {
+      "definition": "Lines where an existing character was directly matched",
+      "lines_with_character_reuse": [2, 8, 9, 11, 12, 14, 15, 17, 18, 19, 20, 21, 25],
+      "count": 13,
+      "rate_pct": 52.0
+    }
+  },
+  "coverage": {
+    "total_lines": 25,
+    "decomposed": 25,
+    "not_decomposed": 0,
+    "coverage_pct": 100.0
+  },
+  "kill_criterion_verdicts": {
+    "KC1_radical_reuse": "PASS — 96.0% (≥80% threshold). One new radical (photovoltaic_energy_function).",
+    "KC2_radical_growth_cap": "PASS — 1 new radical (≤4 cap).",
+    "KC4_coverage": "PASS — 25/25 lines decomposed (100%)."
+  }
+}

@@ -1,0 +1,521 @@
+{
+  "meta": {
+    "product": "Flash CGM Patch — 14-day disposable sensor + BLE bridge, MDR Class IIb",
+    "bom_source": "Engineering knowledge construction from brief baseline-10/01-cgm-wearable.md. Representative 24-line BoM: enzyme-coated microneedle sensor, working/reference/counter electrodes, ASIC potentiostat, flexible polyimide PCB, BLE radio module, MCU, coin cell primary battery, medical-grade acrylate adhesive patch, waterproof overmould housing, sterile blister packaging + carton, BLE bridge: rigid PCB, display, Li-Po battery, USB-C charging port, bridge enclosure.",
+    "bom_line_count": 24,
+    "library_state_at_entry": {
+      "radicals": 20,
+      "characters": 98,
+      "archetypes": 189,
+      "note": "Post-Week-4 library: 20 radicals (seed 5 + BESS 12 + vfarm 1 + drone 1 + bioreactor 1); 98 characters; 189 archetypes."
+    },
+    "post_week4_radical_inventory": [
+      "steel", "copper", "polymer_thermoplastic", "electrical_conducting_function", "solid_state_of_matter",
+      "lithium_iron_phosphate_chemistry", "electrochemical_energy_function", "silicon_semiconductor_function",
+      "magnetic_coupling_function", "electromechanical_switching_function", "thermal_transfer_function",
+      "fluid_flow_state", "mineral_fibre_material", "pressure_vessel_function", "chemical_suppressant_material",
+      "chemical_sensing_function", "optical_sensing_function", "photon_emission_function",
+      "composite_fibre_material", "bioprocess_chemistry_function"
+    ],
+    "council_prediction": "0 new radicals predicted. electrochemical_energy_function covers glucose sensing; bioprocess_chemistry_function covers biocompatibility. Testing whether sub-mm wearable medtech needs any new radical.",
+    "decomposition_methodology": "Manual: for each BoM line attempt mapping to post-Week-4 library. Library grows incrementally — once added for CGM line N, available to later lines.",
+    "decomposition_date": "2026-05-10"
+  },
+  "new_radicals_added_this_product": [],
+  "new_radicals_rationale": "All 24 CGM lines decompose without new radicals. Key test cases: (1) glucose enzymatic electrode — chemical_sensing_function covers electrochemical detection regardless of analyte (glucose, O2, pH); electrochemical_energy_function covers faradaic current transduction. (2) biocompatible skin adhesive — bioprocess_chemistry_function covers ISO 10993-1 biocompatibility evaluation (same function class as USP Class VI bioreactor materials). (3) microneedle structure — polymer_thermoplastic + silicon_semiconductor_function covers both polymer and silicon needle substrates. (4) BLE radio — silicon_semiconductor_function + electrical_conducting_function covers RF semiconductor. (5) sterile packaging — polymer_thermoplastic + bioprocess_chemistry_function covers cleanroom barrier materials. ZERO new radicals needed.",
+  "bom_lines": [
+    {
+      "line_id": 1,
+      "name": "Enzyme-Coated Glucose Oxidase Microneedle Array (working electrode)",
+      "module": "electrochemical_sensor",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "liquid_chemistry_sensor",
+        "radicals_reused": ["chemical_sensing_function", "electrochemical_energy_function", "bioprocess_chemistry_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["glucose_oxidase_enzyme_grade", "microneedle_subcutaneous_grade", "ISO10993_biocompatible_grade"],
+        "new_modifiers_needed": ["glucose_oxidase_enzyme_grade", "microneedle_subcutaneous_grade", "ISO10993_biocompatible_grade"],
+        "new_archetype_needed": "glucose_oxidase_microneedle_working_electrode",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "chemical_sensing_function covers electrochemical detection. bioprocess_chemistry_function covers biocompatibility of enzyme + polymer substrate. New modifiers encode glucose-specific enzyme coating and subcutaneous needle geometry."
+      }
+    },
+    {
+      "line_id": 2,
+      "name": "Silver/Silver-Chloride Reference Electrode (microneedle, Ag/AgCl)",
+      "module": "electrochemical_sensor",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "liquid_chemistry_sensor",
+        "radicals_reused": ["chemical_sensing_function", "electrochemical_energy_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["AgAgCl_reference_grade", "microneedle_subcutaneous_grade", "ISO10993_biocompatible_grade"],
+        "new_modifiers_needed": ["AgAgCl_reference_grade"],
+        "new_archetype_needed": "agagcl_reference_microneedle_electrode",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "Ag/AgCl is a standard electrochemical reference — chemical_sensing_function covers the half-cell potential reference function. Modifier encodes material-specific chemistry."
+      }
+    },
+    {
+      "line_id": 3,
+      "name": "Counter Electrode (Pt or carbon-paste, current sink)",
+      "module": "electrochemical_sensor",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "liquid_chemistry_sensor",
+        "radicals_reused": ["chemical_sensing_function", "electrochemical_energy_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["counter_electrode_grade", "microneedle_subcutaneous_grade"],
+        "new_modifiers_needed": ["counter_electrode_grade"],
+        "new_archetype_needed": "carbon_paste_counter_microneedle_electrode",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 4,
+      "name": "Biocompatible Glucose-Limiting Membrane (polyurethane, diffusion rate control)",
+      "module": "electrochemical_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "polymer_gasket",
+        "radicals_reused": ["polymer_thermoplastic", "bioprocess_chemistry_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "diffusion_membrane",
+        "modifiers_needed": ["glucose_limiting_grade", "polyurethane_grade", "ISO10993_biocompatible_grade"],
+        "new_modifiers_needed": ["glucose_limiting_grade", "polyurethane_grade"],
+        "new_archetype_needed": "glucose_limiting_diffusion_membrane_PU",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "The diffusion membrane is a distinct character from polymer_gasket (static sealing). It controls mass transport rate of glucose. polymer_thermoplastic + bioprocess_chemistry_function cover the polyurethane substrate and biocompatibility requirement. No new radical needed."
+      }
+    },
+    {
+      "line_id": 5,
+      "name": "ASIC Analog Front End — Potentiostat + ADC (single-chip, <1µA quiescent)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "analog_front_end_asic",
+        "modifiers_needed": ["potentiostat_grade", "sub_uA_quiescent_grade", "single_chip_grade"],
+        "new_modifiers_needed": ["potentiostat_grade", "sub_uA_quiescent_grade"],
+        "new_archetype_needed": "potentiostat_asic_cgm_1ua",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A potentiostat ASIC is distinct from a generic PCB controller — it applies a precise electrochemical bias voltage and measures faradaic current. silicon_semiconductor_function covers the chip function. New character needed; no new radical."
+      }
+    },
+    {
+      "line_id": 6,
+      "name": "Ultra-Low-Power MCU (ARM Cortex-M0+, sleep current <1µA)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["cortex_m0_grade", "ulp_grade", "sub_uA_sleep_grade"],
+        "new_modifiers_needed": ["ulp_grade", "sub_uA_sleep_grade"],
+        "new_archetype_needed": "mcu_cortex_m0_ulp_cgm",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 7,
+      "name": "BLE 5.2 Radio SoC (2.4 GHz, integrated antenna matching)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "ble_radio_soc",
+        "modifiers_needed": ["BLE52_grade", "2400MHz_grade", "integrated_antenna_grade"],
+        "new_modifiers_needed": ["BLE52_grade", "2400MHz_grade", "integrated_antenna_grade"],
+        "new_archetype_needed": "ble_52_soc_cgm_wearable",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "BLE radio SoC is distinct from a PCB controller — its primary function is RF transceiver, not computation. silicon_semiconductor_function covers the RF semiconductor process. New character; no new radical."
+      }
+    },
+    {
+      "line_id": 8,
+      "name": "Flexible Polyimide PCB (sensor interconnect, sub-0.1 mm flex)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "copper_wire",
+        "radicals_reused": ["electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "flex_pcb",
+        "modifiers_needed": ["polyimide_substrate_grade", "sub_0p1mm_flex_grade", "medical_grade"],
+        "new_modifiers_needed": ["polyimide_substrate_grade", "sub_0p1mm_flex_grade", "medical_grade"],
+        "new_archetype_needed": "flex_pcb_polyimide_cgm_sensor",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A flex PCB is a distinct character from copper_wire (point-to-point conductor) — it combines patterned copper traces on a flexible polymer substrate with defined electrical routing. No new radical: electrical_conducting_function (copper traces) + polymer_thermoplastic (polyimide base)."
+      }
+    },
+    {
+      "line_id": 9,
+      "name": "Coin Cell Primary Battery — CR2032 or LiMnO2 equivalent (14-day life)",
+      "module": "power",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "lfp_prismatic_cell",
+        "radicals_reused": ["electrochemical_energy_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "primary_lithium_cell",
+        "modifiers_needed": ["coin_cell_grade", "CR2032_grade", "non_rechargeable_grade"],
+        "new_modifiers_needed": ["coin_cell_grade", "CR2032_grade", "non_rechargeable_grade"],
+        "new_archetype_needed": "cr2032_coin_cell_cgm_sensor",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Primary (non-rechargeable) coin cell is distinct from lfp_prismatic_cell (rechargeable, LFP chemistry). The radical electrochemical_energy_function covers all battery chemistries — the character encodes form factor and non-rechargeable distinction. No new radical."
+      }
+    },
+    {
+      "line_id": 10,
+      "name": "Medical-Grade Acrylate Skin Adhesive Patch (35×30 mm, ISO 10993-1 tested)",
+      "module": "patch_body",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "polymer_gasket",
+        "radicals_reused": ["polymer_thermoplastic", "bioprocess_chemistry_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "skin_adhesive_patch",
+        "modifiers_needed": ["medical_acrylate_grade", "35x30mm_grade", "ISO10993_biocompatible_grade", "7_day_wear_grade"],
+        "new_modifiers_needed": ["medical_acrylate_grade", "35x30mm_grade", "7_day_wear_grade"],
+        "new_archetype_needed": "medical_acrylate_patch_35x30_cgm",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A skin adhesive patch is distinct from polymer_gasket (static mechanical seal, compressed face). It bonds to skin via pressure-sensitive adhesive and must meet prolonged-contact biocompatibility. polymer_thermoplastic + bioprocess_chemistry_function cover substrate and biocompatibility. No new radical."
+      }
+    },
+    {
+      "line_id": 11,
+      "name": "Overmoulded Waterproof Housing — sensor capsule (PA12, IP68 equivalent)",
+      "module": "patch_body",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "polymer_enclosure",
+        "radicals_reused": ["polymer_thermoplastic", "bioprocess_chemistry_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["overmould_grade", "PA12_grade", "IP68_equivalent_grade", "ISO10993_biocompatible_grade"],
+        "new_modifiers_needed": ["overmould_grade", "PA12_grade", "IP68_equivalent_grade"],
+        "new_archetype_needed": "overmould_pa12_ip68_cgm_housing",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 12,
+      "name": "Sterile Blister Pack (Tyvek lid, PET tray, EO or gamma sterilised)",
+      "module": "packaging_sterile",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "polymer_enclosure",
+        "radicals_reused": ["polymer_thermoplastic", "bioprocess_chemistry_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "sterile_blister_pack",
+        "modifiers_needed": ["tyvek_lid_grade", "PET_tray_grade", "EO_sterilised_grade", "ISO11607_grade"],
+        "new_modifiers_needed": ["tyvek_lid_grade", "PET_tray_grade", "EO_sterilised_grade", "ISO11607_grade"],
+        "new_archetype_needed": "sterile_blister_tyvek_PET_cgm",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Sterile medical device packaging has a distinct function from a generic polymer_enclosure: it is a validated sterile barrier (ISO 11607) with a peel-open lid. polymer_thermoplastic covers both tray and Tyvek (polyethylene fibre) substrate. bioprocess_chemistry_function covers sterilisation validation. No new radical."
+      }
+    },
+    {
+      "line_id": 13,
+      "name": "Printed Carton (FSC cardboard, instruction leaflet)",
+      "module": "packaging_sterile",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "polymer_enclosure",
+        "radicals_reused": ["solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["FSC_cardboard_grade", "printed_leaflet_grade"],
+        "new_modifiers_needed": ["FSC_cardboard_grade", "printed_leaflet_grade"],
+        "new_archetype_needed": "fsc_carton_cgm_printed",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 14,
+      "name": "Applicator Device — spring-loaded needle insertion + retraction (ABS)",
+      "module": "applicator",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "polymer_enclosure",
+        "radicals_reused": ["polymer_thermoplastic", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "spring_loaded_applicator",
+        "modifiers_needed": ["needle_insertion_grade", "spring_retraction_grade", "ABS_grade"],
+        "new_modifiers_needed": ["needle_insertion_grade", "spring_retraction_grade", "ABS_grade"],
+        "new_archetype_needed": "spring_loaded_cgm_applicator_ABS",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A spring-loaded applicator is a distinct character — it performs a single mechanical actuation event (controlled needle insertion + retraction). polymer_thermoplastic (ABS housing + spring guide) + electromechanical_switching_function (spring energy storage → release). No new radical."
+      }
+    },
+    {
+      "line_id": 15,
+      "name": "BLE Bridge PCB — rigid FR4 with antenna (reader + display driver)",
+      "module": "bridge_electronics",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["BLE_reader_grade", "FR4_grade"],
+        "new_modifiers_needed": ["BLE_reader_grade", "FR4_grade"],
+        "new_archetype_needed": "ble_bridge_pcb_fr4_reader",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 16,
+      "name": "E-Ink Display or OLED segment display (glucose readout, bridge)",
+      "module": "bridge_electronics",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "hmi_touchscreen",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "photon_emission_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["eink_display_grade", "glucose_readout_grade", "wearable_grade"],
+        "new_modifiers_needed": ["eink_display_grade", "glucose_readout_grade", "wearable_grade"],
+        "new_archetype_needed": "eink_glucose_display_bridge",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 17,
+      "name": "Rechargeable LiPo Battery — bridge (100–150 mAh, USB-C rechargeable)",
+      "module": "bridge_electronics",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "lfp_prismatic_cell",
+        "radicals_reused": ["electrochemical_energy_function", "electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "lipo_pouch_cell",
+        "modifiers_needed": ["100_150mAh_grade", "rechargeable_grade", "bridge_wearable_grade"],
+        "new_modifiers_needed": ["100_150mAh_grade", "bridge_wearable_grade"],
+        "new_archetype_needed": "lipo_100mAh_ble_bridge",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "LiPo pouch cell is distinct from lfp_prismatic_cell — different form factor (pouch vs prismatic) and chemistry (LiCoO2/NMC vs LFP). electrochemical_energy_function covers all secondary cell chemistries. No new radical."
+      }
+    },
+    {
+      "line_id": 18,
+      "name": "USB-C Charging Port + Protection Circuit",
+      "module": "bridge_electronics",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "copper_terminal",
+        "radicals_reused": ["electrical_conducting_function", "polymer_thermoplastic", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "usb_c_connector",
+        "modifiers_needed": ["USB_C_grade", "charging_port_grade"],
+        "new_modifiers_needed": ["USB_C_grade", "charging_port_grade"],
+        "new_archetype_needed": "usb_c_port_bridge_cgm",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "USB-C connector is distinct from copper_terminal (bare crimp terminal). It includes keyed mechanical connector, USB power delivery protocol pins, and integrated ESD protection. electrical_conducting_function + silicon_semiconductor_function (protection IC) + polymer_thermoplastic (housing). No new radical."
+      }
+    },
+    {
+      "line_id": 19,
+      "name": "Bridge Housing — ABS + TPE overmould, IP22 (shower-safe)",
+      "module": "bridge_enclosure",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "polymer_enclosure",
+        "radicals_reused": ["polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["ABS_TPE_overmould_grade", "IP22_grade", "wearable_grade"],
+        "new_modifiers_needed": ["ABS_TPE_overmould_grade", "IP22_grade", "wearable_grade"],
+        "new_archetype_needed": "abs_tpe_ip22_bridge_housing",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 20,
+      "name": "Accelerometer + Temperature Sensor (body-worn activity + skin temp correction)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "gas_sensor",
+        "radicals_reused": ["chemical_sensing_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["MEMS_accelerometer_grade", "skin_temp_correction_grade"],
+        "new_modifiers_needed": ["MEMS_accelerometer_grade", "skin_temp_correction_grade"],
+        "new_archetype_needed": "mems_accel_temp_cgm_body",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 21,
+      "name": "Power Management IC + LDO regulators (sensor PMIC)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["PMIC_grade", "LDO_grade", "wearable_grade"],
+        "new_modifiers_needed": ["PMIC_grade", "LDO_grade", "wearable_grade"],
+        "new_archetype_needed": "pmic_ldo_cgm_wearable",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 22,
+      "name": "Crystal Oscillator — 32.768 kHz (RTC, low-power timekeeping)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "gas_sensor",
+        "radicals_reused": ["silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["crystal_oscillator_grade", "32768Hz_grade"],
+        "new_modifiers_needed": ["crystal_oscillator_grade", "32768Hz_grade"],
+        "new_archetype_needed": "crystal_32768hz_rtc_cgm",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 23,
+      "name": "NFC Anti-Collision Tag IC (secondary reader, ISO 15693 Flash Glucose)",
+      "module": "electronics_sensor",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "nfc_tag_ic",
+        "modifiers_needed": ["ISO15693_grade", "flash_glucose_grade", "passive_nfc_grade"],
+        "new_modifiers_needed": ["ISO15693_grade", "flash_glucose_grade", "passive_nfc_grade"],
+        "new_archetype_needed": "nfc_tag_iso15693_cgm",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "NFC tag IC is distinct from a generic PCB controller — it is a passive RF transponder with no battery. silicon_semiconductor_function covers the chip. No new radical."
+      }
+    },
+    {
+      "line_id": 24,
+      "name": "Wiring Loom / Flex Cable — bridge to charging dock (optional snap-fit)",
+      "module": "bridge_enclosure",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "wiring_harness",
+        "radicals_reused": ["electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["flex_cable_grade", "snap_fit_grade", "wearable_grade"],
+        "new_modifiers_needed": ["flex_cable_grade", "snap_fit_grade", "wearable_grade"],
+        "new_archetype_needed": "flex_cable_bridge_dock_cgm",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    }
+  ],
+  "growth_accounting": {
+    "new_radicals": {
+      "count": 0,
+      "entries": [],
+      "cap": 4,
+      "pass": true
+    },
+    "new_characters": {
+      "count": 12,
+      "entries": [
+        "diffusion_membrane", "analog_front_end_asic", "ble_radio_soc", "flex_pcb",
+        "primary_lithium_cell", "skin_adhesive_patch", "sterile_blister_pack",
+        "spring_loaded_applicator", "lipo_pouch_cell", "usb_c_connector",
+        "nfc_tag_ic"
+      ],
+      "note": "11 unique new characters (NFC tag IC counted once; applicator is a new character)."
+    },
+    "new_archetypes": {
+      "count": 24,
+      "note": "One per BoM line"
+    }
+  },
+  "reuse_rates": {
+    "radical_reuse": {
+      "definition": "Lines where all radicals were already in post-Week-4 library",
+      "lines_with_full_radical_reuse": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24],
+      "count": 24,
+      "lines_needing_new_radical": [],
+      "rate_pct": 100.0
+    },
+    "character_reuse": {
+      "definition": "Lines where an existing character was directly matched",
+      "lines_with_character_reuse": [1, 2, 3, 6, 11, 13, 15, 16, 19, 20, 21, 22, 24],
+      "count": 13,
+      "rate_pct": 54.2
+    }
+  },
+  "coverage": {
+    "total_lines": 24,
+    "decomposed": 24,
+    "not_decomposed": 0,
+    "coverage_pct": 100.0
+  },
+  "kill_criterion_verdicts": {
+    "KC1_radical_reuse": "PASS — 100.0% (≥80% threshold). Zero new radicals.",
+    "KC2_radical_growth_cap": "PASS — 0 new radicals (≤4 cap).",
+    "KC4_coverage": "PASS — 24/24 lines decomposed (100%)."
+  }
+}

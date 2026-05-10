@@ -1,0 +1,548 @@
+{
+  "meta": {
+    "product": "2-m Class Coastal AUV — 100 m rated, 24-hour endurance, modular sonar payload",
+    "bom_source": "Engineering knowledge construction from brief baseline-10/08-auv-coastal.md. Representative 25-line BoM: titanium pressure hull (main cylinder + nose + tail), syntactic foam buoyancy trim, 12 kWh oil-compensated Li-ion battery pack + BMS, 2 × brushless thrusters + propellers, 4 × rudder/elevator servos, inertial navigation + Doppler velocity log, acoustic modem transducer, GPS + Iridium masthead, pressure-depth sensor, wet-mate payload connector, obstacle-avoidance sonar, leak detector, emergency drop weight, Wi-Fi antenna, recovery beacon + strobe.",
+    "bom_line_count": 25,
+    "library_state_at_entry": {
+      "radicals": 20,
+      "characters": 98,
+      "archetypes": 189,
+      "note": "Post-Week-4 library, same as CGM entry state (CGM added 0 radicals)."
+    },
+    "post_week4_radical_inventory": [
+      "steel", "copper", "polymer_thermoplastic", "electrical_conducting_function", "solid_state_of_matter",
+      "lithium_iron_phosphate_chemistry", "electrochemical_energy_function", "silicon_semiconductor_function",
+      "magnetic_coupling_function", "electromechanical_switching_function", "thermal_transfer_function",
+      "fluid_flow_state", "mineral_fibre_material", "pressure_vessel_function", "chemical_suppressant_material",
+      "chemical_sensing_function", "optical_sensing_function", "photon_emission_function",
+      "composite_fibre_material", "bioprocess_chemistry_function"
+    ],
+    "council_prediction": "1 possible new radical — hydrodynamic_propulsion_function for thrusters. Test: does fluid_flow_state + electromechanical_switching_function + composite_fibre_material suffice for a brushless propeller drive? Also test: does pressure_vessel_function cover depth-rated hull (process-pressure vs hydrostatic)?",
+    "decomposition_methodology": "Manual. Post-Week-4 library applies. Library grows incrementally within this product.",
+    "decomposition_date": "2026-05-10"
+  },
+  "new_radicals_added_this_product": [
+    {
+      "id": "acoustic_wave_function",
+      "category": "function",
+      "rationale": "Acoustic modem transducer and Doppler velocity log operate by generating and receiving mechanical pressure waves through water. This function class is irreducible to existing radicals: it is distinct from chemical_sensing_function (no chemical analyte), optical_sensing_function (acoustic, not photon), electrical_conducting_function (mechanical wave, not charge), fluid_flow_state (wave propagation through a medium, not bulk fluid motion), and pressure_vessel_function (pressure containment, not wave transduction). Underwater acoustic communication and USBL/DVL navigation are defining enabling technologies for the AUV domain. The radical covers both active sonar (transmit + receive) and passive acoustic sensing."
+    }
+  ],
+  "new_radicals_rationale": "1 new radical added: acoustic_wave_function. All other 24 lines decompose from existing radicals. Key test cases: (1) titanium pressure hull — pressure_vessel_function covers depth-rated hydrostatic loading (same radical as process-pressure vessels; the physics is hydrostatic pressure containment regardless of source); 316L_grade modifier overrides corrosion to marine-resistant, titanium_grade modifier captures alloy properties. (2) Brushless thruster — electromechanical_switching_function (motor) + fluid_flow_state (propeller-fluid coupling) + composite_fibre_material (propeller blade) adequately covers the thruster without a new radical. (3) Syntactic foam — mineral_fibre_material covers glass-microballoon-filled epoxy syntactic foam (same mineral/glass-based composition class). (4) Oil-compensated battery — existing electrochemical_energy_function + fluid_flow_state (oil compensation) + pressure_vessel_function (housing) suffice. Acoustic modem and DVL require acoustic_wave_function.",
+  "bom_lines": [
+    {
+      "line_id": 1,
+      "name": "Titanium Pressure Hull — Main Cylinder (Ti-6Al-4V, 100 m rated)",
+      "module": "pressure_hull",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pressure_vessel",
+        "radicals_reused": ["pressure_vessel_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["titanium_6al4v_grade", "100m_depth_rated_grade", "marine_grade"],
+        "new_modifiers_needed": ["titanium_6al4v_grade", "100m_depth_rated_grade", "marine_grade"],
+        "new_archetype_needed": "ti_6al4v_pressure_hull_100m_main",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "pressure_vessel covers hydrostatic pressure containment at 100 m (10 bar). titanium_6al4v_grade encodes marine corrosion immunity and high strength-to-weight. Same character as BESS/HP process vessels — different pressure source (hydrostatic vs. process), same function."
+      }
+    },
+    {
+      "line_id": 2,
+      "name": "Titanium Pressure Hull — Nose Cone (Ti-6Al-4V, hydrodynamic fairing)",
+      "module": "pressure_hull",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pressure_vessel",
+        "radicals_reused": ["pressure_vessel_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["titanium_6al4v_grade", "nose_cone_grade", "100m_depth_rated_grade"],
+        "new_modifiers_needed": ["nose_cone_grade"],
+        "new_archetype_needed": "ti_6al4v_pressure_hull_nose_100m",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 3,
+      "name": "Titanium Pressure Hull — Tail Section (Ti-6Al-4V, thruster interface)",
+      "module": "pressure_hull",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pressure_vessel",
+        "radicals_reused": ["pressure_vessel_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["titanium_6al4v_grade", "tail_section_grade", "100m_depth_rated_grade"],
+        "new_modifiers_needed": ["tail_section_grade"],
+        "new_archetype_needed": "ti_6al4v_pressure_hull_tail_100m",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 4,
+      "name": "Syntactic Foam Buoyancy Module (glass microballoon-epoxy, 100 m rated)",
+      "module": "buoyancy_ballast",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "thermal_insulation_panel",
+        "radicals_reused": ["mineral_fibre_material", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "syntactic_foam_block",
+        "modifiers_needed": ["glass_microballoon_grade", "100m_rated_grade", "neutral_buoyancy_grade"],
+        "new_modifiers_needed": ["glass_microballoon_grade", "100m_rated_grade", "neutral_buoyancy_grade"],
+        "new_archetype_needed": "syntactic_foam_glass_100m_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Syntactic foam is a new character — a depth-rated buoyancy material (glass microspheres in epoxy matrix). mineral_fibre_material covers the glass-phase (same material class as glass wool, mineral fibre); polymer_thermoplastic covers the epoxy matrix. No new radical. The thermal_insulation_panel character is matched by structural analogy (panel of mineral/polymer composite) but a distinct character is needed for the AUV buoyancy function."
+      }
+    },
+    {
+      "line_id": 5,
+      "name": "12 kWh Li-Ion Battery Pack — oil-compensated pressure-balanced housing",
+      "module": "energy_storage",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "lfp_prismatic_cell",
+        "radicals_reused": ["electrochemical_energy_function", "electrical_conducting_function", "fluid_flow_state", "pressure_vessel_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "oil_compensated_battery_pack",
+        "modifiers_needed": ["12kWh_grade", "oil_compensated_grade", "100m_depth_rated_grade", "marine_grade"],
+        "new_modifiers_needed": ["oil_compensated_grade", "12kWh_grade"],
+        "new_archetype_needed": "oil_compensated_liion_12kwh_100m_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Oil compensation (pressure equalisation via mineral oil bladder) means fluid_flow_state correctly applies. pressure_vessel_function covers the housing. electrochemical_energy_function covers the cells. No new radical."
+      }
+    },
+    {
+      "line_id": 6,
+      "name": "Battery Management System (BMS) — marine-rated, over-temperature + depth protection",
+      "module": "energy_storage",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["BMS_grade", "marine_rated_grade", "depth_protection_grade"],
+        "new_modifiers_needed": ["marine_rated_grade", "depth_protection_grade"],
+        "new_archetype_needed": "bms_marine_depth_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 7,
+      "name": "Brushless Thruster Motor (2 × main drive, 300W continuous, 24V DC)",
+      "module": "propulsion",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "ec_fan_motor",
+        "radicals_reused": ["electromechanical_switching_function", "magnetic_coupling_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "brushless_thruster_motor",
+        "modifiers_needed": ["300W_grade", "24V_DC_grade", "marine_sealed_grade"],
+        "new_modifiers_needed": ["marine_sealed_grade"],
+        "new_archetype_needed": "brushless_thruster_300w_24v_marine",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A brushless thruster motor is distinct from ec_fan_motor — it drives a propeller in seawater requiring magnetically sealed wet windings. electromechanical_switching_function (BLDC commutation) + magnetic_coupling_function (magnetic sealing) cover the function. No new radical needed."
+      }
+    },
+    {
+      "line_id": 8,
+      "name": "Propeller — carbon-fibre, 3-blade, 150mm dia, marine-antifouled",
+      "module": "propulsion",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "axial_fan_blade",
+        "radicals_reused": ["composite_fibre_material", "fluid_flow_state", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["3_blade_marine_grade", "150mm_dia_grade", "antifouling_grade"],
+        "new_modifiers_needed": ["3_blade_marine_grade", "antifouling_grade"],
+        "new_archetype_needed": "cfrp_propeller_3blade_150mm_marine",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed",
+        "rationale": "axial_fan_blade covers the fluid-coupled rotating airfoil function. Marine propeller differs only by medium (water vs air) and antifouling treatment — both captured by modifiers. composite_fibre_material covers CFRP blade. fluid_flow_state covers hydrodynamic thrust generation. No new radical."
+      }
+    },
+    {
+      "line_id": 9,
+      "name": "Electronic Speed Controller (ESC) — 2 × 300W brushless, 24V",
+      "module": "propulsion",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["ESC_grade", "300W_grade", "marine_waterproof_grade"],
+        "new_modifiers_needed": ["ESC_grade", "marine_waterproof_grade"],
+        "new_archetype_needed": "esc_300w_24v_marine_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 10,
+      "name": "Control Surface Servos — 4 × (rudder + elevator + aileron + spoiler)",
+      "module": "control_surfaces",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "ec_fan_motor",
+        "radicals_reused": ["electromechanical_switching_function", "magnetic_coupling_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "control_surface_servo",
+        "modifiers_needed": ["waterproof_servo_grade", "100m_depth_rated_grade", "marine_grade"],
+        "new_modifiers_needed": ["waterproof_servo_grade", "100m_depth_rated_grade"],
+        "new_archetype_needed": "servo_waterproof_100m_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A depth-rated control surface servo is distinct from ec_fan_motor — it has a gearbox, position feedback, and must operate at depth. electromechanical_switching_function covers actuation. No new radical."
+      }
+    },
+    {
+      "line_id": 11,
+      "name": "Inertial Navigation System (INS) + IMU (MEMS, tactical grade)",
+      "module": "navigation",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "gas_sensor",
+        "radicals_reused": ["chemical_sensing_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "ins_imu_module",
+        "modifiers_needed": ["tactical_grade_ins", "MEMS_grade", "navigation_grade"],
+        "new_modifiers_needed": ["tactical_grade_ins", "navigation_grade"],
+        "new_archetype_needed": "mems_ins_tactical_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "INS/IMU uses MEMS accelerometers and gyroscopes — chemical_sensing_function covers inertial sensing (same physical principle: displacement → electrical signal). The character adds INS-specific fusion and navigation output. No new radical."
+      }
+    },
+    {
+      "line_id": 12,
+      "name": "Doppler Velocity Log (DVL) — 4-beam ADCP, 600 kHz, bottom-lock",
+      "module": "navigation",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": null,
+        "radicals_reused": ["acoustic_wave_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": ["acoustic_wave_function"],
+        "new_character_needed": "doppler_velocity_log",
+        "modifiers_needed": ["600kHz_grade", "4_beam_grade", "bottom_lock_grade"],
+        "new_modifiers_needed": ["600kHz_grade", "4_beam_grade", "bottom_lock_grade"],
+        "new_archetype_needed": "dvl_600khz_4beam_auv",
+        "growth": "new_radical+character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "DVL measures velocity by Doppler shift of acoustic pulses reflected from the seabed. Requires acoustic_wave_function — cannot be reduced to optical, chemical, or electromagnetic sensing. This is the radical that AUV genuinely requires."
+      }
+    },
+    {
+      "line_id": 13,
+      "name": "Acoustic Modem Transducer (USBL, 2-way, 9.6 kbps, 2000 m range)",
+      "module": "communications",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "doppler_velocity_log",
+        "radicals_reused": ["acoustic_wave_function", "silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["USBL_grade", "9600bps_grade", "2000m_range_grade"],
+        "new_modifiers_needed": ["USBL_grade", "9600bps_grade", "2000m_range_grade"],
+        "new_archetype_needed": "acoustic_modem_usbl_2000m_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 14,
+      "name": "Pressure / Depth Sensor (Keller PAA-35X or equivalent, 0–150 m, 0.1% FS)",
+      "module": "navigation",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pressure_switch",
+        "radicals_reused": ["chemical_sensing_function", "silicon_semiconductor_function", "pressure_vessel_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "depth_pressure_sensor",
+        "modifiers_needed": ["0_150m_grade", "0p1pct_fs_grade", "marine_grade"],
+        "new_modifiers_needed": ["0_150m_depth_grade", "0p1pct_fs_grade"],
+        "new_archetype_needed": "depth_pressure_sensor_150m_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A depth pressure sensor is distinct from pressure_switch (binary on/off). It provides continuous analog depth measurement. chemical_sensing_function (piezoresistive sensing) + pressure_vessel_function (media isolation). No new radical."
+      }
+    },
+    {
+      "line_id": 15,
+      "name": "GPS + Iridium Masthead Assembly (pop-up mast, surface only)",
+      "module": "communications",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "satellite_comms_antenna",
+        "modifiers_needed": ["GPS_Iridium_grade", "popup_mast_grade", "IP68_grade"],
+        "new_modifiers_needed": ["GPS_Iridium_grade", "popup_mast_grade"],
+        "new_archetype_needed": "gps_iridium_masthead_popup_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "A satellite comms antenna is distinct from pcb_controller — it is an RF radiating element with feed network, not a compute platform. silicon_semiconductor_function covers the GNSS/Iridium chipset. No new radical."
+      }
+    },
+    {
+      "line_id": 16,
+      "name": "2.4 GHz Wi-Fi Pop-Up Antenna Module (surface comms, IEEE 802.11n)",
+      "module": "communications",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "satellite_comms_antenna",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["wifi_80211n_grade", "2400MHz_grade", "IP68_grade"],
+        "new_modifiers_needed": ["wifi_80211n_grade"],
+        "new_archetype_needed": "wifi_popup_2400mhz_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 17,
+      "name": "Forward-Looking Obstacle-Avoidance Sonar (mechanically scanned, 900 kHz)",
+      "module": "payload_navigation",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "doppler_velocity_log",
+        "radicals_reused": ["acoustic_wave_function", "silicon_semiconductor_function", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "imaging_sonar",
+        "modifiers_needed": ["mechanically_scanned_grade", "900kHz_grade", "obstacle_avoidance_grade"],
+        "new_modifiers_needed": ["mechanically_scanned_grade", "900kHz_grade", "obstacle_avoidance_grade"],
+        "new_archetype_needed": "imaging_sonar_900khz_obstacle_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Imaging sonar is distinct from DVL (velocity measurement). It forms acoustic images for obstacle detection. acoustic_wave_function + electromechanical_switching_function (mechanical scan). No new radical."
+      }
+    },
+    {
+      "line_id": 18,
+      "name": "Main Mission Computer / Autopilot PCB (ARM SoC, 100BASE-T Ethernet backbone)",
+      "module": "control_avionics",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["ARM_SoC_grade", "100BaseT_grade", "marine_rated_grade"],
+        "new_modifiers_needed": ["ARM_SoC_grade", "100BaseT_grade"],
+        "new_archetype_needed": "arm_soc_autopilot_100baset_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 19,
+      "name": "Wet-Mate Payload Connector (SubConn or Cobalt, 12-pin, 150 m rated)",
+      "module": "payload_interface",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "copper_terminal",
+        "radicals_reused": ["electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "wet_mate_connector",
+        "modifiers_needed": ["150m_depth_rated_grade", "12_pin_grade", "SubConn_grade"],
+        "new_modifiers_needed": ["150m_depth_rated_grade", "12_pin_grade", "SubConn_grade"],
+        "new_archetype_needed": "wet_mate_connector_12pin_150m_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Wet-mate connector (matable underwater at depth) is distinct from copper_terminal (dry crimp). electrical_conducting_function covers contacts; polymer_thermoplastic covers keyed body. No new radical."
+      }
+    },
+    {
+      "line_id": 20,
+      "name": "Leak Detector — resistive water ingress sensor (hull breach alert)",
+      "module": "safety_systems",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "liquid_chemistry_sensor",
+        "radicals_reused": ["chemical_sensing_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["water_ingress_grade", "resistive_leak_grade"],
+        "new_modifiers_needed": ["water_ingress_grade", "resistive_leak_grade"],
+        "new_archetype_needed": "resistive_leak_detector_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 21,
+      "name": "Emergency Drop Weight (electro-corrosive release, 2 kg lead ballast)",
+      "module": "safety_systems",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "steel_plate",
+        "radicals_reused": ["steel", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "drop_weight_release",
+        "modifiers_needed": ["electrocorrosive_release_grade", "2kg_lead_ballast_grade"],
+        "new_modifiers_needed": ["electrocorrosive_release_grade", "2kg_lead_ballast_grade"],
+        "new_archetype_needed": "drop_weight_2kg_lead_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "Drop weight uses sacrificial galvanic corrosion triggered electrically — steel + electrical_conducting_function. Character needed for the safety-release mechanism. No new radical."
+      }
+    },
+    {
+      "line_id": 22,
+      "name": "Recovery Beacon + Strobe (RF 121.5 MHz + xenon flash, IP68)",
+      "module": "safety_systems",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "indicator_led_array",
+        "radicals_reused": ["photon_emission_function", "electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "recovery_beacon_strobe",
+        "modifiers_needed": ["xenon_strobe_grade", "RF_121p5MHz_grade", "IP68_grade"],
+        "new_modifiers_needed": ["xenon_strobe_grade", "RF_121p5MHz_grade"],
+        "new_archetype_needed": "recovery_beacon_xenon_rf_121p5_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "photon_emission_function covers xenon strobe; silicon_semiconductor_function covers RF beacon IC; electrical_conducting_function covers antenna. New character for combined emergency recovery function. No new radical."
+      }
+    },
+    {
+      "line_id": 23,
+      "name": "Power Distribution PCB + Fusing (24V bus, IP68 sealed)",
+      "module": "power_distribution",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["24V_bus_grade", "IP68_grade", "fused_distribution_grade"],
+        "new_modifiers_needed": ["fused_distribution_grade"],
+        "new_archetype_needed": "power_dist_pcb_24v_ip68_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 24,
+      "name": "Internal Wiring Harness — Ethernet + power + signal (Seacon connectors)",
+      "module": "interconnects",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "wiring_harness",
+        "radicals_reused": ["electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["Seacon_connector_grade", "marine_IP68_grade", "ethernet_power_signal_grade"],
+        "new_modifiers_needed": ["Seacon_connector_grade", "ethernet_power_signal_grade"],
+        "new_archetype_needed": "wiring_harness_seacon_ip68_auv",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 25,
+      "name": "Modular Payload Bay Shell (CFRP tube, wet-mate interface, 30 cm section)",
+      "module": "payload_interface",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "polymer_enclosure",
+        "radicals_reused": ["composite_fibre_material", "pressure_vessel_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "payload_bay_module",
+        "modifiers_needed": ["CFRP_tube_grade", "wet_mate_interface_grade", "100m_depth_rated_grade"],
+        "new_modifiers_needed": ["wet_mate_interface_grade"],
+        "new_archetype_needed": "cfrp_payload_bay_100m_auv",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed",
+        "rationale": "composite_fibre_material (CFRP tube) + pressure_vessel_function (depth-rated shell). New character for payload-bay-specific function. No new radical."
+      }
+    }
+  ],
+  "growth_accounting": {
+    "new_radicals": {
+      "count": 1,
+      "entries": ["acoustic_wave_function"],
+      "cap": 4,
+      "pass": true
+    },
+    "new_characters": {
+      "count": 13,
+      "entries": [
+        "syntactic_foam_block", "oil_compensated_battery_pack", "brushless_thruster_motor",
+        "control_surface_servo", "ins_imu_module", "doppler_velocity_log",
+        "imaging_sonar", "depth_pressure_sensor", "satellite_comms_antenna",
+        "wet_mate_connector", "drop_weight_release", "recovery_beacon_strobe",
+        "payload_bay_module"
+      ]
+    },
+    "new_archetypes": {
+      "count": 25,
+      "note": "One per BoM line"
+    }
+  },
+  "reuse_rates": {
+    "radical_reuse": {
+      "definition": "Lines where all radicals were already in library at time of decomposition",
+      "lines_with_full_radical_reuse": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25],
+      "count": 24,
+      "lines_needing_new_radical": [12],
+      "rate_pct": 96.0,
+      "note": "Line 12 (DVL) triggers acoustic_wave_function. Lines 13 and 17 (acoustic modem, imaging sonar) then reuse it."
+    },
+    "character_reuse": {
+      "definition": "Lines where an existing character was directly matched",
+      "lines_with_character_reuse": [1, 2, 3, 6, 8, 9, 13, 16, 18, 20, 23, 24],
+      "count": 12,
+      "rate_pct": 48.0
+    }
+  },
+  "coverage": {
+    "total_lines": 25,
+    "decomposed": 25,
+    "not_decomposed": 0,
+    "coverage_pct": 100.0
+  },
+  "kill_criterion_verdicts": {
+    "KC1_radical_reuse": "PASS — 96.0% (≥80% threshold). One new radical (acoustic_wave_function).",
+    "KC2_radical_growth_cap": "PASS — 1 new radical (≤4 cap).",
+    "KC4_coverage": "PASS — 25/25 lines decomposed (100%)."
+  }
+}
