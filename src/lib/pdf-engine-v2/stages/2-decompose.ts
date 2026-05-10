@@ -183,13 +183,26 @@ export function validateRadicalTreeOutput(raw: any): RadicalTreeResult {
 
   const validatedRoot = validateNode(composition.root, 'root', unknowns, netNewArchetypes)
 
+  // ── Canonicalisation pass (Opus-risk mitigation) ──────────────────────────
+  // Sort children at every level by archetypeId to eliminate ordering variance
+  // from the LLM. This ensures same brief → same canonical tree shape even when
+  // the LLM emits children in a different order on different runs.
+  // Note: this does NOT fix quantity variance — that requires prompt improvements.
+  function canonicaliseNode(node: CompositionNode): CompositionNode {
+    const sortedChildren = [...node.children]
+      .map(canonicaliseNode)
+      .sort((a, b) => a.archetypeId.localeCompare(b.archetypeId))
+    return { ...node, children: sortedChildren }
+  }
+  const canonicalisedRoot = canonicaliseNode(validatedRoot)
+
   const tree: RadicalTree = {
     radical_spec_version: CURRENT_RADICAL_SPEC_VERSION,
     composition: {
       id: composition.id ?? 'llm_emitted_tree',
       description: composition.description ?? '',
       environment: Array.isArray(composition.environment) ? composition.environment : [],
-      root: validatedRoot,
+      root: canonicalisedRoot,
     },
     meta: {
       created_at: new Date().toISOString(),
