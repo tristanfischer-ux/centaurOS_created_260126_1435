@@ -22,6 +22,7 @@ import type {
   Part,
   BomLine,
   CostBreakdown,
+  CostSummary,
   SupplierMatch,
   RegulatoryItem,
   RiskRow,
@@ -594,10 +595,13 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
     : (_precomputedVerdict === 'FEASIBLE' || feasStatus === 'GREEN' || feasStatus === 'PASS') ? BESS_GREEN
     : MUTED
 
-  const unitCost = state.costBreakdown?.unitTotalGbp
-  const ceiling = state.costBreakdown?.ceilingGbp ?? brief?.constraints?.unitCostCeilingGbp
-  const rawBom = state.costBreakdown?.rawBomCostGbp
-  const nreTotal = state.costBreakdown?.nreTotalGbp
+  // ── Read all cost figures from canonical CostSummary SoT ─────────────────
+  // costSummary is populated by Stage 4 (runBomCostSuppliers) and stored on
+  // state. Falls back to costBreakdown for legacy v1 pipeline compatibility.
+  const cs = state.costSummary
+  const unitCost = cs?.finalUnitCost ?? state.costBreakdown?.unitTotalGbp
+  const ceiling = cs?.ceilingCost ?? state.costBreakdown?.ceilingGbp ?? brief?.constraints?.unitCostCeilingGbp
+  const nreTotal = cs?.nreTotal ?? state.costBreakdown?.nreTotalGbp
 
   const batchSize = brief?.constraints?.batchSize
   const batchNum = safeNumber(batchSize) || 1
@@ -626,9 +630,10 @@ const CoverPage = ({ state }: { state: PipelineState }) => {
     { label: 'Engine Version', value: 'ForgeOS PDF Engine v3' },
   ]
 
-  // A2 FIX (2026-05-09): explicit OVER BUDGET flag used by the cover page banner.
-  const isOverBudget = !!(unitCost && ceiling && unitCost > ceiling)
-  const overBudgetPct = (isOverBudget && unitCost && ceiling) ? ((unitCost - ceiling) / ceiling * 100).toFixed(1) : null
+  // SoT: read isOverBudget from costSummary (computed once in Stage 4)
+  const isOverBudget = cs?.isOverBudget ?? !!(unitCost && ceiling && unitCost > ceiling)
+  const overBudgetPct = cs?.overBudgetPct != null ? cs.overBudgetPct.toFixed(1)
+    : (isOverBudget && unitCost && ceiling) ? ((unitCost - ceiling) / ceiling * 100).toFixed(1) : null
 
   const costStatusProse = (() => {
     if (!unitCost) return 'Pending — cost computation not yet complete.'
@@ -821,6 +826,9 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
         {
           checkId: 'cost_feasibility',
           status: (() => {
+            // SoT: read from costSummary when available
+            const cs = state.costSummary
+            if (cs) return cs.isOverBudget ? 'WARN' : 'PASS'
             const cost = state.costBreakdown?.unitTotalGbp
             const ceil = state.costBreakdown?.ceilingGbp ?? state.research?.designBrief?.constraints?.unitCostCeilingGbp
             if (!cost) return 'WARN'
@@ -828,6 +836,16 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
             return cost <= ceil ? 'PASS' : 'WARN'
           })(),
           reason: (() => {
+            // SoT: read from costSummary when available
+            const cs = state.costSummary
+            if (cs) {
+              const cost = cs.finalUnitCost
+              const ceil = cs.ceilingCost
+              if (!ceil) return `Unit cost ${fmtGbp(cost)}. No ceiling specified.`
+              return cs.isOverBudget
+                ? `Unit cost ${fmtGbp(cost)} exceeds ceiling ${fmtGbp(ceil)}`
+                : `Unit cost ${fmtGbp(cost)} is within ceiling`
+            }
             const cost = state.costBreakdown?.unitTotalGbp
             const ceil = state.costBreakdown?.ceilingGbp ?? state.research?.designBrief?.constraints?.unitCostCeilingGbp
             if (!cost) return 'Cost not yet computed'
@@ -836,7 +854,7 @@ const FeasibilityGatePage = ({ state }: { state: PipelineState }) => {
               ? `Unit cost ${fmtGbp(cost)} is within ceiling`
               : `Unit cost ${fmtGbp(cost)} exceeds ceiling ${fmtGbp(ceil)}`
           })(),
-          evidence: fmtGbp(state.costBreakdown?.unitTotalGbp),
+          evidence: fmtGbp(state.costSummary?.finalUnitCost ?? state.costBreakdown?.unitTotalGbp),
         },
         {
           checkId: 'risk_matrix_populated',
@@ -1245,8 +1263,10 @@ const ModuleOverviewTable = ({ state }: { state: PipelineState }) => {
       : MUTED
 
     const bomCount = state.parts?.filter(p => p.sourceModuleId === m.id).length ?? 0
+    // SoT: read module cost from costSummary.byModule (raw BOM, pre-overhead)
+    const sotMod = state.costSummary?.byModule[m.id]
     const perMod = cb?.perModule?.find(pm => pm.moduleName === m.name)
-    const costGbp = (m as any).estimatedCostGbp ?? perMod?.totalGbp ?? null
+    const costGbp = (m as any).estimatedCostGbp ?? sotMod?.rawGbp ?? perMod?.totalGbp ?? null
 
     return [
       { text: dash(m.name), bold: true },
@@ -1390,13 +1410,21 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
           }
         })
 
-        // Module total
+        // Module total — read from costSummary.byModule (SoT) when available.
+        // Falls back to reducing parts for legacy v1 pipeline compat.
         let tbdCount = 0
-        const moduleTotal = modParts.reduce((acc, p) => {
-          if ((p as any).priceSource === 'manifest_no_price') { tbdCount++; return acc }
-          const q = state.bomLines?.find(bl => bl.childPartId === p.partNumber || bl.childPartId === p.id)?.quantity ?? 1
-          return acc + (p.estimatedUnitCostGbp ?? 0) * q
-        }, 0)
+        const _sotModuleTotal = state.costSummary?.byModule[m.id]?.rawGbp ?? null
+        const moduleTotal = _sotModuleTotal !== null
+          ? (() => {
+              // Count TBD parts even when using SoT total
+              modParts.forEach(p => { if ((p as any).priceSource === 'manifest_no_price') tbdCount++ })
+              return _sotModuleTotal
+            })()
+          : modParts.reduce((acc, p) => {
+              if ((p as any).priceSource === 'manifest_no_price') { tbdCount++; return acc }
+              const q = state.bomLines?.find(bl => bl.childPartId === p.partNumber || bl.childPartId === p.id)?.quantity ?? 1
+              return acc + (p.estimatedUnitCostGbp ?? 0) * q
+            }, 0)
 
         return (
           <Page key={idx} size="A4" style={s.page}>
@@ -1488,6 +1516,11 @@ const ModuleDetailSection = ({ state }: { state: PipelineState }) => {
 
 // ─── Cost Section ──────────────────────────────────────────────────────────────
 const CostSection = ({ state }: { state: PipelineState }) => {
+  // ── Read ALL cost figures from canonical CostSummary SoT ─────────────────
+  // costSummary is computed once by Stage 4 and is the single source of truth.
+  // Do NOT read from costBreakdown for cost computation — only use it for
+  // legacy v1 pipeline compatibility when costSummary is absent.
+  const cs = state.costSummary
   const cb = state.costBreakdown as CostBreakdown & {
     overheadLines?: Array<{ label: string; gbp: number }>
     nreItems?: Array<{ label: string; gbp: number }>
@@ -1496,27 +1529,31 @@ const CostSection = ({ state }: { state: PipelineState }) => {
     perModule?: Array<{ moduleName: string; totalGbp: number; pctOfBom?: number; grade?: string }>
   } | null
 
-  // D FIX (2026-05-09): read narrative from costWaterfall (populated by v2 BOM stage)
-  // The narrative explains cost drivers and volume reduction paths — previously absent.
+  // Cost narrative: from costWaterfall (generated by Stage 4, computed against real numbers)
   const costWaterfall = (state as any).costWaterfall as { narrativeMarkdown?: string } | undefined
   const costNarrative = costWaterfall?.narrativeMarkdown || null
 
   const brief = state.research?.designBrief
-  const unitCost = cb?.unitTotalGbp
-  const ceiling = cb?.ceilingGbp ?? brief?.constraints?.unitCostCeilingGbp ?? null
-  const rawBom = cb?.rawBomCostGbp ?? (unitCost ? unitCost / (cb?.overheadMultiplier || 1.5) : 0)
+  // All numeric cost values read from costSummary (SoT), falling back to costBreakdown for v1 compat
+  const unitCost = cs?.finalUnitCost ?? cb?.unitTotalGbp
+  const ceiling = cs?.ceilingCost ?? cb?.ceilingGbp ?? brief?.constraints?.unitCostCeilingGbp ?? null
+  // rawBom: MUST come from costSummary.bomTotal — never divide back through overhead multiplier
+  const rawBom = cs?.bomTotal ?? cb?.rawBomCostGbp ?? 0
 
-  const ceilingExceeded = unitCost && ceiling && unitCost > ceiling
-  const overBy = (ceilingExceeded && unitCost && ceiling) ? unitCost - ceiling : null
+  const ceilingExceeded = cs ? cs.isOverBudget : !!(unitCost && ceiling && unitCost > ceiling)
+  const overBy = ceilingExceeded ? (cs?.varianceVsCeiling ?? (unitCost && ceiling ? unitCost - ceiling : null)) : null
   const overPct = (overBy && ceiling) ? (overBy / ceiling) * 100 : null
 
-  // Overhead lines — prefer structured data, fall back to computed breakdown
+  // Overhead table: built from costSummary (bomTotal is the SoT base)
+  // Prefer structured overheadLines if present (legacy path); otherwise build from SoT
   const hasOverheadLines = Array.isArray(cb?.overheadLines) && (cb?.overheadLines?.length ?? 0) > 0
+  const overheadMultiplier = cs?.overheadMultiplier ?? cb?.overheadMultiplier ?? 1.5
+  const assemblyCost = cs?.assemblyCost ?? (rawBom * (overheadMultiplier - 1))
   const overheadLines: Array<{ label: string; value: string }> = hasOverheadLines
     ? cb!.overheadLines!.map(ol => ({ label: ol.label, value: fmtGbp(ol.gbp) }))
     : [
         { label: 'BOM Total', value: fmtGbp(rawBom) },
-        { label: 'Assembly Labour (15%)', value: fmtGbp(rawBom * 0.15) },
+        { label: `Assembly Labour (${Math.round((overheadMultiplier - 1) * 60)}%)`, value: fmtGbp(rawBom * (overheadMultiplier - 1) * 0.6) },
         { label: 'Factory Testing (5%)', value: fmtGbp(rawBom * 0.05) },
         { label: 'Shipping (2%)', value: fmtGbp(rawBom * 0.02) },
         { label: 'Overheads (8%)', value: fmtGbp(rawBom * 0.08) },
@@ -1529,9 +1566,9 @@ const CostSection = ({ state }: { state: PipelineState }) => {
   const regs = brief?.regulatory ?? []
   const productClass = state.productClass || state.research?.industryDomain || ''
   const nreBreakdown = computeNreFromRegulatory(regs, productClass)
-  const nreTotal = hasNreItems
+  const nreTotal = cs?.nreTotal ?? (hasNreItems
     ? cb!.nreItems!.reduce((a, n) => a + n.gbp, 0)
-    : (nreBreakdown.totalGbp > 0 ? nreBreakdown.totalGbp : (cb?.nreTotalGbp ?? 0))
+    : (nreBreakdown.totalGbp > 0 ? nreBreakdown.totalGbp : (cb?.nreTotalGbp ?? 0)))
 
   const nreCols = [
     { label: 'NRE Item', width: '70%' },
@@ -1547,22 +1584,32 @@ const CostSection = ({ state }: { state: PipelineState }) => {
         { text: fmtGbp(item.estimatedCostGbp), align: 'right' as const },
       ])
 
-  // BOM by module
+  // BOM by module — read from costSummary.byModule (pre-overhead, raw BOM subtotals)
+  // Fall back to costBreakdown.perModule for v1 pipeline compat
   const perModuleCols = [
     { label: 'Module', width: '44%' },
     { label: 'BOM Cost', width: '22%', align: 'right' as const },
     { label: '% of BOM', width: '14%', align: 'right' as const },
     { label: 'Grade', width: '20%' },
   ]
-  const perModuleRows = (cb?.perModule ?? []).map(pm => [
-    { text: dash(pm.moduleName), bold: true },
-    { text: fmtGbp(pm.totalGbp), align: 'right' as const },
-    {
-      text: (pm as any).pctOfBom != null ? `${((pm as any).pctOfBom as number).toFixed(1)}%` : '—',
-      align: 'right' as const,
-    },
-    { text: (pm as any).grade ? gradeTag((pm as any).grade) : '[?]' },
-  ])
+  const perModuleRows = cs
+    // SoT path: read raw BOM subtotals from costSummary.byModule
+    ? Object.values(cs.byModule).map(mod => [
+        { text: dash(mod.moduleName), bold: true },
+        { text: fmtGbp(mod.rawGbp), align: 'right' as const },
+        { text: `${mod.pctOfBom.toFixed(1)}%`, align: 'right' as const },
+        { text: '[D]' },
+      ])
+    // Legacy fallback: costBreakdown.perModule
+    : (cb?.perModule ?? []).map(pm => [
+        { text: dash(pm.moduleName), bold: true },
+        { text: fmtGbp(pm.totalGbp), align: 'right' as const },
+        {
+          text: (pm as any).pctOfBom != null ? `${((pm as any).pctOfBom as number).toFixed(1)}%` : '—',
+          align: 'right' as const,
+        },
+        { text: (pm as any).grade ? gradeTag((pm as any).grade) : '[?]' },
+      ])
 
   // Cost reduction paths — prefer structured data, fall back to static
   const hasReductionPaths = Array.isArray(cb?.reductionPaths) && (cb?.reductionPaths?.length ?? 0) > 0
@@ -1618,11 +1665,11 @@ const CostSection = ({ state }: { state: PipelineState }) => {
 
           <TealH2>BOM Cost by Module</TealH2>
           <DarkHeaderTable cols={perModuleCols} rows={perModuleRows} />
-          {/* D FIX (2026-05-09): BOM subtotal row under the per-module table */}
-          {(cb?.perModule?.length ?? 0) > 0 && (
+          {/* BOM subtotal row — read from costSummary.bomTotal (SoT), never recomputed */}
+          {(cs ? Object.keys(cs.byModule).length > 0 : (cb?.perModule?.length ?? 0) > 0) && (
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginTop: -10, marginBottom: 12 }} wrap={false}>
               <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold' }}>
-                BOM Subtotal: {fmtGbp(cb!.perModule!.reduce((s, m) => s + m.totalGbp, 0))} (100% = loaded BOM)
+                BOM Subtotal: {fmtGbp(cs?.bomTotal ?? cb?.perModule?.reduce((s, m) => s + m.totalGbp, 0) ?? 0)} (100% = loaded BOM)
               </Text>
             </View>
           )}
@@ -1858,7 +1905,7 @@ const AuditLogSection = ({ state }: { state: PipelineState }) => {
         { step: 'Research', status: state.research ? 'Complete' : 'BLOCKED', durationMs: null, source: 'LLM', notes: state.research ? 'Research complete' : 'Research not run' },
         { step: 'Module Decomposition', status: (state.modules?.length ?? 0) > 0 ? 'Complete' : 'BLOCKED', durationMs: null, source: 'LLM', notes: `${state.modules?.length ?? 0} modules created` },
         { step: 'Sizing Solver', status: state.dimensionSheet ? (state.dimensionSheet.feasible ? 'FEASIBLE' : 'INFEASIBLE') : 'BLOCKED', durationMs: null, source: 'Deterministic', notes: state.dimensionSheet?.feasible ? 'Feasible layout' : 'No layout data' },
-        { step: 'BOM and Cost', status: (state.parts?.length ?? 0) > 0 ? 'Complete' : 'BLOCKED', durationMs: null, source: 'LLM + Deterministic', notes: `${state.parts?.length ?? 0} BOM lines, total ${fmtGbp(state.costBreakdown?.unitTotalGbp)}` },
+        { step: 'BOM and Cost', status: (state.parts?.length ?? 0) > 0 ? 'Complete' : 'BLOCKED', durationMs: null, source: 'LLM + Deterministic', notes: `${state.parts?.length ?? 0} BOM lines, total ${fmtGbp(state.costSummary?.finalUnitCost ?? state.costBreakdown?.unitTotalGbp)}` },
         { step: 'Assembly Shortlist', status: (state.suppliers?.length ?? 0) > 0 ? 'Complete' : 'WARN', durationMs: null, source: 'Corpus + API', notes: `${state.suppliers?.length ?? 0} assembly partner matches` },
         { step: 'Feasibility Gate', status: 'Complete', durationMs: null, source: 'Deterministic', notes: 'Gate checks evaluated' },
         { step: 'PDF Generation', status: 'Complete', durationMs: null, source: 'ForgeOS PDF Engine v3', notes: 'BESS-style renderer' },
@@ -2178,13 +2225,13 @@ export default function PdfRendererV3({ state }: { state: PipelineState }) {
     _fmeaPreCount > 0,  // risk_matrix_populated
   ]
   const _gateHasFail = !_gateChecks.every(Boolean)
-  // cost_feasibility WARN check
-  const _activeCeiling = safe.costBreakdown?.ceilingGbp ?? safe.research?.designBrief?.constraints?.unitCostCeilingGbp
-  const _costExceedsCeiling = !!(
-    safe.costBreakdown?.unitTotalGbp &&
-    _activeCeiling &&
-    safe.costBreakdown.unitTotalGbp > _activeCeiling
-  )
+  // cost_feasibility WARN check — SoT: read from costSummary when available
+  const _costExceedsCeiling = safe.costSummary
+    ? safe.costSummary.isOverBudget
+    : (() => {
+        const _activeCeiling = safe.costBreakdown?.ceilingGbp ?? safe.research?.designBrief?.constraints?.unitCostCeilingGbp
+        return !!(safe.costBreakdown?.unitTotalGbp && _activeCeiling && safe.costBreakdown.unitTotalGbp > _activeCeiling)
+      })()
   _preState.coverVerdict = _gateHasFail ? 'NOT FEASIBLE' : _costExceedsCeiling ? 'CONDITIONAL' : 'FEASIBLE'
 
   // ToC: only render when estimated page count > 25 AND FULL_REPORT.

@@ -480,6 +480,48 @@ export interface CostReductionPath {
   feasible: 'Yes' | 'No' | 'Maybe' | 'At volume'
 }
 
+/**
+ * CostSummary — single canonical source of truth for all cost consumers.
+ *
+ * Computed ONCE at the end of Stage 4 (runBomCostSuppliers) and stored on
+ * PipelineState. ALL downstream consumers — cover page, cost waterfall,
+ * overhead table, cost narrative, module subtotals — MUST read from this
+ * object. Never recompute a BOM total downstream.
+ *
+ * Universal: works for any product class (BESS, drone, vertical farm, etc.).
+ * The numbers come from LLM-emitted BOM line items; the structure is constant.
+ */
+export interface CostSummary {
+  /** Sum of all BOM line item totals: unitCostGbp × quantity, raw (no overhead). */
+  bomTotal: number
+  /** bomTotal × (overheadMultiplier - 1) — the markup above raw BOM. */
+  assemblyCost: number
+  /** bomTotal × overheadMultiplier — the fully-loaded unit cost. */
+  finalUnitCost: number
+  /** The overhead multiplier applied (e.g. 1.5). */
+  overheadMultiplier: number
+  /** NRE total for this product (certification, tooling, test). */
+  nreTotal: number
+  /** Brief ceiling in GBP, or null when the brief has no cost ceiling. */
+  ceilingCost: number | null
+  /** finalUnitCost − ceilingCost. Negative = over budget. */
+  varianceVsCeiling: number | null
+  /** True when finalUnitCost > ceilingCost. */
+  isOverBudget: boolean
+  /** Per-module BOM subtotals (raw, pre-overhead). moduleId → GBP. */
+  byModule: Record<string, { moduleName: string; rawGbp: number; pctOfBom: number }>
+  /** Top cost drivers (top 5 BOM lines by extended cost, descending). */
+  topDrivers: Array<{ partName: string; pct: number; totalGbp: number; costSource: string }>
+  /** Split of buy (distributor-quoted), buy (estimated), make costs within bomTotal. */
+  buyDistributorGbp: number
+  buyEstimatedGbp: number
+  makeEstimatedGbp: number
+  /** Fraction of bomTotal backed by real distributor prices (0–1). */
+  quotedCostFraction: number
+  /** Percentage by which finalUnitCost exceeds ceilingCost, or null. */
+  overBudgetPct: number | null
+}
+
 /** Extends CostBreakdown with PA Stage 7b fields for the BESS-style renderer. */
 export interface CostBreakdownPA extends CostBreakdown {
   /** Explicit named overhead lines (assembly, test, shipping, overheads, contingency) */
@@ -715,6 +757,13 @@ export interface PipelineState {
   parts: Part[]
   bomLines: BomLine[]
   costBreakdown: CostBreakdown | null
+  /**
+   * Canonical cost source of truth — computed ONCE by Stage 4 (runBomCostSuppliers).
+   * ALL downstream consumers (cover page, cost waterfall, overhead table, narrative,
+   * module subtotals) MUST read from this. Never recompute BOM totals downstream.
+   * Optional so legacy v1 pipeline and partial-state renders do not crash.
+   */
+  costSummary?: CostSummary
   reviews: SpecialistReview[]
   suppliers: SupplierMatch[]
   proofreadFindings: string | null

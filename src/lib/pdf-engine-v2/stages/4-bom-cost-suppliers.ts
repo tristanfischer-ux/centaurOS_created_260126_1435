@@ -285,6 +285,8 @@ export interface BomCostSuppliersInput {
 export interface BomCostSuppliersOutput {
   bomLines: IntegratedBomLine[]
   costWaterfall: CostWaterfall
+  /** Canonical cost source of truth — stored on PipelineState.costSummary. */
+  costSummary: import('../types').CostSummary
   sectionBom: string
   sectionCost: string
   sectionSuppliers: string
@@ -1538,33 +1540,33 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       pctOfBom: _grandTotalModuleGbp > 0 ? (m.totalGbp / _grandTotalModuleGbp) * 100 : 0,
     }))
 
-    // ── Phase 6: WRITE_COST_NARRATIVE (with real cost view) ──────────────
-    // If LLM already returned a narrative, use it. Otherwise generate one now.
-    let narrativeMarkdown = llmNarrative
-
-    if (!narrativeMarkdown) {
-      // Highest cost line
-      const highestLine = [...integratedLines].sort((a, b) => (b.unitCostGbp * b.quantity) - (a.unitCostGbp * a.quantity))[0]
-      narrativeMarkdown = [
-        `The estimated per-unit cost is £${unitTotalGbp.toFixed(2)} at a batch size of ${batchSize} units, ` +
-        (ceilingGbp
-          ? `against a target ceiling of £${ceilingGbp.toFixed(2)} — ${exceedsCeiling ? `exceeding the ceiling by ${Math.abs(gapPct ?? 0).toFixed(1)}%.` : `within budget.`}`
-          : 'with no cost ceiling specified.'),
-        '',
-        `Buy parts (distributor-quoted) account for £${buyDistributorGbp.toFixed(2)} ` +
-        `(${(quotedCostFraction * 100).toFixed(0)}% of raw BOM cost). ` +
-        `Buy parts estimated without a distributor match contribute a further £${buyEstimatedGbp.toFixed(2)}. ` +
-        `Make (custom-fabricated) parts are estimated at £${makeEstimatedGbp.toFixed(2)} — ` +
-        `these are Grade D expert estimates pending supplier request for quotation.`,
-        '',
-        highestLine
-          ? `The highest-cost line is **${highestLine.name}** at £${(highestLine.unitCostGbp * highestLine.quantity).toFixed(2)} ` +
-            `(${highestLine.costSource} source). ` +
-            `The primary cost-reduction opportunity is to obtain supplier quotes for Make parts and ` +
-            `evaluate alternative distributor sources for the highest-cost Buy lines.`
-          : '',
-      ].filter(Boolean).join('\n')
-    }
+    // ── Phase 6: Deterministic cost narrative from real computed figures ─────
+    // The LLM narrative (llmNarrative) was generated BEFORE Buy/Make cost
+    // resolution, so it contains the LLM's imagined cost figures — not the
+    // real distributor-quoted prices. We ALWAYS generate the narrative
+    // deterministically from the resolved costWaterfall numbers. This eliminates
+    // the class of bug where the narrative says "£142,500 within budget" while
+    // the waterfall shows £587k over budget.
+    const highestLine = [...integratedLines].sort((a, b) => (b.unitCostGbp * b.quantity) - (a.unitCostGbp * a.quantity))[0]
+    const narrativeMarkdown = [
+      `The estimated per-unit cost is £${unitTotalGbp.toFixed(2)} at a batch size of ${batchSize} units, ` +
+      (ceilingGbp
+        ? `against a target ceiling of £${ceilingGbp.toFixed(2)} — ${exceedsCeiling ? `exceeding the ceiling by ${Math.abs(gapPct ?? 0).toFixed(1)}% (£${(unitTotalGbp - ceilingGbp).toFixed(2)} over).` : `within budget (headroom: £${(ceilingGbp - unitTotalGbp).toFixed(2)}).`}`
+        : 'with no cost ceiling specified.'),
+      '',
+      `Buy parts (distributor-quoted) account for £${buyDistributorGbp.toFixed(2)} ` +
+      `(${(quotedCostFraction * 100).toFixed(0)}% of raw BOM cost). ` +
+      `Buy parts estimated without a distributor match contribute a further £${buyEstimatedGbp.toFixed(2)}. ` +
+      `Make (custom-fabricated) parts are estimated at £${makeEstimatedGbp.toFixed(2)} — ` +
+      `these are Grade D expert estimates pending supplier request for quotation.`,
+      '',
+      highestLine
+        ? `The highest-cost line is **${highestLine.name}** at £${(highestLine.unitCostGbp * highestLine.quantity).toFixed(2)} ` +
+          `(${highestLine.costSource} source). ` +
+          `The primary cost-reduction opportunity is to obtain supplier quotes for Make parts and ` +
+          `evaluate alternative distributor sources for the highest-cost Buy lines.`
+        : '',
+    ].filter(Boolean).join('\n')
 
     const costWaterfall: CostWaterfall = {
       rawBomCostGbp,
@@ -1610,6 +1612,54 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       })),
     }
 
+    // ── Canonical CostSummary — computed ONCE, read by all downstream consumers ──
+    // All cost numbers (cover page, overhead table, cost narrative, module subtotals)
+    // MUST be derived from this object. Never recompute BOM totals downstream.
+    const _isOverBudget = ceilingGbp !== null && unitTotalGbp > ceilingGbp
+    const _varianceVsCeiling = ceilingGbp !== null ? unitTotalGbp - ceilingGbp : null
+    const _overBudgetPct = (_isOverBudget && ceilingGbp) ? ((unitTotalGbp - ceilingGbp) / ceilingGbp) * 100 : null
+
+    // Top cost drivers: top 5 BOM lines by extended cost, descending
+    const _linesSorted = [...integratedLines]
+      .map(l => ({ name: l.name, total: l.unitCostGbp * l.quantity, src: l.costSource }))
+      .sort((a, b) => b.total - a.total)
+    const _topDrivers = _linesSorted.slice(0, 5).map(l => ({
+      partName: l.name,
+      totalGbp: l.total,
+      pct: rawBomCostGbp > 0 ? (l.total / rawBomCostGbp) * 100 : 0,
+      costSource: l.src,
+    }))
+
+    // Per-module raw BOM subtotals (pre-overhead, matching the BOM line items)
+    const _byModule: import('../types').CostSummary['byModule'] = {}
+    for (const m of costWaterfall.perModule) {
+      // perModule.totalGbp has overhead applied — strip it back to get raw BOM cost per module
+      const rawModGbp = overhead.multiplier > 0 ? m.totalGbp / overhead.multiplier : m.totalGbp
+      _byModule[m.moduleId] = {
+        moduleName: m.moduleName,
+        rawGbp: rawModGbp,
+        pctOfBom: rawBomCostGbp > 0 ? (rawModGbp / rawBomCostGbp) * 100 : 0,
+      }
+    }
+
+    const costSummary: import('../types').CostSummary = {
+      bomTotal: rawBomCostGbp,
+      assemblyCost: assemblyCostGbp,
+      finalUnitCost: unitTotalGbp,
+      overheadMultiplier: overhead.multiplier,
+      nreTotal: nreTotalGbp,
+      ceilingCost: ceilingGbp ?? null,
+      varianceVsCeiling: _varianceVsCeiling,
+      isOverBudget: _isOverBudget,
+      byModule: _byModule,
+      topDrivers: _topDrivers,
+      buyDistributorGbp,
+      buyEstimatedGbp,
+      makeEstimatedGbp,
+      quotedCostFraction,
+      overBudgetPct: _overBudgetPct,
+    }
+
     const verifiedCount = integratedLines.filter(l => l.verification_status === 'verified').length
     const estimatedCount = integratedLines.filter(l => l.verification_status === 'estimated').length
     console.log(
@@ -1617,7 +1667,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       `${verifiedCount} VERIFIED + ${estimatedCount} ESTIMATED, ` +
       `${buyLines.length} Buy (${buyDistributorGbp > 0 ? 'some distributor-quoted' : 'all estimated'}), ` +
       `${makeLines.length} Make, ` +
-      `£${unitTotalGbp.toFixed(2)} total`
+      `£${unitTotalGbp.toFixed(2)} total (bomTotal: £${rawBomCostGbp.toFixed(2)})`
     )
 
     return {
@@ -1625,6 +1675,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       data: {
         bomLines: integratedLines,
         costWaterfall,
+        costSummary,
         sectionBom,
         sectionCost,
         sectionSuppliers,

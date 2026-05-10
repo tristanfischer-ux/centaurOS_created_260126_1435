@@ -1110,6 +1110,7 @@ export async function runPipeline(
       quantity: bl.quantity,
     }))
     state.costBreakdown = d.costBreakdown                         // backwards compat
+    state.costSummary = d.costSummary                             // canonical SoT for all cost consumers
     state.suppliers = d.supplierMatches                           // backwards compat — skip stage 5
     ;(state as any).costWaterfall = d.costWaterfall
     ;(state as any).integratedBomLines = d.bomLines
