@@ -225,6 +225,254 @@ export function deriveBessQuantityOverrides(params: {
   return { quantities, mandatoryCharacters }
 }
 
+// ---------------------------------------------------------------------------
+// Per-class mandatory character sets for non-BESS product classes
+// Prevents cross-contamination: without a mandatory set, LLM outputs generic
+// shared characters (e.g. liquid_cooling_system) that map to BESS/heat-pump
+// sentences via the character hierarchy. The mandatory set pins the tree shape.
+// ---------------------------------------------------------------------------
+
+/**
+ * Mandatory character list for Drone/UAV briefs.
+ * Characters only appear in drone-specific words (airframe_body, propulsion_motors,
+ * avionics_compute). Does NOT include liquid_cooling_system (would land in BESS
+ * thermal sentence), fire_suppression_system, ems_controller etc.
+ */
+export function deriveDroneMandatoryCharacters(): string[] {
+  return [
+    // Airframe structure
+    'aluminium_extrusion',  // airframe_body
+    'steel_bolt',           // airframe_body fasteners
+    'polymer_enclosure',    // airframe_body housing
+    // Propulsion
+    'power_converter',      // propulsion_motors (ESC / motor driver)
+    'copper_wire',          // propulsion_motors wiring
+    // Avionics
+    'pcb_controller',       // avionics_compute (flight computer)
+    'network_switch',       // avionics_compute (comm hub)
+  ]
+}
+
+/**
+ * Mandatory character list for CGM (Continuous Glucose Monitor) wearable briefs.
+ * Maps only to biosensor_hardware and edge_compute_hardware sentences.
+ * No BESS, heat pump, or drone characters.
+ */
+export function deriveCgmMandatoryCharacters(): string[] {
+  return [
+    // Biosensor system
+    'pcb_controller',   // biosensor_hardware (analogue front-end + MCU)
+    'copper_wire',      // biosensor_hardware (flex harness)
+    // Polymer sealing / biocompat housing
+    'polymer_enclosure',  // hull_structure (outer waterproof shell) — closest hierarchy match
+    'polymer_gasket',     // hull_structure (O-ring/seal for IP67)
+  ]
+}
+
+/**
+ * Mandatory character list for Heat Pump briefs.
+ * Pins to refrigerant_circuit, hydronic_circuit, heat_pump_controls, heat_pump_enclosure.
+ * Excludes BESS/battery characters.
+ */
+export function deriveHeatPumpMandatoryCharacters(): string[] {
+  return [
+    // Refrigerant cycle
+    'liquid_cooling_system',  // refrigerant_cycle (compressor + loop)
+    'copper_wire',            // refrigerant_distribution (wiring)
+    'polymer_gasket',         // refrigerant_distribution (seals)
+    // Hydronic connections
+    'copper_terminal',        // hydronic_connections
+    // Controls
+    'pcb_controller',         // hp_controls_compute
+    // Enclosure
+    'polymer_enclosure',      // hp_enclosure_structure
+    'aluminium_extrusion',    // hp_enclosure_structure frame
+    'steel_plate',            // hp_enclosure_structure sheet metal
+    'steel_bolt',             // hp_enclosure_structure fasteners
+  ]
+}
+
+/**
+ * Mandatory character list for Vertical Farm briefs.
+ * Pins to growing_rack_system, lighting_system, fertigation_loop, hvac_co2_system.
+ */
+export function deriveVerticalFarmMandatoryCharacters(): string[] {
+  return [
+    // Growing rack
+    'aluminium_extrusion',    // rack_structure_vfarm
+    'steel_bolt',             // rack_structure_vfarm fasteners
+    // Lighting
+    'pcb_controller',         // lighting_fixtures (LED driver board)
+    'copper_wire',            // lighting_fixtures wiring
+    // Fertigation
+    'liquid_cooling_system',  // fertigation_flow (pump/loop — closest character)
+    'polymer_gasket',         // fertigation_flow (seals)
+    // HVAC/CO2
+    'pressure_vessel',        // co2_dosing (CO2 cylinder)
+    'gas_sensor',             // co2_dosing (CO2 sensor)
+  ]
+}
+
+/**
+ * Mandatory character list for EV Charger briefs.
+ * Pins to charger_power_conversion, charger_enclosure.
+ */
+export function deriveEvChargerMandatoryCharacters(): string[] {
+  return [
+    // Charger PCS
+    'power_converter',        // charger_pcs (rectifier/PFC)
+    'transformer',            // charger_pcs (isolation transformer)
+    'circuit_breaker',        // charger_pcs (protection)
+    // Enclosure
+    'switchboard_enclosure',  // charger_enclosure_structure
+    'polymer_enclosure',      // charger_enclosure_structure (door/front)
+  ]
+}
+
+/**
+ * Mandatory character list for Bioreactor briefs.
+ * Pins to bioreactor_vessel, bioreactor_controls.
+ */
+export function deriveBioreactorMandatoryCharacters(): string[] {
+  return [
+    // Vessel body
+    'pressure_vessel',  // bioreactor_vessel_body (steel autoclave vessel)
+    'polymer_gasket',   // bioreactor_vessel_body (seals)
+    'steel_plate',      // bioreactor_vessel_body (flanges)
+    // Controls and sensing
+    'gas_sensor',         // bioreactor_sensing (pH/DO/temp sensor)
+    'pcb_controller',     // bioreactor_sensing (controller)
+    'optical_arc_sensor', // bioreactor_sensing (optical sensor for OD)
+  ]
+}
+
+/**
+ * Mandatory character list for Edge AI Server briefs.
+ * Pins to edge_compute_system.
+ */
+export function deriveEdgeAiMandatoryCharacters(): string[] {
+  return [
+    // Edge compute hardware
+    'pcb_controller',  // edge_compute_hardware (GPU/TPU board)
+    'network_switch',  // edge_compute_hardware (comm switch)
+    'copper_wire',     // edge_compute_hardware (harness)
+  ]
+}
+
+/**
+ * Mandatory character list for AUV (Autonomous Underwater Vehicle) briefs.
+ * Pins to hull_and_buoyancy, edge_compute_system.
+ */
+export function deriveAuvMandatoryCharacters(): string[] {
+  return [
+    // Hull and buoyancy
+    'polymer_enclosure',  // hull_structure (pressure hull)
+    'aluminium_extrusion', // hull_structure (frame)
+    'polymer_gasket',     // hull_structure (O-ring seals)
+    // Compute
+    'pcb_controller',     // edge_compute_hardware (mission computer)
+    'network_switch',     // edge_compute_hardware (acoustic/ethernet switch)
+    'copper_wire',        // edge_compute_hardware (harness)
+  ]
+}
+
+/**
+ * Mandatory character list for HAPS (High Altitude Pseudo-Satellite) briefs.
+ * Pins to haps_airframe, propulsion_system, edge_compute_system.
+ */
+export function deriveHapsMandatoryCharacters(): string[] {
+  return [
+    // HAPS airframe
+    'aluminium_extrusion', // haps_structure (spar/frame)
+    'steel_bolt',          // haps_structure (fasteners)
+    'polymer_enclosure',   // haps_structure (nacelle/pod)
+    // Propulsion
+    'power_converter',     // propulsion_motors (motor driver)
+    'copper_wire',         // propulsion_motors (wiring)
+    // Avionics / compute
+    'pcb_controller',      // edge_compute_hardware (flight computer)
+    'network_switch',      // edge_compute_hardware (comms)
+  ]
+}
+
+/**
+ * Resolve the mandatory character set and optional quantity overrides for ANY
+ * product class. Returns undefined for quantity overrides when the class has no
+ * physics-derived quantities (all quantities come from LLM then).
+ *
+ * This is the single call site for 2-decompose.ts — it replaces the ad-hoc
+ * BESS-only check that caused cross-contamination for all other classes.
+ */
+export function deriveClassMandatoryCharacters(
+  classification: string,
+  parsedBriefConstraints?: { target_performance?: { value?: number | null } },
+): {
+  mandatoryCharacters: string[]
+  quantityOverrides?: Record<string, number>
+} {
+  const cls = classification.toLowerCase()
+
+  // BESS — physics-derived quantities from brief
+  if (cls === 'battery_energy_storage' || cls === 'bess' || cls.includes('energy_storage')) {
+    const perfValue = parsedBriefConstraints?.target_performance?.value
+    if (typeof perfValue === 'number') {
+      const derived = deriveBessQuantityOverrides({ usableKwh: perfValue })
+      return { mandatoryCharacters: derived.mandatoryCharacters, quantityOverrides: derived.quantities }
+    }
+    // BESS without energy figure — use mandatory set only, no quantity overrides
+    const derived = deriveBessQuantityOverrides({ usableKwh: 3500 }) // safe fallback
+    return { mandatoryCharacters: derived.mandatoryCharacters, quantityOverrides: undefined }
+  }
+
+  // Drone / UAV
+  if (cls.includes('drone') || cls.includes('uav') || cls.includes('quadcopter') || cls.includes('multirotor')) {
+    return { mandatoryCharacters: deriveDroneMandatoryCharacters() }
+  }
+
+  // CGM / wearable medical
+  if (cls.includes('cgm') || cls.includes('glucose') || cls.includes('wearable') || cls.includes('biosensor')) {
+    return { mandatoryCharacters: deriveCgmMandatoryCharacters() }
+  }
+
+  // Heat pump / thermal system
+  if (cls.includes('heat_pump') || cls.includes('thermal_system') || cls.includes('heat pump')) {
+    return { mandatoryCharacters: deriveHeatPumpMandatoryCharacters() }
+  }
+
+  // Vertical farm / CEA
+  if (cls.includes('vertical_farm') || cls.includes('farm') || cls.includes('cea') || cls.includes('greenhouse')) {
+    return { mandatoryCharacters: deriveVerticalFarmMandatoryCharacters() }
+  }
+
+  // EV charger
+  if (cls.includes('ev_charger') || cls.includes('charger') || cls.includes('ev charger')) {
+    return { mandatoryCharacters: deriveEvChargerMandatoryCharacters() }
+  }
+
+  // Bioreactor
+  if (cls.includes('bioreactor') || cls.includes('ferment')) {
+    return { mandatoryCharacters: deriveBioreactorMandatoryCharacters() }
+  }
+
+  // Edge AI / server
+  if (cls.includes('edge_ai') || cls.includes('edge ai') || cls.includes('server') || cls.includes('compute')) {
+    return { mandatoryCharacters: deriveEdgeAiMandatoryCharacters() }
+  }
+
+  // AUV / underwater
+  if (cls.includes('auv') || cls.includes('underwater') || cls.includes('subsea') || cls.includes('rov')) {
+    return { mandatoryCharacters: deriveAuvMandatoryCharacters() }
+  }
+
+  // HAPS / stratospheric
+  if (cls.includes('haps') || cls.includes('stratospheric') || cls.includes('pseudo-satellite')) {
+    return { mandatoryCharacters: deriveHapsMandatoryCharacters() }
+  }
+
+  // Unknown class — return empty (no contamination protection, but no false mandatory chars)
+  return { mandatoryCharacters: [] }
+}
+
 /**
  * Build a deterministic RadicalTree from a flat leaf list.
  *

@@ -89,6 +89,280 @@ const DocPageFooter = () => (
   </View>
 )
 
+// ---------------------------------------------------------------------------
+// P3 — Executive Summary (3-paragraph narrative)
+// Synthesises from existing pipeline data — no new LLM call.
+// ---------------------------------------------------------------------------
+
+function buildExecutiveSummary(state: PipelineState): { p1: string; p2: string; p3: string } {
+  const brief = state.research?.designBrief
+  const cs = state.radicalCostSummary ?? state.costSummary
+  const grammarVerdicts = state.grammarVerdicts
+  const resolvedTree = state.resolvedRadicalTree
+  const productClass = dash(state.productClass)
+  const useCase = dash(brief?.useCase)
+
+  // §1 Product description paragraph
+  const radicalCs = state.radicalCostSummary
+  const bomLineCount = radicalCs
+    ? Math.round(radicalCs.radicalMeta?.total_leaves ?? cs?.topDrivers?.length ?? 0)
+    : Math.round(cs?.topDrivers?.length ?? 0)
+  const unitCostGbp = cs ? fmtGbp(cs.finalUnitCost) : '—'
+  const moduleCount = resolvedTree
+    ? resolvedTree.composition.root.children.length
+    : (state.modules?.length ?? 0)
+  const p1 =
+    `${useCase} — product class: ${productClass}. ` +
+    `System comprises ${moduleCount} top-level module${moduleCount !== 1 ? 's' : ''} across ${bomLineCount} bill-of-materials lines. ` +
+    `Total system cost estimate: ${unitCostGbp}.`
+
+  // §2 Design outcome paragraph
+  const passCount = grammarVerdicts?.pass_count ?? 0
+  const warnCount = grammarVerdicts?.warn_count ?? 0
+  const blockCount = grammarVerdicts?.block_count ?? 0
+  const totalRules = passCount + warnCount + blockCount
+  const overallVerdict = grammarVerdicts?.overall_verdict ?? 'N/A'
+  const overBudgetStr = cs?.isOverBudget
+    ? `Exceeds cost ceiling by ${cs.overBudgetPct != null ? cs.overBudgetPct.toFixed(0) + '%' : 'an unknown margin'}.`
+    : cs?.ceilingCost
+    ? 'Within cost ceiling.'
+    : 'No cost ceiling specified.'
+  const spaceFit = state.dimensionSheet?.feasible
+    ? 'Within spatial envelope.'
+    : state.dimensionSheet
+    ? 'Spatial fit: conflicts identified.'
+    : 'Spatial envelope not evaluated.'
+  const p2 =
+    `Design Rule Check: ${overallVerdict} — ${passCount}/${totalRules} rules pass, ${warnCount} WARN, ${blockCount} BLOCK. ` +
+    `${spaceFit} ${overBudgetStr}`
+
+  // §3 Next-step recommendation paragraph
+  const topWarns = grammarVerdicts?.verdicts
+    .filter(v => v.verdict === 'WARN' || v.verdict === 'BLOCK')
+    .slice(0, 2)
+    .map(v => v.rule_id.replace(/_/g, ' '))
+  const ruleNotes = topWarns && topWarns.length > 0
+    ? `(a) address design rule findings: ${topWarns.join(', ')}; `
+    : ''
+  const costNotes = cs?.isOverBudget
+    ? `(b) re-evaluate cost ceiling — current estimate ${unitCostGbp}${cs.ceilingCost ? ` vs target ${fmtGbp(cs.ceilingCost)}` : ''}; `
+    : ''
+  const certNote = `(c) validate regulatory requirements for ${productClass} before procurement commitment.`
+  const p3 = `Recommended next steps: ${ruleNotes}${costNotes}${certNote}`
+
+  return { p1, p2, p3 }
+}
+
+// ---------------------------------------------------------------------------
+// P3 — Executive Summary Page
+// ---------------------------------------------------------------------------
+
+const ExecutiveSummaryPage = ({ state }: { state: PipelineState }) => {
+  const { p1, p2, p3 } = buildExecutiveSummary(state)
+  const projectId = dash(state.projectId)
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | Executive Summary`} />
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+        Executive Summary
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+      {/* §1 Product description */}
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: MUTED, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Product Description
+      </Text>
+      <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 16 }}>
+        {p1}
+      </Text>
+
+      {/* §2 Design outcome */}
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: MUTED, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Design Outcome
+      </Text>
+      <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 16 }}>
+        {p2}
+      </Text>
+
+      {/* §3 Next steps */}
+      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: MUTED, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+        Next Steps
+      </Text>
+      <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 16 }}>
+        {p3}
+      </Text>
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// P2 — Feasibility Assessment Page (4-field structured section)
+// Synthesises from existing pipeline data — no new LLM call.
+// ---------------------------------------------------------------------------
+
+function buildFeasibilityFields(state: PipelineState): {
+  costVerdict: string
+  topRisks: string[]
+  regulatoryFlags: string[]
+  manufacturingFlags: string[]
+} {
+  const cs = state.radicalCostSummary ?? state.costSummary
+  const grammarVerdicts = state.grammarVerdicts
+  const brief = state.research?.designBrief
+
+  // Field 1 — Cost verdict + reduction path
+  let costVerdict = '—'
+  if (cs) {
+    const unitCost = cs.finalUnitCost
+    const ceiling = cs.ceilingCost ?? brief?.constraints?.unitCostCeilingGbp
+    if (ceiling && unitCost > ceiling) {
+      const pct = ((unitCost - ceiling) / ceiling * 100).toFixed(0)
+      // Suggest reduction paths from topDrivers
+      const top2Drivers = cs.topDrivers?.slice(0, 2).map(d => d.partName) ?? []
+      const reductionSuggestions: string[] = []
+      if (top2Drivers[0]) reductionSuggestions.push(`substitute or batch-source ${top2Drivers[0]}`)
+      if (top2Drivers[1]) reductionSuggestions.push(`re-evaluate specification on ${top2Drivers[1]}`)
+      reductionSuggestions.push(`increase production volume from batch to series run`)
+      costVerdict =
+        `Over budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)} (+${pct}%). ` +
+        `Reduction paths: ${reductionSuggestions.slice(0, 2).join('; ')}.`
+    } else if (ceiling) {
+      costVerdict = `Within budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)}.`
+    } else {
+      costVerdict = `Estimated unit cost: ${fmtGbp(unitCost)}. No cost ceiling specified in brief.`
+    }
+  }
+
+  // Field 2 — Top 3 risks (from grammar WARN + BLOCK verdicts)
+  const topRisks: string[] = []
+  if (grammarVerdicts) {
+    const nonPass = grammarVerdicts.verdicts.filter(v => v.verdict !== 'PASS')
+    for (const v of nonPass.slice(0, 3)) {
+      const ruleLabel = v.rule_id.replace(/_/g, ' ')
+      const riskText = `${v.verdict} — ${ruleLabel}: ${v.reason.slice(0, 120)}${v.reason.length > 120 ? '...' : ''}`
+      topRisks.push(riskText)
+    }
+  }
+  if (topRisks.length === 0) {
+    topRisks.push('All design rule checks pass — no high-priority engineering risks identified.')
+  }
+
+  // Field 3 — Regulatory flags
+  const regulatoryFlags: string[] = []
+  if (state.regulatoryExtraction?.regulatory_entries) {
+    const regs = state.regulatoryExtraction.regulatory_entries.slice(0, 4)
+    for (const reg of regs) {
+      regulatoryFlags.push(`${reg.standard_name} (${reg.jurisdiction}): ${reg.gap_action}`)
+    }
+  } else if (state.research?.designBrief?.regulatory) {
+    const regs = state.research.designBrief.regulatory.slice(0, 4)
+    for (const reg of regs) {
+      regulatoryFlags.push(`${reg.code}: ${reg.summary}`)
+    }
+  }
+  if (regulatoryFlags.length === 0) {
+    regulatoryFlags.push('No specific regulatory items surfaced — verify jurisdiction-specific requirements before manufacture.')
+  }
+
+  // Field 4 — Manufacturing flags (from grammar verdicts + cost structure)
+  const manufacturingFlags: string[] = []
+  if (cs) {
+    const quotedPct = ((cs.quotedCostFraction ?? 0) * 100).toFixed(0)
+    manufacturingFlags.push(`Price confidence: ${quotedPct}% of BOM backed by distributor quotes; remainder is Grade-D or LLM estimate.`)
+    if (cs.topDrivers && cs.topDrivers.length > 0) {
+      const driver = cs.topDrivers[0]
+      manufacturingFlags.push(`Top cost driver: ${driver.partName} — ${driver.pct.toFixed(0)}% of BOM total (${fmtGbp(driver.totalGbp)}).`)
+    }
+  }
+  const customCotsSplit = cs
+    ? `OEM/custom parts constitute the majority of cost — verify minimum order quantities and lead times before design lock.`
+    : `Lead time and minimum order quantity verification required before design lock.`
+  manufacturingFlags.push(customCotsSplit)
+
+  return { costVerdict, topRisks, regulatoryFlags, manufacturingFlags }
+}
+
+const FeasibilityAssessmentPage = ({ state }: { state: PipelineState }) => {
+  const { costVerdict, topRisks, regulatoryFlags, manufacturingFlags } = buildFeasibilityFields(state)
+  const projectId = dash(state.projectId)
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | Feasibility Assessment`} />
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+        Feasibility Assessment
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+      {/* Field 1 — Cost verdict */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          1. Cost Verdict and Reduction Paths
+        </Text>
+        <Text style={{ fontSize: 10, color: INK, lineHeight: 1.5 }}>
+          {costVerdict}
+        </Text>
+      </View>
+
+      {/* Field 2 — Top 3 risks */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          2. Top Engineering Risks
+        </Text>
+        {topRisks.map((risk, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
+            <Text style={{ fontSize: 9, color: BESS_RED, fontFamily: 'Helvetica-Bold', width: 14 }}>
+              {i + 1}.
+            </Text>
+            <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>
+              {risk}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Field 3 — Regulatory flags */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          3. Regulatory Flags
+        </Text>
+        {regulatoryFlags.map((flag, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
+            <Text style={{ fontSize: 9, color: BESS_AMBER, fontFamily: 'Helvetica-Bold', width: 14 }}>
+              ►
+            </Text>
+            <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>
+              {flag}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      {/* Field 4 — Manufacturing flags */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+          4. Manufacturing and Sourcing Flags
+        </Text>
+        {manufacturingFlags.map((flag, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
+            <Text style={{ fontSize: 9, color: BESS_NAVY, fontFamily: 'Helvetica-Bold', width: 14 }}>
+              ►
+            </Text>
+            <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>
+              {flag}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
 // Simplified Cover page for Radical shadow PDF
 const RadicalCoverPage = ({ state }: { state: PipelineState }) => {
   const brief = state.research?.designBrief
@@ -123,11 +397,11 @@ const RadicalCoverPage = ({ state }: { state: PipelineState }) => {
         </Text>
       </View>
 
-      {/* Grammar verdict banner */}
+      {/* Design Rule Check verdict banner */}
       {grammarVerdicts && (
         <View style={{ borderWidth: 1.5, borderColor: grammarColour, padding: 10, marginBottom: 14 }}>
           <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: grammarColour, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.6 }}>
-            Grammar Engine Verdict
+            Design Rule Check (DRC) Verdict
           </Text>
           <Text style={{ fontSize: 12, fontFamily: 'Helvetica-Bold', color: grammarColour }}>
             {overallGrammar} — {grammarVerdicts.pass_count} PASS · {grammarVerdicts.warn_count} WARN · {grammarVerdicts.block_count} BLOCK
@@ -185,9 +459,9 @@ const GrammarVerdictsPage = ({ state }: { state: PipelineState }) => {
 
   return (
     <Page size="A4" style={pageStyle}>
-      <DocPageHeader title={`${dash(state.projectId)} | Forge Engineering Report (Radical v1) | Grammar Verdicts`} />
+      <DocPageHeader title={`${dash(state.projectId)} | Forge Engineering Report (Radical v1) | Design Rule Check`} />
       <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
-        Grammar Engine Verdicts
+        Design Rule Check (DRC) Verdicts
       </Text>
       <Text style={{ fontSize: 10, color: MUTED, marginBottom: 14 }}>
         Overall: {grammarVerdicts.overall_verdict} — {grammarVerdicts.rules_fired} rules fired, computed {grammarVerdicts.computed_at}
@@ -306,14 +580,17 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §1 Cover */}
       <RadicalCoverPage state={safe} />
 
-      {/* §2 System Modules and Architecture — Radical tree view */}
+      {/* §2 Executive Summary — P3 fix: 3-paragraph narrative (no new LLM call) */}
+      <ExecutiveSummaryPage state={safe} />
+
+      {/* §3 System Modules and Architecture — Radical tree view */}
       <RadicalModulesSection
         resolvedTree={resolvedTree}
         radicalCostSummary={radicalCostSummary}
         projectId={projectId}
       />
 
-      {/* §3 Bill of Materials — sentence-grouped, grammar verdicts inline */}
+      {/* §4 Bill of Materials — sentence-grouped, grammar verdicts inline */}
       <RadicalBomSection
         resolvedTree={resolvedTree}
         radicalCostSummary={radicalCostSummary}
@@ -321,14 +598,17 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
         projectId={projectId}
       />
 
-      {/* §4 Cost Waterfall — from radicalCostSummary */}
+      {/* §5 Cost Waterfall — from radicalCostSummary */}
       <RadicalCostSection
         radicalCostSummary={radicalCostSummary}
         fallbackCostSummary={safe.costSummary}
         projectId={projectId}
       />
 
-      {/* §5 Grammar Verdicts detail page */}
+      {/* §6 Feasibility Assessment — P2 fix: 4-field structured section (no new LLM call) */}
+      <FeasibilityAssessmentPage state={safe} />
+
+      {/* §7 Design Rule Check detail page */}
       {grammarVerdicts && (
         <GrammarVerdictsPage state={safe} />
       )}

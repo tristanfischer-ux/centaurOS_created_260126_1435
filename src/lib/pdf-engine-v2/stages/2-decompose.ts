@@ -4,7 +4,7 @@ import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { validateFmea, type FmeaRow } from '../lib/fmea-validator'
 import type { RadicalTree, CompositionNode } from '../radical/schema.js'
 import { CURRENT_RADICAL_SPEC_VERSION } from '../radical/schema.js'
-import { buildTreeFromLeaves, validateLeafList, deriveBessQuantityOverrides } from '../radical/structural-builder.js'
+import { buildTreeFromLeaves, validateLeafList, deriveBessQuantityOverrides, deriveClassMandatoryCharacters } from '../radical/structural-builder.js'
 import { HIERARCHY_STATS } from '../radical/character-hierarchy.js'
 
 // Stage 2: Module Decomposition — uses MODULE_DECOMPOSITION_SYSTEM from prompts.ts
@@ -416,20 +416,19 @@ export async function runDecomposeRadical(
   const productSlug = parsedBrief.project_id ?? classification.replace(/[^a-z0-9_]/gi, '_')
 
   // Derive physics-based quantity overrides AND mandatory character set for determinism.
-  // For BESS: compute from brief's energy/voltage/capacity constraints.
-  // These override the LLM-provided multiplicities so same brief → same quantities.
-  // mandatoryCharacters ensures tree SHAPE is deterministic regardless of LLM variance.
-  let quantityOverrides: Record<string, number> | undefined
-  let mandatoryCharacters: string[] | undefined
-  if (classification === 'battery_energy_storage' || classification === 'bess') {
-    const perfValue = parsedBrief.constraints?.target_performance?.value
-    const usableKwh = typeof perfValue === 'number' ? perfValue : undefined
-    if (usableKwh) {
-      const derived = deriveBessQuantityOverrides({ usableKwh })
-      quantityOverrides = derived.quantities
-      mandatoryCharacters = derived.mandatoryCharacters
-      console.log(`[decompose-radical] Stage 2: BESS quantity overrides applied (${usableKwh} kWh brief → ${quantityOverrides['lfp_prismatic_cell']} cells, ${mandatoryCharacters.length} mandatory characters)`)
-    }
+  // P1-FIX: use deriveClassMandatoryCharacters() for ALL product classes, not just BESS.
+  // Without mandatory character sets, non-BESS classes get cross-contaminated: generic
+  // shared characters (liquid_cooling_system, pcb_controller) map to BESS/heat-pump sentences
+  // in the hierarchy because they appear there first. Mandatory sets pin the class-appropriate
+  // characters and filter out cross-class characters.
+  const classResult = deriveClassMandatoryCharacters(classification, parsedBrief.constraints)
+  const mandatoryCharacters: string[] | undefined = classResult.mandatoryCharacters.length > 0 ? classResult.mandatoryCharacters : undefined
+  const quantityOverrides: Record<string, number> | undefined = classResult.quantityOverrides
+
+  if (mandatoryCharacters) {
+    console.log(`[decompose-radical] Stage 2: mandatory characters resolved for class="${classification}" (${mandatoryCharacters.length} chars)${quantityOverrides ? ' + quantity overrides' : ''}`)
+  } else {
+    console.log(`[decompose-radical] Stage 2: no mandatory character set for class="${classification}" — tree shape depends on LLM output`)
   }
 
   let buildResult

@@ -352,8 +352,8 @@ const GrammarVerdictSummaryBanner = ({ grammarVerdicts }: { grammarVerdicts: Gra
 
   return (
     <View style={[rs.grammarBanner, { borderColor: colour }]} wrap={false}>
-      <Text style={[rs.grammarBannerLabel, { color: colour }]}>Grammar Engine Results</Text>
-      <Text style={[rs.grammarBannerText, { color: colour }]}>{verdict}</Text>
+      <Text style={[rs.grammarBannerLabel, { color: colour }]}>Design Rule Check (DRC) Results</Text>
+      <Text style={[rs.grammarBannerText, { color: colour }]}>{verdict.replace('grammar rules', 'design rules').replace('Grammar:', 'DRC:')}</Text>
       <Text style={[rs.grammarBannerText, { color: MUTED, marginTop: 4 }]}>
         {pass_count} PASS · {warn_count} WARN · {block_count} BLOCK
         {grammarVerdicts.relaxations_applied > 0 ? ` · ${grammarVerdicts.relaxations_applied} relaxation(s) applied` : ''}
