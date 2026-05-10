@@ -1839,6 +1839,9 @@ export async function runPipeline(
           resolvedRadicalTree: state.resolvedRadicalTree,
           radicalCostSummary: state.radicalCostSummary ?? null,
           grammarVerdicts: state.grammarVerdicts ?? null,
+          // Fix 4 (task #91-phase4): legacy costSummary.bomTotal paired field so the
+          // aggregator can compute cost delta = (radical - legacy) / legacy
+          legacyCostBomTotal: state.costSummary?.bomTotal ?? null,
           savedAt: new Date().toISOString(),
         }
         writeFileSync(statePath, JSON.stringify(minimalState, null, 2))

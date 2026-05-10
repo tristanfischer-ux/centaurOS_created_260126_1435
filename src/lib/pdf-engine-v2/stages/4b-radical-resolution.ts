@@ -168,6 +168,13 @@ const MECHANICAL_COTS_CHARACTERS = new Set<string>([
   'copper_busbar',
   'cable_transit_frame',
   'thermal_insulation_panel',
+  // Generic hardware — stocked by RS / Farnell / Würth / McMaster; Grade D fallback below
+  'steel_bolt',
+  'steel_threaded_rod',
+  'copper_wire',
+  'copper_terminal',
+  'polymer_gasket',
+  'aluminium_heatsink',
 ])
 
 /** Characters that map to OEM subsystem */
@@ -185,6 +192,10 @@ const OEM_SUBSYSTEM_CHARACTERS = new Set<string>([
 /** Characters that map to structural fabricated */
 const STRUCTURAL_FABRICATED_CHARACTERS = new Set<string>([
   'steel_rack_frame',
+  // Structural raw-material profiles and sheet — fabricated or cut-to-length supply
+  'aluminium_extrusion',
+  'steel_plate',
+  'polymer_enclosure',   // custom moulded / formed housing
 ])
 
 /** Characters that map to software IP */
@@ -280,6 +291,18 @@ const MPN_HINTS_BY_CHARACTER: Record<string, string[]> = {
   'circuit_breaker': ['XT5N 1000 Ekip Touch LSI 3p F F', 'E2.2N 2000 Ekip Hi-Touch LSI 4p WMP'],
   // BMS controller slave board
   'pcb_controller': ['NXP-BMS-SLAVE-REF', 'ISL94212'],
+  // Generic M10 hex bolt DIN 933 A2 stainless — RS Components
+  'steel_bolt': ['526-9064', '278-6010'],
+  // M10 × 1000 mm A2 stainless threaded rod — RS / Würth
+  'steel_threaded_rod': ['527-0104', '278-6090'],
+  // 2.5 mm² LSZH single-core copper building wire (Prysmian H07Z1-U) — RS
+  'copper_wire': ['224-4488', '879-7004'],
+  // 16 mm² copper ring terminal M10 — RS / Panduit
+  'copper_terminal': ['476-9481', 'RB16-10-X'],
+  // Silicone O-ring cord stock (Ø 3.5 mm) — RS / Eriks
+  'polymer_gasket': ['614-3249', '614-3231'],
+  // 60 W black anodised aluminium heatsink — Fischer Elektronik / Aavid
+  'aluminium_heatsink': ['460-1466', 'FA-T220-38E'],
 }
 
 // ---------------------------------------------------------------------------
@@ -334,6 +357,17 @@ const GRADE_D_BY_CHARACTER: Record<string, GradeD> = {
   'steel_door': { typical: 1200, basis: 'Fire-rated steel personnel door with panic hardware' },
   'cable_transit_frame': { typical: 180, basis: 'IP55 cable transit frame (Roxtec class), per frame' },
   'switchboard_enclosure': { typical: 3500, basis: 'AC distribution board IP55 enclosure' },
+  // Generic hardware / mechanical COTS — Grade D basis prices per unit
+  'steel_bolt': { typical: 2, basis: 'M10 × 40 mm A2 stainless hex bolt, DIN 933 (RS Components / Würth; per-bolt at OEM qty)' },
+  'steel_threaded_rod': { typical: 8, basis: 'M10 × 1000 mm A2 stainless threaded rod (RS Components; per-rod)' },
+  'copper_wire': { typical: 12, basis: '2.5 mm² LSZH single-core copper building wire, per 10 m (Prysmian H07Z1-U class)' },
+  'copper_terminal': { typical: 4, basis: '16 mm² copper ring terminal M10 (Panduit / Weidmüller; per-terminal)' },
+  'polymer_gasket': { typical: 18, basis: 'EPDM or silicone flat gasket / O-ring set, per enclosure or circuit (RS / Eriks class)' },
+  'aluminium_heatsink': { typical: 45, basis: 'Extruded aluminium heatsink 60 W (Fischer Elektronik LA/Aavid class; per unit)' },
+  // Structural fabricated — Grade D per-metre or per-sheet
+  'aluminium_extrusion': { typical: 35, basis: '40 × 40 mm T-slot aluminium profile, per metre (Bosch Rexroth / MiniTec class)' },
+  'steel_plate': { typical: 180, basis: '3 mm S235 HR steel plate 1000 × 500 mm, laser-cut (UK fabrication, per sheet)' },
+  'polymer_enclosure': { typical: 280, basis: 'ABS or GRP moulded enclosure, mid-size (Spelsberg / nVent Hoffman class; per unit)' },
 }
 
 // ---------------------------------------------------------------------------

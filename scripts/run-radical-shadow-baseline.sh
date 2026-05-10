@@ -302,10 +302,12 @@ else:
 import json, sys
 try:
     d = json.load(open('$OUT_DIR/state.json'))
-    rc = d.get('radicalCostSummary')
-    # The legacy bomTotal isn't in the state snapshot directly — it's in state.costSummary
-    # which isn't serialised. We fall back to None.
-    print('')
+    # Fix 4: legacyCostBomTotal is now written directly to the state snapshot
+    val = d.get('legacyCostBomTotal')
+    if val is not None and val > 0:
+        print(int(val))
+    else:
+        print('')
 except:
     print('')
 " 2>/dev/null || echo "")
