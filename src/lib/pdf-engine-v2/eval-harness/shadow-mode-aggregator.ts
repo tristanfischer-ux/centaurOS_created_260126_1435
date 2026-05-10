@@ -123,6 +123,31 @@ interface RunResult {
   primaryRenderMs: number | null
   radicalRenderMs: number | null
   totalDurationMs: number
+  /** Legacy finalUnitCost parsed from Phase3/shadow-diff log line */
+  legacyCostFinalUnit: number | null
+}
+
+// ---------------------------------------------------------------------------
+// Helper: parse legacy cost from Phase3/shadow-diff log line
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the legacy finalUnitCost from the pipeline log.
+ * The pipeline writes: [Phase3/shadow-diff] Legacy (Stage 4):  £<N,NNN>
+ * Returns null if not found.
+ */
+function parseLegacyCostFromLog(logPath: string): number | null {
+  try {
+    const log = readFileSync(logPath, 'utf-8')
+    // Match: [Phase3/shadow-diff] Legacy (Stage 4):  £<digits with commas>
+    const match = log.match(/\[Phase3\/shadow-diff\] Legacy \(Stage 4\):\s+£([\d,]+)/)
+    if (match) {
+      return parseInt(match[1].replace(/,/g, ''), 10)
+    }
+    return null
+  } catch {
+    return null
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -216,6 +241,13 @@ function loadRunResults(evidenceDir: string): RunResult[] {
     const ok = manifest?.ok ?? (state !== null)
     const errorReason = manifest?.errorReason
 
+    // Legacy cost: prefer manifest value, fall back to parsing from log.txt
+    const logFile = join(runDir, 'log.txt')
+    const legacyCostFromManifest = (manifest?.legacyCostBomTotal != null && manifest.legacyCostBomTotal > 0)
+      ? manifest.legacyCostBomTotal
+      : null
+    const legacyCostFinalUnit = legacyCostFromManifest ?? parseLegacyCostFromLog(logFile)
+
     results.push({
       slug,
       productClass,
@@ -228,6 +260,7 @@ function loadRunResults(evidenceDir: string): RunResult[] {
       primaryRenderMs: manifest?.primaryRenderMs ?? null,
       radicalRenderMs: manifest?.radicalRenderMs ?? null,
       totalDurationMs: manifest?.totalDurationMs ?? 0,
+      legacyCostFinalUnit,
     })
 
     console.log(`[aggregator] Loaded ${slug} (${productClass}) — ok=${ok}${errorReason ? ` [${errorReason}]` : ''}`)
@@ -290,16 +323,17 @@ function extractRunMetrics(run: RunResult): RunMetrics {
   const state = run.state
 
   // Cost delta
+  // Note: radicalCostSummary.bomTotal = finalUnitCost (fully-loaded) per 4c-radical-cost-rollup.ts
+  // Legacy: parsed from [Phase3/shadow-diff] log line which also logs finalUnitCost
   const radicalBomTotal = state.radicalCostSummary?.bomTotal
-  const legacyBomTotal = run.manifest?.legacyCostBomTotal
+  const legacyCostFinalUnit = run.legacyCostFinalUnit
   if (
     radicalBomTotal !== undefined &&
     radicalBomTotal !== null &&
-    legacyBomTotal !== undefined &&
-    legacyBomTotal !== null &&
-    legacyBomTotal !== 0
+    legacyCostFinalUnit !== null &&
+    legacyCostFinalUnit !== 0
   ) {
-    base.costDeltaFraction = (radicalBomTotal - legacyBomTotal) / legacyBomTotal
+    base.costDeltaFraction = (radicalBomTotal - legacyCostFinalUnit) / legacyCostFinalUnit
   }
 
   // Both PDFs OK

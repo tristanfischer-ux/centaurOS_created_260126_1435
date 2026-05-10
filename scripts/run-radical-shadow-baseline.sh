@@ -246,6 +246,27 @@ for s in d.get('stages',[]):
 
     echo "[run-one] [$SLUG] Pipeline ok=$RUN_OK exit=$EXIT duration=${TOTAL_DURATION_MS}ms"
 
+    # ── Extract legacy cost from Phase3/shadow-diff log line ──────────────
+    # The pipeline logs: [Phase3/shadow-diff] Legacy (Stage 4):  £<N>
+    # We parse this to get the legacy bomTotal for the cost delta metric.
+    LEGACY_COST_BOM_TOTAL=$(echo "$RUN_OUTPUT" | python3 -c "
+import sys, re
+text = sys.stdin.read()
+# Match: [Phase3/shadow-diff] Legacy (Stage 4):  £<number>
+m = re.search(r'\[Phase3/shadow-diff\] Legacy \(Stage 4\):\s+£([\d,]+)', text)
+if m:
+    val = int(m.group(1).replace(',', ''))
+    print(val)
+else:
+    print('')
+" 2>/dev/null || echo "")
+
+    if [ -n "$LEGACY_COST_BOM_TOTAL" ]; then
+      echo "[run-one] [$SLUG] Legacy cost (Stage 4): £${LEGACY_COST_BOM_TOTAL}"
+    else
+      echo "[run-one] [$SLUG] Legacy cost not found in pipeline output (Phase 3 may be disabled or diff not logged)"
+    fi
+
     # ── Move primary PDF ────────────────────────────────────────────────────
     local PDF_SRC="$REPO_ROOT/output-${OUTPUT_PREFIX}.pdf"
     local PRIMARY_PDF_SIZE=0
@@ -338,6 +359,8 @@ except:
     RAD_MS_JSON=$( [ -n "$RADICAL_RENDER_MS" ] && echo "$RADICAL_RENDER_MS" || echo "null" )
     local ERROR_JSON
     ERROR_JSON=$( [ -n "$ERROR_REASON" ] && printf '"%s"' "$ERROR_REASON" || echo "null" )
+    local LEGACY_COST_JSON
+    LEGACY_COST_JSON=$( [ -n "$LEGACY_COST_BOM_TOTAL" ] && echo "$LEGACY_COST_BOM_TOTAL" || echo "null" )
     local SAVED_AT
     SAVED_AT="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
 
@@ -352,12 +375,12 @@ except:
   "radicalPdfSizeBytes": %s,
   "primaryRenderMs": %s,
   "radicalRenderMs": %s,
-  "legacyCostBomTotal": null,
+  "legacyCostBomTotal": %s,
   "savedAt": "%s"
 }\n' \
       "$SLUG" "$BRIEF_PATH" "$PRODUCT_CLASS" "$MANIFEST_OK_BOOL" "$ERROR_JSON" \
       "$TOTAL_DURATION_MS" "$PRIMARY_PDF_SIZE" "$RADICAL_PDF_SIZE" \
-      "$PRIM_MS_JSON" "$RAD_MS_JSON" "$SAVED_AT" \
+      "$PRIM_MS_JSON" "$RAD_MS_JSON" "$LEGACY_COST_JSON" "$SAVED_AT" \
       > "$OUT_DIR/run-manifest.json" || \
       printf '{"slug":"%s","ok":false,"errorReason":"manifest write failed"}\n' "$SLUG" > "$OUT_DIR/run-manifest.json"
 
