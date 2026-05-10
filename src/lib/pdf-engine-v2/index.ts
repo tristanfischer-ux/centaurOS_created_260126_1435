@@ -69,6 +69,7 @@ import { mapProductClassToIndustryDomain } from './lib/industry-domain'
 import { validateModuleAssignments } from './lib/module-assignment-validator'
 import { isPhase2ResolutionEnabled, runRadicalResolution } from './stages/4b-radical-resolution'
 import { isPhase3CostRollupEnabled, runRadicalCostRollup, logCostSummaryDiff } from './stages/4c-radical-cost-rollup'
+import { isPhase4GrammarEnabled, runRadicalGrammar } from './stages/4d-radical-grammar'
 
 export interface EngineResult {
   ok: boolean
@@ -1184,6 +1185,46 @@ export async function runPipeline(
       }
     } else if (isPhase3CostRollupEnabled() && !state.resolvedRadicalTree) {
       console.warn('[pipeline] Radical Phase 3: RADICAL_PHASE_3_COSTROLLUP=true but state.resolvedRadicalTree is absent — Phase 2 must run first')
+    }
+
+    // ── Radical Phase 4: Grammar Engine (behind RADICAL_PHASE_4_GRAMMAR flag) ─
+    // Applies 6 v1 grammar rules to the resolved radical tree.
+    // Requires Phase 2 (state.resolvedRadicalTree) to be populated first.
+    // Phase 3 (state.radicalCostSummary) is consumed when available but optional.
+    // Output: state.grammarVerdicts — consumed by Phase 5 renderer.
+    // Strictly additive — existing feasibility gate is UNCHANGED.
+    // Zero LLM calls — purely deterministic.
+    if (isPhase4GrammarEnabled() && state.resolvedRadicalTree) {
+      console.log('[pipeline] Radical Phase 4: RADICAL_PHASE_4_GRAMMAR=true, running grammar engine...')
+      try {
+        const grammarResult = runRadicalGrammar(
+          state.resolvedRadicalTree,
+          state.radicalCostSummary,
+        )
+        state.grammarVerdicts = grammarResult
+
+        console.log(
+          `[pipeline] Radical Phase 4: grammar complete. ` +
+          `Overall: ${grammarResult.overall_verdict} ` +
+          `| PASS: ${grammarResult.pass_count} WARN: ${grammarResult.warn_count} BLOCK: ${grammarResult.block_count} ` +
+          `| Relaxations: ${grammarResult.relaxations_applied}`
+        )
+
+        // Surface any WARNs or BLOCKs prominently
+        for (const v of grammarResult.verdicts) {
+          if (v.verdict === 'WARN' || v.verdict === 'BLOCK') {
+            const mark = v.verdict === 'BLOCK' ? '🔴' : '🟡'
+            console.warn(
+              `[pipeline] Radical Phase 4: ${mark} ${v.verdict} [${v.rule_id}]: ${v.reason.slice(0, 160)}`
+            )
+          }
+        }
+      } catch (phase4Err) {
+        // Non-fatal — Phase 4 failure must NEVER block the main pipeline
+        console.warn(`[pipeline] Radical Phase 4: exception (non-fatal): ${(phase4Err as Error).message}`)
+      }
+    } else if (isPhase4GrammarEnabled() && !state.resolvedRadicalTree) {
+      console.warn('[pipeline] Radical Phase 4: RADICAL_PHASE_4_GRAMMAR=true but state.resolvedRadicalTree is absent — Phase 2 must run first')
     }
 
     // ── Module Assignment Plausibility Validation (UNIVERSAL-ROBUSTNESS) ──

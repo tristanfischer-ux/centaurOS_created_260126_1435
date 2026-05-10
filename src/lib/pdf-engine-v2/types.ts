@@ -781,6 +781,17 @@ export interface PipelineState {
    * Renderer (Phase 5) reads radicalCostSummary when RADICAL_PHASE_3_COSTROLLUP=true.
    */
   radicalCostSummary?: import('./stages/4c-radical-cost-rollup.js').RadicalCostSummary
+  /**
+   * Phase 4 — Grammar Verdicts.
+   * Populated when RADICAL_PHASE_4_GRAMMAR=true AND resolvedRadicalTree exists.
+   * Contains one GrammarVerdict per rule fired, plus overall_verdict and
+   * relaxation_summary from the constraint optimiser.
+   *
+   * COEXISTS alongside the existing feasibility gate — strictly additive.
+   * Phase 5 renderer reads grammarVerdicts to render inline WARN/BLOCK callouts.
+   * Phase 7 cutover integrates grammar into the feasibility gate proper.
+   */
+  grammarVerdicts?: import('./stages/4d-radical-grammar.js').GrammarPassState
   pipelineError?: {
     stage: string
     message: string
