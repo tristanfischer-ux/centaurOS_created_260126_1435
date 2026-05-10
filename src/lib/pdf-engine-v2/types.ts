@@ -744,6 +744,21 @@ export interface PipelineState {
    */
   reportTypeRouterResult?: import('./report-type-router').ReportTypeRouterResult
   productClass?: string
+  /**
+   * Radical Phase 1 only — populated when RADICAL_PHASE_1_TREE_OUTPUT=true.
+   * The LLM-emitted Radical tree for this product, validated against the seed
+   * library. Consumed by Phase 0 vertical slice when RADICAL_PHASE_0_SLICE=true.
+   * Does NOT replace state.modules — both coexist during the migration.
+   * Any UNKNOWN_RADICAL nodes are tracked in radicalTreeUnknowns.
+   */
+  radicalTree?: import('./radical/schema.js').RadicalTree
+  /**
+   * UNKNOWN_RADICAL placeholders found in the LLM-emitted tree.
+   * Each entry is the archetypeId string emitted by the LLM, e.g.
+   * "<UNKNOWN_RADICAL>: 15-year UV-resistant polymer foam insulation panel".
+   * Empty array = all archetypes resolved from library.
+   */
+  radicalTreeUnknowns?: string[]
   pipelineError?: {
     stage: string
     message: string

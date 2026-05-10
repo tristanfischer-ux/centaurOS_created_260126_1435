@@ -11,7 +11,7 @@ import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
 import { runBriefGeneration, runBriefParsing } from './stages/0-brief-generation'
 import { runResearch, runResearchSynthesis, extractResearchConstraints } from './stages/1-research'
-import { runDecompose, runDecomposePA } from './stages/2-decompose'
+import { runDecompose, runDecomposePA, runDecomposeRadical, isPhaseOneTreeOutputEnabled } from './stages/2-decompose'
 import { runRegulatoryExtraction } from './stages/1b-regulatory'
 import { runSizeLayout, runSizingSecondPass } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
@@ -1064,6 +1064,63 @@ export async function runPipeline(
       return await generateErrorPdf(state, stages, llmCalls, startTime)
     }
     state.modules = decomposeResult.data
+
+    // ── Radical Phase 1: tree emission (BESS only, behind feature flag) ────
+    // When RADICAL_PHASE_1_TREE_OUTPUT=true AND paMode is active, run the
+    // Radical decompose in parallel with the normal flat-list output.
+    // This is STRICTLY ADDITIVE — state.modules is unchanged.
+    // The tree is written to state.radicalTree + state.radicalTreeUnknowns.
+    // Unknown radicals are surfaced to console but do NOT block the pipeline.
+    if (paMode && state.parsedBrief && isPhaseOneTreeOutputEnabled()) {
+      console.log('[pipeline] Radical Phase 1: RADICAL_PHASE_1_TREE_OUTPUT=true, running tree decomposition...')
+      try {
+        const productClassForRadical: string = typeof classification === 'string'
+          ? classification
+          : ((classification as any).productClass ?? 'UNKNOWN')
+        const radicalResult = await runDecomposeRadical(
+          state.parsedBrief,
+          productClassForRadical,
+          state.regulatoryExtraction,
+        )
+        if (radicalResult.ok && radicalResult.data) {
+          state.radicalTree = radicalResult.data.tree
+          state.radicalTreeUnknowns = radicalResult.data.unknowns
+          console.log(
+            `[pipeline] Radical Phase 1: tree emitted. Unknowns: ${radicalResult.data.unknowns.length}` +
+            (radicalResult.data.unknowns.length > 0
+              ? ` — SURFACE TO TRISTAN: ${radicalResult.data.unknowns.join(', ')}`
+              : '')
+          )
+          if (radicalResult.data.netNewArchetypes.length > 0) {
+            console.warn(`[pipeline] Radical Phase 1: net-new archetypes (not in library): ${radicalResult.data.netNewArchetypes.join(', ')}`)
+          }
+
+          // Phase 1 + Phase 0 integration: if both flags are set, re-run the
+          // vertical slice with the LLM-emitted tree so the grammar + cost
+          // rollup paths run against real LLM output (not the hardcoded tree).
+          if (isPhaseZeroSliceEnabled() && state.radicalTree) {
+            console.log('[pipeline] Radical Phase 1+0 integration: re-running vertical slice with LLM-emitted tree...')
+            try {
+              const p1SliceResult = await runPhaseZeroSlice(state.radicalTree)
+              ;(state as any).radicalPhase1Slice = p1SliceResult
+              console.log(
+                `[pipeline] Phase 1+0 slice: ok=${p1SliceResult.ok} source=${p1SliceResult.tree_source} ` +
+                `grammar=${p1SliceResult.grammar.verdict} ` +
+                `cost=£${p1SliceResult.cost_rollup.system_total_gbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })} ` +
+                `nodes=${p1SliceResult.tree_node_count} leaves=${p1SliceResult.tree_leaf_count}`
+              )
+            } catch (p1SliceErr) {
+              console.warn(`[pipeline] Phase 1+0 slice threw (non-fatal): ${(p1SliceErr as Error).message}`)
+            }
+          }
+        } else {
+          console.warn(`[pipeline] Radical Phase 1: tree decomposition failed (non-fatal): ${radicalResult.error}`)
+        }
+      } catch (radicalErr) {
+        // Non-fatal — Radical Phase 1 failure must NEVER block the main pipeline
+        console.warn(`[pipeline] Radical Phase 1: exception (non-fatal): ${(radicalErr as Error).message}`)
+      }
+    }
 
     // ── Module Assignment Plausibility Validation (UNIVERSAL-ROBUSTNESS) ──
     // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): deterministic check that each

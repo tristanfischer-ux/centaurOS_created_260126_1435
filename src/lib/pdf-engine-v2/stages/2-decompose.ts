@@ -1,11 +1,339 @@
 import type { Module, ModulePA, ResearchResult, StageResult, RiskRow, StructuredBriefJSON, RegulatoryExtraction } from '../types'
-import { MODULE_DECOMPOSITION_SYSTEM, MODULE_DECOMPOSITION_SYSTEM_PA } from '../prompts'
+import { MODULE_DECOMPOSITION_SYSTEM, MODULE_DECOMPOSITION_SYSTEM_PA, MODULE_DECOMPOSITION_RADICAL_PROMPT } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { validateFmea, type FmeaRow } from '../lib/fmea-validator'
+import type { RadicalTree, CompositionNode } from '../radical/schema.js'
+import { CURRENT_RADICAL_SPEC_VERSION } from '../radical/schema.js'
 
 // Stage 2: Module Decomposition — uses MODULE_DECOMPOSITION_SYSTEM from prompts.ts
 // PA path: uses MODULE_DECOMPOSITION_SYSTEM_PA and validateDecomposeResultPA().
+// Radical Phase 1 path: uses MODULE_DECOMPOSITION_RADICAL_PROMPT when
+//   RADICAL_PHASE_1_TREE_OUTPUT=true, emits a RadicalTree into state.radicalTree.
 // The prompts are defined in prompts.ts and imported above.
+
+// ---------------------------------------------------------------------------
+// Radical Phase 1 — feature flag + BESS-only guard
+// ---------------------------------------------------------------------------
+
+/**
+ * Returns true when the Radical Phase 1 tree output is enabled.
+ * Must be set to exactly "true" (case-insensitive) to activate.
+ * Phase 1 is BESS-only — other product classes ignore this flag.
+ */
+export function isPhaseOneTreeOutputEnabled(): boolean {
+  const raw = (process.env.RADICAL_PHASE_1_TREE_OUTPUT ?? '').toLowerCase().trim()
+  return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
+}
+
+// ---------------------------------------------------------------------------
+// Known radical library IDs for validation
+// ---------------------------------------------------------------------------
+
+/** All 22 radical IDs in the commissioned library (seed + Weeks 2-5). */
+const KNOWN_RADICALS = new Set<string>([
+  // Seed
+  'steel', 'copper', 'polymer_thermoplastic', 'electrical_conducting_function', 'solid_state_of_matter',
+  // Week 2 (BESS)
+  'lithium_iron_phosphate_chemistry', 'electrochemical_energy_function', 'silicon_semiconductor_function',
+  'magnetic_coupling_function', 'electromechanical_switching_function', 'thermal_transfer_function',
+  'fluid_flow_state', 'mineral_fibre_material', 'pressure_vessel_function', 'chemical_suppressant_material',
+  'chemical_sensing_function', 'optical_sensing_function',
+  // Week 3
+  'aluminium_alloy', 'refrigerant_fluid', 'mechanical_kinetic_function',
+  // Week 4
+  'carbon_fibre_composite', 'digital_logic_function',
+  // Week 5
+  'optical_transduction_function', 'biochemical_sensing_function', 'buoyancy_control_function',
+  'electrochemical_reaction_function',
+])
+
+/** All known character IDs (seed + Week 2). Weeks 3-5 characters added as library grows. */
+const KNOWN_CHARACTERS = new Set<string>([
+  // Seed
+  'steel_bolt', 'copper_wire', 'aluminium_extrusion', 'polymer_gasket', 'steel_plate', 'copper_busbar',
+  'polymer_enclosure', 'steel_threaded_rod', 'aluminium_heatsink', 'copper_terminal',
+  // Week 2 (BESS)
+  'lfp_prismatic_cell', 'steel_rack_frame', 'pcb_controller', 'power_converter', 'transformer',
+  'dc_contactor', 'circuit_breaker', 'resistor', 'protection_relay', 'liquid_cooling_system',
+  'thermal_insulation_panel', 'fire_suppression_system', 'pressure_vessel', 'gas_sensor',
+  'optical_arc_sensor', 'ems_controller', 'network_switch', 'steel_door', 'cable_transit_frame',
+  'switchboard_enclosure',
+])
+
+/** All known archetype IDs (seed + Week 2). */
+const KNOWN_ARCHETYPES = new Set<string>([
+  // Seed
+  'M8x30_316L_socket_head_bolt', 'M16x50_plain_steel_bolt', 'IP67_polymer_enclosure',
+  'bare_polymer_enclosure', 'M8x30_plain_steel_bolt', 'tinned_copper_terminal_50A',
+  'standard_copper_wire', 'standard_aluminium_heatsink', 'standard_copper_busbar',
+  'standard_polymer_gasket',
+  // Week 2 (BESS)
+  'lfp_prismatic_cell_280Ah', 'steel_battery_rack_frame', 'bms_master_controller',
+  'bms_slave_cell_monitor', 'pcs_inverter_1mw_bidirectional', 'step_up_transformer_400v_11kv',
+  'dc_contactor_1500v_300a', 'dc_mccb_1500v_2000a', 'ac_acb_400v_2000a', 'ac_output_circuit_breaker',
+  'dc_busbar_800v_2000a', 'precharge_resistor_hv', 'g99_protection_relay', 'liquid_cooling_loop_1mw',
+  'mineral_wool_insulation_panel', 'container_fire_suppression_system', 'fire_suppression_cylinder_novec',
+  'li_ion_offgas_detector', 'arc_flash_detection_sensor', 'ems_scada_controller',
+  'managed_ethernet_switch_industrial', 'ups_3kva_industrial', 'fire_rated_steel_door_panic',
+  'cable_transit_frame_ip55', 'ac_distribution_board_ip55',
+])
+
+// ---------------------------------------------------------------------------
+// Radical Phase 1 — result type
+// ---------------------------------------------------------------------------
+
+export interface RadicalTreeResult {
+  tree: RadicalTree
+  unknowns: string[]         // UNKNOWN_RADICAL placeholder archetypeIds
+  netNewArchetypes: string[] // archetypes in tree but not in KNOWN_ARCHETYPES (non-unknown)
+  netNewCharacters: string[] // characters implied by unknowns (for surfacing)
+}
+
+// ---------------------------------------------------------------------------
+// Recursive node validator
+// ---------------------------------------------------------------------------
+
+function validateNode(
+  node: any,
+  path: string,
+  unknowns: string[],
+  netNewArchetypes: string[],
+): CompositionNode {
+  if (!node || typeof node !== 'object') {
+    throw new Error(`Radical tree node at ${path} is not an object`)
+  }
+
+  const archetypeId = node.archetypeId ?? node.archetype_id
+  if (!archetypeId || typeof archetypeId !== 'string') {
+    throw new Error(`Radical tree node at ${path} missing archetypeId`)
+  }
+
+  const multiplicity = node.multiplicity ?? node.quantity ?? 1
+  if (typeof multiplicity !== 'number' || !Number.isFinite(multiplicity) || multiplicity < 1) {
+    throw new Error(`Radical tree node at ${path} has invalid multiplicity: ${multiplicity}`)
+  }
+
+  // Detect UNKNOWN_RADICAL placeholders
+  if (archetypeId.startsWith('<UNKNOWN_RADICAL>')) {
+    unknowns.push(archetypeId)
+  } else {
+    // Track net-new archetypes (not in known library — may be valid future additions)
+    if (!KNOWN_ARCHETYPES.has(archetypeId)) {
+      netNewArchetypes.push(archetypeId)
+    }
+  }
+
+  // Recurse into children
+  const rawChildren: any[] = Array.isArray(node.children) ? node.children : []
+  const children: CompositionNode[] = rawChildren.map((child, i) =>
+    validateNode(child, `${path}.children[${i}]`, unknowns, netNewArchetypes)
+  )
+
+  return {
+    archetypeId,
+    quantity: multiplicity,
+    children,
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Radical tree JSON parser + validator
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse and validate a raw LLM JSON response as a Radical tree.
+ * Returns the validated tree + metadata (unknowns, net-new archetypes).
+ *
+ * Validation rules:
+ *   - radical_spec_version must be "1.0.0" (exact major version match)
+ *   - composition.root must be present and non-null
+ *   - All multiplicity values >= 1
+ *   - UNKNOWN_RADICAL placeholders are tracked (not rejected — surfaced to caller)
+ *   - No circular reference detection needed (JSON cannot encode cycles)
+ */
+export function validateRadicalTreeOutput(raw: any): RadicalTreeResult {
+  if (!raw || typeof raw !== 'object') {
+    throw new Error('Radical tree: response is not a JSON object')
+  }
+
+  const version = raw.radical_spec_version ?? raw.version
+  if (!version || typeof version !== 'string') {
+    throw new Error('Radical tree: missing radical_spec_version')
+  }
+
+  const majorVersion = parseInt(version.split('.')[0], 10)
+  const expectedMajor = parseInt(CURRENT_RADICAL_SPEC_VERSION.split('.')[0], 10)
+  if (majorVersion !== expectedMajor) {
+    throw new Error(
+      `Radical tree: spec version ${version} is incompatible with current ${CURRENT_RADICAL_SPEC_VERSION}`
+    )
+  }
+
+  const composition = raw.composition
+  if (!composition || typeof composition !== 'object') {
+    throw new Error('Radical tree: missing composition object')
+  }
+
+  if (!composition.root || typeof composition.root !== 'object') {
+    throw new Error('Radical tree: missing composition.root')
+  }
+
+  const unknowns: string[] = []
+  const netNewArchetypes: string[] = []
+
+  const validatedRoot = validateNode(composition.root, 'root', unknowns, netNewArchetypes)
+
+  const tree: RadicalTree = {
+    radical_spec_version: CURRENT_RADICAL_SPEC_VERSION,
+    composition: {
+      id: composition.id ?? 'llm_emitted_tree',
+      description: composition.description ?? '',
+      environment: Array.isArray(composition.environment) ? composition.environment : [],
+      root: validatedRoot,
+    },
+    meta: {
+      created_at: new Date().toISOString(),
+      product_slug: composition.id ?? undefined,
+      authored_by: 'phase-1-llm',
+    },
+  }
+
+  return { tree, unknowns, netNewArchetypes, netNewCharacters: [] }
+}
+
+// ---------------------------------------------------------------------------
+// Radical Phase 1 — runDecomposeRadical
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the Radical Phase 1 module decomposition for BESS.
+ * Emits a Radical tree (RadicalTree) rather than a flat module list.
+ *
+ * Called from runDecomposePA() when RADICAL_PHASE_1_TREE_OUTPUT=true.
+ * The flat module list (state.modules) is ALSO returned unchanged —
+ * this function is strictly ADDITIVE.
+ *
+ * Temperature is forced to 0.0 for determinism. Same brief MUST produce
+ * the same tree shape (Opus-risk mitigation per migration plan council).
+ */
+export async function runDecomposeRadical(
+  parsedBrief: StructuredBriefJSON,
+  classification: string,
+  regulatoryExtraction?: RegulatoryExtraction,
+): Promise<StageResult<RadicalTreeResult>> {
+  const startTime = Date.now()
+  console.log('[decompose-radical] Starting Radical Phase 1 tree decomposition...')
+
+  const allEntries = regulatoryExtraction?.regulatory_entries ?? []
+  const regSummary = allEntries.length
+    ? `\n\n[Regulatory entries from Stage 4]\n` +
+      allEntries.slice(0, 20).map(e => `- ${e.standard_name} (${e.jurisdiction}): ${e.engineering_impact}`).join('\n')
+    : ''
+
+  const userContent =
+    `[Structured brief JSON from Stage 1]\n${JSON.stringify(parsedBrief, null, 2)}\n\n` +
+    `[Product classification from Stage 2]\n${classification}` +
+    regSummary
+
+  // Force temperature=0 for determinism
+  const models = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3']
+
+  for (const model of models) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 300_000)
+
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.0,   // DETERMINISM: must be 0 — Opus-risk mitigation
+          max_tokens: 16384,
+          messages: [
+            { role: 'system', content: MODULE_DECOMPOSITION_RADICAL_PROMPT },
+            { role: 'user', content: userContent },
+          ],
+        }),
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeout)
+
+      if (!response.ok) {
+        throw new Error(`OpenRouter API returned status: ${response.status}`)
+      }
+
+      const json = await response.json()
+      const msg = json.choices?.[0]?.message
+      let raw = msg?.content || msg?.reasoning || ''
+      if (!raw && msg?.reasoning_details?.length) {
+        raw = msg.reasoning_details
+          .filter((d: any) => d.type === 'reasoning.text')
+          .map((d: any) => d.text)
+          .join('\n')
+      }
+
+      if (!raw) {
+        throw new Error('No content in OpenRouter response')
+      }
+
+      console.log(`[decompose-radical] ${model} responded: ${raw.length} chars`)
+
+      // JSON extraction (same robust strategy as callOpenRouter)
+      let jsonStr = raw
+      jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+      jsonStr = jsonStr.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '').trim()
+      jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
+
+      let parsed: any
+      try {
+        parsed = JSON.parse(jsonStr)
+      } catch {
+        const firstBrace = jsonStr.indexOf('{')
+        const lastBrace = jsonStr.lastIndexOf('}')
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+          try {
+            parsed = JSON.parse(jsonStr.slice(firstBrace, lastBrace + 1))
+          } catch {
+            throw new Error('Failed to parse JSON from Radical tree LLM response')
+          }
+        } else {
+          throw new Error('No JSON object found in Radical tree LLM response')
+        }
+      }
+
+      const result = validateRadicalTreeOutput(parsed)
+
+      console.log(`[decompose-radical] Tree validated. Unknowns: ${result.unknowns.length}, net-new archetypes: ${result.netNewArchetypes.length}`)
+      if (result.unknowns.length > 0) {
+        console.warn(`[decompose-radical] UNKNOWN_RADICAL nodes found: ${result.unknowns.join(', ')}`)
+      }
+      if (result.netNewArchetypes.length > 0) {
+        console.warn(`[decompose-radical] Net-new archetypes (not in seed library): ${result.netNewArchetypes.join(', ')}`)
+      }
+
+      return {
+        ok: true,
+        data: result,
+        durationMs: Date.now() - startTime,
+      }
+    } catch (err) {
+      clearTimeout(timeout)
+      console.warn(`[decompose-radical] ${model} failed: ${(err as Error).message}. Trying next...`)
+      continue
+    }
+  }
+
+  return {
+    ok: false,
+    error: 'All models failed for Radical Phase 1 decomposition',
+    durationMs: Date.now() - startTime,
+  }
+}
 
 /**
  * Validates the JSON decomposition result against the required schema constraints.

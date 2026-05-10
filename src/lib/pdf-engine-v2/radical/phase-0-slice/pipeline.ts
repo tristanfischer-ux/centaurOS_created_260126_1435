@@ -28,6 +28,12 @@ import { ALL_GRAMMAR_RULES } from '../seed-library.js'
 import type { RadicalTree } from '../schema.js'
 import { CURRENT_RADICAL_SPEC_VERSION, isVersionCompatible } from '../schema.js'
 
+// Phase 1 integration flag check
+function isPhaseOneEnabled(): boolean {
+  const raw = (process.env.RADICAL_PHASE_1_TREE_OUTPUT ?? '').toLowerCase().trim()
+  return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
+}
+
 // Lifted and productionised from demo/grammar-pass.ts
 import { runBessGrammarPass } from '../demo/grammar-pass.js'
 // Lifted and productionised from demo/cost-rollup.ts
@@ -42,6 +48,8 @@ export interface PhaseZeroSliceResult {
   product_slug: 'bess-container'
   radical_spec_version: string
   version_compatible: boolean
+  /** "hardcoded" = Phase 0 original; "llm_emitted" = Phase 1 integration */
+  tree_source: 'hardcoded' | 'llm_emitted'
 
   tree_node_count: number
   tree_leaf_count: number
@@ -107,16 +115,33 @@ function countCompositionNodes(tree: RadicalTree): number {
  * Should only be called when isPhaseZeroSliceEnabled() returns true.
  * Returns a full trace of the pipeline state so callers can verify
  * the Radical tree worked without running a full PDF render.
+ *
+ * Phase 1 integration: if llmEmittedTree is provided (and
+ * RADICAL_PHASE_1_TREE_OUTPUT=true), the slice uses the LLM-emitted tree
+ * instead of the hardcoded one. When only RADICAL_PHASE_0_SLICE=true
+ * (and not the Phase 1 flag), the hardcoded tree is used (original behaviour).
  */
-export async function runPhaseZeroSlice(): Promise<PhaseZeroSliceResult> {
+export async function runPhaseZeroSlice(llmEmittedTree?: RadicalTree): Promise<PhaseZeroSliceResult> {
   const startMs = Date.now()
 
   try {
     console.log('[phase-0-slice] Starting BESS vertical slice...')
 
-    // ── Step 1: Build and load the hardcoded BESS tree ─────────────────────
-    console.log('[phase-0-slice] Step 1: Build hardcoded BESS Radical tree')
-    const rawTree = buildBessHardcodedTree()
+    // ── Step 1: Build/load the BESS Radical tree ───────────────────────────
+    // Phase 1 integration: use LLM-emitted tree when both flags are set.
+    const usePhaseOne = isPhaseOneEnabled() && llmEmittedTree != null
+    let rawTree: RadicalTree
+    let treeSource: 'hardcoded' | 'llm_emitted'
+
+    if (usePhaseOne) {
+      console.log('[phase-0-slice] Step 1: Using LLM-emitted Radical tree (Phase 1 integration)')
+      rawTree = llmEmittedTree!
+      treeSource = 'llm_emitted'
+    } else {
+      console.log('[phase-0-slice] Step 1: Build hardcoded BESS Radical tree (Phase 0 original)')
+      rawTree = buildBessHardcodedTree()
+      treeSource = 'hardcoded'
+    }
 
     // ── Step 2: Version-compatibility check ────────────────────────────────
     console.log(`[phase-0-slice] Step 2: Version check (tree=${rawTree.radical_spec_version}, current=${CURRENT_RADICAL_SPEC_VERSION})`)
@@ -189,6 +214,7 @@ export async function runPhaseZeroSlice(): Promise<PhaseZeroSliceResult> {
       product_slug: 'bess-container',
       radical_spec_version: tree.radical_spec_version,
       version_compatible: versionCompatible,
+      tree_source: treeSource,
 
       tree_node_count: nodeCount,
       tree_leaf_count: leaves.length,
@@ -230,6 +256,7 @@ export async function runPhaseZeroSlice(): Promise<PhaseZeroSliceResult> {
       product_slug: 'bess-container',
       radical_spec_version: CURRENT_RADICAL_SPEC_VERSION,
       version_compatible: true,
+      tree_source: 'hardcoded' as const,
       tree_node_count: 0,
       tree_leaf_count: 0,
       grammar: {

@@ -325,6 +325,136 @@ USER:
 [Product classification from Stage 2]
 [Regulatory entries from Stage 4 — these constrain module design]`
 
+// ─── Stage 5 (Radical Phase 1): Module Decomposition — Radical tree output ──
+// Activated when RADICAL_PHASE_1_TREE_OUTPUT=true (BESS only in Phase 1).
+// Instructs the LLM to emit a hierarchical Radical tree JSON conforming to
+// schema.ts, rather than the flat module list of MODULE_DECOMPOSITION_SYSTEM_PA.
+//
+// Key rules for this prompt:
+//   - Reference the 22-radical seed library inline so the LLM picks from it.
+//   - Emit UNKNOWN_RADICAL placeholders for anything not in the library.
+//   - Temperature MUST be 0.0 for determinism (set by caller).
+//   - Output consumed by validateRadicalTreeOutput() in 2-decompose.ts.
+//
+// DO NOT use this prompt on PA_PIPELINE=false or for any product class other
+// than BESS without Phase 1 being declared complete.
+
+export const MODULE_DECOMPOSITION_RADICAL_PROMPT = `You are a systems engineer decomposing a hardware product into a hierarchical Radical tree. You MUST output ONLY valid JSON — no preamble, no markdown fences, no commentary.
+
+=== RADICAL LIBRARY (v1.0.0) — USE THESE IDs EXACTLY ===
+
+RADICALS (22 total — the atomic primitives):
+From seed:
+  steel, copper, polymer_thermoplastic, electrical_conducting_function, solid_state_of_matter
+
+Added Week 2 (BESS):
+  lithium_iron_phosphate_chemistry, electrochemical_energy_function, silicon_semiconductor_function,
+  magnetic_coupling_function, electromechanical_switching_function, thermal_transfer_function,
+  fluid_flow_state, mineral_fibre_material, pressure_vessel_function, chemical_suppressant_material,
+  chemical_sensing_function, optical_sensing_function
+
+Added Week 3 (heat pump / vertical farm):
+  aluminium_alloy, refrigerant_fluid, mechanical_kinetic_function
+
+Added Week 4 (drone / EV charger / bioreactor / edge AI):
+  carbon_fibre_composite, digital_logic_function
+
+Added Week 5 (AUV / CGM / HAPS):
+  optical_transduction_function, biochemical_sensing_function, buoyancy_control_function,
+  electrochemical_reaction_function
+
+CHARACTERS (function-classes — composite of 2-4 radicals):
+From seed:
+  steel_bolt, copper_wire, aluminium_extrusion, polymer_gasket, steel_plate, copper_busbar,
+  polymer_enclosure, steel_threaded_rod, aluminium_heatsink, copper_terminal
+
+Added Week 2 (BESS):
+  lfp_prismatic_cell, steel_rack_frame, pcb_controller, power_converter, transformer,
+  dc_contactor, circuit_breaker, resistor, protection_relay, liquid_cooling_system,
+  thermal_insulation_panel, fire_suppression_system, pressure_vessel, gas_sensor,
+  optical_arc_sensor, ems_controller, network_switch, steel_door, cable_transit_frame,
+  switchboard_enclosure
+
+ARCHETYPES (character + modifiers — the designed-with layer):
+From seed:
+  M8x30_316L_socket_head_bolt, M16x50_plain_steel_bolt, IP67_polymer_enclosure,
+  bare_polymer_enclosure, M8x30_plain_steel_bolt, tinned_copper_terminal_50A,
+  standard_copper_wire, standard_aluminium_heatsink, standard_copper_busbar,
+  standard_polymer_gasket
+
+BESS archetypes (Week 2):
+  lfp_prismatic_cell_280Ah, steel_battery_rack_frame, bms_master_controller,
+  bms_slave_cell_monitor, pcs_inverter_1mw_bidirectional, step_up_transformer_400v_11kv,
+  dc_contactor_1500v_300a, dc_mccb_1500v_2000a, ac_acb_400v_2000a, ac_output_circuit_breaker,
+  dc_busbar_800v_2000a, precharge_resistor_hv, g99_protection_relay, liquid_cooling_loop_1mw,
+  mineral_wool_insulation_panel, container_fire_suppression_system, fire_suppression_cylinder_novec,
+  li_ion_offgas_detector, arc_flash_detection_sensor, ems_scada_controller,
+  managed_ethernet_switch_industrial, ups_3kva_industrial, fire_rated_steel_door_panic,
+  cable_transit_frame_ip55, ac_distribution_board_ip55
+
+=== UNKNOWN RADICAL RULE ===
+If a part CANNOT be decomposed using the existing library above, emit the character or archetype node with:
+  "archetype_id": "<UNKNOWN_RADICAL>: <description of what is needed>"
+Do NOT invent a new radical name. Do NOT use an existing radical ID for something it does not represent.
+The pipeline will flag these for human review.
+
+=== OUTPUT SCHEMA ===
+{
+  "radical_spec_version": "1.0.0",
+  "composition": {
+    "id": string (snake_case product identifier),
+    "description": string (1 sentence),
+    "environment": [string] (e.g. "indoor", "industrial", "cooling_capacity_W:1200000"),
+    "root": <CompositionNode>
+  }
+}
+
+CompositionNode schema (recursive):
+{
+  "archetypeId": string (archetype ID from library above, OR "<UNKNOWN_RADICAL>: <desc>"),
+  "label": string (human-readable name, e.g. "LFP Prismatic Cell 280Ah"),
+  "multiplicity": integer >= 1 (quantity of THIS node relative to its parent),
+  "mpn_hint": string|null (LLM's best known manufacturer part number — null if unknown),
+  "manufacturer_hint": string|null (e.g. "CATL", "Sungrow" — null if unknown),
+  "estimated_unit_price_gbp": number|null (realistic 2025 UK B2B price — null if unknown),
+  "children": [<CompositionNode>]
+}
+
+=== HIERARCHY RULES ===
+Hierarchy levels (top to bottom):
+  paragraph = the complete system (one root node)
+  sentence   = system modules (e.g. battery_rack_assembly, BMS, PCS)
+  word       = subsystems within a module (e.g. cell_string, rack_frame)
+  character  = individual component types (leaf nodes)
+
+Rules:
+1. Root node archetypeId is the top-level system identifier (e.g. "bess_container_3_5mwh_system").
+2. Root has multiplicity = 1.
+3. Each module-level node (sentence) has multiplicity = 1 UNLESS the brief specifies multiple identical modules.
+4. Leaf nodes (characters) carry the actual part counts derived from brief specifications.
+5. multiplicity at each level is RELATIVE to the parent (not the system total).
+   Example: if the system has 8 racks and each rack has 50 cells, the rack node has multiplicity=8 and the cell node has multiplicity=50 (not 400).
+6. Every module MUST appear as a sentence-level node. Do not flatten the tree.
+7. children = [] for leaf nodes (actual components with no further decomposition).
+8. Derive part counts from brief specifications (energy, voltage, power). Show calculation in label when non-trivial.
+
+=== DETERMINISM RULES (CRITICAL) ===
+- Use temperature 0 semantics: given the same brief, produce the SAME tree every time.
+- Sort children within each node alphabetically by archetypeId.
+- Quantities must be derived from the brief's numeric constraints — not guessed.
+- Do not vary structure based on phrasing variations. Lock to the brief's explicit numbers.
+
+=== WHAT NOT TO DO ===
+- Do NOT emit modules, expected_parts, or any PA Stage 5 schema fields. This schema is DIFFERENT.
+- Do NOT invent radical IDs not in the library above.
+- Do NOT collapse multiple distinct modules into one node.
+- Do NOT omit the estimated_unit_price_gbp field — null is acceptable when unknown.
+
+USER:
+[Structured brief JSON from Stage 1]
+[Product classification from Stage 2]
+[Regulatory entries from Stage 4]`
+
 // ─── Stage 6: BOM Generation ───────────────────────────────────────────────
 
 export const BOM_GENERATION_SYSTEM = `You are a manufacturing engineer generating a bill of materials for a hardware product. You work from the modules you are given and the grounding data (materials catalogue, process catalogue) provided in the user message.
