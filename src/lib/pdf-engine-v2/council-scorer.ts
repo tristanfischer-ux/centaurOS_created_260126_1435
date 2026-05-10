@@ -340,10 +340,18 @@ Return ONLY valid JSON:
   // generators Gemini/MiMo/DeepSeek, strong engineering non-hallucination).
   // Verified available on OpenRouter 2026-05-08. Alternates if gpt-5.4 is
   // unavailable: moonshotai/kimi-k2.6 or meta-llama/llama-4-maverick.
+  //
+  // B5 (2026-05-10): removed z-ai/glm-5.1 — frequent attempt-1 failures
+  // caused the retry loop to accumulate across 11 sections and time out the
+  // entire pipeline before the PDF was written (vfarm, BESS, all 3 recent runs
+  // killed at this stage). GLM-5.1 was also a recurring parse-miss source on
+  // dense tables (multimodal council memory). Replaced with
+  // mistralai/mistral-large — different lineage from all content generators,
+  // reliable JSON schema compliance, no self-judge risk.
   const judges = [
-    'x-ai/grok-4.3',          // honest adversary, 98% tool-use, 75% non-hallucination
-    'openai/gpt-5.4',         // B2: replaced MiMo — OpenAI lineage, no overlap with content generators
-    'z-ai/glm-5.1',           // schema enforcer, 74% non-hallucination
+    'x-ai/grok-4.3',                // honest adversary, 98% tool-use, 75% non-hallucination
+    'openai/gpt-5.4',               // B2: replaced MiMo — OpenAI lineage, no overlap with content generators
+    'mistralai/mistral-large',      // B5: replaced GLM-5.1 — Mistral lineage, reliable JSON compliance
   ]
 
   // F8: track which model produced each vote so we can build a per-judge breakdown.
