@@ -309,7 +309,7 @@ Onboarding a new product class is a decomposition exercise: take a representativ
 
 The Radical architecture currently works in a research sandbox. It has been validated thoroughly: decompositions checked, grammar rules tested, resolution queried against live distributor APIs, costs computed, CSVs generated. The production PDF pipeline still uses the older per-class approach.
 
-Migration from the old architecture to the new one is planned across eight phases over approximately 10 to 12 weeks. The phases replace one piece of the old system at a time with its Radical equivalent, rather than switching everything over at once.
+Migration from the old architecture to the new one is planned across seven phases over approximately 16 to 18 weeks. The phases replace one piece of the old system at a time with its Radical equivalent, rather than switching everything over at once. A council review identified two blocking gaps that the original plan did not address: an evaluation harness (automated scoring against the existing 10-product test suite before any phase is signed off) and a schema versioning system (so that the library can evolve without breaking previously decomposed products). Both gaps are now in scope for the first phase.
 
 The early phases establish the data model and the new radical library alongside the existing pipeline — no change to what users see yet. Middle phases introduce the resolution and grammar modules, connecting the radical decomposition to real distributor queries and physics checks. Later phases replace the cost computation and report rendering with the hierarchy-aware versions that produce the auditable cost waterfall and the orderable CSVs.
 
