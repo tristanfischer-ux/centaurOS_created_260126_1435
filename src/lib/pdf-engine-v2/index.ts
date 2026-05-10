@@ -65,6 +65,7 @@ import type { PipelineState, StageResult, BriefConstraints, StructuredBriefJSON,
 import { routeReportType, normaliseStatus, type ReportTypeRouterResult } from './report-type-router'
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 import { mapProductClassToIndustryDomain } from './lib/industry-domain'
+import { validateModuleAssignments } from './lib/module-assignment-validator'
 
 export interface EngineResult {
   ok: boolean
@@ -1024,6 +1025,29 @@ export async function runPipeline(
       return await generateErrorPdf(state, stages, llmCalls, startTime)
     }
     state.modules = decomposeResult.data
+
+    // ── Module Assignment Plausibility Validation (UNIVERSAL-ROBUSTNESS) ──
+    // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): deterministic check that each
+    // part belongs to a module that makes physical sense. Catches:
+    //   - HVAC Fan Coil in Structural Frame (vfarm) → should be HVAC Module
+    //   - BMS in ISO Container Module (BESS) → should be Battery Subsystem
+    // Warnings are surfaced to console and stored on state for PDF audit log.
+    // Non-fatal — never blocks the pipeline.
+    try {
+      const assignmentResult = validateModuleAssignments(state.modules)
+      if (assignmentResult.warningCount > 0) {
+        console.warn(`[pipeline] Module assignment: ${assignmentResult.warningCount} plausibility warnings (${assignmentResult.checkedCount} parts checked)`)
+        for (const w of assignmentResult.warnings) {
+          console.warn(`[pipeline]   MISASSIGNED: "${w.partName}" in "${w.moduleName}" (${w.partCategory}) → ${w.suggestedModule}`)
+        }
+        // Store for PDF audit log and downstream stages
+        ;(state as any).moduleAssignmentWarnings = assignmentResult.warnings
+      } else {
+        console.log(`[pipeline] Module assignment: all ${assignmentResult.checkedCount} parts plausibly assigned`)
+      }
+    } catch (assignErr) {
+      console.warn(`[pipeline] Module assignment validator failed (non-fatal): ${(assignErr as Error).message}`)
+    }
 
     // ── Sizing Second Pass ─────────────────────────────────────────────────
     // The first sizing pass (Stage 3, above) ran on empty modules so that the
