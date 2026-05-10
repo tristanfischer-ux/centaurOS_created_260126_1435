@@ -1,9 +1,11 @@
 import type { Module, ModulePA, ResearchResult, StageResult, RiskRow, StructuredBriefJSON, RegulatoryExtraction } from '../types'
-import { MODULE_DECOMPOSITION_SYSTEM, MODULE_DECOMPOSITION_SYSTEM_PA, MODULE_DECOMPOSITION_RADICAL_PROMPT } from '../prompts'
+import { MODULE_DECOMPOSITION_SYSTEM, MODULE_DECOMPOSITION_SYSTEM_PA, MODULE_DECOMPOSITION_RADICAL_PROMPT, MODULE_DECOMPOSITION_LEAVES_PROMPT } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { validateFmea, type FmeaRow } from '../lib/fmea-validator'
 import type { RadicalTree, CompositionNode } from '../radical/schema.js'
 import { CURRENT_RADICAL_SPEC_VERSION } from '../radical/schema.js'
+import { buildTreeFromLeaves, validateLeafList, deriveBessQuantityOverrides } from '../radical/structural-builder.js'
+import { HIERARCHY_STATS } from '../radical/character-hierarchy.js'
 
 // Stage 2: Module Decomposition — uses MODULE_DECOMPOSITION_SYSTEM from prompts.ts
 // PA path: uses MODULE_DECOMPOSITION_SYSTEM_PA and validateDecomposeResultPA().
@@ -87,6 +89,12 @@ export interface RadicalTreeResult {
   unknowns: string[]         // UNKNOWN_RADICAL placeholder archetypeIds
   netNewArchetypes: string[] // archetypes in tree but not in KNOWN_ARCHETYPES (non-unknown)
   netNewCharacters: string[] // characters implied by unknowns (for surfacing)
+  /** Phase 1.5: count of leaf records the LLM identified in Stage 1 */
+  leafCount?: number
+  /** Phase 1.5: count of leaves the builder could NOT place in the hierarchy */
+  unmappedLeafCount?: number
+  /** Phase 1.5: true if built via two-stage (deterministic Stage 2) */
+  twoStageMode?: boolean
 }
 
 // ---------------------------------------------------------------------------
@@ -98,6 +106,7 @@ function validateNode(
   path: string,
   unknowns: string[],
   netNewArchetypes: string[],
+  depth: number = 0,
 ): CompositionNode {
   if (!node || typeof node !== 'object') {
     throw new Error(`Radical tree node at ${path} is not an object`)
@@ -117,8 +126,13 @@ function validateNode(
   if (archetypeId.startsWith('<UNKNOWN_RADICAL>')) {
     unknowns.push(archetypeId)
   } else {
-    // Track net-new archetypes (not in known library — may be valid future additions)
-    if (!KNOWN_ARCHETYPES.has(archetypeId)) {
+    // Phase 1 finding: only validate archetypeId membership at LEAF nodes (depth >= 2).
+    // Sentence and word nodes are compositions — they don't need archetype matches.
+    // Root (depth=0) and sentence (depth=1) and word (depth=2) nodes use structural IDs.
+    // Leaf nodes (depth >= 3) must be from the known library.
+    const rawChildren: any[] = Array.isArray(node.children) ? node.children : []
+    const isLeaf = rawChildren.length === 0
+    if (isLeaf && !KNOWN_ARCHETYPES.has(archetypeId)) {
       netNewArchetypes.push(archetypeId)
     }
   }
@@ -126,7 +140,7 @@ function validateNode(
   // Recurse into children
   const rawChildren: any[] = Array.isArray(node.children) ? node.children : []
   const children: CompositionNode[] = rawChildren.map((child, i) =>
-    validateNode(child, `${path}.children[${i}]`, unknowns, netNewArchetypes)
+    validateNode(child, `${path}.children[${i}]`, unknowns, netNewArchetypes, depth + 1)
   )
 
   return {
@@ -218,37 +232,16 @@ export function validateRadicalTreeOutput(raw: any): RadicalTreeResult {
 // Radical Phase 1 — runDecomposeRadical
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Phase 1.5 — Two-stage decomposition helpers
+// ---------------------------------------------------------------------------
+
 /**
- * Run the Radical Phase 1 module decomposition for BESS.
- * Emits a Radical tree (RadicalTree) rather than a flat module list.
- *
- * Called from runDecomposePA() when RADICAL_PHASE_1_TREE_OUTPUT=true.
- * The flat module list (state.modules) is ALSO returned unchanged —
- * this function is strictly ADDITIVE.
- *
- * Temperature is forced to 0.0 for determinism. Same brief MUST produce
- * the same tree shape (Opus-risk mitigation per migration plan council).
+ * Call OpenRouter for the leaf-identification stage (Stage 1 of two-stage).
+ * Returns raw parsed JSON (the leaf array) or throws on failure.
+ * Temperature is forced to 0.0.
  */
-export async function runDecomposeRadical(
-  parsedBrief: StructuredBriefJSON,
-  classification: string,
-  regulatoryExtraction?: RegulatoryExtraction,
-): Promise<StageResult<RadicalTreeResult>> {
-  const startTime = Date.now()
-  console.log('[decompose-radical] Starting Radical Phase 1 tree decomposition...')
-
-  const allEntries = regulatoryExtraction?.regulatory_entries ?? []
-  const regSummary = allEntries.length
-    ? `\n\n[Regulatory entries from Stage 4]\n` +
-      allEntries.slice(0, 20).map(e => `- ${e.standard_name} (${e.jurisdiction}): ${e.engineering_impact}`).join('\n')
-    : ''
-
-  const userContent =
-    `[Structured brief JSON from Stage 1]\n${JSON.stringify(parsedBrief, null, 2)}\n\n` +
-    `[Product classification from Stage 2]\n${classification}` +
-    regSummary
-
-  // Force temperature=0 for determinism
+async function callOpenRouterLeaves(systemPrompt: string, userContent: string): Promise<any> {
   const models = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3']
 
   for (const model of models) {
@@ -265,9 +258,9 @@ export async function runDecomposeRadical(
         body: JSON.stringify({
           model,
           temperature: 0.0,   // DETERMINISM: must be 0 — Opus-risk mitigation
-          max_tokens: 16384,
+          max_tokens: 8192,
           messages: [
-            { role: 'system', content: MODULE_DECOMPOSITION_RADICAL_PROMPT },
+            { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
           ],
         }),
@@ -294,56 +287,188 @@ export async function runDecomposeRadical(
         throw new Error('No content in OpenRouter response')
       }
 
-      console.log(`[decompose-radical] ${model} responded: ${raw.length} chars`)
+      console.log(`[decompose-radical-leaves] ${model} responded: ${raw.length} chars`)
 
-      // JSON extraction (same robust strategy as callOpenRouter)
+      // JSON extraction — expecting a bare array
       let jsonStr = raw
       jsonStr = jsonStr.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
       jsonStr = jsonStr.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '').trim()
       jsonStr = jsonStr.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim()
 
-      let parsed: any
+      // Try parse whole string first
       try {
-        parsed = JSON.parse(jsonStr)
-      } catch {
-        const firstBrace = jsonStr.indexOf('{')
-        const lastBrace = jsonStr.lastIndexOf('}')
-        if (firstBrace >= 0 && lastBrace > firstBrace) {
-          try {
-            parsed = JSON.parse(jsonStr.slice(firstBrace, lastBrace + 1))
-          } catch {
-            throw new Error('Failed to parse JSON from Radical tree LLM response')
-          }
-        } else {
-          throw new Error('No JSON object found in Radical tree LLM response')
-        }
+        return JSON.parse(jsonStr)
+      } catch { /* fall through */ }
+
+      // Try first bracket to last bracket (bare array)
+      const firstBracket = jsonStr.indexOf('[')
+      const lastBracket = jsonStr.lastIndexOf(']')
+      if (firstBracket >= 0 && lastBracket > firstBracket) {
+        try {
+          return JSON.parse(jsonStr.slice(firstBracket, lastBracket + 1))
+        } catch { /* fall through */ }
       }
 
-      const result = validateRadicalTreeOutput(parsed)
+      // Try first brace to last brace (wrapped in object)
+      const firstBrace = jsonStr.indexOf('{')
+      const lastBrace = jsonStr.lastIndexOf('}')
+      if (firstBrace >= 0 && lastBrace > firstBrace) {
+        try {
+          const parsed = JSON.parse(jsonStr.slice(firstBrace, lastBrace + 1))
+          // If the object has a 'leaves' or 'components' array, unwrap it
+          if (Array.isArray(parsed.leaves)) return parsed.leaves
+          if (Array.isArray(parsed.components)) return parsed.components
+          if (Array.isArray(parsed.parts)) return parsed.parts
+          return parsed
+        } catch { /* fall through */ }
+      }
 
-      console.log(`[decompose-radical] Tree validated. Unknowns: ${result.unknowns.length}, net-new archetypes: ${result.netNewArchetypes.length}`)
-      if (result.unknowns.length > 0) {
-        console.warn(`[decompose-radical] UNKNOWN_RADICAL nodes found: ${result.unknowns.join(', ')}`)
-      }
-      if (result.netNewArchetypes.length > 0) {
-        console.warn(`[decompose-radical] Net-new archetypes (not in seed library): ${result.netNewArchetypes.join(', ')}`)
-      }
-
-      return {
-        ok: true,
-        data: result,
-        durationMs: Date.now() - startTime,
-      }
+      throw new Error('Failed to parse leaf-list JSON from LLM response')
     } catch (err) {
       clearTimeout(timeout)
-      console.warn(`[decompose-radical] ${model} failed: ${(err as Error).message}. Trying next...`)
+      console.warn(`[decompose-radical-leaves] ${model} failed: ${(err as Error).message}. Trying next...`)
       continue
     }
   }
 
+  throw new Error('All models failed for Radical Phase 1.5 leaf identification')
+}
+
+/**
+ * Run the Radical Phase 1.5 module decomposition — two-stage architecture.
+ *
+ * Stage 1 (LLM): identify LEAVES only — flat list of LeafRecord
+ *   - Uses MODULE_DECOMPOSITION_LEAVES_PROMPT (constrained format)
+ *   - Constrained output format greatly reduces structural variance vs free-form tree
+ *   - Temperature 0.0 enforced
+ *
+ * Stage 2 (deterministic code): build the hierarchical tree from the leaf list
+ *   - Uses buildTreeFromLeaves() in radical/structural-builder.ts
+ *   - NO LLM call — pure deterministic code
+ *   - Same leaf list ALWAYS produces same tree shape
+ *
+ * Called from runDecomposePA() when RADICAL_PHASE_1_TREE_OUTPUT=true.
+ * The flat module list (state.modules) is ALSO returned unchanged —
+ * this function is strictly ADDITIVE.
+ *
+ * Determinism guarantee:
+ *   - Tree structure: FULLY deterministic (Stage 2 is pure code)
+ *   - Leaf list: deterministic if LLM is stable at temp=0.0
+ *   - If leaf list variance is detected: surface diagnostic, do NOT silently pass
+ */
+export async function runDecomposeRadical(
+  parsedBrief: StructuredBriefJSON,
+  classification: string,
+  regulatoryExtraction?: RegulatoryExtraction,
+): Promise<StageResult<RadicalTreeResult>> {
+  const startTime = Date.now()
+  console.log('[decompose-radical] Starting Radical Phase 1.5 two-stage decomposition...')
+  console.log(`[decompose-radical] Hierarchy: ${HIERARCHY_STATS.sentences} sentences, ${HIERARCHY_STATS.words} words, ${HIERARCHY_STATS.characterMappings} character mappings`)
+
+  const allEntries = regulatoryExtraction?.regulatory_entries ?? []
+  const regSummary = allEntries.length
+    ? `\n\n[Regulatory entries from Stage 4]\n` +
+      allEntries.slice(0, 20).map(e => `- ${e.standard_name} (${e.jurisdiction}): ${e.engineering_impact}`).join('\n')
+    : ''
+
+  const userContent =
+    `[Structured brief JSON from Stage 1]\n${JSON.stringify(parsedBrief, null, 2)}\n\n` +
+    `[Product classification from Stage 2]\n${classification}` +
+    regSummary
+
+  // ── Stage 1: LLM identifies leaves ──────────────────────────────────────
+  console.log('[decompose-radical] Stage 1: LLM leaf identification (temp=0.0)...')
+  let rawLeafList: any
+  try {
+    rawLeafList = await callOpenRouterLeaves(MODULE_DECOMPOSITION_LEAVES_PROMPT, userContent)
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Stage 1 leaf identification failed: ${(err as Error).message}`,
+      durationMs: Date.now() - startTime,
+    }
+  }
+
+  let leaves
+  try {
+    leaves = validateLeafList(rawLeafList)
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Stage 1 leaf-list validation failed: ${(err as Error).message}`,
+      durationMs: Date.now() - startTime,
+    }
+  }
+
+  console.log(`[decompose-radical] Stage 1 complete: ${leaves.length} leaves identified`)
+
+  const unknownLeaves = leaves.filter(l => l.character_id === '<UNKNOWN>' || l.character_id.startsWith('<UNKNOWN>'))
+  if (unknownLeaves.length > 0) {
+    console.warn(`[decompose-radical] Stage 1: ${unknownLeaves.length} UNKNOWN character(s) — library may need expansion:`)
+    for (const ul of unknownLeaves) {
+      console.warn(`  UNKNOWN: ${ul.description ?? ul.character_id}`)
+    }
+  }
+
+  // ── Stage 2: deterministic tree builder ─────────────────────────────────
+  console.log('[decompose-radical] Stage 2: deterministic tree build from leaf list...')
+
+  const productSlug = parsedBrief.project_id ?? classification.replace(/[^a-z0-9_]/gi, '_')
+
+  // Derive physics-based quantity overrides AND mandatory character set for determinism.
+  // For BESS: compute from brief's energy/voltage/capacity constraints.
+  // These override the LLM-provided multiplicities so same brief → same quantities.
+  // mandatoryCharacters ensures tree SHAPE is deterministic regardless of LLM variance.
+  let quantityOverrides: Record<string, number> | undefined
+  let mandatoryCharacters: string[] | undefined
+  if (classification === 'battery_energy_storage' || classification === 'bess') {
+    const perfValue = parsedBrief.constraints?.target_performance?.value
+    const usableKwh = typeof perfValue === 'number' ? perfValue : undefined
+    if (usableKwh) {
+      const derived = deriveBessQuantityOverrides({ usableKwh })
+      quantityOverrides = derived.quantities
+      mandatoryCharacters = derived.mandatoryCharacters
+      console.log(`[decompose-radical] Stage 2: BESS quantity overrides applied (${usableKwh} kWh brief → ${quantityOverrides['lfp_prismatic_cell']} cells, ${mandatoryCharacters.length} mandatory characters)`)
+    }
+  }
+
+  let buildResult
+  try {
+    buildResult = buildTreeFromLeaves(leaves, productSlug, classification, quantityOverrides, mandatoryCharacters)
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Stage 2 tree build failed: ${(err as Error).message}`,
+      durationMs: Date.now() - startTime,
+    }
+  }
+
+  const { tree, unmappedCharacters, placedLeafCount, stats } = buildResult
+
+  console.log(`[decompose-radical] Stage 2 complete: ${stats.sentences} sentences, ${stats.words} words, ${placedLeafCount} leaves placed, ${stats.unmapped} unmapped`)
+
+  if (unmappedCharacters.length > 0) {
+    console.warn(`[decompose-radical] Unmapped characters (no hierarchy entry): ${unmappedCharacters.join(', ')}`)
+    console.warn('[decompose-radical] Add these to character-hierarchy.ts to place them in the tree')
+  }
+
+  // Collect unknowns for reporting (combine UNKNOWN leaves + unmapped characters)
+  const allUnknowns = [
+    ...unknownLeaves.map(l => `<UNKNOWN_RADICAL>: ${l.description ?? l.character_id}`),
+    ...unmappedCharacters.filter(c => !c.startsWith('<UNKNOWN>')).map(c => `unmapped:${c}`),
+  ]
+
   return {
-    ok: false,
-    error: 'All models failed for Radical Phase 1 decomposition',
+    ok: true,
+    data: {
+      tree,
+      unknowns: allUnknowns,
+      netNewArchetypes: [],   // Stage 2 uses known archetypes from the library
+      netNewCharacters: unknownLeaves.map(l => l.description ?? l.character_id),
+      leafCount: leaves.length,
+      unmappedLeafCount: stats.unmapped,
+      twoStageMode: true,
+    },
     durationMs: Date.now() - startTime,
   }
 }

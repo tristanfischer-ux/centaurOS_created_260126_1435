@@ -455,6 +455,91 @@ USER:
 [Product classification from Stage 2]
 [Regulatory entries from Stage 4]`
 
+// ─── Stage 5 (Radical Phase 1.5): Leaf-Only Identification prompt ────────────
+// Activated when RADICAL_PHASE_1_TREE_OUTPUT=true (BESS only in Phase 1.5).
+// This is Stage 1 of the two-stage decomposition:
+//   Stage 1 (LLM, this prompt): identify LEAVES only — flat list of LeafRecord
+//   Stage 2 (deterministic code): build the hierarchical tree from the leaf list
+//
+// Key design decisions:
+//   - Output a FLAT JSON array — no hierarchy. Hierarchy is built deterministically.
+//   - character_id MUST be from the seed library. Unknown → '<UNKNOWN>: description'
+//   - Constrained format minimises structural variance (Opus-risk mitigation).
+//   - Maximum 200 leaves per response.
+//   - Temperature 0 enforced by caller.
+
+export const MODULE_DECOMPOSITION_LEAVES_PROMPT = `You are a systems engineer identifying the LEAF COMPONENTS of a hardware product.
+
+Your task is to identify ONLY the individual component instances — NOT to build a hierarchy.
+A separate deterministic algorithm will assemble the hierarchy from your list.
+
+You MUST output ONLY a JSON array — no preamble, no markdown fences, no commentary.
+
+=== RADICAL CHARACTER LIBRARY (v1.0.0) — USE THESE character_id VALUES EXACTLY ===
+
+Seed characters:
+  steel_bolt, copper_wire, aluminium_extrusion, polymer_gasket, steel_plate, copper_busbar,
+  polymer_enclosure, steel_threaded_rod, aluminium_heatsink, copper_terminal
+
+BESS characters (Week 2):
+  lfp_prismatic_cell, steel_rack_frame, pcb_controller, power_converter, transformer,
+  dc_contactor, circuit_breaker, resistor, protection_relay, liquid_cooling_system,
+  thermal_insulation_panel, fire_suppression_system, pressure_vessel, gas_sensor,
+  optical_arc_sensor, ems_controller, network_switch, steel_door, cable_transit_frame,
+  switchboard_enclosure
+
+Heat pump / vertical farm characters (Week 3):
+  (use liquid_cooling_system for refrigerant/hydronic loops, pcb_controller for drives/inverters,
+   aluminium_extrusion for frames, polymer_gasket for seals, copper_wire for wiring)
+
+Drone / EV charger / bioreactor / edge AI characters (Week 4):
+  (use power_converter for motor drivers/charger PCS, pcb_controller for flight computers/BMS,
+   aluminium_extrusion for airframe extrusions, network_switch for comm hubs)
+
+AUV / CGM / HAPS characters (Week 5):
+  (use polymer_enclosure for pressure hulls, pcb_controller for mission computers,
+   polymer_gasket for O-ring seals, copper_wire for harnesses)
+
+=== UNKNOWN RULE ===
+If a part CANNOT be mapped to any character above, emit:
+  { "character_id": "<UNKNOWN>", "description": "describe the part clearly", "multiplicity": N, ... }
+Do NOT invent new character_id values. Do NOT use an existing ID for something it does not represent.
+
+=== OUTPUT SCHEMA ===
+Respond with ONLY a JSON array of objects:
+[
+  {
+    "character_id": string,         // MUST be from the library above OR "<UNKNOWN>"
+    "archetype_id": string|null,    // specific archetype if known (e.g. "lfp_prismatic_cell_280Ah"), else null
+    "multiplicity": integer,        // count of this component type in this role (>= 1)
+    "mpn_hint": string|null,        // best known MPN (e.g. "CATL LF280K"), null if unknown
+    "manufacturer_hint": string|null, // e.g. "CATL", "Sungrow", null if unknown
+    "estimated_unit_price_gbp": number|null, // realistic 2025 UK B2B price, null if unknown
+    "description": string|null      // REQUIRED if character_id is "<UNKNOWN>"; optional otherwise
+  },
+  ...
+]
+
+=== QUANTITY RULES ===
+- multiplicity is the count of this SPECIFIC component type in a SINGLE unit of the product.
+- For BESS cells: derive from brief's energy / (cell_voltage × cell_Ah). Show calculation in description.
+  Example BESS 3.5 MWh, 280Ah, 3.2V, 80% DoD → 3500/0.8/3.2/280 × 1000 = 4883 → round to 4896 (16-string aligned).
+- For power electronics, BMS boards, switchgear: derive from brief's power/voltage/module count.
+- For common fasteners: estimate from product scale — do NOT default to 1 for bolts in an assembly.
+- multiplicity MUST always be >= 1.
+
+=== CONSTRAINTS ===
+- Maximum 200 leaf records in total.
+- Do NOT emit intermediate or parent nodes — leaves only.
+- Do NOT wrap the array in an object. Return the bare array [ ... ].
+- No duplicate (character_id, archetype_id) pairs — if you need two distinct usages, differentiate by archetype_id or add description.
+- Sort records by character_id alphabetically — this helps determinism.
+
+USER:
+[Structured brief JSON from Stage 1]
+[Product classification from Stage 2]
+[Regulatory entries from Stage 4]`
+
 // ─── Stage 6: BOM Generation ───────────────────────────────────────────────
 
 export const BOM_GENERATION_SYSTEM = `You are a manufacturing engineer generating a bill of materials for a hardware product. You work from the modules you are given and the grounding data (materials catalogue, process catalogue) provided in the user message.
