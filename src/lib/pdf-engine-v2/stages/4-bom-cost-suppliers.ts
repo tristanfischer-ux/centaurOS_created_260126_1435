@@ -785,6 +785,108 @@ The narrative MUST:
 Output: narrativeMarkdown — 3 to 5 paragraphs, no section headers, British English spelling.
 <!-- END SUBTASK: WRITE_COST_NARRATIVE -->`
 
+// ── Distributor bulk-bin / sanity-ceiling detection ──────────────────────────
+//
+// Distributors sometimes return a listing whose "unit price" is actually the
+// price for a multi-unit bin (e.g. 32 × T-slot lengths for £800). The qty=1
+// price break represents "pack of 32" not "one length". The code previously
+// recorded £800 as the unit cost, then multiplied by quantity → 10-50× overpriced.
+//
+// Two-part defence:
+//
+//   Part A — minimum-qty pack detection:
+//     When the distributor result's lowest `qty` price break has `qty > PACK_MIN_THRESHOLD`,
+//     the listing is a bulk pack (minimum purchase is N units). Divide the reported
+//     unit price by N to get the true per-unit cost, or demote to ESTIMATE when N
+//     is implausibly large (> 100) indicating a catalogue listing, not component pricing.
+//     NOTE: qty1Price() in aggregator/index.ts already picks sorted[0].qty, so
+//     `best.priceGBP[0].qty` is the smallest available purchase qty after sorting.
+//
+//   Part B — sanity ceiling per material/part class:
+//     If the verified price exceeds 2× the Grade D max for this part class, the
+//     distributor match is almost certainly a bulk-bin or false-positive. Demote
+//     to ESTIMATE with a warning. Sanity ceilings are derived from GRADE_D max×2.
+//     For parts without a Grade D key, a generic structural ceiling of £200/unit
+//     applies for mechanical_cots parts (structural, extrusions, hardware).
+//
+// See V7 council 1e4adaf2 for the T-slot extrusion regression that motivated this.
+
+const PACK_MIN_THRESHOLD = 5  // qty breaks starting above this are considered bulk packs
+
+/**
+ * Sanity ceiling in GBP per unit for common part categories.
+ * If a distributor-returned unit price exceeds this, demote to ESTIMATE.
+ * Keyed by lowercased name-fragment patterns (checked with `includes`).
+ *
+ * Values are 2× the Grade D typical or a reasonable engineering judgment.
+ * These are NOT cost estimates — they are anomaly detection thresholds only.
+ */
+const DISTRIBUTOR_SANITY_CEILINGS: Array<{ pattern: RegExp; ceilingGbp: number; basis: string }> = [
+  // Structural framing / extrusion — T-slot aluminium profile: £2–15/m; max £40/m per Grade D ceiling
+  { pattern: /t.?slot|aluminium.*extrusion|aluminum.*extrusion|profile.*extrusion|extrusion.*profile|structural.*frame|frame.*extrusion|v.?slot/i, ceilingGbp: 100, basis: 'T-slot/aluminium extrusion: max £40/m typical; £100 ceiling catches bulk-bin packs' },
+  // Standard fasteners, screws, bolts — commodity items; max ~£0.50/unit × 1000 = £500 for a bag; ceiling for a single unit
+  { pattern: /\bscrew\b|\bbolt\b|\bnut\b|\bwasher\b|\brivet\b|fastener/i, ceilingGbp: 50, basis: 'Standard fasteners: commodity pricing; >£50 single unit indicates bulk pack' },
+  // Standard bearings — SKF/NSK commodity: £5–50 each
+  { pattern: /\bbearing\b/i, ceilingGbp: 500, basis: 'Standard bearing: commodity; >£500 indicates pack or large custom unit' },
+  // PCB / PWB blank stock — not subsystems; ~£10-100 for standard boards
+  { pattern: /\bpcb\b|\bpwb\b|printed.*circuit.*board/i, ceilingGbp: 300, basis: 'PCB blank: standard sizes <£100; >£300 indicates subsystem mis-match' },
+  // Cables and wire — £0.50–£20/m; a spool of 100m could be £200
+  { pattern: /\bcable\b|\bwire\b|\bharness\b/i, ceilingGbp: 500, basis: 'Cable/wire: bulk reel possible; >£500 per BOM line suggests whole-reel price' },
+  // LED grow lights — Fluence/Signify class: £400–£2000/panel per Grade D; max ceiling 2× = £4000
+  { pattern: /led.*grow|grow.*light|horticultural.*led|led.*horticultural|ppfd|plant.*light/i, ceilingGbp: 4000, basis: 'LED grow light panel: Grade D £400–£2000; >£4000 ceiling' },
+  // Structural steel/aluminium plate or sheet — £2–£20/kg; a 10kg sheet ~£200
+  { pattern: /sheet.*metal|metal.*sheet|steel.*plate|aluminium.*plate/i, ceilingGbp: 1000, basis: 'Sheet metal/plate: material cost basis; >£1000 indicates large custom weldment or bulk order' },
+]
+
+/**
+ * Check if a distributor result looks like a bulk-bin pack and return the
+ * corrected unit price, or null if no correction is needed.
+ *
+ * Returns: { correctedPrice, reason } if correction needed; null otherwise.
+ */
+function detectBulkBin(
+  result: import('../lib/distributors/index').AggregateResult,
+  partName: string,
+): { correctedPrice: number | null; reason: string } | null {
+  const best = result.best
+  if (!best.priceGBP || best.priceGBP.length === 0) return null
+
+  // Sort by qty ascending (same logic as qty1Price() in aggregator)
+  const sorted = [...best.priceGBP].sort((a, b) => a.qty - b.qty)
+  const lowestBreak = sorted[0]
+
+  // Part A: minimum purchase quantity is a bulk pack
+  if (lowestBreak.qty > PACK_MIN_THRESHOLD) {
+    const packQty = lowestBreak.qty
+    const packPrice = lowestBreak.unitPriceGbp
+    const perUnit = packPrice / packQty
+    if (packQty > 500) {
+      // Implausibly large pack — this is almost certainly wrong; demote to ESTIMATE
+      return {
+        correctedPrice: null,
+        reason: `Distributor minimum qty=${packQty} (> 500) — cannot reliably extract per-unit price from pack listing; demoting to ESTIMATE`,
+      }
+    }
+    return {
+      correctedPrice: perUnit,
+      reason: `Distributor listed minimum pack of ${packQty} units at £${packPrice.toFixed(2)} total — corrected to £${perUnit.toFixed(2)}/unit`,
+    }
+  }
+
+  // Part B: sanity ceiling check — even at qty=1 break, if price exceeds ceiling demote
+  const qty1Price = lowestBreak.unitPriceGbp
+  for (const ceiling of DISTRIBUTOR_SANITY_CEILINGS) {
+    if (ceiling.pattern.test(partName) && qty1Price > ceiling.ceilingGbp) {
+      return {
+        correctedPrice: null,
+        reason: `Distributor price £${qty1Price.toFixed(2)} exceeds sanity ceiling £${ceiling.ceilingGbp} for "${partName}" — likely bulk-bin or catalogue mis-match. Basis: ${ceiling.basis}`,
+      }
+    }
+  }
+
+  return null
+}
+
 // ── Grade D subsystem estimate table ─────────────────────────────────────────
 //
 // Indicative Grade D estimates for common subsystems (UK 2025 market).
@@ -1291,6 +1393,39 @@ Return ALL four sub-task results in the JSON structure specified in the system p
 
           const best = result.best
           const qty1 = result.qty1GBP
+
+          // ── Bulk-bin / sanity-ceiling detection (V7 council fix) ─────────
+          // Detect when a distributor result is for a multi-unit bin or when the
+          // price exceeds a sanity ceiling for this part class. If detected,
+          // either correct the price (pack division) or demote to ESTIMATE.
+          // See detectBulkBin() for the full logic. V7 council 1e4adaf2.
+          const bulkBinCheck = qty1 != null ? detectBulkBin(result, line.name) : null
+          if (bulkBinCheck !== null) {
+            if (bulkBinCheck.correctedPrice !== null) {
+              // Correctable: divide pack price by quantity
+              console.warn(`[bom-v2] Bulk-bin correction for "${line.name}": ${bulkBinCheck.reason}`)
+              line.unitCostGbp = bulkBinCheck.correctedPrice
+              line.costSource = 'estimated'
+              line.verification_status = 'estimated'
+              line.bestDistributor = undefined
+              line.distributors = undefined
+              line.gradeD_estimate_basis = `Distributor bulk-bin auto-corrected: ${bulkBinCheck.reason}`
+            } else {
+              // Non-correctable: demote to ESTIMATE entirely
+              console.warn(`[bom-v2] Bulk-bin / sanity-ceiling demote for "${line.name}": ${bulkBinCheck.reason}`)
+              const llmPrice = (line as any)._llmUnitPriceGbp as number | null | undefined
+              if (llmPrice != null && llmPrice > 0) {
+                line.unitCostGbp = llmPrice
+              }
+              line.costSource = 'estimated'
+              line.verification_status = 'estimated'
+              line.bestDistributor = undefined
+              line.distributors = undefined
+              line.gradeD_estimate_basis = `Distributor price demoted to ESTIMATE — ${bulkBinCheck.reason}`
+            }
+            // Skip remaining distributor processing for this line
+            return
+          }
 
           // Map distributor results
           line.distributors = [best, ...result.alternates].map(r => ({
