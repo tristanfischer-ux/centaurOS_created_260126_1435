@@ -1347,17 +1347,19 @@ Return ALL four sub-task results in the JSON structure specified in the system p
 
     // ── Phase 4c: Grade D fallback for zero-cost lines ───────────────────
     // After distributor lookup (4a) and supplier search (4b), any line that
-    // remains at unitCostGbp === 0 is a DATA GAP — whether VERIFIED or ESTIMATED.
-    // A VERIFIED £0 is a false-positive distributor match (e.g. Mouser fuzzy-
-    // matching "Battery Management System" to a passive part).  We apply a
-    // Grade D table estimate for known subsystem classes so the BOM total is
-    // structurally consistent and the council can see real indicative costs.
+    // renders as £0 in the PDF (unitCostGbp < 1.0) is a DATA GAP — whether
+    // VERIFIED or ESTIMATED. A VERIFIED sub-£1 line is a false-positive
+    // distributor match (e.g. Mouser fuzzy-matching "Battery Management System"
+    // to a passive part with a tiny catalogue price of £0.001).
     //
-    // Hierarchy applied: VERIFIED (non-zero) > LLM ESTIMATE (non-zero) > GRADE D > DATA GAP
+    // Guard: use < 1.0 (not === 0) to catch near-zero distributor prices that
+    // Intl.NumberFormat rounds to "£0" in the rendered PDF.
+    //
+    // Hierarchy applied: VERIFIED (non-zero, ≥£1) > LLM ESTIMATE (≥£1) > GRADE D > DATA GAP
     {
       let gradeDApplied = 0
       for (const line of integratedLines) {
-        if (line.unitCostGbp > 0) continue  // already costed — leave alone
+        if (line.unitCostGbp >= 1.0) continue  // already meaningfully costed — leave alone
 
         const subsystemKey = classifySubsystemForGradeD(line.name)
         if (!subsystemKey) continue
