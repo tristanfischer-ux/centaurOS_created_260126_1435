@@ -1,0 +1,672 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ForgeOS Radical Glyph System — v0</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;background:#fff;color:#1a1a1a;font-size:15px;line-height:1.55}
+.page{max-width:1100px;margin:0 auto;padding:40px 32px 80px}
+h1{font-size:24px;font-weight:700;letter-spacing:-.02em;margin-bottom:4px}
+h2{font-size:17px;font-weight:700;letter-spacing:-.01em;margin:40px 0 14px;border-bottom:2px solid #1a1a1a;padding-bottom:6px}
+h3{font-size:14px;font-weight:600;margin:20px 0 8px;color:#444}
+p{margin-bottom:10px}
+.meta{font-size:12px;color:#777;margin-bottom:32px}
+code{font-family:"SF Mono","Fira Code",monospace;font-size:12px;background:#f4f4f4;padding:1px 4px;border-radius:3px}
+.glyph-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:16px;margin-bottom:32px}
+.glyph-card{border:1px solid #e0e0e0;border-radius:6px;padding:14px 12px 10px;background:#fafafa}
+.glyph-card .sizes{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+.glyph-label{font-size:11px;color:#555;line-height:1.3;margin-top:2px}
+.radical-id{font-size:11px;font-family:"SF Mono","Fira Code",monospace;color:#333;font-weight:600;margin-bottom:4px;word-break:break-all}
+.category-tag{display:inline-block;font-size:10px;padding:1px 5px;border-radius:3px;margin-bottom:6px}
+.cat-material{background:#e8f4fd;color:#1a6fa0}
+.cat-function{background:#f0fae8;color:#2a7a1a}
+.cat-state{background:#fef6e4;color:#8a5a00}
+.px12{width:12px;height:12px;display:inline-block}
+.px64{width:64px;height:64px;display:inline-block}
+.char-square{display:inline-grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;border:2px solid #333;border-radius:3px;overflow:hidden;background:#fff}
+.quad{display:flex;align-items:center;justify-content:center;border:.5px solid #ddd;position:relative}
+.quad.fn{background:#f8fff8}
+.quad.mat{background:#f8f8ff}
+.quad.empty{background:#fafafa}
+.quad.empty::after{content:"—";font-size:9px;color:#ccc}
+.tax-table{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:24px}
+.tax-table th{background:#f0f0f0;text-align:left;padding:7px 10px;border:1px solid #ddd;font-weight:600}
+.tax-table td{padding:6px 10px;border:1px solid #e8e8e8;vertical-align:top}
+.tax-table tr:nth-child(even) td{background:#fafafa}
+.product-section{margin-bottom:48px}
+.product-header{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.product-title{font-size:18px;font-weight:700}
+.product-subtitle{font-size:13px;color:#666}
+.sentence-clusters{display:flex;flex-direction:column;gap:10px;margin-bottom:16px}
+.cluster{border:1px solid #d0d0d0;border-radius:6px;overflow:hidden}
+.cluster-header{display:flex;align-items:center;gap:12px;padding:10px 14px;background:#f5f5f5;cursor:pointer;user-select:none}
+.cluster-label{font-size:13px;color:#333;flex:1}
+.cluster-toggle{font-size:11px;color:#888;white-space:nowrap}
+.expand-toggle{display:none}
+.expand-toggle:checked ~ .cluster-body{display:block}
+.cluster-body{display:none;padding:14px;border-top:1px solid #e0e0e0;background:#fff}
+.char-row{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-start}
+.char-item{display:flex;flex-direction:column;align-items:center;gap:4px}
+.char-item-label{font-size:10px;color:#666;text-align:center;max-width:80px}
+label.cluster-header{display:flex;cursor:pointer}
+label.cluster-header:hover{background:#eee}
+.matrix-wrap{overflow-x:auto;margin-bottom:32px}
+.matrix-table{border-collapse:collapse;font-size:12px}
+.matrix-table th{padding:6px 8px;border:1px solid #ddd;background:#f5f5f5;font-weight:600;white-space:nowrap}
+.matrix-table td{padding:5px 8px;border:1px solid #e8e8e8;text-align:center}
+.matrix-table td.hit{background:#e8f5e9;color:#2e7d32;font-weight:700}
+.matrix-table td.miss{background:#fafafa;color:#bbb}
+.matrix-table td.radical-name{text-align:left;font-family:"SF Mono","Fira Code",monospace;font-size:11px;font-weight:500;white-space:nowrap}
+.override-note{background:#fef9e7;border:1px solid #f0c040;border-radius:5px;padding:12px 16px;margin-bottom:24px;font-size:13px}
+@media print{.cluster-body{display:block!important}h2{page-break-before:always}.cluster-toggle{display:none}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<h1>ForgeOS Radical Glyph System — v0</h1>
+<p class="meta">Council: 3d806f0c &nbsp;|&nbsp; Date: 2026-05-10 &nbsp;|&nbsp; 21 explicit glyphs + 1 implicit default &nbsp;|&nbsp; 12&#xD7;12 px monoline micro-grid &nbsp;|&nbsp; Light theme</p>
+
+<h2>1. Glyph Catalogue &#x2014; 21 Explicit Radicals</h2>
+<p>Each glyph shown at 12 px (functional minimum) and 64 px (display size). All glyphs are inline SVG &#x2014; monoline, greyscale-safe, no gradients, no emoji.</p>
+<div class="override-note">
+  <strong>solid_state_of_matter</strong> is <em>implicit by default</em> &#x2014; rendered only when explicitly invoked (phase-change materials, thermal fuses, eutectic alloys). Not in the standard palette; defined at the end of this section.
+</div>
+<div class="glyph-grid" id="glyph-catalogue"></div>
+
+<h2>2. Modifier Taxonomy &#x2014; 15 &#xD7; 5 &#xD7; 4 = 300 Combinations</h2>
+<p>New glyphs must differ on at least 2 of the 3 layers from any existing glyph. This prevents palette exhaustion at 60+ radicals.</p>
+<h3>Layer 1 &#x2014; 15 Base Shapes</h3>
+<table class="tax-table">
+<thead><tr><th>#</th><th>Shape</th><th>Description</th><th>Examples</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>hexagon</code></td><td>6-sided polygon</td><td>steel, copper, aluminium, polymer, elastomer, ceramic, composite</td></tr>
+<tr><td>2</td><td><code>square</code></td><td>4-sided box</td><td>silicon_semiconductor, photovoltaic, solid_state (filled)</td></tr>
+<tr><td>3</td><td><code>circle</code></td><td>Round outline</td><td>pressure_vessel (with internal arrows)</td></tr>
+<tr><td>4</td><td><code>triangle-up</code></td><td>Apex up</td><td>photon_emission (diode triangle)</td></tr>
+<tr><td>5</td><td><code>triangle-down</code></td><td>Apex down</td><td>derating, convergence functions</td></tr>
+<tr><td>6</td><td><code>diamond</code></td><td>45&#xB0;-rotated square</td><td>hazard, chemical sensing variants</td></tr>
+<tr><td>7</td><td><code>pentagon</code></td><td>5-sided polygon</td><td>lithium_iron_phosphate (LFP)</td></tr>
+<tr><td>8</td><td><code>octagon</code></td><td>8-sided polygon</td><td>safety / stop functions</td></tr>
+<tr><td>9</td><td><code>droplet</code></td><td>Teardrop silhouette</td><td>chemical_sensing, bioprocess_chemistry</td></tr>
+<tr><td>10</td><td><code>wave</code></td><td>Sinusoidal band</td><td>fluid_flow (horizontal), acoustic (outward arcs)</td></tr>
+<tr><td>11</td><td><code>lightning</code></td><td>Stepped diagonal bolt</td><td>arc flash (not electrical_conducting &#x2014; banned by council)</td></tr>
+<tr><td>12</td><td><code>gear</code></td><td>Toothed wheel</td><td>mechanical actuation</td></tr>
+<tr><td>13</td><td><code>magnet-U</code></td><td>Open U / horseshoe</td><td>magnetic_coupling</td></tr>
+<tr><td>14</td><td><code>lens</code></td><td>Double-convex vesica</td><td>optical_sensing, photon_emission</td></tr>
+<tr><td>15</td><td><code>bracket</code></td><td>Containment [ ]</td><td>electrochemical_energy (battery cell pair)</td></tr>
+</tbody>
+</table>
+<h3>Layer 2 &#x2014; 5 Fills</h3>
+<table class="tax-table">
+<thead><tr><th>#</th><th>Fill</th><th>Description</th><th>Semantic</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>outline</code></td><td>Stroke only, no fill</td><td>State of matter, passive</td></tr>
+<tr><td>2</td><td><code>solid</code></td><td>Fully filled</td><td>Active function, primary material (metals use filled hexagon)</td></tr>
+<tr><td>3</td><td><code>hatch-diagonal</code></td><td>45&#xB0; lines ///</td><td>Composite, fibrous, reinforced (CFRP weave)</td></tr>
+<tr><td>4</td><td><code>grid</code></td><td>Cross-hatch #</td><td>Array, multi-cell, semiconductor fab (photovoltaic grid)</td></tr>
+<tr><td>5</td><td><code>dotted</code></td><td>Evenly spaced dots</td><td>Chemical / molecular, diffuse (elastomer dashes)</td></tr>
+</tbody>
+</table>
+<h3>Layer 3 &#x2014; 4 Internal Marks</h3>
+<table class="tax-table">
+<thead><tr><th>#</th><th>Mark</th><th>Description</th><th>Semantic</th></tr></thead>
+<tbody>
+<tr><td>1</td><td><code>monogram</code></td><td>Chemical symbol (Fe, Cu, Al, Si, P, E, Cm, LFP)</td><td>IUPAC material identity</td></tr>
+<tr><td>2</td><td><code>icon</code></td><td>Small geometric primitive (arc, coil, node, cone)</td><td>Function metaphor</td></tr>
+<tr><td>3</td><td><code>polarity</code></td><td>+/&#x2212; poles</td><td>Electrochemical, charged (battery cell)</td></tr>
+<tr><td>4</td><td><code>subscript</code></td><td>Numeric subscript</td><td>Subtype within class</td></tr>
+</tbody>
+</table>
+<p><strong>15 &#xD7; 5 &#xD7; 4 = 300 addressable combinations confirmed.</strong> Current v0 usage: 22 glyphs (7.3% of available space).</p>
+
+<h2>3. Quadrant Rules &#x2014; System B (function-top, material-bottom)</h2>
+<table class="tax-table" style="max-width:600px">
+<thead><tr><th>Slot</th><th>Position</th><th>Semantic</th></tr></thead>
+<tbody>
+<tr><td>TL</td><td>Top-left</td><td>Primary function</td></tr>
+<tr><td>TR</td><td>Top-right</td><td>Secondary function OR state of matter</td></tr>
+<tr><td>BL</td><td>Bottom-left</td><td>Primary material / substrate</td></tr>
+<tr><td>BR</td><td>Bottom-right</td><td>Secondary material / coating / containment</td></tr>
+</tbody>
+</table>
+<p>Empty quadrants render a faint dash placeholder (not blank dead space). Compression to 2&#xD7;3 grid for 5&#x2013;6 radicals. Full fall-through rules in <code>QUADRANT-RULES.md</code>.</p>
+
+<h2>4. Grammar Conflict Rendering</h2>
+<p>Conflicts render <em>between</em> character squares &#x2014; never on them. Radical icons stay legible when diagnosing the conflict. Coloured borders are a secondary signal only (colour-blind safe).</p>
+<div id="conflict-examples"></div>
+
+<h2>5. Product Paragraphs &#x2014; BESS, Heat Pump, Drone</h2>
+<p>Default view: sentence-cluster summary showing the dominant radical icon. Click any cluster header to expand to full quadrant view. All 3 products use the same radicals as the week-2 to week-4 decompositions for direct comparison.</p>
+<div id="product-paragraphs"></div>
+
+<h2>6. Cross-Product Radical Matrix</h2>
+<p>Radicals appearing in all 3 products are universal building blocks of the system.</p>
+<div class="matrix-wrap" id="cross-matrix"></div>
+
+</div>
+
+<script>
+// ═══════════════════════════ GLYPH SVG DEFINITIONS ═══════════════════════════
+// All designed on 12x12 viewBox, monoline, no gradients, no emoji.
+// sw = stroke width: thinner at small sizes.
+
+function sw(sz){return sz<=16?1.1:1.5}
+
+function g(size,content){
+  return '<svg width="'+size+'" height="'+size+'" viewBox="0 0 12 12" xmlns="http://www.w3.org/2000/svg" style="display:block;overflow:visible">'+content+'</svg>';
+}
+
+// Hexagon path
+function hex(){return 'M6,1 L10.2,3.5 L10.2,8.5 L6,11 L1.8,8.5 L1.8,3.5 Z';}
+
+var GLYPHS = [
+  {id:'steel',cat:'material',label:'Steel',
+   desc:'Fe inside hexagon. Hexagon = crystalline metallic lattice. Fe = IUPAC. Distinct silhouette from Cu circle in prior table but council moved both to hexagon; steel and copper differ by monogram only.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="'+hex()+'" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6" y="7.5" text-anchor="middle" font-size="4.5" font-family="monospace" font-weight="bold" fill="#1a1a1a">Fe</text>');}},
+
+  {id:'copper',cat:'material',label:'Copper',
+   desc:'Cu inside hexagon. Cu = IUPAC. Distinct from steel by monogram. Note: copper differs on internal mark only — acceptable at 12px as Cu vs Fe are visually distinct letter pairs.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="'+hex()+'" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6" y="7.5" text-anchor="middle" font-size="4" font-family="monospace" font-weight="bold" fill="#1a1a1a">Cu</text>');}},
+
+  {id:'aluminium',cat:'material',label:'Aluminium',
+   desc:'Al inside hexagon. Al = IUPAC. Lightest of the metal hexagons — Al monogram is two tall letters, visually distinct from Fe and Cu at 12px.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="'+hex()+'" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6" y="7.5" text-anchor="middle" font-size="4" font-family="monospace" font-weight="bold" fill="#1a1a1a">Al</text>');}},
+
+  {id:'electrical_conducting_function',cat:'function',label:'Electrical Conducting',
+   desc:'Circuit trace: line + node + line (=●=). Path metaphor for electron routing. Lightning bolt BANNED by council (Q3b). Horizontal line + solid node is instantly readable at 12px.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<line x1="1" y1="6" x2="4.2" y2="6" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><circle cx="6" cy="6" r="1.6" fill="#1a1a1a"/><line x1="7.8" y1="6" x2="11" y2="6" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/>');}},
+
+  {id:'silicon_semiconductor_function',cat:'function',label:'Silicon Semiconductor',
+   desc:'Square with corner notch (chip IC silhouette) + Si monogram. Notch at bottom-left = IC orientation mark. Square base distinguishes from all hexagon metals.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="M2,2 L10,2 L10,10 L4,10 L2,8 Z" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6.2" y="7.5" text-anchor="middle" font-size="4" font-family="monospace" font-weight="bold" fill="#1a1a1a">Si</text>');}},
+
+  {id:'magnetic_coupling_function',cat:'function',label:'Magnetic Coupling',
+   desc:'Horseshoe U-magnet, outlined. Tristan + all 3 council seats confirmed. U shape is unmistakable at 12px. Distinct from all hexagon/square shapes. Pole caps at top.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="M2.5,2 L2.5,7.5 Q2.5,11 6,11 Q9.5,11 9.5,7.5 L9.5,2" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round" stroke-linejoin="round"/><line x1="1.2" y1="2" x2="3.8" y2="2" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><line x1="8.2" y1="2" x2="10.8" y2="2" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/>');}},
+
+  {id:'photovoltaic_energy_function',cat:'function',label:'Photovoltaic Energy',
+   desc:'2x2 grid square. Solar cell array geometry — grid = area conversion. Sun glyph (&#9728;) retired as too noisy at 12px per council Q3c. Cross-hatch inside square is instantly recognisable.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<rect x="1.5" y="1.5" width="9" height="9" fill="none" stroke="#1a1a1a" stroke-width="'+s+'"/><line x1="6" y1="1.5" x2="6" y2="10.5" stroke="#1a1a1a" stroke-width="'+(s*0.8)+'"/><line x1="1.5" y1="6" x2="10.5" y2="6" stroke="#1a1a1a" stroke-width="'+(s*0.8)+'" />');}},
+
+  {id:'fluid_flow_state',cat:'state',label:'Fluid Flow State',
+   desc:'Three outline horizontal wavy lines (=== style). State = outline; function = filled (council Q3a). Horizontal orientation = flow direction. Distinct from thermal (vertical waves).',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="M1,3.5 Q3,2.2 5,3.5 Q7,4.8 9,3.5 Q10.2,2.8 11,3.5" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><path d="M1,6 Q3,4.7 5,6 Q7,7.3 9,6 Q10.2,5.3 11,6" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><path d="M1,8.5 Q3,7.2 5,8.5 Q7,9.8 9,8.5 Q10.2,7.8 11,8.5" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/>');}},
+
+  {id:'electrochemical_energy_function',cat:'function',label:'Electrochemical Energy',
+   desc:'Battery cell pair [+|&#x2212;]. Rectangle with internal divider and polarity marks. Universally understood. Bracket base shape unique from all circular/hexagonal glyphs.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<rect x="1" y="3" width="10" height="6" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" rx="0.5"/><line x1="6" y1="3" x2="6" y2="9" stroke="#1a1a1a" stroke-width="'+(s*0.75)+'"/><text x="3.5" y="7.2" text-anchor="middle" font-size="4.5" font-weight="bold" fill="#1a1a1a">+</text><text x="8.5" y="7.4" text-anchor="middle" font-size="5" fill="#1a1a1a">&#x2212;</text>');}},
+
+  {id:'thermal_transfer_function',cat:'function',label:'Thermal Transfer',
+   desc:'Three vertical rising wavy lines. Heat-sink / convection convention. VERTICAL orientation distinguishes from fluid_flow_state (horizontal). Three lines = direction of heat flow upward.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="M3,10 Q2.2,8.5 3,7 Q3.8,5.5 3,4 Q2.2,2.5 3,1" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><path d="M6,10 Q5.2,8.5 6,7 Q6.8,5.5 6,4 Q5.2,2.5 6,1" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><path d="M9,10 Q8.2,8.5 9,7 Q9.8,5.5 9,4 Q8.2,2.5 9,1" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/>');}},
+
+  {id:'electric_heater_element',cat:'function',label:'Electric Heater Element',
+   desc:'Coiled-wire serpentine (the actual filament shape). Resistance wire in serpentine loop above a base line. Distinct from switch (asymmetric) and conducting trace (horizontal only).',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="M1.5,9 L1.5,7 Q1.5,5.5 3,5.5 Q4.5,5.5 4.5,7 Q4.5,8.5 6,8.5 Q7.5,8.5 7.5,7 Q7.5,5.5 9,5.5 Q10.5,5.5 10.5,7 L10.5,9" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round" stroke-linejoin="round"/><line x1="1" y1="9.5" x2="11" y2="9.5" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/>');}},
+
+  {id:'chemical_sensing_function',cat:'function',label:'Chemical Sensing',
+   desc:'Outline droplet + inner sensing circle. Droplet = chemical medium; small circle = sensing aperture / target reticle. Distinct from bioprocess (dashed inner ring) at 12px.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="M6,1.5 Q9.2,5 9.2,7.2 Q9.2,10.5 6,10.5 Q2.8,10.5 2.8,7.2 Q2.8,5 6,1.5 Z" fill="none" stroke="#1a1a1a" stroke-width="'+s+'"/><circle cx="6" cy="7" r="1.5" fill="none" stroke="#1a1a1a" stroke-width="'+(s*0.75)+'"/>');}},
+
+  {id:'bioprocess_chemistry_function',cat:'function',label:'Bioprocess Chemistry',
+   desc:'Outline droplet + dashed inner cellular ring. Dashed ring = membrane boundary (life). Solid inner circle = sensing (chemical). Dashed vs solid is the distinguishing mark at 12px.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="M6,1.5 Q9.2,5 9.2,7.2 Q9.2,10.5 6,10.5 Q2.8,10.5 2.8,7.2 Q2.8,5 6,1.5 Z" fill="none" stroke="#1a1a1a" stroke-width="'+s+'"/><circle cx="6" cy="7" r="2.2" fill="none" stroke="#1a1a1a" stroke-width="'+(s*0.6)+'" stroke-dasharray="1.2,0.8"/>');}},
+
+  {id:'acoustic_wave_function',cat:'function',label:'Acoustic Wave',
+   desc:'Speaker cone (filled triangle) with three outward arcs. IEC/transmitter convention. Cone is filled to distinguish from photon_emission (outline triangle + outward arrows).',
+   svg:function(sz){var s=sw(sz);return g(sz,'<polygon points="2,4.5 2,7.5 4.5,9 4.5,3" fill="#1a1a1a"/><path d="M5.5,4.5 Q7,6 5.5,7.5" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><path d="M7,3.5 Q9.5,6 7,8.5" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><path d="M8.5,2.5 Q11.5,6 8.5,9.5" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/>');}},
+
+  {id:'electromechanical_switching_function',cat:'function',label:'Electromechanical Switching',
+   desc:'Open switch schematic: two terminal dots + angled lever. IEC relay/contactor convention. The angled gap between terminals is the distinguishing feature at 12px.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<line x1="1" y1="8" x2="3.8" y2="8" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><circle cx="4" cy="8" r="0.9" fill="#1a1a1a"/><line x1="4" y1="8" x2="8" y2="4" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/><circle cx="8.2" cy="4.5" r="0.9" fill="none" stroke="#1a1a1a" stroke-width="'+(s*0.8)+'"/><line x1="8.2" y1="4.5" x2="11" y2="4.5" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linecap="round"/>');}},
+
+  {id:'pressure_vessel_function',cat:'function',label:'Pressure Vessel',
+   desc:'Circle with two inward-pointing arrows (top and bottom). Inward arrows = stress direction under pressure. Circular containment is the universally understood pressure vessel shape.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<circle cx="6" cy="6" r="4.8" fill="none" stroke="#1a1a1a" stroke-width="'+s+'"/><line x1="6" y1="2" x2="6" y2="4.5" stroke="#1a1a1a" stroke-width="'+(s*0.9)+'" stroke-linecap="round"/><polygon points="6,5.2 5,3.8 7,3.8" fill="#1a1a1a"/><line x1="6" y1="10" x2="6" y2="7.5" stroke="#1a1a1a" stroke-width="'+(s*0.9)+'" stroke-linecap="round"/><polygon points="6,6.8 5,8.2 7,8.2" fill="#1a1a1a"/>');}},
+
+  {id:'composite_fibre_material',cat:'material',label:'Composite Fibre',
+   desc:'C in hexagon with diagonal hatch fill. Hatch = anisotropic CFRP layup. Distinct from polymer (P + wave) and mineral (triangle + horizontal hash). Council confirmed for drone decomposition (week-4 new radical).',
+   svg:function(sz){var s=sw(sz);var clipId='cfhx'+Math.floor(Math.random()*9999);return g(sz,'<defs><clipPath id="'+clipId+'"><path d="'+hex()+'"/></clipPath></defs><path d="'+hex()+'" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><line x1="-1" y1="5" x2="7" y2="13" stroke="#1a1a1a" stroke-width="0.7" clip-path="url(#'+clipId+')" opacity="0.55"/><line x1="2" y1="2" x2="10" y2="10" stroke="#1a1a1a" stroke-width="0.7" clip-path="url(#'+clipId+')" opacity="0.55"/><line x1="5" y1="-1" x2="13" y2="7" stroke="#1a1a1a" stroke-width="0.7" clip-path="url(#'+clipId+')" opacity="0.55"/><text x="6" y="7.6" text-anchor="middle" font-size="4.5" font-family="monospace" font-weight="bold" fill="#1a1a1a">C</text>');}},
+
+  {id:'polymer_thermoplastic',cat:'material',label:'Polymer Thermoplastic',
+   desc:'P inside hexagon with sinusoidal wave overlay at base. P = polymer identity; wave = chain mobility / thermoplastic flowing behaviour. Wave distinguishes from all other hexagon metals.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="'+hex()+'" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6" y="7" text-anchor="middle" font-size="4.5" font-family="monospace" font-weight="bold" fill="#1a1a1a">P</text><path d="M2.5,8.8 Q3.8,7.8 5.1,8.8 Q6.4,9.8 7.7,8.8 Q8.8,8 9.5,8.8" fill="none" stroke="#1a1a1a" stroke-width="'+(s*0.7)+'" stroke-linecap="round"/>');}},
+
+  {id:'elastomer',cat:'material',label:'Elastomer',
+   desc:'E inside hexagon with dashed oval. E = elastomer; dashed oval = elastic deformation ring (stretch). Dashes distinguish from solid ceramic marks. Unique combination in palette.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="'+hex()+'" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6" y="7.2" text-anchor="middle" font-size="4.5" font-family="monospace" font-weight="bold" fill="#1a1a1a">E</text><ellipse cx="6" cy="6.2" rx="3" ry="4.5" fill="none" stroke="#1a1a1a" stroke-width="'+(s*0.55)+'" stroke-dasharray="1.3,0.9"/>');}},
+
+  {id:'ceramic',cat:'material',label:'Ceramic',
+   desc:'Cm inside hexagon with crystalline corner tick marks. Cm = ceramic monogram; corner ticks = brittle lattice / crystal grain boundaries. Corner marks are the differentiator from all other hexagon materials.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<path d="'+hex()+'" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6" y="7.3" text-anchor="middle" font-size="3.8" font-family="monospace" font-weight="bold" fill="#1a1a1a">Cm</text><line x1="2.8" y1="2.8" x2="4" y2="4" stroke="#1a1a1a" stroke-width="0.8" opacity="0.7"/><line x1="9.2" y1="2.8" x2="8" y2="4" stroke="#1a1a1a" stroke-width="0.8" opacity="0.7"/>');}},
+
+  {id:'lithium_iron_phosphate_chemistry',cat:'material',label:'Lithium Iron Phosphate',
+   desc:'LFP inside pentagon. Pentagon = unique base shape not used by any other radical. Multi-letter monogram acceptable for chemistry subtype. Instantly distinct from all hexagon materials.',
+   svg:function(sz){var s=sw(sz);return g(sz,'<polygon points="6,1 10.5,4.5 8.8,10.5 3.2,10.5 1.5,4.5" fill="none" stroke="#1a1a1a" stroke-width="'+s+'" stroke-linejoin="round"/><text x="6" y="7.6" text-anchor="middle" font-size="3.6" font-family="monospace" font-weight="bold" fill="#1a1a1a">LFP</text>');}},
+];
+
+// Implicit override — defined but not in standard catalogue
+var SOLID_STATE = {id:'solid_state_of_matter',cat:'state',label:'Solid State of Matter (implicit override)',
+  desc:'Filled square. Rendered ONLY when explicitly invoked (phase-change materials, thermal fuses, eutectic alloys). Not rendered by default — implicit for all solid components.',
+  svg:function(sz){return g(sz,'<rect x="1.5" y="1.5" width="9" height="9" fill="#1a1a1a" rx="0.5"/>');} };
+
+// ─── Lookup ───
+function glyphById(id){
+  for(var i=0;i<GLYPHS.length;i++){if(GLYPHS[i].id===id)return GLYPHS[i];}
+  if(id===SOLID_STATE.id)return SOLID_STATE;
+  return null;
+}
+
+// ─── Render glyph catalogue ───
+function renderGlyphCatalogue(){
+  var container=document.getElementById('glyph-catalogue');
+  var all=GLYPHS.concat([SOLID_STATE]);
+  for(var i=0;i<all.length;i++){
+    var glyph=all[i];
+    var catClass=glyph.cat==='material'?'cat-material':glyph.cat==='function'?'cat-function':'cat-state';
+    var card=document.createElement('div');
+    card.className='glyph-card';
+    var div=document.createElement('div');
+    div.className='radical-id';
+    div.textContent=glyph.id;
+    card.appendChild(div);
+    var span=document.createElement('span');
+    span.className='category-tag '+catClass;
+    span.textContent=glyph.cat;
+    card.appendChild(span);
+    var sizes=document.createElement('div');
+    sizes.className='sizes';
+    var b12=document.createElement('div');
+    var px12=document.createElement('div');
+    px12.className='px12';
+    px12.style.width='12px';
+    px12.style.height='12px';
+    px12.style.display='inline-block';
+    // Use a container with overflow visible
+    var tmp=document.createElement('div');
+    tmp.style.display='inline-block';
+    tmp.style.lineHeight='0';
+    tmp.innerHTML=glyph.svg(12); // only glyph SVGs — completely static, no user input
+    px12.appendChild(tmp);
+    var lbl12=document.createElement('div');
+    lbl12.style.fontSize='9px';lbl12.style.color='#aaa';lbl12.style.marginTop='2px';
+    lbl12.textContent='12 px';
+    b12.appendChild(px12);b12.appendChild(lbl12);
+    var b64=document.createElement('div');
+    var px64=document.createElement('div');
+    px64.className='px64';
+    px64.style.width='64px';px64.style.height='64px';px64.style.display='inline-block';
+    var tmp64=document.createElement('div');
+    tmp64.style.display='inline-block';tmp64.style.lineHeight='0';
+    tmp64.innerHTML=glyph.svg(64);
+    px64.appendChild(tmp64);
+    var lbl64=document.createElement('div');
+    lbl64.style.fontSize='9px';lbl64.style.color='#aaa';lbl64.style.marginTop='2px';
+    lbl64.textContent='64 px';
+    b64.appendChild(px64);b64.appendChild(lbl64);
+    sizes.appendChild(b12);sizes.appendChild(b64);
+    card.appendChild(sizes);
+    var descDiv=document.createElement('div');
+    descDiv.className='glyph-label';
+    var strong=document.createElement('strong');
+    strong.textContent=glyph.label;
+    descDiv.appendChild(strong);
+    descDiv.appendChild(document.createElement('br'));
+    descDiv.appendChild(document.createTextNode(glyph.desc));
+    card.appendChild(descDiv);
+    container.appendChild(card);
+  }
+}
+
+// ─── Character square ───
+function makeCharSquare(radicals, quadSize){
+  quadSize=quadSize||28;
+  var slots={TL:null,TR:null,BL:null,BR:null};
+  for(var i=0;i<radicals.length;i++){slots[radicals[i].slot]=radicals[i].id;}
+  function makeQuad(slot){
+    var id=slots[slot];
+    var isTop=(slot==='TL'||slot==='TR');
+    var q=document.createElement('div');
+    q.className='quad '+(isTop?'fn':'mat')+(id?'':' empty');
+    q.style.width=quadSize+'px';q.style.height=quadSize+'px';
+    if(id){
+      var glyph=glyphById(id);
+      if(glyph){
+        q.title=id;
+        var inner=document.createElement('div');
+        inner.style.lineHeight='0';
+        inner.innerHTML=glyph.svg(quadSize-6);
+        q.appendChild(inner);
+      }
+    }
+    return q;
+  }
+  var sq=document.createElement('div');
+  sq.className='char-square';
+  sq.style.width=(quadSize*2)+'px';sq.style.height=(quadSize*2)+'px';
+  sq.appendChild(makeQuad('TL'));sq.appendChild(makeQuad('TR'));
+  sq.appendChild(makeQuad('BL'));sq.appendChild(makeQuad('BR'));
+  return sq;
+}
+
+// ─── Conflict examples ───
+function renderConflictExamples(){
+  var container=document.getElementById('conflict-examples');
+
+  function conflictRow(title,desc,radL,radR,svgLine,badgeClass,badgeText,ruleText){
+    var h3=document.createElement('h3');h3.textContent=title;container.appendChild(h3);
+    var p=document.createElement('p');p.style.fontSize='13px';p.style.marginBottom='8px';
+    p.textContent=desc;container.appendChild(p);
+    var row=document.createElement('div');
+    row.style.cssText='display:flex;align-items:center;gap:0;margin-bottom:20px;flex-wrap:wrap;gap:8px;';
+    var wrapL=document.createElement('div');wrapL.style.cssText='border:2px solid '+(badgeClass==='block'?'#c0392b':'#e67e22')+';border-radius:4px;';
+    wrapL.appendChild(makeCharSquare(radL,26));
+    var mid=document.createElement('div');mid.style.cssText='position:relative;width:60px;height:68px;flex-shrink:0;';
+    var svgDiv=document.createElement('div');svgDiv.innerHTML=svgLine;
+    mid.appendChild(svgDiv);
+    var wrapR=document.createElement('div');wrapR.style.cssText='border:2px solid '+(badgeClass==='block'?'#c0392b':'#e67e22')+';border-radius:4px;';
+    wrapR.appendChild(makeCharSquare(radR,26));
+    var info=document.createElement('div');info.style.cssText='margin-left:12px;font-size:12px;color:#555;max-width:260px;';
+    info.textContent=ruleText;
+    row.appendChild(wrapL);row.appendChild(mid);row.appendChild(wrapR);row.appendChild(info);
+    container.appendChild(row);
+  }
+
+  conflictRow(
+    'BLOCK &#x2014; Galvanic incompatibility: steel + copper in marine environment',
+    'Bold jagged fracture line between character squares. Filled red triangle badge at midpoint. Coloured borders are secondary signal only (colour-blind safe).',
+    [{slot:'BL',id:'steel'},{slot:'TL',id:'electrical_conducting_function'}],
+    [{slot:'BL',id:'copper'},{slot:'TL',id:'electrical_conducting_function'}],
+    '<svg width="60" height="68" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg"><polyline points="0,34 10,26 18,42 30,18 42,38 50,30 60,34" fill="none" stroke="#c0392b" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><polygon points="30,12 23,24 37,24" fill="#c0392b"/><text x="30" y="23" text-anchor="middle" font-size="9" font-weight="bold" fill="#fff">!</text><text x="30" y="60" text-anchor="middle" font-size="8" font-weight="bold" fill="#c0392b">BLOCK</text></svg>',
+    'block',
+    'BLOCK',
+    'Rule: GALVANIC_ALUMINIUM_COPPER_CONTACT. Pair: steel + copper in marine environment. Standard: BS EN ISO 8251. Tooltip on hover shows rule name + radical pair + engineering standard.'
+  );
+
+  conflictRow(
+    'WARN &#x2014; Thermal capacity approaching rated load',
+    'Amber dashed connector between character squares. Open triangle badge at midpoint.',
+    [{slot:'TL',id:'thermal_transfer_function'},{slot:'BL',id:'steel'}],
+    [{slot:'TL',id:'electrochemical_energy_function'},{slot:'BL',id:'lithium_iron_phosphate_chemistry'}],
+    '<svg width="60" height="68" viewBox="0 0 60 68" xmlns="http://www.w3.org/2000/svg"><line x1="0" y1="34" x2="60" y2="34" stroke="#e67e22" stroke-width="2.5" stroke-dasharray="5,3" stroke-linecap="round"/><polygon points="30,20 23,32 37,32" fill="none" stroke="#e67e22" stroke-width="2" stroke-linejoin="round"/><text x="30" y="31" text-anchor="middle" font-size="9" font-weight="bold" fill="#e67e22">!</text><text x="30" y="60" text-anchor="middle" font-size="8" font-weight="bold" fill="#e67e22">WARN</text></svg>',
+    'warn',
+    'WARN',
+    'Rule: THERMAL_CAPACITY_VS_LOAD. Pair: thermal_transfer + electrochemical_energy. Standard: IEC 62619. Dashed connector + open triangle = warning, not block. Radicals remain fully legible.'
+  );
+}
+
+// ─── Product data ───
+var PRODUCTS = [
+  {id:'bess',title:'BESS &#x2014; Battery Energy Storage System',subtitle:'3.5 MWh / 1 MW, 40-ft ISO container, LFP prismatic',
+   sentences:[
+    {label:'Electrochemical core &#x2014; 4,375 LFP cells in 125 racks',dominant:'electrochemical_energy_function',
+     chars:[
+      {label:'LFP Cell\n280Ah',radicals:[{slot:'TL',id:'electrochemical_energy_function'},{slot:'BL',id:'lithium_iron_phosphate_chemistry'}]},
+      {label:'Battery Rack\nFrame',radicals:[{slot:'BL',id:'steel'}]},
+      {label:'BMS\nController',radicals:[{slot:'TL',id:'silicon_semiconductor_function'},{slot:'TR',id:'electrical_conducting_function'},{slot:'BL',id:'polymer_thermoplastic'}]},
+     ]},
+    {label:'Power conversion &#x2014; 1 MW bidirectional inverter + step-up transformer',dominant:'electrical_conducting_function',
+     chars:[
+      {label:'PCS Inverter\n1 MW bidir.',radicals:[{slot:'TL',id:'electrical_conducting_function'},{slot:'TR',id:'silicon_semiconductor_function'}]},
+      {label:'Step-up\nTransformer',radicals:[{slot:'TL',id:'electrical_conducting_function'},{slot:'TR',id:'magnetic_coupling_function'}]},
+      {label:'DC Contactor\n1500V 300A',radicals:[{slot:'TL',id:'electrical_conducting_function'},{slot:'TR',id:'electromechanical_switching_function'}]},
+     ]},
+    {label:'Thermal management &#x2014; liquid cooling loop',dominant:'thermal_transfer_function',
+     chars:[
+      {label:'Liquid Cooling\nSystem',radicals:[{slot:'TL',id:'thermal_transfer_function'},{slot:'TR',id:'fluid_flow_state'},{slot:'BL',id:'polymer_thermoplastic'}]},
+      {label:'Mineral Wool\nInsulation',radicals:[{slot:'BL',id:'composite_fibre_material'}]},
+     ]},
+    {label:'Fire detection + suppression &#x2014; pressure vessels + gas sensors',dominant:'pressure_vessel_function',
+     chars:[
+      {label:'Fire Suppression\nSystem',radicals:[{slot:'TL',id:'pressure_vessel_function'},{slot:'BL',id:'polymer_thermoplastic'}]},
+      {label:'Gas Sensor\n(Li-ion off-gas)',radicals:[{slot:'TL',id:'chemical_sensing_function'},{slot:'TR',id:'silicon_semiconductor_function'},{slot:'BL',id:'polymer_thermoplastic'}]},
+     ]},
+  ]},
+  {id:'heatpump',title:'Heat Pump &#x2014; 30 kW Monobloc Air-to-Water',subtitle:'R290, UK commercial retrofit',
+   sentences:[
+    {label:'Vapour-compression cycle &#x2014; ATOMIC: thermal + fluid + electromechanical',dominant:'thermal_transfer_function',
+     chars:[
+      {label:'Vapour-Compression\nCycle R290',radicals:[{slot:'TL',id:'thermal_transfer_function'},{slot:'TR',id:'fluid_flow_state'},{slot:'BL',id:'electromechanical_switching_function'}]},
+      {label:'Brazed Plate\nHeat Exchanger',radicals:[{slot:'TL',id:'thermal_transfer_function'},{slot:'TR',id:'fluid_flow_state'}]},
+     ]},
+    {label:'Air-side fan &#x2014; variable speed EC motor + aerofoil blade',dominant:'electromechanical_switching_function',
+     chars:[
+      {label:'EC Fan Motor\nvariable speed',radicals:[{slot:'TL',id:'electromechanical_switching_function'},{slot:'TR',id:'fluid_flow_state'}]},
+      {label:'Axial Fan\nBlade',radicals:[{slot:'BL',id:'polymer_thermoplastic'}]},
+     ]},
+    {label:'Control and inverter &#x2014; PCB controller + VFD drive',dominant:'silicon_semiconductor_function',
+     chars:[
+      {label:'Controller PCB\nR290-safe',radicals:[{slot:'TL',id:'silicon_semiconductor_function'},{slot:'TR',id:'electrical_conducting_function'},{slot:'BL',id:'polymer_thermoplastic'}]},
+      {label:'Inverter Drive\nVFD 3-phase',radicals:[{slot:'TL',id:'electrical_conducting_function'},{slot:'TR',id:'silicon_semiconductor_function'}]},
+     ]},
+    {label:'Safety systems &#x2014; leak detector + pressure switches',dominant:'chemical_sensing_function',
+     chars:[
+      {label:'R290 Leak\nDetector',radicals:[{slot:'TL',id:'chemical_sensing_function'},{slot:'TR',id:'silicon_semiconductor_function'}]},
+      {label:'HP/LP Pressure\nSwitches',radicals:[{slot:'TL',id:'pressure_vessel_function'},{slot:'TR',id:'electromechanical_switching_function'}]},
+     ]},
+  ]},
+  {id:'drone',title:'Cinematography Drone &#x2014; Sub-899 g, 4K 60fps',subtitle:'40-minute endurance, consumer prosumer',
+   sentences:[
+    {label:'Airframe &#x2014; folding CFRP body and motor arms',dominant:'composite_fibre_material',
+     chars:[
+      {label:'CFRP Folding\nAirframe',radicals:[{slot:'BL',id:'composite_fibre_material'}]},
+      {label:'CFRP Propeller\nGuards',radicals:[{slot:'BL',id:'composite_fibre_material'}]},
+     ]},
+    {label:'Propulsion &#x2014; 4 brushless motors + ESCs + propellers',dominant:'electromechanical_switching_function',
+     chars:[
+      {label:'Brushless Motor\n2306, 2400KV',radicals:[{slot:'TL',id:'electromechanical_switching_function'},{slot:'TR',id:'magnetic_coupling_function'},{slot:'BL',id:'copper'}]},
+      {label:'ESC 40A\nBLHeli',radicals:[{slot:'TL',id:'electrical_conducting_function'},{slot:'TR',id:'silicon_semiconductor_function'}]},
+      {label:'Propeller\n5-inch triblade',radicals:[{slot:'BL',id:'polymer_thermoplastic'}]},
+     ]},
+    {label:'Camera + gimbal &#x2014; 1-inch CMOS, 3-axis brushless stabilisation',dominant:'optical_sensing_function',
+     chars:[
+      {label:'CMOS Camera\n4K 60fps',radicals:[{slot:'TL',id:'optical_sensing_function'},{slot:'TR',id:'silicon_semiconductor_function'}]},
+      {label:'3-Axis Gimbal\nBrushless',radicals:[{slot:'TL',id:'electromechanical_switching_function'},{slot:'TR',id:'magnetic_coupling_function'}]},
+     ]},
+    {label:'Avionics &#x2014; flight controller, IMU, GNSS, obstacle avoidance',dominant:'silicon_semiconductor_function',
+     chars:[
+      {label:'Flight Controller\nF7 ArduPilot',radicals:[{slot:'TL',id:'silicon_semiconductor_function'},{slot:'TR',id:'electrical_conducting_function'}]},
+      {label:'IMU 6-axis\nMEMS',radicals:[{slot:'TL',id:'silicon_semiconductor_function'},{slot:'TR',id:'chemical_sensing_function'}]},
+      {label:'Stereo Vision\nSensors',radicals:[{slot:'TL',id:'optical_sensing_function'},{slot:'TR',id:'silicon_semiconductor_function'}]},
+     ]},
+  ]},
+];
+
+// ─── Render product paragraphs ───
+function renderProductParagraphs(){
+  var container=document.getElementById('product-paragraphs');
+  var toggleIdx=0;
+
+  for(var pi=0;pi<PRODUCTS.length;pi++){
+    var prod=PRODUCTS[pi];
+    var section=document.createElement('div');
+    section.className='product-section';
+
+    var header=document.createElement('div');
+    header.className='product-header';
+    var ptitle=document.createElement('span');
+    ptitle.className='product-title';
+    ptitle.innerHTML=prod.title;
+    var psub=document.createElement('span');
+    psub.className='product-subtitle';
+    psub.innerHTML=prod.subtitle;
+    header.appendChild(ptitle);header.appendChild(psub);
+    section.appendChild(header);
+
+    var clusters=document.createElement('div');
+    clusters.className='sentence-clusters';
+
+    for(var si=0;si<prod.sentences.length;si++){
+      var sent=prod.sentences[si];
+      var tid='toggle'+toggleIdx++;
+
+      var clusterDiv=document.createElement('div');
+      clusterDiv.className='cluster';
+
+      var inp=document.createElement('input');
+      inp.type='checkbox';inp.className='expand-toggle';inp.id=tid;
+      clusterDiv.appendChild(inp);
+
+      var lbl=document.createElement('label');
+      lbl.className='cluster-header';
+      lbl.htmlFor=tid;
+
+      // dominant glyph icon
+      var domG=glyphById(sent.dominant);
+      if(domG){
+        var iconDiv=document.createElement('div');
+        iconDiv.style.cssText='width:28px;height:28px;display:flex;align-items:center;justify-content:center;flex-shrink:0;';
+        iconDiv.innerHTML=domG.svg(22);
+        lbl.appendChild(iconDiv);
+      }
+
+      var lblText=document.createElement('div');
+      lblText.className='cluster-label';
+      lblText.innerHTML=sent.label;
+      lbl.appendChild(lblText);
+
+      var toggle=document.createElement('div');
+      toggle.className='cluster-toggle';
+      toggle.textContent='Click to expand ›';
+      lbl.appendChild(toggle);
+      clusterDiv.appendChild(lbl);
+
+      var body=document.createElement('div');
+      body.className='cluster-body';
+
+      var charRow=document.createElement('div');
+      charRow.className='char-row';
+      for(var ci=0;ci<sent.chars.length;ci++){
+        var ch=sent.chars[ci];
+        var charItem=document.createElement('div');
+        charItem.className='char-item';
+        charItem.appendChild(makeCharSquare(ch.radicals,28));
+        var charLbl=document.createElement('div');
+        charLbl.className='char-item-label';
+        charLbl.innerHTML=ch.label.replace('\n','<br>');
+        charItem.appendChild(charLbl);
+        charRow.appendChild(charItem);
+      }
+      body.appendChild(charRow);
+
+      // list radicals used
+      var allRads=[];
+      for(var ci2=0;ci2<sent.chars.length;ci2++){
+        for(var ri=0;ri<sent.chars[ci2].radicals.length;ri++){
+          var rid=sent.chars[ci2].radicals[ri].id;
+          if(allRads.indexOf(rid)<0)allRads.push(rid);
+        }
+      }
+      var radLine=document.createElement('div');
+      radLine.style.cssText='margin-top:10px;font-size:12px;color:#777;';
+      radLine.textContent='Radicals: ';
+      for(var ri2=0;ri2<allRads.length;ri2++){
+        var c=document.createElement('code');c.textContent=allRads[ri2];
+        radLine.appendChild(c);
+        if(ri2<allRads.length-1)radLine.appendChild(document.createTextNode(' '));
+      }
+      body.appendChild(radLine);
+      clusterDiv.appendChild(body);
+      clusters.appendChild(clusterDiv);
+    }
+    section.appendChild(clusters);
+    container.appendChild(section);
+  }
+}
+
+// ─── Cross-product matrix ───
+function renderCrossMatrix(){
+  var container=document.getElementById('cross-matrix');
+
+  function radicalsForProduct(prod){
+    var ids={};
+    for(var si=0;si<prod.sentences.length;si++){
+      for(var ci=0;ci<prod.sentences[si].chars.length;ci++){
+        for(var ri=0;ri<prod.sentences[si].chars[ci].radicals.length;ri++){
+          ids[prod.sentences[si].chars[ci].radicals[ri].id]=true;
+        }
+      }
+    }
+    return ids;
+  }
+
+  var r0=radicalsForProduct(PRODUCTS[0]);
+  var r1=radicalsForProduct(PRODUCTS[1]);
+  var r2=radicalsForProduct(PRODUCTS[2]);
+
+  var allKeys={};
+  function addKeys(obj){for(var k in obj)allKeys[k]=true;}
+  addKeys(r0);addKeys(r1);addKeys(r2);
+
+  var sorted=Object.keys(allKeys).sort(function(a,b){
+    var ac=(r0[a]?1:0)+(r1[a]?1:0)+(r2[a]?1:0);
+    var bc=(r0[b]?1:0)+(r1[b]?1:0)+(r2[b]?1:0);
+    if(bc!==ac)return bc-ac;
+    return a.localeCompare(b);
+  });
+
+  var table=document.createElement('table');
+  table.className='matrix-table';
+  var thead=document.createElement('thead');
+  var hr=document.createElement('tr');
+  ['Radical','BESS','Heat Pump','Drone','Count'].forEach(function(h){
+    var th=document.createElement('th');th.textContent=h;hr.appendChild(th);
+  });
+  thead.appendChild(hr);table.appendChild(thead);
+
+  var tbody=document.createElement('tbody');
+  var universalCount=0;
+  var universalNames=[];
+  for(var i=0;i<sorted.length;i++){
+    var id=sorted[i];
+    var inB=!!r0[id],inH=!!r1[id],inD=!!r2[id];
+    var count=(inB?1:0)+(inH?1:0)+(inD?1:0);
+    if(count===3){universalCount++;universalNames.push(id);}
+    var tr=document.createElement('tr');
+
+    var tdName=document.createElement('td');tdName.className='radical-name';
+    var glyph=glyphById(id);
+    if(glyph){
+      var svgSpan=document.createElement('span');svgSpan.style.verticalAlign='middle';
+      svgSpan.innerHTML=glyph.svg(14);
+      tdName.appendChild(svgSpan);
+      tdName.appendChild(document.createTextNode('  '+id));
+    } else {
+      tdName.textContent=id;
+    }
+    tr.appendChild(tdName);
+
+    [inB,inH,inD].forEach(function(v){
+      var td=document.createElement('td');
+      td.className=v?'hit':'miss';
+      td.textContent=v?'✓':'·';
+      tr.appendChild(td);
+    });
+
+    var tdCount=document.createElement('td');
+    tdCount.textContent=count+'/3';
+    tdCount.style.fontWeight=count===3?'700':'400';
+    tdCount.style.color=count===3?'#2e7d32':count===2?'#1a6fa0':'#999';
+    tr.appendChild(tdCount);
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  container.appendChild(table);
+
+  var note=document.createElement('p');
+  note.style.cssText='margin-top:12px;font-size:13px;';
+  note.textContent=universalCount+' universal radical'+(universalCount!==1?'s':'')+' appear in all 3 products: '+universalNames.join(', ')+'.';
+  container.appendChild(note);
+}
+
+// ─── BOOT ───
+renderGlyphCatalogue();
+renderConflictExamples();
+renderProductParagraphs();
+renderCrossMatrix();
+</script>
+</body>
+</html>
