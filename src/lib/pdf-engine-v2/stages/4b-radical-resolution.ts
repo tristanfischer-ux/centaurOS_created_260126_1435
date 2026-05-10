@@ -35,6 +35,7 @@
 import type { RadicalTree, CompositionNode } from '../radical/schema.js'
 import { findSkuForPart, type AggregateResult } from '../lib/distributors/index.js'
 import { findEntriesByPartTerm, VENDOR_CATALOG, type VendorCatalogEntry } from '../lib/vendor-catalog.js'
+import { findSuppliersBySpecialism } from '../lib/local-corpus.js'
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -526,13 +527,16 @@ async function resolveDistributorLeaf(
 }
 
 /**
- * Resolve an oem_subsystem leaf via vendor-catalog lookup.
- * Falls back to Grade D on catalog miss.
+ * Resolve an oem_subsystem leaf via vendor-catalog lookup, then Nightshift
+ * specialism lookup, then Grade D fallback.
+ *
+ * @param productClass  Used to select specialism tags for corpus lookup (Fix 2, task #59)
  */
 function resolveOemSubsystemLeaf(
   archetypeId: string,
   qty: number,
   estimatedUnitPriceGbp: number | null,
+  productClass: string = 'unknown',
 ): ResolvedLeafAnnotation {
   const catalogKey = OEM_CATALOG_BY_CHARACTER[archetypeId]
   let catalogEntry: VendorCatalogEntry | undefined
@@ -567,7 +571,29 @@ function resolveOemSubsystemLeaf(
     }
   }
 
-  // No catalog match — try Grade D
+  // No catalog match — try Nightshift corpus specialism lookup (Fix 2, task #59)
+  const corpusSuppliers = findSuppliersBySpecialism(productClass, 1)
+  if (corpusSuppliers && corpusSuppliers.length > 0) {
+    const top = corpusSuppliers[0]
+    const gradeD = GRADE_D_BY_CHARACTER[archetypeId]
+    return {
+      archetype_id: archetypeId,
+      part_class: 'oem_subsystem',
+      qty,
+      mpn: null,
+      manufacturer: top.name,
+      unit_price_gbp: gradeD?.typical ?? estimatedUnitPriceGbp,
+      lead_weeks: null,
+      verification_grade: (gradeD || estimatedUnitPriceGbp !== null) ? 'grade_d' : 'stub',
+      source: 'vendor_catalog',
+      source_url: top.website ?? null,
+      distributor: 'vendor_catalog',
+      grade_d_basis: gradeD?.basis ?? null,
+      notes: `Nightshift corpus: ${top.name} (${top.country ?? '?'}); specialism match for ${productClass}`,
+    }
+  }
+
+  // No corpus match — try Grade D
   const gradeD = GRADE_D_BY_CHARACTER[archetypeId]
   if (gradeD) {
     return {
@@ -618,7 +644,7 @@ function resolveOemSubsystemLeaf(
     source_url: null,
     distributor: null,
     grade_d_basis: null,
-    notes: 'OEM subsystem: no vendor catalog entry, no Grade D entry, no LLM estimate',
+    notes: 'OEM subsystem: no vendor catalog entry, no Nightshift corpus match, no Grade D entry, no LLM estimate',
   }
 }
 
@@ -806,7 +832,7 @@ export async function runRadicalResolution(
     } else if (partClass === 'structural_fabricated') {
       annotation = resolveStructuralFabricatedLeaf(archetypeId, qty, estimatedUnitPriceGbp)
     } else if (partClass === 'oem_subsystem') {
-      annotation = resolveOemSubsystemLeaf(archetypeId, qty, estimatedUnitPriceGbp)
+      annotation = resolveOemSubsystemLeaf(archetypeId, qty, estimatedUnitPriceGbp, productClass)
     } else if (isDistributorResultPlausibleForClass(partClass)) {
       // electronic_cots or mechanical_cots — try distributor
       annotation = await resolveDistributorLeaf(
@@ -819,7 +845,7 @@ export async function runRadicalResolution(
       )
     } else {
       // Fallback for unknown partClass — should not happen given exhaustive coverage above
-      annotation = resolveOemSubsystemLeaf(archetypeId, qty, estimatedUnitPriceGbp)
+      annotation = resolveOemSubsystemLeaf(archetypeId, qty, estimatedUnitPriceGbp, productClass)
     }
 
     // Use archetypeId as the map key — multiple leaves can share the same archetypeId

@@ -234,6 +234,103 @@ export function semanticSupplierSearch(
   })
 }
 
+// ─── Domain → specialism tag mapping ─────────────────────────────────────────
+//
+// Maps each Radical product class to the Nightshift specialism tags that
+// indicate a relevant OEM or system integrator. Used by findSuppliersBySpecialism
+// to surface 1-3 real candidate companies for oem_subsystem leaves.
+//
+// Source: Play 1 corpus enrichment (commit 19ad938 in Forge-Capital/nightshift).
+// Specialism tags use the exact strings in the companies.specialism JSON array.
+
+export const PRODUCT_CLASS_TO_SPECIALISM: Record<string, string[]> = {
+  energy_storage:   ['bess_integrator', 'pcs_power_electronics', 'bms_specialist'],
+  thermal_system:   ['hvac_system_oem'],
+  ev_charger:       ['ev_charger_integrator', 'pcs_power_electronics'],
+  drone:            ['precision_machining_cnc', 'composite_layup', 'additive_3d_print_metal'],
+  edge_ai_server:   ['industrial_enclosure_oem', 'precision_machining_cnc'],
+  wearable_medical: ['wearable_medical', 'medical_device_cm'],
+  bioreactor:       ['medical_device_cm', 'precision_machining_cnc'],
+  vertical_farm:    ['vertical_farm_systems'],
+  auv:              ['auv_marine_systems', 'precision_machining_cnc'],
+  haps:             ['haps_aerospace', 'aerospace_composite'],
+}
+
+export interface SpecialismSupplier {
+  companyId: string
+  name: string
+  website: string | null
+  country: string | null
+  city: string | null
+  description: string | null
+  specialism: string[]
+  enrichmentQuality: number
+}
+
+/**
+ * Specialism-based supplier lookup — no embedding required.
+ * Queries the companies.specialism JSON array for matching tags and returns
+ * up to topK companies ordered by enrichment_quality DESC.
+ *
+ * Returns null if the corpus is unavailable, empty array if no matches.
+ *
+ * Used by Phase 2 resolution (4b-radical-resolution.ts) to surface candidate
+ * OEM suppliers for oem_subsystem leaves without requiring an LLM call or
+ * embedding.
+ */
+export function findSuppliersBySpecialism(
+  productClass: string,
+  topK: number = 3,
+): SpecialismSupplier[] | null {
+  const db = getDb()
+  if (!db) return null
+
+  const tags = PRODUCT_CLASS_TO_SPECIALISM[productClass]
+  if (!tags || tags.length === 0) return []
+
+  // Build a LIKE clause for each tag — the specialism column is a JSON array string.
+  // e.g. specialism = '["bess_integrator","pcs_power_electronics"]'
+  const clauses = tags.map(() => `specialism LIKE ?`).join(' OR ')
+  const params = tags.map(t => `%${t}%`)
+
+  type Row = {
+    id: string
+    name: string
+    website_url: string | null
+    country: string | null
+    city: string | null
+    description: string | null
+    specialism: string | null
+    enrichment_quality: number | null
+  }
+
+  try {
+    const rows = db.prepare(
+      `SELECT id, name, website_url, country, city, description, specialism, enrichment_quality
+       FROM companies
+       WHERE (${clauses})
+         AND status != 'rejected'
+         AND enrichment_quality >= 40
+       ORDER BY enrichment_quality DESC
+       LIMIT ?`,
+    ).all(...params, topK) as Row[]
+
+    return rows.map(r => ({
+      companyId: r.id,
+      name: r.name,
+      website: r.website_url,
+      country: r.country,
+      city: r.city,
+      description: r.description,
+      specialism: r.specialism ? ((() => { try { return JSON.parse(r.specialism) } catch { return [] } })()) : [],
+      enrichmentQuality: r.enrichment_quality ?? 0,
+    }))
+  } catch (err) {
+    console.warn('[local-corpus] findSuppliersBySpecialism failed:', (err as Error).message)
+    return []
+  }
+}
+
 /**
  * Lightweight stat for logging: count how many companies have embeddings,
  * process capabilities, and synthesised profiles. Useful for the pipeline
