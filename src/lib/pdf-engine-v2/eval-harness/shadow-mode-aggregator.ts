@@ -96,6 +96,8 @@ interface Phase5StateSnapshot {
   resolvedRadicalTree?: ResolvedRadicalTree
   radicalCostSummary?: CostSummary
   grammarVerdicts?: GrammarVerdicts
+  /** Fix 4: legacy cost paired field, written by index.ts Phase 5 block */
+  legacyCostBomTotal?: number | null
 }
 
 interface RunManifest {
@@ -242,12 +244,15 @@ function loadRunResults(evidenceDir: string): RunResult[] {
     const ok = manifest?.ok ?? (state !== null)
     const errorReason = manifest?.errorReason
 
-    // Legacy cost: prefer manifest value, fall back to parsing from log.txt
+    // Legacy cost: prefer manifest value, then state.json direct field, then log parsing
     const logFile = join(runDir, 'log.txt')
     const legacyCostFromManifest = (manifest?.legacyCostBomTotal != null && manifest.legacyCostBomTotal > 0)
       ? manifest.legacyCostBomTotal
       : null
-    const legacyCostFinalUnit = legacyCostFromManifest ?? parseLegacyCostFromLog(logFile)
+    const legacyCostFromState = (state?.legacyCostBomTotal != null && state.legacyCostBomTotal > 0)
+      ? state.legacyCostBomTotal
+      : null
+    const legacyCostFinalUnit = legacyCostFromManifest ?? legacyCostFromState ?? parseLegacyCostFromLog(logFile)
 
     results.push({
       slug,
