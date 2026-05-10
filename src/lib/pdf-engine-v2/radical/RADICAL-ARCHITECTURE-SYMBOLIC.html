@@ -1,0 +1,1456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ForgeOS Radical Architecture — Symbolic Visualisation</title>
+  <style>
+    /* ---- Reset & base ---- */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial,
+                   "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+      font-size: 16px;
+      line-height: 1.75;
+      color: #1a1a1a;
+      background: #fafafa;
+    }
+
+    /* ---- Layout ---- */
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 48px 32px 80px;
+    }
+
+    /* ---- Typography ---- */
+    h1 { font-size: 2.2rem; font-weight: 700; color: #1a1a1a; line-height: 1.2; margin-bottom: 0.4rem; }
+    h2 { font-size: 1.45rem; font-weight: 700; color: #2563eb; margin: 2.8rem 0 0.8rem; border-bottom: 2px solid #e5e7eb; padding-bottom: 0.3rem; }
+    h3 { font-size: 1.1rem; font-weight: 600; color: #1a1a1a; margin: 1.8rem 0 0.5rem; }
+    p  { margin-bottom: 1rem; }
+    ul, ol { margin: 0.5rem 0 1rem 1.6rem; }
+    li { margin-bottom: 0.3rem; }
+    strong { font-weight: 600; }
+
+    /* ---- Cover ---- */
+    .cover {
+      border-bottom: 3px solid #2563eb;
+      padding-bottom: 2rem;
+      margin-bottom: 2.5rem;
+    }
+    .cover-subtitle { font-size: 1.15rem; color: #4b5563; margin-top: 0.5rem; margin-bottom: 1.2rem; }
+    .cover-meta { font-size: 0.9rem; color: #6b7280; }
+    .cover-meta span { margin-right: 1.5rem; }
+
+    /* ---- TOC ---- */
+    .toc {
+      background: #f1f5f9;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 2.5rem;
+    }
+    .toc h3 { margin-top: 0; color: #374151; font-size: 0.9rem; text-transform: uppercase; letter-spacing: 0.05em; }
+    .toc ol { margin: 0.5rem 0 0 1.4rem; }
+    .toc li { margin-bottom: 0.25rem; font-size: 0.95rem; }
+
+    /* ---- Callout ---- */
+    .callout {
+      border-left: 4px solid #2563eb;
+      background: #eff6ff;
+      border-radius: 0 6px 6px 0;
+      padding: 1rem 1.4rem;
+      margin: 1.5rem 0;
+      font-size: 1.05rem;
+      color: #1e3a8a;
+      font-style: italic;
+    }
+
+    /* ---- Tables ---- */
+    .table-wrap { overflow-x: auto; margin: 1.2rem 0 1.6rem; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+    thead th {
+      background: #1e3a8a;
+      color: #fff;
+      text-align: left;
+      padding: 9px 12px;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+    tbody tr:nth-child(odd)  { background: #ffffff; }
+    tbody tr:nth-child(even) { background: #f8fafc; }
+    tbody tr:hover { background: #eff6ff; }
+    tbody td { padding: 8px 12px; border-bottom: 1px solid #e5e7eb; vertical-align: middle; }
+
+    /* ---- Glyph display ---- */
+    .glyph-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+      margin: 1.4rem 0 2rem;
+    }
+    .glyph-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1.1rem;
+      background: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+    }
+    .glyph-card.constructed {
+      border-color: #f59e0b;
+      background: #fffbeb;
+    }
+    .glyph-symbol {
+      font-size: 3rem;
+      line-height: 1.1;
+      margin-bottom: 0.4rem;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", serif;
+    }
+    .glyph-id {
+      font-size: 0.72rem;
+      color: #6b7280;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      margin-bottom: 0.3rem;
+      word-break: break-all;
+    }
+    .glyph-en {
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #1a1a1a;
+      margin-bottom: 0.25rem;
+    }
+    .glyph-note {
+      font-size: 0.75rem;
+      color: #6b7280;
+      font-style: italic;
+      line-height: 1.3;
+    }
+    .badge-constructed {
+      font-size: 0.68rem;
+      background: #fef3c7;
+      color: #92400e;
+      border: 1px solid #f59e0b;
+      border-radius: 999px;
+      padding: 1px 6px;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+    .badge-real {
+      font-size: 0.68rem;
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #34d399;
+      border-radius: 999px;
+      padding: 1px 6px;
+      font-weight: 600;
+      margin-bottom: 0.3rem;
+    }
+
+    /* ---- Composition mechanics ---- */
+    .comp-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.8rem;
+      margin: 1.2rem 0 2rem;
+    }
+    @media (max-width: 680px) { .comp-grid { grid-template-columns: 1fr; } }
+    .comp-row {
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 0.8rem 1rem;
+      background: #fff;
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      flex-wrap: wrap;
+    }
+    .comp-glyph {
+      font-size: 1.8rem;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+      line-height: 1;
+    }
+    .comp-plus { color: #9ca3af; font-weight: 600; font-size: 1rem; }
+    .comp-arrow { color: #2563eb; font-size: 1.2rem; }
+    .comp-result {
+      font-size: 1.1rem;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+    }
+    .comp-label {
+      font-size: 0.78rem;
+      color: #6b7280;
+      flex-basis: 100%;
+    }
+
+    /* ---- Colour-coding for shared radicals ---- */
+    /* Each colour is consistent across ALL product paragraphs */
+    .r-solid     { color: #7c3aed; }  /* solid_state_of_matter — purple */
+    .r-elec      { color: #dc2626; }  /* electrical_conducting_function — red */
+    .r-si        { color: #0284c7; }  /* silicon_semiconductor_function — blue */
+    .r-steel     { color: #374151; }  /* steel — dark grey */
+    .r-copper    { color: #b45309; }  /* copper — amber */
+    .r-polymer   { color: #059669; }  /* polymer_thermoplastic — green */
+    .r-thermal   { color: #ea580c; }  /* thermal_transfer_function — orange */
+    .r-fluid     { color: #0891b2; }  /* fluid_flow_state — cyan */
+    .r-em        { color: #7c3aed; }  /* electromechanical_switching_function — violet */
+    .r-chem      { color: #65a30d; }  /* chemical_sensing_function — lime */
+    .r-optical   { color: #db2777; }  /* optical_sensing_function — pink */
+    .r-elchem    { color: #9333ea; }  /* electrochemical_energy_function — indigo */
+    .r-pressure  { color: #6b7280; }  /* pressure_vessel_function — grey */
+    .r-magnetic  { color: #2563eb; }  /* magnetic_coupling_function — blue */
+    .r-composite { color: #854d0e; }  /* composite_fibre_material — brown */
+    .r-lfp       { color: #be123c; }  /* lithium_iron_phosphate_chemistry — rose */
+
+    /* bold glyph in product paragraphs */
+    .pg-glyph {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+    }
+
+    /* ---- Product paragraph tree ---- */
+    .product-section {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 1.4rem 1.6rem;
+      margin-bottom: 1.6rem;
+      background: #fff;
+    }
+    .product-header {
+      display: flex;
+      align-items: baseline;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+    .product-glyph-main {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+      font-size: 2.4rem;
+      line-height: 1;
+    }
+    .product-name { font-weight: 700; font-size: 1.15rem; }
+    .product-desc { color: #6b7280; font-size: 0.9rem; }
+    .tree { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.85rem; line-height: 1.8; }
+    .tree-branch { padding-left: 0; }
+    .module-header {
+      font-weight: 700;
+      color: #1e3a8a;
+      display: block;
+      margin-top: 0.6rem;
+    }
+    .tree-item {
+      display: flex;
+      gap: 0.5rem;
+      align-items: baseline;
+    }
+    .tree-prefix { color: #9ca3af; flex-shrink: 0; }
+    .tree-char {
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+      font-size: 1rem;
+    }
+    .tree-en { color: #374151; font-size: 0.82rem; font-family: -apple-system, sans-serif; }
+    .tree-radicals { font-size: 0.75rem; color: #9ca3af; margin-left: 0.3rem; }
+    .tree-qty { color: #6b7280; font-size: 0.75rem; margin-left: 0.3rem; font-family: -apple-system, sans-serif; }
+    .tree-new { color: #f59e0b; font-size: 0.68rem; font-weight: 600; background: #fffbeb; border: 1px solid #fcd34d; border-radius: 999px; padding: 0 5px; vertical-align: middle; }
+
+    /* ---- Cross-product matrix ---- */
+    .matrix-wrap { overflow-x: auto; margin: 1.2rem 0 2rem; }
+    .matrix { border-collapse: collapse; font-size: 0.82rem; width: 100%; min-width: 900px; }
+    .matrix th { padding: 6px 8px; text-align: center; border: 1px solid #e5e7eb; font-weight: 600; }
+    .matrix th.row-header { text-align: left; background: #f1f5f9; min-width: 160px; }
+    .matrix th.col-header {
+      background: #1e3a8a;
+      color: #fff;
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", serif;
+      font-size: 1rem;
+      writing-mode: vertical-rl;
+      text-orientation: mixed;
+      height: 110px;
+      vertical-align: bottom;
+      padding: 8px 4px;
+    }
+    .matrix td { padding: 5px 8px; border: 1px solid #e5e7eb; text-align: center; }
+    .matrix td.row-label { text-align: left; font-size: 0.8rem; color: #374151; background: #f8fafc; }
+    .matrix .yes { font-size: 1.1rem; }
+    .matrix .no  { color: #d1d5db; font-size: 0.8rem; }
+
+    /* ---- Grammar diagrams ---- */
+    .grammar-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 1.2rem;
+      margin: 1.4rem 0 2rem;
+    }
+    @media (max-width: 780px) { .grammar-grid { grid-template-columns: 1fr; } }
+    .grammar-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+      background: #fff;
+    }
+    .grammar-card h4 { font-size: 0.85rem; font-weight: 700; color: #2563eb; margin-bottom: 0.6rem; text-transform: uppercase; letter-spacing: 0.04em; }
+    .grammar-card .rule-name { font-size: 0.8rem; font-weight: 600; color: #374151; font-family: monospace; margin-bottom: 0.5rem; }
+
+    /* ---- Legend ---- */
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin: 1rem 0 1.6rem;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 0.3rem;
+      font-size: 0.8rem;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 3px 8px;
+      background: #fff;
+    }
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* print */
+    @media print {
+      body { background: #fff; }
+      .page { max-width: 100%; padding: 20px; }
+      h2 { page-break-before: auto; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ======== COVER ======== -->
+  <div class="cover">
+    <h1>ForgeOS Radical Architecture</h1>
+    <p class="cover-subtitle">Symbolic Visualisation — Radicals as Chinese-Style Glyphs, Three Products as Visual Paragraphs</p>
+    <p class="cover-meta">
+      <span>ForgeOS / PDF Engine v2</span>
+      <span>Companion to RADICAL-ARCHITECTURE-EXPLAINER.html (commit 583e7c6d)</span>
+      <span>2026-05-10</span>
+    </p>
+  </div>
+
+  <!-- ======== TOC ======== -->
+  <div class="toc">
+    <h3>Contents</h3>
+    <ol>
+      <li><a href="#s1">The Idea — Why Glyphs?</a></li>
+      <li><a href="#s2">Radical Symbol Map — All 22 Radicals</a></li>
+      <li><a href="#s3">Composition Mechanics — Characters as Compound Glyphs</a></li>
+      <li><a href="#s4">Three Products as Visual Paragraphs</a></li>
+      <li><a href="#s5">Grammar Rules — Visual Encoding</a></li>
+      <li><a href="#s6">Cross-Product Universality Matrix</a></li>
+      <li><a href="#s7">What the Symbols Show</a></li>
+    </ol>
+  </div>
+
+  <!-- ======== SECTION 1 ======== -->
+  <h2 id="s1"><span class="section-num">1.</span> The Idea — Why Glyphs?</h2>
+
+  <p>Chinese characters encode meaning compositionally. 銅 (copper) is 金 (metal) + 同 (same/together). 鋁 (aluminium) is 金 + 呂 (two mouths, stacked). The metal radical 金 appears identically in both — a visual signal that these are material siblings.</p>
+
+  <p>ForgeOS Radical works the same way. A <strong>radical</strong> is an atomic concept. A <strong>character</strong> is a composition of radicals. Three maximally different products — a 3.5 MWh battery energy storage system, a 30 kW heat pump, and a consumer cinematography drone — when written in this symbolic language, share many of the same glyphs. That shared visual vocabulary is the claim: <em>the same library of atoms describes all hardware products</em>.</p>
+
+  <div class="callout">
+    "If you can turn the radicals into symbols… three products described in paragraphs and be able to see the commonality in symbolic representation."
+  </div>
+
+  <p>Each Chinese character below has an English annotation underneath it. Real Chinese characters are marked <span class="badge-real" style="display:inline-block">real</span>. Glyphs that do not exist as standard Unicode characters are marked <span class="badge-constructed" style="display:inline-block">constructed</span> with a note explaining the stroke logic.</p>
+
+  <!-- ======== SECTION 2 ======== -->
+  <h2 id="s2"><span class="section-num">2.</span> Radical Symbol Map — All 22 Radicals</h2>
+
+  <p>The ForgeOS radical library spans 5 seed radicals (from the initial spike), 12 additions from the BESS decomposition, 1 from the vertical farm, and 1 from the drone. Colour coding used here is <strong>consistent throughout this document</strong> — the same colour always means the same radical.</p>
+
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:#7c3aed"></div> solid_state_of_matter</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#dc2626"></div> electrical_conducting_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#0284c7"></div> silicon_semiconductor_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#374151"></div> steel</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#b45309"></div> copper</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#059669"></div> polymer_thermoplastic</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#ea580c"></div> thermal_transfer_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#0891b2"></div> fluid_flow_state</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6d28d9"></div> electromechanical_switching_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#65a30d"></div> chemical_sensing_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#db2777"></div> optical_sensing_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#9333ea"></div> electrochemical_energy_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#6b7280"></div> pressure_vessel_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#2563eb"></div> magnetic_coupling_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#be123c"></div> lithium_iron_phosphate_chemistry</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#854d0e"></div> composite_fibre_material</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#166534"></div> mineral_fibre_material</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#1d4ed8"></div> photon_emission_function</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#7f1d1d"></div> chemical_suppressant_material</div>
+    <div class="legend-item"><div class="legend-dot" style="background:#701a75"></div> electrochemical_energy_function</div>
+  </div>
+
+  <div class="glyph-grid">
+
+    <!-- 1. steel -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-steel">鋼</span>
+      <span class="glyph-id">steel</span>
+      <span class="glyph-en">Steel (material)</span>
+      <span class="glyph-note">金 (metal) + 岡 (ridge/strong). Standard Mandarin character for steel.</span>
+    </div>
+
+    <!-- 2. copper -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-copper">銅</span>
+      <span class="glyph-id">copper</span>
+      <span class="glyph-en">Copper (material)</span>
+      <span class="glyph-note">金 (metal) + 同 (same/together). Metal that conducts together.</span>
+    </div>
+
+    <!-- 3. polymer_thermoplastic -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-polymer">塑</span>
+      <span class="glyph-id">polymer_thermoplastic</span>
+      <span class="glyph-en">Polymer (material)</span>
+      <span class="glyph-note">土 (earth/form) + 朔 (mould/new). Standard character for plastics.</span>
+    </div>
+
+    <!-- 4. electrical_conducting_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-elec">電</span>
+      <span class="glyph-id">electrical_conducting_function</span>
+      <span class="glyph-en">Electrical (function)</span>
+      <span class="glyph-note">Standard character for electricity. Rain + lightning bolt — energy from sky.</span>
+    </div>
+
+    <!-- 5. solid_state_of_matter -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-solid">固</span>
+      <span class="glyph-id">solid_state_of_matter</span>
+      <span class="glyph-en">Solid (state of matter)</span>
+      <span class="glyph-note">囗 (enclosure) + 古 (ancient/established). That which holds its shape.</span>
+    </div>
+
+    <!-- 6. silicon_semiconductor_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-si">矽</span>
+      <span class="glyph-id">silicon_semiconductor_function</span>
+      <span class="glyph-en">Silicon (semiconductor)</span>
+      <span class="glyph-note">石 (stone/mineral) + 夕 (evening). Traditional Chinese character for silicon element.</span>
+    </div>
+
+    <!-- 7. electrochemical_energy_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-elchem">電池</span>
+      <span class="glyph-id">electrochemical_energy_function</span>
+      <span class="glyph-en">Electrochemical energy (function)</span>
+      <span class="glyph-note">電 (electricity) + 池 (pool/reservoir). Battery — electricity pool. Used as digraph to distinguish from bare 電.</span>
+    </div>
+
+    <!-- 8. lithium_iron_phosphate_chemistry -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-lfp">鋰</span>
+      <span class="glyph-id">lithium_iron_phosphate_chemistry</span>
+      <span class="glyph-en">Lithium (LFP chemistry)</span>
+      <span class="glyph-note">金 (metal) + 里 (inside/village). Standard character for lithium element — the inner metal.</span>
+    </div>
+
+    <!-- 9. magnetic_coupling_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-magnetic">磁</span>
+      <span class="glyph-id">magnetic_coupling_function</span>
+      <span class="glyph-en">Magnetic coupling (function)</span>
+      <span class="glyph-note">石 (stone/mineral) + 兹 (now/this). Magnetite → magnetic field. Standard Chinese character for magnetism.</span>
+    </div>
+
+    <!-- 10. electromechanical_switching_function -->
+    <div class="glyph-card">
+      <span class="badge-constructed">constructed</span>
+      <span class="glyph-symbol r-em">力電</span>
+      <span class="glyph-id">electromechanical_switching_function</span>
+      <span class="glyph-en">Electromechanical switch (function)</span>
+      <span class="glyph-note">Constructed: 力 (force/mechanical) + 電 (electrical). Force acting on electricity — a relay or motor actuator. Written as digraph.</span>
+    </div>
+
+    <!-- 11. thermal_transfer_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-thermal">熱</span>
+      <span class="glyph-id">thermal_transfer_function</span>
+      <span class="glyph-en">Thermal transfer (function)</span>
+      <span class="glyph-note">火 (fire) at bottom + 埶 (hold/cultivate) at top. Standard character for heat.</span>
+    </div>
+
+    <!-- 12. fluid_flow_state -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-fluid">流</span>
+      <span class="glyph-id">fluid_flow_state</span>
+      <span class="glyph-en">Fluid flow (state)</span>
+      <span class="glyph-note">水 (water radical 氵) + 㐬 (flowing hair). Standard character for flow/current.</span>
+    </div>
+
+    <!-- 13. mineral_fibre_material -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol" style="color:#166534">礦纖</span>
+      <span class="glyph-id">mineral_fibre_material</span>
+      <span class="glyph-en">Mineral fibre (material)</span>
+      <span class="glyph-note">礦 (mineral/ore) + 纖 (fibre/thread). Mineral wool insulation. Written as digraph for specificity.</span>
+    </div>
+
+    <!-- 14. pressure_vessel_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-pressure">壓</span>
+      <span class="glyph-id">pressure_vessel_function</span>
+      <span class="glyph-en">Pressure vessel (function)</span>
+      <span class="glyph-note">厂 (cliff/overhang) + 土 (earth) + 土 (earth). Weight pressing down. Standard character for pressure.</span>
+    </div>
+
+    <!-- 15. chemical_suppressant_material -->
+    <div class="glyph-card">
+      <span class="badge-constructed">constructed</span>
+      <span class="glyph-symbol" style="color:#7f1d1d">化抑</span>
+      <span class="glyph-id">chemical_suppressant_material</span>
+      <span class="glyph-en">Chemical suppressant (material)</span>
+      <span class="glyph-note">Constructed: 化 (chemistry/transform) + 抑 (suppress/restrain). Chemical that restrains — fire-suppressant agent. Written as digraph.</span>
+    </div>
+
+    <!-- 16. chemical_sensing_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-chem">化感</span>
+      <span class="glyph-id">chemical_sensing_function</span>
+      <span class="glyph-en">Chemical sensing (function)</span>
+      <span class="glyph-note">化 (chemistry/change) + 感 (sense/feel). Chemistry that is felt — a gas sensor or analytic sensor.</span>
+    </div>
+
+    <!-- 17. optical_sensing_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-optical">光感</span>
+      <span class="glyph-id">optical_sensing_function</span>
+      <span class="glyph-en">Optical sensing (function)</span>
+      <span class="glyph-note">光 (light) + 感 (sense/feel). Light that is felt — a photodiode, CMOS sensor, or arc detector.</span>
+    </div>
+
+    <!-- 18. photon_emission_function -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol" style="color:#1d4ed8">光發</span>
+      <span class="glyph-id">photon_emission_function</span>
+      <span class="glyph-en">Photon emission (function)</span>
+      <span class="glyph-note">光 (light) + 發 (emit/produce). Light that is made — an LED or grow light. Distinguished from 光感 (sensing) by the 發.</span>
+    </div>
+
+    <!-- 19. composite_fibre_material (drone addition) -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol r-composite">碳纖</span>
+      <span class="glyph-id">composite_fibre_material</span>
+      <span class="glyph-en">Carbon fibre composite (material)</span>
+      <span class="glyph-note">碳 (carbon element) + 纖 (fibre/thread). Standard term for carbon-fibre composite material.</span>
+    </div>
+
+    <!-- 20. aluminium (implicit — used in characters, no standalone radical but worth including) -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol" style="color:#4b5563">鋁</span>
+      <span class="glyph-id">aluminium (character material)</span>
+      <span class="glyph-en">Aluminium (material)</span>
+      <span class="glyph-note">金 (metal) + 呂 (two stacked mouths — layered/stacked). Standard character for aluminium. Appears in characters, shares 金 root with 鋼 (steel) and 銅 (copper).</span>
+    </div>
+
+    <!-- 21. fire / heat (for electric_heater_element) -->
+    <div class="glyph-card">
+      <span class="badge-real">real</span>
+      <span class="glyph-symbol" style="color:#b91c1c">火電</span>
+      <span class="glyph-id">electric_heater_element (character)</span>
+      <span class="glyph-en">Electric heater element</span>
+      <span class="glyph-note">火 (fire/heat) + 電 (electrical). Electrical heating — a resistive heater element. Combines the fire and electricity radicals.</span>
+    </div>
+
+    <!-- 22. elastomer / vibration isolation -->
+    <div class="glyph-card">
+      <span class="badge-constructed">constructed</span>
+      <span class="glyph-symbol" style="color:#4f46e5">塑震</span>
+      <span class="glyph-id">vibration_isolator_mount (character)</span>
+      <span class="glyph-en">Vibration isolator (character)</span>
+      <span class="glyph-note">Constructed: 塑 (polymer) + 震 (vibration/earthquake). Polymer that absorbs vibration. TPU damping mounts.</span>
+    </div>
+
+  </div>
+
+  <!-- ======== SECTION 3 ======== -->
+  <h2 id="s3"><span class="section-num">3.</span> Composition Mechanics — Characters as Compound Glyphs</h2>
+
+  <p>Each Character in the Radical system is a composition of two or more radicals. The table below shows 18 key characters as compound glyphs. Read each row as: "radical A + radical B → character C (English name)". Note how <span class="r-elec">電</span> (electrical) and <span class="r-solid">固</span> (solid) appear in almost every row — they are the highest-frequency radicals.</p>
+
+  <div class="comp-grid">
+
+    <div class="comp-row">
+      <span class="comp-glyph r-copper">銅</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-elec">電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-copper">銅線</span>
+      <span class="comp-label">copper_wire — copper + electrical + solid = conducting wire</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-steel">鋼</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-steel">鋼螺</span>
+      <span class="comp-label">steel_bolt — steel + solid = threaded structural fastener</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-copper">銅</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-elec">電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-copper">銅匯</span>
+      <span class="comp-label">copper_busbar — copper + electrical + solid = power distribution bar</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-si">矽</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-elec">電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-polymer">塑</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-si">矽控</span>
+      <span class="comp-label">pcb_controller — silicon + electrical + polymer + solid = control board</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-elec">電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-si">矽</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-elec">電換</span>
+      <span class="comp-label">power_converter — electrical + silicon + solid = power electronics converter</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-thermal">熱</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-fluid">流</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-elec">電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-thermal">水冷</span>
+      <span class="comp-label">liquid_cooling_system — thermal + fluid + electrical + solid = liquid cooling loop</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-elchem">電池</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-elchem">鋰電</span>
+      <span class="comp-label">lfp_prismatic_cell — electrochemical + solid = LFP battery cell</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-elec">電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-em">力電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-em">電開</span>
+      <span class="comp-label">dc_contactor / circuit_breaker — electrical + electromechanical + solid = switchgear</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-chem">化感</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-si">矽</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-chem">感器</span>
+      <span class="comp-label">gas_sensor — chemical sensing + silicon + solid = detector</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-optical">光感</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-si">矽</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-optical">光弧</span>
+      <span class="comp-label">optical_arc_sensor — optical sensing + silicon + solid = arc flash detector</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-fluid">流</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-em">力電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-fluid">流泵</span>
+      <span class="comp-label">centrifugal_pump — fluid + electromechanical + solid = pump</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-thermal">熱</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-fluid">流</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-thermal">熱換</span>
+      <span class="comp-label">brazed_plate_heat_exchanger — thermal + fluid + solid = heat exchanger</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-composite">碳纖</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-composite">碳架</span>
+      <span class="comp-label">composite_structural_frame — carbon fibre + solid = CFRP airframe</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-optical">光感</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-si">矽</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-optical">光像</span>
+      <span class="comp-label">cmos_image_sensor_module — optical sensing + silicon + solid = camera sensor</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-magnetic">磁</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-em">力電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-si">矽</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-magnetic">磁穩</span>
+      <span class="comp-label">brushless_gimbal — magnetic + electromechanical + silicon + solid = camera stabiliser</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-elchem">電池</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-elchem">鋰包</span>
+      <span class="comp-label">lipo_pouch_cell — electrochemical energy + solid = LiPo battery pack</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-elec">電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-magnetic">磁</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-magnetic">電變</span>
+      <span class="comp-label">transformer — electrical + magnetic + solid = step-up transformer</span>
+    </div>
+
+    <div class="comp-row">
+      <span class="comp-glyph r-fluid">流</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-thermal">熱</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-em">力電</span><span class="comp-plus">+</span>
+      <span class="comp-glyph r-solid">固</span>
+      <span class="comp-arrow">→</span>
+      <span class="comp-result r-thermal">冷循</span>
+      <span class="comp-label">vapour_compression_cycle — fluid + thermal + electromechanical + solid = heat pump cycle</span>
+    </div>
+
+  </div>
+
+  <!-- ======== SECTION 4 ======== -->
+  <h2 id="s4"><span class="section-num">4.</span> Three Products as Visual Paragraphs</h2>
+
+  <p>Each product is rendered as a hierarchical tree. The <strong>coloured glyphs</strong> are the radicals — the same colour always means the same radical. Each line shows: glyph | English name | radicals used (in their colours). When you see the same coloured glyph in the BESS tree, the heat pump tree, AND the drone tree, that is a universality signal.</p>
+
+  <p><strong>Key:</strong> <span class="r-solid">固</span> = solid &nbsp; <span class="r-elec">電</span> = electrical &nbsp; <span class="r-si">矽</span> = silicon &nbsp; <span class="r-thermal">熱</span> = thermal &nbsp; <span class="r-fluid">流</span> = fluid &nbsp; <span class="r-chem">化感</span> = chemical sensing &nbsp; <span class="r-optical">光感</span> = optical sensing &nbsp; <span class="r-em">力電</span> = electromechanical &nbsp; <span class="r-elchem">電池</span> = electrochemical energy</p>
+
+  <!-- PRODUCT 1: BESS -->
+  <div class="product-section">
+    <div class="product-header">
+      <span class="product-glyph-main r-elchem">儲能</span>
+      <div>
+        <div class="product-name">BESS — Containerised 3.5 MWh Battery Energy Storage System</div>
+        <div class="product-desc">40-ft ISO container, LFP prismatic, 1 MW bidirectional PCS, G99 grid connection</div>
+      </div>
+    </div>
+    <div class="tree">
+
+      <span class="module-header">── 電池系統 Battery Rack Assembly ──────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-lfp">鋰</span><span class="r-elchem">電</span></span>
+        <span class="tree-en">LFP Prismatic Cell 280Ah</span>
+        <span class="tree-qty">× 4,375</span>
+        <span class="tree-radicals">[ <span class="r-lfp">鋰</span> <span class="r-elchem">電池</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-steel">鋼</span>架</span>
+        <span class="tree-en">Battery Rack Frame (welded steel)</span>
+        <span class="tree-qty">× 125</span>
+        <span class="tree-radicals">[ <span class="r-steel">鋼</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 電管系統 Battery Management System (BMS) ──────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-si">矽</span>控</span>
+        <span class="tree-en">BMS Master Controller PCB</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-si">矽</span>控</span>
+        <span class="tree-en">BMS Slave Cell Monitor PCB</span>
+        <span class="tree-qty">× 10–14 / rack</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 變流系統 Power Conversion System (PCS) ────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-elec">電</span>換</span>
+        <span class="tree-en">1 MW Bidirectional Inverter</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-elec">電</span><span class="r-magnetic">磁</span>變</span>
+        <span class="tree-en">Step-up Transformer 400V → 11kV</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-magnetic">磁</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 開關配電 DC Distribution Switchgear ───────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-elec">電</span><span class="r-em">開</span></span>
+        <span class="tree-en">1,500 V DC Contactor 300A</span>
+        <span class="tree-qty">× 2 / string</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-em">力電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-elec">電</span><span class="r-em">開</span></span>
+        <span class="tree-en">1,500 V DC MCCB 2000A</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-em">力電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-copper">銅</span>匯</span>
+        <span class="tree-en">DC Busbar Assembly 800V / 2000A</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-copper">銅</span> <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-si">矽</span><span class="r-em">開</span>護</span>
+        <span class="tree-en">G99 Protection Relay</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-em">力電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 冷卻系統 Thermal Management ──────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-thermal">熱</span><span class="r-fluid">流</span>冷</span>
+        <span class="tree-en">Liquid Cooling Loop — chiller + pumps + manifolds</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-thermal">熱</span> <span class="r-fluid">流</span> <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 火警系統 Fire Detection &amp; Suppression ────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-chem">化感</span>器</span>
+        <span class="tree-en">Lithium off-gas detector</span>
+        <span class="tree-qty">× 4</span>
+        <span class="tree-radicals">[ <span class="r-chem">化感</span> <span class="r-si">矽</span> <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-optical">光感</span>弧</span>
+        <span class="tree-en">Arc Flash Detection Sensor</span>
+        <span class="tree-qty">× 2</span>
+        <span class="tree-radicals">[ <span class="r-optical">光感</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 能管系統 EMS / SCADA ──────────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-si">矽</span>控</span>
+        <span class="tree-en">EMS / SCADA Controller</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-elec">電</span>換</span>
+        <span class="tree-en">Uninterruptible Power Supply (UPS)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PRODUCT 2: HEAT PUMP -->
+  <div class="product-section">
+    <div class="product-header">
+      <span class="product-glyph-main r-thermal">熱泵</span>
+      <div>
+        <div class="product-name">Heat Pump — 30 kW Monobloc Air-to-Water, R290</div>
+        <div class="product-desc">UK commercial retrofit, natural refrigerant, EN378 compliant</div>
+      </div>
+    </div>
+    <div class="tree">
+
+      <span class="module-header">── 冷媒迴路 Refrigerant Circuit ─────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-thermal">熱</span><span class="r-fluid">流</span>循</span>
+        <span class="tree-en">Vapour-Compression Cycle R290 30kW (ATOMIC)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-thermal">熱</span> <span class="r-fluid">流</span> <span class="r-em">力電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-fluid">流</span>媒</span>
+        <span class="tree-en">R290 Refrigerant Charge ≤500g</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-fluid">流</span> <span style="color:#7f1d1d">化抑</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-copper">銅</span>管</span>
+        <span class="tree-en">Copper Refrigerant Lines (pre-bent, insulated)</span>
+        <span class="tree-qty">× 1 set</span>
+        <span class="tree-radicals">[ <span class="r-copper">銅</span> <span class="r-fluid">流</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span style="color:#b91c1c" class="tree-char">火電</span>
+        <span class="tree-en">Defrost Heater Element (crankcase + drain pan)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 水側換熱 Water-Side Heat Exchanger ───────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-thermal">熱</span><span class="r-fluid">流</span>換</span>
+        <span class="tree-en">Brazed-Plate Heat Exchanger (water condenser)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-thermal">熱</span> <span class="r-fluid">流</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 風側換熱 Air-Side Fan Assembly ───────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-em">力電</span>扇</span>
+        <span class="tree-en">Outdoor Fan Motor (variable speed EC)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-fluid">流</span> <span class="r-em">力電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-polymer">塑</span>葉</span>
+        <span class="tree-en">Fan Blade Assembly (aerofoil, axial)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 控制變頻 Control &amp; Inverter Drive ─────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-elec">電</span>換</span>
+        <span class="tree-en">Inverter Drive (compressor VFD, 3-phase)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-si">矽</span>控</span>
+        <span class="tree-en">Controller PCB (heat pump control, R290-safe)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 水路系統 Water Circuit ────────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-fluid">流</span><span class="r-em">力電</span>泵</span>
+        <span class="tree-en">Hydronic Circulation Pump</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-fluid">流</span> <span class="r-em">力電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-pressure">壓</span>安</span>
+        <span class="tree-en">Hydronic Safety Group (PRV + expansion vessel)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-pressure">壓</span> <span class="r-fluid">流</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 感測安全 Sensor Array &amp; Safety ──────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-chem">化感</span>器</span>
+        <span class="tree-en">R290 Refrigerant Leak Detector (catalytic bead)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-chem">化感</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-chem">化感</span>器</span>
+        <span class="tree-en">Outdoor Air Temperature / RH Sensor</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-chem">化感</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-pressure">壓</span>開</span>
+        <span class="tree-en">High / Low Pressure Safety Switches</span>
+        <span class="tree-qty">× 2</span>
+        <span class="tree-radicals">[ <span class="r-pressure">壓</span> <span class="r-em">力電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 機殼結構 Enclosure &amp; Acoustic ───────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-steel">鋼</span>殼</span>
+        <span class="tree-en">Monobloc Enclosure / Chassis (powder-coated steel)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-steel">鋼</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-copper">銅</span><span class="r-polymer">塑</span>線</span>
+        <span class="tree-en">Wiring Harness + Cable Management</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-copper">銅</span> <span class="r-elec">電</span> <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- PRODUCT 3: DRONE -->
+  <div class="product-section">
+    <div class="product-header">
+      <span class="product-glyph-main r-composite">飛翼</span>
+      <div>
+        <div class="product-name">Drone — Consumer Cinematography Quadcopter, sub-899g</div>
+        <div class="product-desc">4K 60fps, 40-min endurance, folding CFRP airframe, 3-axis gimbal</div>
+      </div>
+    </div>
+    <div class="tree">
+
+      <span class="module-header">── 機體折疊 Folding Airframe ────────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-composite">碳纖</span>架</span>
+        <span class="tree-en">Folding CFRP Airframe — body + motor arms</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-composite">碳纖</span> <span class="r-solid">固</span> ] <span class="tree-new">NEW radical</span></span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-composite">碳纖</span>護</span>
+        <span class="tree-en">Carbon-Fibre Propeller Guards (folding)</span>
+        <span class="tree-qty">× 4</span>
+        <span class="tree-radicals">[ <span class="r-composite">碳纖</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 推進系統 Propulsion &amp; ESC ───────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-em">力電</span><span class="r-magnetic">磁</span>機</span>
+        <span class="tree-en">Brushless Outrunner Motor 2306 / 2400KV</span>
+        <span class="tree-qty">× 4</span>
+        <span class="tree-radicals">[ <span class="r-em">力電</span> <span class="r-elec">電</span> <span class="r-magnetic">磁</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-elec">電</span>換</span>
+        <span class="tree-en">Electronic Speed Controller (ESC) 40A BLHeli</span>
+        <span class="tree-qty">× 4</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-polymer">塑</span>槳</span>
+        <span class="tree-en">Propellers — 5-inch tri-blade</span>
+        <span class="tree-qty">× 4 + 2 spare sets</span>
+        <span class="tree-radicals">[ <span class="r-polymer">塑</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 電源管理 Battery &amp; BMS ──────────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-elchem">電池</span>包</span>
+        <span class="tree-en">4S LiPo Battery Pack 4000mAh 15C</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elchem">電池</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-si">矽</span>控</span>
+        <span class="tree-en">Battery Management System PCB (4S BMS)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-copper">銅</span>插</span>
+        <span class="tree-en">Smart Battery Connector + Latch 50A</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-copper">銅</span> <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 雲台相機 Gimbal &amp; Camera ─────────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-magnetic">磁</span><span class="r-em">力電</span>穩</span>
+        <span class="tree-en">3-Axis Brushless Gimbal (tilt + roll + pan)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-em">力電</span> <span class="r-magnetic">磁</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-optical">光感</span>像</span>
+        <span class="tree-en">1-inch CMOS Camera Module (4K 60fps, 10-bit)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-optical">光感</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-optical">光感</span>鏡</span>
+        <span class="tree-en">Camera Lens 4.5mm f/2.8 wide-angle</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-optical">光感</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 飛控航電 Flight Controller &amp; Avionics ────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-si">矽</span>控</span>
+        <span class="tree-en">Flight Controller (F7 SoC, ArduPilot)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-chem">化感</span><span class="r-si">矽</span></span>
+        <span class="tree-en">IMU Module (6-axis MEMS — accelerometer + gyroscope)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-chem">化感</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-chem">化感</span>氣</span>
+        <span class="tree-en">Barometric Pressure Sensor</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-chem">化感</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-si">矽</span>衛</span>
+        <span class="tree-en">Multi-constellation GNSS Module (GPS + GLONASS + BeiDou)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-chem">化感</span>向</span>
+        <span class="tree-en">Electronic Compass (magnetometer HMC5983)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-chem">化感</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 視覺避障 Obstacle Avoidance ──────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-optical">光感</span>避</span>
+        <span class="tree-en">Stereo Vision Sensor Array (front + rear + downward)</span>
+        <span class="tree-qty">× 3 arrays</span>
+        <span class="tree-radicals">[ <span class="r-optical">光感</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+      <span class="module-header">── 無線影像 Radio &amp; Video Link ──────────────────────────</span>
+
+      <div class="tree-item">
+        <span class="tree-prefix">├─</span>
+        <span class="tree-char"><span class="r-si">矽</span><span class="r-elec">電</span>播</span>
+        <span class="tree-en">5.8 GHz Digital Video Transmission (OcuSync-class)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-elec">電</span> <span class="r-si">矽</span> <span class="r-solid">固</span> ]</span>
+      </div>
+      <div class="tree-item">
+        <span class="tree-prefix">└─</span>
+        <span class="tree-char"><span class="r-si">矽</span>識</span>
+        <span class="tree-en">Remote ID Module (ASTM F3322, BT + WiFi)</span>
+        <span class="tree-qty">× 1</span>
+        <span class="tree-radicals">[ <span class="r-si">矽</span> <span class="r-elec">電</span> <span class="r-solid">固</span> ]</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ======== SECTION 5 ======== -->
+  <h2 id="s5"><span class="section-num">5.</span> Grammar Rules — Visual Encoding</h2>
+
+  <p>Grammar rules fire when specific radical combinations meet physical conditions. Three key rules are shown below as inline diagrams.</p>
+
+  <div class="grammar-grid">
+
+    <!-- KCL -->
+    <div class="grammar-card">
+      <h4>Kirchhoff Current Law</h4>
+      <div class="rule-name">KCL_NODE_BALANCE</div>
+      <p style="font-size:0.82rem;margin-bottom:0.7rem;">At any electrical node, currents must sum to zero. Fires whenever ≥3 <span class="r-elec">電</span> paths converge at a node.</p>
+      <svg viewBox="0 0 200 160" width="100%" style="max-width:200px;display:block;margin:0 auto;">
+        <defs>
+          <marker id="arr" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto">
+            <path d="M0,0 L0,6 L8,3 z" fill="#dc2626"/>
+          </marker>
+        </defs>
+        <!-- node circle -->
+        <circle cx="100" cy="80" r="10" fill="#dc2626" opacity="0.15" stroke="#dc2626" stroke-width="2"/>
+        <text x="100" y="84" text-anchor="middle" font-size="11" fill="#dc2626" font-family="PingFang SC, serif">電</text>
+        <!-- incoming left -->
+        <line x1="30" y1="80" x2="85" y2="80" stroke="#dc2626" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="50" y="73" font-size="10" fill="#6b7280">I₁ →</text>
+        <!-- incoming top -->
+        <line x1="100" y1="20" x2="100" y2="65" stroke="#dc2626" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="107" y="45" font-size="10" fill="#6b7280">I₂ ↓</text>
+        <!-- outgoing right -->
+        <line x1="115" y1="80" x2="175" y2="80" stroke="#dc2626" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="138" y="73" font-size="10" fill="#6b7280">I₃ →</text>
+        <!-- outgoing bottom -->
+        <line x1="100" y1="95" x2="100" y2="145" stroke="#dc2626" stroke-width="2" marker-end="url(#arr)"/>
+        <text x="107" y="128" font-size="10" fill="#6b7280">I₄ ↓</text>
+        <!-- equation -->
+        <text x="100" y="158" text-anchor="middle" font-size="10" fill="#374151">I₁+I₂ = I₃+I₄ &nbsp; ✓</text>
+      </svg>
+    </div>
+
+    <!-- Galvanic corrosion -->
+    <div class="grammar-card">
+      <h4>Galvanic Corrosion</h4>
+      <div class="rule-name">GALVANIC_ALUMINIUM_COPPER_CONTACT</div>
+      <p style="font-size:0.82rem;margin-bottom:0.7rem;">Direct contact of <span class="r-copper">銅</span> (copper) and <span style="color:#4b5563">鋁</span> (aluminium) in a marine environment triggers rapid galvanic corrosion. Rule fires and flags a WARN.</p>
+      <svg viewBox="0 0 200 160" width="100%" style="max-width:200px;display:block;margin:0 auto;">
+        <!-- copper block -->
+        <rect x="20" y="55" width="70" height="50" rx="4" fill="#fef3c7" stroke="#b45309" stroke-width="2"/>
+        <text x="55" y="77" text-anchor="middle" font-size="18" fill="#b45309" font-family="PingFang SC, serif">銅</text>
+        <text x="55" y="94" text-anchor="middle" font-size="9" fill="#b45309">copper</text>
+        <!-- contact line -->
+        <line x1="90" y1="55" x2="90" y2="105" stroke="#374151" stroke-width="3" stroke-dasharray="3,3"/>
+        <!-- aluminium block -->
+        <rect x="90" y="55" width="70" height="50" rx="4" fill="#f1f5f9" stroke="#4b5563" stroke-width="2"/>
+        <text x="125" y="77" text-anchor="middle" font-size="18" fill="#4b5563" font-family="PingFang SC, serif">鋁</text>
+        <text x="125" y="94" text-anchor="middle" font-size="9" fill="#4b5563">aluminium</text>
+        <!-- warning -->
+        <text x="100" y="130" text-anchor="middle" font-size="13" fill="#dc2626">⚠ GALVANIC PAIR</text>
+        <text x="100" y="145" text-anchor="middle" font-size="9" fill="#6b7280">PREN difference triggers rule</text>
+        <!-- electron flow arrow -->
+        <path d="M90,80 C80,70 70,70 60,75" stroke="#dc2626" fill="none" stroke-width="1.5" marker-end="url(#arr)"/>
+        <text x="62" y="65" font-size="8" fill="#dc2626">e⁻</text>
+      </svg>
+    </div>
+
+    <!-- Voltage derate -->
+    <div class="grammar-card">
+      <h4>Voltage Derate</h4>
+      <div class="rule-name">VOLTAGE_DERATE_80PCT</div>
+      <p style="font-size:0.82rem;margin-bottom:0.7rem;">Any <span class="r-elec">電</span> component operated above 80% of its rated voltage must be flagged. Below 80% is safe operating margin (green zone).</p>
+      <svg viewBox="0 0 200 160" width="100%" style="max-width:200px;display:block;margin:0 auto;">
+        <!-- bar background -->
+        <rect x="40" y="20" width="30" height="120" rx="4" fill="#e5e7eb"/>
+        <!-- green zone 0-80% -->
+        <rect x="40" y="60" width="30" height="80" rx="4" fill="#dcfce7"/>
+        <!-- red zone 80-100% -->
+        <rect x="40" y="20" width="30" height="40" rx="4" fill="#fee2e2"/>
+        <!-- 80% line -->
+        <line x1="35" y1="60" x2="75" y2="60" stroke="#dc2626" stroke-width="2" stroke-dasharray="4,2"/>
+        <text x="78" y="64" font-size="9" fill="#dc2626" font-weight="600">80%</text>
+        <!-- current operating point — over limit example -->
+        <circle cx="55" cy="38" r="6" fill="#dc2626"/>
+        <text x="82" y="42" font-size="9" fill="#dc2626">⚠ 92% — derate</text>
+        <!-- safe point -->
+        <circle cx="55" cy="90" r="6" fill="#16a34a"/>
+        <text x="82" y="94" font-size="9" fill="#16a34a">✓ 70% — OK</text>
+        <!-- labels -->
+        <text x="55" y="152" text-anchor="middle" font-size="9" fill="#374151" font-family="PingFang SC, serif"><tspan fill="#dc2626">電</tspan> voltage %</text>
+      </svg>
+    </div>
+
+  </div>
+
+  <!-- ======== SECTION 6 ======== -->
+  <h2 id="s6"><span class="section-num">6.</span> Cross-Product Universality Matrix</h2>
+
+  <p>The table below shows, for each of the 22 radicals (columns), which of the three products uses it (rows). A filled cell means the radical appears in at least one character in that product's decomposition. <strong>Columns with all three rows filled are universally shared radicals</strong> — the strongest signal of the architecture's universality claim.</p>
+
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th class="row-header">Product</th>
+          <th class="col-header"><span class="r-solid">固</span><br>solid</th>
+          <th class="col-header"><span class="r-elec">電</span><br>electrical</th>
+          <th class="col-header"><span class="r-si">矽</span><br>silicon</th>
+          <th class="col-header"><span class="r-thermal">熱</span><br>thermal</th>
+          <th class="col-header"><span class="r-fluid">流</span><br>fluid</th>
+          <th class="col-header"><span class="r-em" style="font-size:0.8rem">力電</span><br>electromech</th>
+          <th class="col-header"><span class="r-chem">化感</span><br>chem-sense</th>
+          <th class="col-header"><span class="r-optical">光感</span><br>optical</th>
+          <th class="col-header"><span class="r-elchem">電池</span><br>electroch.</th>
+          <th class="col-header"><span class="r-copper">銅</span><br>copper</th>
+          <th class="col-header"><span class="r-steel">鋼</span><br>steel</th>
+          <th class="col-header"><span class="r-polymer">塑</span><br>polymer</th>
+          <th class="col-header"><span class="r-magnetic">磁</span><br>magnetic</th>
+          <th class="col-header"><span class="r-pressure">壓</span><br>pressure</th>
+          <th class="col-header"><span class="r-lfp">鋰</span><br>LFP</th>
+          <th class="col-header"><span class="r-composite">碳纖</span><br>composite</th>
+          <th class="col-header" style="font-size:0.8rem"><span style="color:#166534">礦纖</span><br>min-fibre</th>
+          <th class="col-header" style="font-size:0.8rem"><span style="color:#1d4ed8">光發</span><br>photon-emit</th>
+          <th class="col-header" style="font-size:0.8rem"><span style="color:#7f1d1d">化抑</span><br>suppressant</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td class="row-label"><span class="r-elchem">儲能</span> BESS</td>
+          <!-- solid --> <td class="yes" style="background:#ede9fe">&#9679;</td>
+          <!-- electrical --> <td class="yes" style="background:#fee2e2">&#9679;</td>
+          <!-- silicon --> <td class="yes" style="background:#dbeafe">&#9679;</td>
+          <!-- thermal --> <td class="yes" style="background:#ffedd5">&#9679;</td>
+          <!-- fluid --> <td class="yes" style="background:#cffafe">&#9679;</td>
+          <!-- electromech --> <td class="yes" style="background:#ede9fe">&#9679;</td>
+          <!-- chem-sense --> <td class="yes" style="background:#ecfccb">&#9679;</td>
+          <!-- optical --> <td class="yes" style="background:#fce7f3">&#9679;</td>
+          <!-- electroch --> <td class="yes" style="background:#f5f3ff">&#9679;</td>
+          <!-- copper --> <td class="yes" style="background:#fef3c7">&#9679;</td>
+          <!-- steel --> <td class="yes" style="background:#f1f5f9">&#9679;</td>
+          <!-- polymer --> <td class="yes" style="background:#d1fae5">&#9679;</td>
+          <!-- magnetic --> <td class="yes" style="background:#dbeafe">&#9679;</td>
+          <!-- pressure --> <td class="yes" style="background:#f3f4f6">&#9679;</td>
+          <!-- LFP --> <td class="yes" style="background:#ffe4e6">&#9679;</td>
+          <!-- composite --> <td class="no">—</td>
+          <!-- min-fibre --> <td class="yes" style="background:#f0fdf4">&#9679;</td>
+          <!-- photon-emit --> <td class="no">—</td>
+          <!-- suppressant --> <td class="yes" style="background:#fdf2f8">&#9679;</td>
+        </tr>
+        <tr>
+          <td class="row-label"><span class="r-thermal">熱泵</span> Heat Pump</td>
+          <!-- solid --> <td class="yes" style="background:#ede9fe">&#9679;</td>
+          <!-- electrical --> <td class="yes" style="background:#fee2e2">&#9679;</td>
+          <!-- silicon --> <td class="yes" style="background:#dbeafe">&#9679;</td>
+          <!-- thermal --> <td class="yes" style="background:#ffedd5">&#9679;</td>
+          <!-- fluid --> <td class="yes" style="background:#cffafe">&#9679;</td>
+          <!-- electromech --> <td class="yes" style="background:#ede9fe">&#9679;</td>
+          <!-- chem-sense --> <td class="yes" style="background:#ecfccb">&#9679;</td>
+          <!-- optical --> <td class="no">—</td>
+          <!-- electroch --> <td class="no">—</td>
+          <!-- copper --> <td class="yes" style="background:#fef3c7">&#9679;</td>
+          <!-- steel --> <td class="yes" style="background:#f1f5f9">&#9679;</td>
+          <!-- polymer --> <td class="yes" style="background:#d1fae5">&#9679;</td>
+          <!-- magnetic --> <td class="no">—</td>
+          <!-- pressure --> <td class="yes" style="background:#f3f4f6">&#9679;</td>
+          <!-- LFP --> <td class="no">—</td>
+          <!-- composite --> <td class="no">—</td>
+          <!-- min-fibre --> <td class="yes" style="background:#f0fdf4">&#9679;</td>
+          <!-- photon-emit --> <td class="no">—</td>
+          <!-- suppressant --> <td class="yes" style="background:#fdf2f8">&#9679;</td>
+        </tr>
+        <tr>
+          <td class="row-label"><span class="r-composite">飛翼</span> Drone</td>
+          <!-- solid --> <td class="yes" style="background:#ede9fe">&#9679;</td>
+          <!-- electrical --> <td class="yes" style="background:#fee2e2">&#9679;</td>
+          <!-- silicon --> <td class="yes" style="background:#dbeafe">&#9679;</td>
+          <!-- thermal --> <td class="yes" style="background:#ffedd5">&#9679;</td>
+          <!-- fluid --> <td class="yes" style="background:#cffafe">&#9679;</td>
+          <!-- electromech --> <td class="yes" style="background:#ede9fe">&#9679;</td>
+          <!-- chem-sense --> <td class="yes" style="background:#ecfccb">&#9679;</td>
+          <!-- optical --> <td class="yes" style="background:#fce7f3">&#9679;</td>
+          <!-- electroch --> <td class="yes" style="background:#f5f3ff">&#9679;</td>
+          <!-- copper --> <td class="yes" style="background:#fef3c7">&#9679;</td>
+          <!-- steel --> <td class="no">—</td>
+          <!-- polymer --> <td class="yes" style="background:#d1fae5">&#9679;</td>
+          <!-- magnetic --> <td class="yes" style="background:#dbeafe">&#9679;</td>
+          <!-- pressure --> <td class="no">—</td>
+          <!-- LFP --> <td class="no">—</td>
+          <!-- composite --> <td class="yes" style="background:#f5e6d3">&#9679;</td>
+          <!-- min-fibre --> <td class="no">—</td>
+          <!-- photon-emit --> <td class="yes" style="background:#eff6ff">&#9679;</td>
+          <!-- suppressant --> <td class="no">—</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p>The first seven columns — <span class="r-solid">固</span>, <span class="r-elec">電</span>, <span class="r-si">矽</span>, <span class="r-thermal">熱</span>, <span class="r-fluid">流</span>, <span class="r-em">力電</span>, <span class="r-chem">化感</span> — appear in <strong>all three products</strong>. <span class="r-copper">銅</span> (copper) and <span class="r-polymer">塑</span> (polymer) also appear in all three, bringing the universal radical count to <strong>9 out of 19</strong>. This is the numeric proof of the universality claim: nearly half the radical set describes every product in the library.</p>
+
+  <!-- ======== SECTION 7 ======== -->
+  <h2 id="s7"><span class="section-num">7.</span> What the Symbols Show</h2>
+
+  <p>When the three product paragraphs are placed side by side and the glyphs are consistently coloured, three insights become unavoidable:</p>
+
+  <ol>
+    <li><strong><span class="r-solid">固</span> is the ground state of hardware.</strong> Solid state of matter appears in every single character across all three products. It is the universal substrate — every physical component is solid, always. In prose this is invisible because it goes without saying. In glyph form it stands out as the most-repeated symbol, which raises an interesting question about whether it belongs at the radical level at all, or is better modelled as a precondition.</li>
+
+    <li><strong><span class="r-si">矽</span> is the great equaliser.</strong> Silicon semiconductor function appears in the BESS BMS, the heat pump controller, and nine separate drone components — flight controller, BMS, ESC, GNSS, IMU, barometric sensor, compass, video radio, and remote ID. A 40-ft energy storage container and a sub-899g flying camera share the same silicon radical in more than half their component lines. This is not a coincidence; it reflects the fact that all modern hardware is already substantially a software system that happens to sit inside metal.</li>
+
+    <li><strong><span class="r-thermal">熱</span>+<span class="r-fluid">流</span> is the thermal signature.</strong> The combination of thermal transfer and fluid flow appears in the BESS liquid cooling loop, the heat pump vapour-compression cycle and water circuit, and the drone ESC heatsink (thermal) and fan flow. The combination represents "managed heat movement" — a recurring engineering problem regardless of product domain.</li>
+
+    <li><strong>Product-specific radicals are thin.</strong> The drone needed only <span class="r-composite">碳纖</span> (composite fibre) as a new radical — one out of 19. The heat pump needed zero new radicals. BESS needed 12 from scratch, but that was the second product ever. By the third product the library was already 96% sufficient. The marginal cost of adding a new product decreases rapidly.</li>
+
+    <li><strong>The visual form reveals grammar opportunities.</strong> Once you can see that <span class="r-copper">銅</span> appears in both BESS (busbar) and heat pump (refrigerant lines) and drone (battery connector), the galvanic corrosion rule immediately suggests itself as a cross-product risk whenever <span class="r-copper">銅</span> and <span style="color:#4b5563">鋁</span> share a module. In prose, this connection requires a human engineer to make the link. In the symbolic representation, it is spatially obvious.</li>
+  </ol>
+
+  <div class="callout">
+    The symbolic vocabulary does not make hardware engineering easier. It makes the shared structure of hardware engineering <em>visible</em> — and visibility is the first step to systematic automation.
+  </div>
+
+  <hr style="border:none;border-top:1px solid #e5e7eb;margin:3rem 0 1.5rem"/>
+  <p style="font-size:0.82rem;color:#9ca3af;text-align:center">
+    ForgeOS Radical Architecture — Symbolic Visualisation &nbsp;|&nbsp; Fractional Forge &nbsp;|&nbsp; 2026-05-10<br>
+    Companion document to RADICAL-ARCHITECTURE-EXPLAINER.html (commit 583e7c6d)
+  </p>
+
+</div>
+</body>
+</html>
