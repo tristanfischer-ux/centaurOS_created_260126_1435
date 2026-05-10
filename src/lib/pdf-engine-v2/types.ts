@@ -759,6 +759,17 @@ export interface PipelineState {
    * Empty array = all archetypes resolved from library.
    */
   radicalTreeUnknowns?: string[]
+  /**
+   * Phase 2 — Resolved Radical Tree.
+   * Populated when RADICAL_PHASE_2_RESOLUTION=true.
+   * Same tree shape as radicalTree but each leaf CompositionNode carries a
+   * `resolution` annotation: mpn, manufacturer, unit_price_gbp, lead_weeks,
+   * verification_grade, source.
+   *
+   * Strictly additive — does NOT replace state.modules or state.bomLines.
+   * Phase 5 renderer will eventually consume this; Phase 7 cuts over.
+   */
+  resolvedRadicalTree?: import('./stages/4b-radical-resolution.js').ResolvedRadicalTree
   pipelineError?: {
     stage: string
     message: string

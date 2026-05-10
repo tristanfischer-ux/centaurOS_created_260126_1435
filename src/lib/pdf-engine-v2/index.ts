@@ -67,6 +67,7 @@ import { routeReportType, normaliseStatus, type ReportTypeRouterResult } from '.
 import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 import { mapProductClassToIndustryDomain } from './lib/industry-domain'
 import { validateModuleAssignments } from './lib/module-assignment-validator'
+import { isPhase2ResolutionEnabled, runRadicalResolution } from './stages/4b-radical-resolution'
 
 export interface EngineResult {
   ok: boolean
@@ -1120,6 +1121,35 @@ export async function runPipeline(
         // Non-fatal — Radical Phase 1 failure must NEVER block the main pipeline
         console.warn(`[pipeline] Radical Phase 1: exception (non-fatal): ${(radicalErr as Error).message}`)
       }
+    }
+
+    // ── Radical Phase 2: Resolution (behind RADICAL_PHASE_2_RESOLUTION flag) ─
+    // Walks state.radicalTree leaves and resolves each to: mpn, manufacturer,
+    // unit_price_gbp, lead_weeks, verification_grade, source.
+    // Strictly additive — state.modules / state.bomLines are UNCHANGED.
+    // Requires Phase 1 tree (state.radicalTree) to be populated first.
+    if (isPhase2ResolutionEnabled() && state.radicalTree) {
+      console.log('[pipeline] Radical Phase 2: RADICAL_PHASE_2_RESOLUTION=true, running resolution...')
+      try {
+        const productClassForResolution: string = typeof classification === 'string'
+          ? classification
+          : ((classification as any).productClass ?? 'unknown')
+        const resolvedTree = await runRadicalResolution(state.radicalTree, productClassForResolution)
+        state.resolvedRadicalTree = resolvedTree
+        const rMeta = resolvedTree.resolution_meta
+        console.log(
+          `[pipeline] Radical Phase 2: resolution complete. ` +
+          `Verified: ${rMeta.stats.verified_by_distributor}, ` +
+          `Catalog: ${rMeta.stats.from_vendor_catalog}, ` +
+          `Grade-D: ${rMeta.stats.grade_d}, Stub: ${rMeta.stats.stub}, ` +
+          `API calls: ${rMeta.distributor_calls_made}`
+        )
+      } catch (phase2Err) {
+        // Non-fatal — Phase 2 failure must NEVER block the main pipeline
+        console.warn(`[pipeline] Radical Phase 2: exception (non-fatal): ${(phase2Err as Error).message}`)
+      }
+    } else if (isPhase2ResolutionEnabled() && !state.radicalTree) {
+      console.warn('[pipeline] Radical Phase 2: RADICAL_PHASE_2_RESOLUTION=true but state.radicalTree is absent — Phase 1 must run first')
     }
 
     // ── Module Assignment Plausibility Validation (UNIVERSAL-ROBUSTNESS) ──
