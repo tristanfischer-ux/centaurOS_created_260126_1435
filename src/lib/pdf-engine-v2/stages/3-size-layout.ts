@@ -5,13 +5,136 @@ import type { Module, DimensionSheet, DimensionSheetPA, SizingZone, StageResult,
 // solver hard-codes "battery_energy_storage", "heat_pump", "vertical_farm".
 // Mismatch means every real brief fell through to the tiny generic envelope
 // and returned INFEASIBLE in 0-1 ms, blocking every downstream stage.
+//
+// UNIVERSAL-ROBUSTNESS FIX (2026-05-10): Expanded to cover all 10 baseline
+// product classes so no class falls through to the 5×5×3m generic envelope.
 function normaliseDomain(raw: string | undefined): string {
   if (!raw) return 'generic'
   const d = raw.toLowerCase().replace(/[\s-]+/g, '_')
   if (/battery|bess|energy.?storage|lfp|lithium|cell/.test(d)) return 'battery_energy_storage'
   if (/heat.?pump|thermal|refriger|hvac|chiller|boiler/.test(d)) return 'heat_pump'
-  if (/farm|vertical|greenhouse|agricul|horticul|indoor.?grow/.test(d)) return 'vertical_farm'
+  if (/farm|vertical|greenhouse|agricul|horticul|indoor.?grow|cea|controlled.?environ/.test(d)) return 'vertical_farm'
+  if (/haps|stratospher|high.?altitude|pseudo.?satellite/.test(d)) return 'haps'
+  if (/auv|autonomous.?underw|underwater.?vehicl|rov|subsea.?vehicl/.test(d)) return 'auv'
+  if (/drone|uav|multirotor|fixed.?wing|quadcopter/.test(d)) return 'drone'
+  if (/ev.?charg|electric.?vehicl.?charg|ccs|ocpp|charge.?point/.test(d)) return 'ev_charger'
+  if (/bioreactor|fermenter|cell.?cultur|bioprocess|pharma.?vessel/.test(d)) return 'bioreactor'
+  if (/edge.?ai|edge.?compute|inference.?server|ai.?server|gpu.?server|industrial.?compute/.test(d)) return 'edge_ai_server'
+  if (/cgm|glucose.?monitor|wearable.?sensor|biosensor|wearable.?medical/.test(d)) return 'cgm'
   return 'generic'
+}
+
+// ── Class-aware envelope lookup table ─────────────────────────────────────────
+//
+// UNIVERSAL-ROBUSTNESS FIX (2026-05-10): Each product class gets a correct
+// default envelope based on real-world form factors. These are defaults; if
+// the brief specifies explicit dimensions, those override these values in the
+// solver (see brief.targetDimensions handling below).
+//
+// Sources for each entry are recorded in the `basis` field for auditability.
+// All dimensions are INTERNAL usable dimensions in mm.
+interface EnvelopeSpec {
+  kind: string
+  label: string
+  interior_w_mm: number
+  interior_d_mm: number
+  interior_h_mm: number
+  interior_floor_m2: number
+  interior_volume_m3: number
+  rated_max_payload_kg: number
+  basis: string
+}
+
+function makeEnvelopeSpec(
+  kind: string, label: string,
+  w_m: number, d_m: number, h_m: number,
+  payload_kg: number,
+  basis: string
+): EnvelopeSpec {
+  return {
+    kind, label,
+    interior_w_mm: Math.round(w_m * 1000),
+    interior_d_mm: Math.round(d_m * 1000),
+    interior_h_mm: Math.round(h_m * 1000),
+    interior_floor_m2: Number((w_m * d_m).toFixed(3)),
+    interior_volume_m3: Number((w_m * d_m * h_m).toFixed(3)),
+    rated_max_payload_kg: payload_kg,
+    basis,
+  }
+}
+
+const CLASS_ENVELOPE: Record<string, EnvelopeSpec> = {
+  // Standard 40-ft ISO High-Cube container interior (ISO 668:2020).
+  // Internal: 12.032 m × 2.352 m × 2.698 m. Basis: ISO 1496-1:2023.
+  battery_energy_storage: makeEnvelopeSpec(
+    'container_40ft', '40ft ISO High-Cube Container',
+    12.032, 2.352, 2.698, 27_230,
+    'ISO 668:2020 / ISO 1496-1 — standard 40ft HC internal dimensions'
+  ),
+  // EV charger: pedestal-mount outdoor cabinet (~800 mm deep, 600 mm wide, 1800 mm tall).
+  // 150-kW DC fast charger enclosure (ABB Terra 184 / EVBox / Alpitronic class).
+  ev_charger: makeEnvelopeSpec(
+    'outdoor_cabinet', 'Outdoor Pedestal Enclosure (150 kW DC)',
+    0.6, 0.8, 1.8, 800,
+    'Typical 150-kW DC DCFC pedestal enclosure — Alpitronic HYC150 / ABB Terra 184 class'
+  ),
+  // Containerised pharma bioreactor vessel — 50-L pilot scale.
+  // Nominal footprint: 0.8 m × 0.6 m × 1.2 m (Sartorius Biostat STR 50 L class).
+  bioreactor: makeEnvelopeSpec(
+    'pilot_vessel', 'Pilot-Scale Bioreactor Vessel (50 L)',
+    0.8, 0.6, 1.2, 300,
+    'Sartorius Biostat STR / Cytiva BioProcess Container class — 50-L pilot scale'
+  ),
+  // Standard CEA grow room / grow module (not 40-ft container).
+  // Corrected from erroneous 10×10×5m default. Basis: UK CEA industry standard
+  // grow cell dimensions (IGS, Jones Food, Bowery class modular grow room).
+  vertical_farm: makeEnvelopeSpec(
+    'cea_grow_room', 'Modular CEA Grow Room',
+    12.0, 6.0, 3.0, 30_000,
+    'UK CEA modular grow room — IGS/Jones Food class; 12×6m footprint, 3m clear height'
+  ),
+  // Residential/light-commercial split heat pump (outdoor unit only).
+  // Use the existing HEAT_PUMP_ENVELOPES for the full system — this is the
+  // canonical single-unit envelope for classes falling into generic routing.
+  heat_pump: makeEnvelopeSpec(
+    'outdoor_unit', 'Outdoor Heat Pump Unit',
+    1.1, 0.5, 1.7, 250,
+    'Typical 30 kW R290 outdoor unit — Mitsubishi Ecodan / Vaillant class'
+  ),
+  // Prosumer/professional multirotor drone. Covers DJI Agras T40 / JOUAV CW-30 class.
+  // For micro-drones (< 250 g) or heavy-lift (> 150 kg), brief overrides expected.
+  drone: makeEnvelopeSpec(
+    'multirotor_frame', 'Multirotor Drone Frame Envelope',
+    1.2, 1.2, 0.6, 40,
+    'Commercial multirotor envelope — DJI Agras T40 / JOUAV CW-30 class (brief should override for nano/heavy-lift)'
+  ),
+  // Body-worn CGM sensor patch. Dexcom G7 / Libre 3 class.
+  // At this scale, spatial packing is not a meaningful gate — the solver
+  // will defer sizing if no meaningful layout calculation is possible.
+  cgm: makeEnvelopeSpec(
+    'wearable_patch', 'Body-worn CGM Sensor Patch',
+    0.038, 0.030, 0.012, 0.1,
+    'Dexcom G7 / Abbott Libre 3 class body-worn sensor patch envelope'
+  ),
+  // Industrial edge AI compute enclosure. NVIDIA EGX / Supermicro SuperEdge class.
+  edge_ai_server: makeEnvelopeSpec(
+    'edge_compute_enclosure', 'Industrial Edge Compute Enclosure',
+    0.5, 0.4, 0.3, 40,
+    'Industrial edge compute enclosure — NVIDIA EGX / Supermicro SuperEdge 1U class'
+  ),
+  // Coastal/survey AUV pressure hull. Teledyne Gavia / Kongsberg Hugin 1000 class.
+  auv: makeEnvelopeSpec(
+    'auv_pressure_hull', 'Coastal AUV Pressure Hull',
+    0.45, 0.45, 3.0, 250,
+    'Coastal survey AUV — Teledyne Gavia / Saab Seaeye Sabertooth class; cylinder approximated as box'
+  ),
+  // Stratospheric HAPS platform. Airbus Zephyr S / Vanilla Aircraft VA001 class.
+  // Internal payload bay is the relevant constraint; wing dimensions are structural only.
+  haps: makeEnvelopeSpec(
+    'haps_payload_bay', 'HAPS Payload Bay',
+    0.6, 0.4, 0.3, 50,
+    'Stratospheric HAPS payload bay — Airbus Zephyr S class; payload bay, not full wingspan'
+  ),
 }
 
 const HEAT_PUMP_ENVELOPES = {
@@ -76,25 +199,31 @@ function solveSizing(
   let floor_budget_m2: number;
   
   if (domain === 'battery_energy_storage') {
+    // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): use CLASS_ENVELOPE lookup.
+    // Previously hardcoded; now consistent with the class-aware table.
+    const spec = CLASS_ENVELOPE.battery_energy_storage
     envelope = {
-      kind: 'container_40ft',
-      label: '40ft ISO Container',
-      interior_w_mm: 12032,
-      interior_d_mm: 2352,
-      interior_h_mm: 2690,
-      interior_floor_m2: (12032 * 2352) / 1_000_000,
-      interior_volume_m3: (12032 * 2352 * 2690) / 1_000_000_000
+      kind: spec.kind,
+      label: spec.label,
+      interior_w_mm: spec.interior_w_mm,
+      interior_d_mm: spec.interior_d_mm,
+      interior_h_mm: spec.interior_h_mm,
+      interior_floor_m2: spec.interior_floor_m2,
+      interior_volume_m3: spec.interior_volume_m3,
     };
     floor_budget_m2 = envelope.interior_floor_m2 * 0.85; // 15% for aisles
   } else if (domain === 'vertical_farm') {
+    // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): corrected from erroneous 10×10×5m.
+    // Real CEA grow room: 12×6×3m (IGS/Jones Food class). See CLASS_ENVELOPE.
+    const spec = CLASS_ENVELOPE.vertical_farm
     envelope = {
-      kind: 'warehouse_bay',
-      label: 'Standard Warehouse Bay',
-      interior_w_mm: 10000,
-      interior_d_mm: 10000,
-      interior_h_mm: 5000,
-      interior_floor_m2: 100,
-      interior_volume_m3: 500
+      kind: spec.kind,
+      label: spec.label,
+      interior_w_mm: spec.interior_w_mm,
+      interior_d_mm: spec.interior_d_mm,
+      interior_h_mm: spec.interior_h_mm,
+      interior_floor_m2: spec.interior_floor_m2,
+      interior_volume_m3: spec.interior_volume_m3,
     };
     floor_budget_m2 = envelope.interior_floor_m2 * 0.85;
   } else if (domain === 'heat_pump') {
@@ -228,15 +357,32 @@ function solveSizing(
       recommendations,
     };
   } else {
-    envelope = {
-      kind: 'generic_room',
-      label: 'Generic Room',
-      interior_w_mm: 5000,
-      interior_d_mm: 5000,
-      interior_h_mm: 3000,
-      interior_floor_m2: 25,
-      interior_volume_m3: 75
-    };
+    // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): check CLASS_ENVELOPE before
+    // falling back to the generic room. All 10 baseline classes now have an
+    // entry; only truly unknown product types fall through to generic.
+    const classSpec = CLASS_ENVELOPE[domain]
+    if (classSpec) {
+      envelope = {
+        kind: classSpec.kind,
+        label: classSpec.label,
+        interior_w_mm: classSpec.interior_w_mm,
+        interior_d_mm: classSpec.interior_d_mm,
+        interior_h_mm: classSpec.interior_h_mm,
+        interior_floor_m2: classSpec.interior_floor_m2,
+        interior_volume_m3: classSpec.interior_volume_m3,
+      };
+      console.log(`[size-layout] class-aware envelope: ${classSpec.label} (${classSpec.basis})`)
+    } else {
+      envelope = {
+        kind: 'generic_room',
+        label: 'Generic Room',
+        interior_w_mm: 5000,
+        interior_d_mm: 5000,
+        interior_h_mm: 3000,
+        interior_floor_m2: 25,
+        interior_volume_m3: 75
+      };
+    }
     floor_budget_m2 = envelope.interior_floor_m2 * 0.85;
   }
 
@@ -263,12 +409,29 @@ function solveSizing(
       // ~mass / 4500 ≈ mass × 0.00022. Use 0.0002 as a realistic heuristic.
       m2 = (massKg ?? 50) * 0.0002;
     } else if (domain === 'vertical_farm') {
-      const canopy = targets.canopy_m2 || 100;
+      // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): use available canopy area from
+      // brief targets if provided, else divide the envelope floor equally.
+      const canopy = targets.canopy_m2 || envelope.interior_floor_m2;
       m2 = canopy / (modules.length || 1);
     } else if (domain === 'heat_pump') {
       // Mid-density components, compact. ~0.001 m² per kg is plausible for
       // a 1-1.5 m tall outdoor unit.
       m2 = (massKg ?? 20) * 0.001;
+    } else if (domain === 'cgm') {
+      // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): CGM patch — sub-100mm scale.
+      // Spatial packing has no meaning at this scale; allocate equal slices.
+      m2 = envelope.interior_floor_m2 / (modules.length || 1);
+    } else if (domain === 'drone') {
+      // Drone: volume packing within the frame bounding box. Use a generous
+      // 0.002 m² per kg heuristic (lighter, more spread-out components).
+      m2 = (massKg ?? 5) * 0.002;
+    } else if (domain === 'auv') {
+      // AUV: cylindrical hull — components pack along the axis.
+      // Cylindrical cross-section × length. Use 0.0005 m²/kg for dense packing.
+      m2 = (massKg ?? 20) * 0.0005;
+    } else if (domain === 'bioreactor') {
+      // Bioreactor: vessel footprint dominates. Equal share of floor per module.
+      m2 = envelope.interior_floor_m2 / (modules.length || 1);
     } else {
       m2 = (massKg ?? 20) * 0.001;
     }
