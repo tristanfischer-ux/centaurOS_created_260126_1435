@@ -32,6 +32,7 @@
 
 import { readdirSync, readFileSync, statSync, existsSync, writeFileSync } from 'fs'
 import { join, resolve } from 'path'
+import { fileURLToPath } from 'url'
 
 // ---------------------------------------------------------------------------
 // Types mirroring the actual pipeline output
@@ -832,7 +833,8 @@ async function main() {
   let reportPath: string
   try {
     // ESM path: import.meta.url is always available under tsx
-    const scriptDir = new URL('.', import.meta.url).pathname
+    // Use fileURLToPath to handle URL-encoded characters (e.g. spaces) in the path
+    const scriptDir = fileURLToPath(new URL('.', import.meta.url))
     reportPath = join(scriptDir, `shadow-mode-report-${timestamp}.md`)
   } catch {
     reportPath = join(evidenceDir, `shadow-mode-report-${timestamp}.md`)
