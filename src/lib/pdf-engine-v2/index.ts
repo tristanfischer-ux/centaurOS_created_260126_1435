@@ -1840,8 +1840,12 @@ export async function runPipeline(
           radicalCostSummary: state.radicalCostSummary ?? null,
           grammarVerdicts: state.grammarVerdicts ?? null,
           // Fix 4 (task #91-phase4): legacy costSummary.bomTotal paired field so the
-          // aggregator can compute cost delta = (radical - legacy) / legacy
-          legacyCostBomTotal: state.costSummary?.bomTotal ?? null,
+          // aggregator can compute cost delta = (radical - legacy) / legacy.
+          // v2-integrated path sets state.costSummary; v1 legacy path sets only
+          // state.costBreakdown. Fall back to rawBomCostGbp so both paths emit a value.
+          legacyCostBomTotal: state.costSummary?.bomTotal
+            ?? state.costBreakdown?.rawBomCostGbp
+            ?? null,
           savedAt: new Date().toISOString(),
         }
         writeFileSync(statePath, JSON.stringify(minimalState, null, 2))
