@@ -814,6 +814,10 @@ const GRADE_D_SUBSYSTEM_ESTIMATES_GBP: Record<string, {
   auv_thruster: { min: 1500, typical: 4000, max: 9000, basis: 'Brushless DC thruster, 100–500 W for AUV' },
   thermal_insulation_panel: { min: 200, typical: 600, max: 1500, basis: 'Mineral wool or PIR insulation panel set for container' },
   cooling_loop_pump: { min: 500, typical: 1200, max: 3000, basis: 'Circulating pump for liquid cooling loop' },
+  // LFP prismatic cells — per-cell unit cost. CATL/EVE/BYD market rate 2025.
+  // These are per-cell prices; the Grade D fallback is applied per-line (unit × qty).
+  lfp_prismatic_cell_280ah: { min: 45, typical: 60, max: 80, basis: 'CATL/EVE/BYD LFP prismatic 280 Ah, 3.2 V — OEM spot price 2025' },
+  lfp_prismatic_cell_generic: { min: 40, typical: 55, max: 75, basis: 'LFP prismatic cell (any capacity), OEM channel 2025 — fallback when Ah not specified' },
 }
 
 /**
@@ -866,6 +870,14 @@ function classifySubsystemForGradeD(name: string): string | null {
 
   // Cooling loop pump
   if (n.includes('cooling') && n.includes('pump')) return 'cooling_loop_pump'
+
+  // LFP prismatic cells — must match BEFORE generic battery/cell checks to avoid false-positives
+  // on pack-level items. Pattern requires "lfp" or ("lithium" + "iron" / "ferrophosphate") + "cell".
+  if ((n.includes('lfp') || n.includes('lifepo') || n.includes('lithium iron') || n.includes('lithium ferrophosphate')) && n.includes('cell')) {
+    if (n.includes('280') || n.includes('280ah')) return 'lfp_prismatic_cell_280ah'
+    return 'lfp_prismatic_cell_generic'
+  }
+  if (n.includes('lfp') && n.includes('prismatic')) return 'lfp_prismatic_cell_280ah'
 
   return null
 }
@@ -1355,32 +1367,75 @@ Return ALL four sub-task results in the JSON structure specified in the system p
     // Guard: use < 1.0 (not === 0) to catch near-zero distributor prices that
     // Intl.NumberFormat rounds to "£0" in the rendered PDF.
     //
-    // Hierarchy applied: VERIFIED (non-zero, ≥£1) > LLM ESTIMATE (≥£1) > GRADE D > DATA GAP
+    // Hierarchy applied: VERIFIED (non-zero, ≥£1) > LLM ESTIMATE (≥£1) > GRADE D > LLM price hint > DATA GAP
+    //
+    // CRITICAL: a sub-£1 line that has no Grade D key MUST still be sanitised.
+    // If left at e.g. £0.319, the renderer displays "£0" as unit cost but the
+    // cost aggregator multiplies the raw float — producing arithmetically
+    // impossible totals (e.g. 4,882 × £0 shown, £1,556 actual). Fix: when no
+    // Grade D key matches, fall back to the LLM unit price hint (_llmUnitPriceGbp)
+    // if it is ≥£1, else zero out the line cleanly so both unit and total show £0.
     {
       let gradeDApplied = 0
+      let llmFallbackApplied = 0
+      let zeroSanitised = 0
       for (const line of integratedLines) {
         if (line.unitCostGbp >= 1.0) continue  // already meaningfully costed — leave alone
 
+        // ── Tier 1: Grade D table ─────────────────────────────────────────
         const subsystemKey = classifySubsystemForGradeD(line.name)
-        if (!subsystemKey) continue
+        const entry = subsystemKey ? GRADE_D_SUBSYSTEM_ESTIMATES_GBP[subsystemKey] : null
 
-        const entry = GRADE_D_SUBSYSTEM_ESTIMATES_GBP[subsystemKey]
-        if (!entry) continue
+        if (entry) {
+          line.unitCostGbp = entry.typical
+          line.gradeD_estimate_basis = `${entry.basis} (Grade D ±50%, typical of range £${entry.min.toLocaleString()}–£${entry.max.toLocaleString()})`
+          line.costSource = 'estimated'
+          // Demote verification_status: a Grade D is NOT VERIFIED, even if a
+          // distributor returned a match with qty1=0 (false-positive lookup).
+          line.verification_status = 'estimated'
+          // Clear any false-positive distributor data so the renderer shows Grade D table, not distributor name
+          line.bestDistributor = undefined
+          line.distributors = undefined
+          gradeDApplied++
+          console.log(`[bom-v2] Grade D fallback for "${line.name}" → ${subsystemKey}: £${entry.typical.toLocaleString()} (${entry.basis})`)
+          continue
+        }
 
-        line.unitCostGbp = entry.typical
-        line.gradeD_estimate_basis = `${entry.basis} (Grade D ±50%, typical of range £${entry.min.toLocaleString()}–£${entry.max.toLocaleString()})`
-        line.costSource = 'estimated'
-        // Demote verification_status: a Grade D is NOT VERIFIED, even if a
-        // distributor returned a match with qty1=0 (false-positive lookup).
-        line.verification_status = 'estimated'
-        // Clear any false-positive distributor data so the renderer shows Grade D table, not distributor name
-        line.bestDistributor = undefined
-        line.distributors = undefined
-        gradeDApplied++
-        console.log(`[bom-v2] Grade D fallback for "${line.name}" → ${subsystemKey}: £${entry.typical.toLocaleString()} (${entry.basis})`)
+        // ── Tier 2: LLM unit price hint (from MODULE_DECOMPOSITION expected_parts) ──
+        // Used when Grade D has no key for this part but the decompose-stage LLM
+        // provided an estimated_unit_price_gbp that is ≥£1 (meaningful).
+        const llmPrice = (line as any)._llmUnitPriceGbp as number | null | undefined
+        if (llmPrice != null && llmPrice >= 1.0) {
+          line.unitCostGbp = llmPrice
+          line.costSource = 'estimated'
+          line.verification_status = 'estimated'
+          line.bestDistributor = undefined
+          line.distributors = undefined
+          llmFallbackApplied++
+          console.log(`[bom-v2] LLM price hint fallback for "${line.name}": £${llmPrice} (sub-£1 distributor price stripped)`)
+          continue
+        }
+
+        // ── Tier 3: hard zero — sanitise to prevent unit/total mismatch ──
+        // The line has no Grade D key and no LLM price hint. Zero it cleanly
+        // so the renderer shows £0 unit AND £0 total (not a phantom float total).
+        if (line.unitCostGbp > 0) {
+          console.warn(`[bom-v2] Sub-£1 line "${line.name}" has no Grade D key and no LLM price — zeroing to prevent unit/total mismatch (was £${line.unitCostGbp.toFixed(4)})`)
+          line.unitCostGbp = 0
+          line.verification_status = 'estimated'
+          line.bestDistributor = undefined
+          line.distributors = undefined
+          zeroSanitised++
+        }
       }
       if (gradeDApplied > 0) {
         console.log(`[bom-v2] Grade D fallback applied to ${gradeDApplied} zero-cost lines`)
+      }
+      if (llmFallbackApplied > 0) {
+        console.log(`[bom-v2] LLM price hint fallback applied to ${llmFallbackApplied} lines`)
+      }
+      if (zeroSanitised > 0) {
+        console.log(`[bom-v2] ${zeroSanitised} sub-£1 lines zeroed cleanly (no Grade D key, no LLM hint)`)
       }
     }
 
