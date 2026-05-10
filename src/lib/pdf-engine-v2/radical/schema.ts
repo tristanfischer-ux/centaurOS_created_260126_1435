@@ -1,5 +1,5 @@
 /**
- * Lattice Schema — First Light spike
+ * Radical Schema — First Light spike
  *
  * Hierarchy (low to high):
  *   Radical → Character → [+ Modifier] → Archetype → CatalogueEntry
@@ -66,7 +66,7 @@ export type CatalogueEntry = {
 // ---------------------------------------------------------------------------
 // The full in-memory library (no persistence in First Light)
 // ---------------------------------------------------------------------------
-export type LatticeLibrary = {
+export type RadicalLibrary = {
   radicals: Map<string, Radical>
   characters: Map<string, Character>
   modifiers: Map<string, Modifier>

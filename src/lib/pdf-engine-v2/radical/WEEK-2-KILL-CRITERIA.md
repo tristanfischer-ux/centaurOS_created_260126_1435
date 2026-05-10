@@ -1,6 +1,6 @@
 # Week 2 Kill Criteria — non-negotiable
 
-These are committed BEFORE Week 2 decomposition begins. If any fires, the Lattice architecture is killed for BESS coverage; no Week 3 dispatch.
+These are committed BEFORE Week 2 decomposition begins. If any fires, the Radical architecture is killed for BESS coverage; no Week 3 dispatch.
 
 1. **Radical growth ratio** — new radicals added during BESS decomposition must be ≤ 3× the seed (5 → max 15 new = 20 total). >15 new radicals to cover BESS = atomistic too coarse, kill.
 2. **Character growth ratio** — new characters added must be ≤ 5× the seed (10 → max 50 new = 60 total). >50 new characters = composite layer not capturing reuse, kill.

@@ -10,14 +10,14 @@
       "archetypes": 65,
       "note": "Post-Week-2 + vfarm: 17+1=18 radicals; 30+19=49 chars. Heat pump decomposes against this LARGER library."
     },
-    "coherence_rule_statement": "Kill criterion 4: the vapour-compression refrigerant cycle (compressor + condenser + expansion valve + evaporator + refrigerant charge, operating as one closed-loop thermodynamic system) MUST be representable as a SINGLE ATOMIC archetype — not as a composition of 5 separate sub-archetypes that cross-reference each other. The cycle's internal topology is a black box to the Lattice grammar; only its external interfaces (thermal capacity, COP, refrigerant type, charge mass) are exposed as archetype properties. If the cycle is split, kill criterion 4 fires.",
+    "coherence_rule_statement": "Kill criterion 4: the vapour-compression refrigerant cycle (compressor + condenser + expansion valve + evaporator + refrigerant charge, operating as one closed-loop thermodynamic system) MUST be representable as a SINGLE ATOMIC archetype — not as a composition of 5 separate sub-archetypes that cross-reference each other. The cycle's internal topology is a black box to the Radical grammar; only its external interfaces (thermal capacity, COP, refrigerant type, charge mass) are exposed as archetype properties. If the cycle is split, kill criterion 4 fires.",
     "coherence_resolution": "SINGLE ATOMIC ARCHETYPE — vapour_compression_cycle_R290_30kW. The cycle is modelled as one entry with external-interface properties only. Internal components (compressor, condenser, evaporator, EXV) are NOT separate archetypes. This is structurally equivalent to how lfp_prismatic_cell does not decompose its anode/cathode/separator — the electrochemistry is atomic.",
     "decomposition_date": "2026-05-10"
   },
   "coherence_test_detail": {
     "question": "Can the vapour-compression cycle be ONE archetype?",
-    "answer": "YES. The cycle has well-defined external interfaces: heat_input_kw (evaporator side, from air), heat_output_kw (condenser side, to water), COP at rated conditions, refrigerant_type, charge_mass_g. These are archetype-level properties. The internal sub-components (scroll compressor, brazed-plate condenser, brazed-plate evaporator, electronic expansion valve) are assembly-internal — they inform the archetype's manufacturing notes but do not become separate Lattice archetypes, because they are never sourced or costed independently at the system-BoM level.",
-    "supporting_argument": "A BESS cell (lfp_prismatic_cell_280Ah) does not decompose into anode + cathode + separator + electrolyte in the Lattice grammar. The Lattice grammar works at the system-BoM grain, not at the sub-component grain. The refrigerant cycle is the heat pump's 'cell' — the value-creating irreducible unit. Splitting it would require tracking the compressor, condenser, evaporator and EXV as separate Lattice archetypes that cannot be individually sourced from a distributor — breaking the sourcing rule.",
+    "answer": "YES. The cycle has well-defined external interfaces: heat_input_kw (evaporator side, from air), heat_output_kw (condenser side, to water), COP at rated conditions, refrigerant_type, charge_mass_g. These are archetype-level properties. The internal sub-components (scroll compressor, brazed-plate condenser, brazed-plate evaporator, electronic expansion valve) are assembly-internal — they inform the archetype's manufacturing notes but do not become separate Radical archetypes, because they are never sourced or costed independently at the system-BoM level.",
+    "supporting_argument": "A BESS cell (lfp_prismatic_cell_280Ah) does not decompose into anode + cathode + separator + electrolyte in the Radical grammar. The Radical grammar works at the system-BoM grain, not at the sub-component grain. The refrigerant cycle is the heat pump's 'cell' — the value-creating irreducible unit. Splitting it would require tracking the compressor, condenser, evaporator and EXV as separate Radical archetypes that cannot be individually sourced from a distributor — breaking the sourcing rule.",
     "result": "SINGLE — kill criterion 4 PASS"
   },
   "bom_lines": [
@@ -490,5 +490,5 @@
     "coverage_pct": 100.0
   },
   "kill_criterion_2_verdict": "PASS — 100% radical reuse (>70% threshold). Zero new radicals needed. The post-Week-2+vfarm library is fully sufficient.",
-  "kill_criterion_4_verdict": "PASS — SINGLE ATOMIC ARCHETYPE. vapour_compression_cycle_R290_30kW is one entry. The cycle's internal compressor/condenser/evaporator/EXV topology is black-boxed at the Lattice archetype level. Only external interfaces are properties. Coherence rule holds."
+  "kill_criterion_4_verdict": "PASS — SINGLE ATOMIC ARCHETYPE. vapour_compression_cycle_R290_30kW is one entry. The cycle's internal compressor/condenser/evaporator/EXV topology is black-boxed at the Radical archetype level. Only external interfaces are properties. Coherence rule holds."
 }

@@ -1,6 +1,6 @@
 # First Light Kill Criteria — non-negotiable
 
-These are committed BEFORE the spike begins. If any of them fires during First Light Week 1, the Lattice architecture is killed; no Week 2 dispatch.
+These are committed BEFORE the spike begins. If any of them fires during First Light Week 1, the Radical architecture is killed; no Week 2 dispatch.
 
 1. **Property cascade integrity** — A character that contains radical "steel" must inherit `steel.density = 7.85 g/cm³` without override. If the character's resolved density is anything else, kill.
 2. **Grammar rule firing** — The KCL rule (Kirchhoff's Current Law) must fire on a deliberately broken test composition (a circuit with current_in ≠ current_out) and PASS on a balanced one. Both polarities must be observed. If the rule produces same verdict for broken + balanced, kill.

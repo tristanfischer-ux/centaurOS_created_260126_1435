@@ -1,6 +1,6 @@
 # Week 3 Kill Criteria — non-negotiable
 
-These are committed BEFORE Week 3 begins. If any fires, the Lattice architecture has a generalisation problem; surface to Tristan, no Week 4.
+These are committed BEFORE Week 3 begins. If any fires, the Radical architecture has a generalisation problem; surface to Tristan, no Week 4.
 
 CROSS-PRODUCT REUSE TESTS (the universality check):
 
@@ -14,6 +14,6 @@ CROSS-PRODUCT REUSE TESTS (the universality check):
 
 5. **Per-product growth caps** — vfarm new radicals ≤8, heat pump new radicals ≤8 (sub-linear growth). If either product needs ≥10 new radicals beyond the post-Week-2 library, we're approaching per-class-in-disguise.
 
-If ALL FIVE pass: Lattice architecture is universal. Recommend dispatch of v1 production migration (8-11 week effort per first council).
+If ALL FIVE pass: Radical architecture is universal. Recommend dispatch of v1 production migration (8-11 week effort per first council).
 
 If any fail: surface to Tristan with diagnostic. Do not proceed to v1 production migration.

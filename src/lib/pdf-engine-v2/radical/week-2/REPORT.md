@@ -1,4 +1,4 @@
-# Lattice Week 2 — BESS Decomposition Report
+# Radical Week 2 — BESS Decomposition Report
 
 **Date:** 2026-05-10
 **BOM source:** BESS Container 3.5 MWh / 1 MW PCS, 40-ft ISO (briefs/baseline-10/09-bess-container.md)
@@ -53,7 +53,7 @@
 
 ## Verdict
 
-**ALL 5 KILL CRITERIA PASS. Lattice SCALES for BESS.**
+**ALL 5 KILL CRITERIA PASS. Radical SCALES for BESS.**
 
 Week 3 dispatch authorised: decompose vertical farm + heat pump.
 
@@ -99,4 +99,4 @@ solid_state_of_matter is not a filler radical. It appeared in all 25 lines. The 
 
 ---
 
-*Decomposition performed manually against seed library. Zero LLM API costs. No production pipeline code touched. Fully sandboxed in lattice/week-2/.*
+*Decomposition performed manually against seed library. Zero LLM API costs. No production pipeline code touched. Fully sandboxed in radical/week-2/.*

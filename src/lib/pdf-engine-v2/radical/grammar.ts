@@ -1,5 +1,5 @@
 /**
- * Lattice Grammar Engine — First Light spike
+ * Radical Grammar Engine — First Light spike
  *
  * Key design decision (per council G7 / Gemini's deadlock finding):
  * The grammar engine is a CONSTRAINT OPTIMISER with relaxation weights, not
@@ -14,7 +14,7 @@
 import type {
   Composition,
   CompositionNode,
-  LatticeLibrary,
+  RadicalLibrary,
   PropertyMap,
 } from "./schema.js"
 import { getResolvedProperties } from "./property-api.js"
@@ -43,7 +43,7 @@ export type GrammarRule = {
   hardness: "hard" | "soft" | "adjustable"
   evaluate: (
     composition: Composition,
-    library: LatticeLibrary
+    library: RadicalLibrary
   ) => RuleEvaluation
 }
 
@@ -393,7 +393,7 @@ export const MATERIAL_MARINE_CORROSION: GrammarRule = {
 
 export function runGrammarEngine(
   composition: Composition,
-  library: LatticeLibrary,
+  library: RadicalLibrary,
   rules: GrammarRule[]
 ): EngineResult {
   // Step 1: Evaluate all rules

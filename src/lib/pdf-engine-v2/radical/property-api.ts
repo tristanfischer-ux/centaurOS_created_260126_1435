@@ -1,5 +1,5 @@
 /**
- * Lattice Property API — First Light spike
+ * Radical Property API — First Light spike
  *
  * Cascade order: radical union → character override → modifier overrides (in declared order)
  *
@@ -9,7 +9,7 @@
  * itself. The Archetype is the stable "designed-with" unit that grammar rules query.
  */
 
-import type { Archetype, LatticeLibrary, PropertyMap } from "./schema.js"
+import type { Archetype, RadicalLibrary, PropertyMap } from "./schema.js"
 
 // ---------------------------------------------------------------------------
 // Core cascade function
@@ -17,7 +17,7 @@ import type { Archetype, LatticeLibrary, PropertyMap } from "./schema.js"
 
 export function getResolvedProperties(
   archetype: Archetype,
-  library: LatticeLibrary
+  library: RadicalLibrary
 ): PropertyMap {
   const character = library.characters.get(archetype.character)
   if (!character) {
@@ -63,7 +63,7 @@ export function getResolvedProperties(
 
 export function resolveById(
   archetypeId: string,
-  library: LatticeLibrary
+  library: RadicalLibrary
 ): PropertyMap {
   const archetype = library.archetypes.get(archetypeId)
   if (!archetype) {

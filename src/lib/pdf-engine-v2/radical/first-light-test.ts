@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
- * First Light Test Runner — Lattice architecture kill-criteria validation
+ * First Light Test Runner — Radical architecture kill-criteria validation
  *
- * Run: npx tsx src/lib/pdf-engine-v2/lattice/first-light-test.ts
+ * Run: npx tsx src/lib/pdf-engine-v2/radical/first-light-test.ts
  *
  * Exits 0 if all 5 criteria pass. Exits 1 if any fail.
  */
@@ -17,7 +17,7 @@ import {
   MARINE_PLAIN_STEEL_COMPOSITION,
   TWO_RULE_CONFLICT_COMPOSITION,
 } from "./composition.js"
-import type { LatticeLibrary } from "./schema.js"
+import type { RadicalLibrary } from "./schema.js"
 
 // ---------------------------------------------------------------------------
 // Output helpers
@@ -47,7 +47,7 @@ function header(msg: string) {
 
 type CriterionResult = { number: number; name: string; passed: boolean; detail: string }
 
-function criterion1_propertyCascadeIntegrity(library: LatticeLibrary): CriterionResult {
+function criterion1_propertyCascadeIntegrity(library: RadicalLibrary): CriterionResult {
   // A character containing radical "steel" must inherit steel.density = 7.85 g/cm³
   // Use the steel_bolt character (radicals: ["steel", "solid_state_of_matter"])
   // with NO overriding modifier — just the M8x30_plain_steel_bolt archetype (modifiers: ["M8"])
@@ -67,7 +67,7 @@ function criterion1_propertyCascadeIntegrity(library: LatticeLibrary): Criterion
   }
 }
 
-function criterion2_grammarRuleFiring(library: LatticeLibrary): CriterionResult {
+function criterion2_grammarRuleFiring(library: RadicalLibrary): CriterionResult {
   // KCL must BLOCK on broken composition, PASS on balanced
   const kclRule = ALL_GRAMMAR_RULES.find((r) => r.id === "KCL_node_balance")!
 
@@ -88,7 +88,7 @@ function criterion2_grammarRuleFiring(library: LatticeLibrary): CriterionResult 
   }
 }
 
-function criterion3_inheritanceWithOverride(library: LatticeLibrary): CriterionResult {
+function criterion3_inheritanceWithOverride(library: RadicalLibrary): CriterionResult {
   // steel radical has marine_corrosion_resistant = false
   // 316L_grade modifier overrides to marine_corrosion_resistant = true
   // M8x30_316L_socket_head_bolt archetype uses steel_bolt character + [M8, 316L_grade]
@@ -112,7 +112,7 @@ function criterion3_inheritanceWithOverride(library: LatticeLibrary): CriterionR
   }
 }
 
-function criterion4_archetypeLayerPresent(library: LatticeLibrary): CriterionResult {
+function criterion4_archetypeLayerPresent(library: RadicalLibrary): CriterionResult {
   // Archetype type must exist between Modifier and CatalogueEntry.
   // Verify:
   //   1. The library has archetypes
@@ -171,7 +171,7 @@ function criterion4_archetypeLayerPresent(library: LatticeLibrary): CriterionRes
   }
 }
 
-function criterion5_relaxationWeightApplied(library: LatticeLibrary): CriterionResult {
+function criterion5_relaxationWeightApplied(library: RadicalLibrary): CriterionResult {
   // Two grammar rules must conflict on a test composition;
   // the lower-weight rule must relax with tradeoff EXPLICIT in output.
   //
@@ -239,7 +239,7 @@ function criterion5_relaxationWeightApplied(library: LatticeLibrary): CriterionR
 // Bonus: print the actual resolved property map for a representative archetype
 // ---------------------------------------------------------------------------
 
-function printResolvedPropertyMap(library: LatticeLibrary) {
+function printResolvedPropertyMap(library: RadicalLibrary) {
   header("Resolved property map: M8x30_316L_socket_head_bolt")
   const props = resolveById("M8x30_316L_socket_head_bolt", library)
   console.log(JSON.stringify(props, null, 2))
@@ -249,7 +249,7 @@ function printResolvedPropertyMap(library: LatticeLibrary) {
 // Bonus: show KCL verdicts side by side
 // ---------------------------------------------------------------------------
 
-function printKCLVerdicts(library: LatticeLibrary) {
+function printKCLVerdicts(library: RadicalLibrary) {
   header("KCL rule: BROKEN vs BALANCED composition")
   const kclRule = ALL_GRAMMAR_RULES.find((r) => r.id === "KCL_node_balance")!
 
@@ -268,7 +268,7 @@ function printKCLVerdicts(library: LatticeLibrary) {
 // Bonus: show inheritance-with-override detail
 // ---------------------------------------------------------------------------
 
-function printInheritanceOverride(library: LatticeLibrary) {
+function printInheritanceOverride(library: RadicalLibrary) {
   header("Inheritance with override: steel radical → 316L_grade modifier")
   const steel = library.radicals.get("steel")!
   console.log(`Radical "steel" marine_corrosion_resistant = ${steel.properties["marine_corrosion_resistant"]}`)
@@ -284,7 +284,7 @@ function printInheritanceOverride(library: LatticeLibrary) {
 // Bonus: show relaxation in detail
 // ---------------------------------------------------------------------------
 
-function printRelaxationDetail(library: LatticeLibrary) {
+function printRelaxationDetail(library: RadicalLibrary) {
   header("Relaxation test: two conflicting soft rules")
   const result = runGrammarEngine(
     TWO_RULE_CONFLICT_COMPOSITION,
@@ -313,7 +313,7 @@ function printRelaxationDetail(library: LatticeLibrary) {
 // ---------------------------------------------------------------------------
 
 async function main() {
-  console.log(`${BOLD}First Light — Lattice Architecture Kill-Criteria Validation${RESET}`)
+  console.log(`${BOLD}First Light — Radical Architecture Kill-Criteria Validation${RESET}`)
   console.log("=".repeat(60))
 
   const library = buildSeedLibrary()

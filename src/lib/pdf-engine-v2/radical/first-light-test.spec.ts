@@ -27,7 +27,7 @@ const library = buildSeedLibrary()
 // Library sanity
 // ---------------------------------------------------------------------------
 
-describe("Lattice seed library", () => {
+describe("Radical seed library", () => {
   it("loads 5 radicals, 10 characters, 5 modifiers, 10 archetypes, 2 catalogue entries", () => {
     expect(library.radicals.size).toBe(5)
     expect(library.characters.size).toBe(10)

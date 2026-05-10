@@ -1,5 +1,5 @@
 /**
- * Lattice Seed Library — First Light spike
+ * Radical Seed Library — First Light spike
  *
  * Hard-coded, no persistence. Contains:
  *   5 radicals
@@ -12,7 +12,7 @@
  *   steel, copper, polymer_thermoplastic, electrical_conducting_function, solid_state_of_matter
  */
 
-import type { LatticeLibrary, Radical, Character, Modifier, Archetype, CatalogueEntry } from "./schema.js"
+import type { RadicalLibrary, Radical, Character, Modifier, Archetype, CatalogueEntry } from "./schema.js"
 import {
   KCL_NODE_BALANCE,
   GALVANIC_ALUMINIUM_COPPER_CONTACT,
@@ -339,8 +339,8 @@ const catalogueEntries: CatalogueEntry[] = [
 // Build and export the library
 // ---------------------------------------------------------------------------
 
-export function buildSeedLibrary(): LatticeLibrary {
-  const library: LatticeLibrary = {
+export function buildSeedLibrary(): RadicalLibrary {
+  const library: RadicalLibrary = {
     radicals: new Map(radicals.map((r) => [r.id, r])),
     characters: new Map(characters.map((c) => [c.id, c])),
     modifiers: new Map(modifiers.map((m) => [m.id, m])),

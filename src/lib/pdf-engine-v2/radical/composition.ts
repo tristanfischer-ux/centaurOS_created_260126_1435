@@ -1,5 +1,5 @@
 /**
- * Lattice Composition helpers — First Light spike
+ * Radical Composition helpers — First Light spike
  *
  * Re-exports the runGrammarEngine runner and provides factory helpers
  * for building Composition objects used in tests and the first-light runner.

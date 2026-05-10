@@ -1,4 +1,4 @@
-# Lattice Week 3 — Cross-Product Universality Report
+# Radical Week 3 — Cross-Product Universality Report
 
 **Date:** 2026-05-10
 **Products decomposed:** Vertical Farm (vfarm, 30-line BoM) + Heat Pump (22-line BoM)
@@ -34,7 +34,7 @@
 ### KC4 — Refrigerant-cycle coherence — PASS
 
 - Result: **SINGLE ATOMIC ARCHETYPE** — `vapour_compression_cycle_R290_30kW`
-- Compressor, condenser, evaporator, and electronic expansion valve are NOT separate Lattice archetypes
+- Compressor, condenser, evaporator, and electronic expansion valve are NOT separate Radical archetypes
 - External interfaces only (30 kW capacity, COP ≥3.5, R290 refrigerant, ≤500g charge, 65°C flow temp) are archetype-level properties
 - Coherence rule holds: the thermodynamic cycle is the irreducible unit, structurally equivalent to `lfp_prismatic_cell_280Ah` in BESS
 - Sourcing rule holds: splitting the cycle into sub-archetypes would produce entries that cannot be independently sourced from a distributor at this system grain
@@ -93,7 +93,7 @@
 
 | Rank | Overlap | Products | Why surprising |
 |---|---|---|---|
-| 1 | `levelling_foot` | Vfarm + HP | A mounting foot for a DWC growing rack and an outdoor heat pump plinth are structurally identical at the character level. Same radical stack, different product domains. Lattice correctly collapses them before modifier context is applied. |
+| 1 | `levelling_foot` | Vfarm + HP | A mounting foot for a DWC growing rack and an outdoor heat pump plinth are structurally identical at the character level. Same radical stack, different product domains. Radical correctly collapses them before modifier context is applied. |
 | 2 | `pressure_vessel` | All 3 | Three completely different pressurised containers — halon fire suppression cylinder, food-grade CO2 cylinder, hydronic expansion vessel — share one character. Modifiers carry the domain specifics. |
 | 3 | `liquid_cooling_system` | All 3 | A 1 MW glycol battery cooling loop, a grow-room HVAC/dehumidifier, and a vapour-compression heat pump cycle all match `liquid_cooling_system`. The character abstracts "closed fluid thermal circuit driven by a pump" across radically different technologies. |
 | 4 | `gas_sensor` | All 3 | Li-ion offgas detector (electrochemical), NDIR CO2 sensor (optical absorption), and R290 catalytic bead leak detector (catalytic oxidation) all map to `gas_sensor` with different sensing-principle modifiers. Three unrelated sensing technologies, one character. |
@@ -117,7 +117,7 @@ All 52 BoM lines across vfarm + heat pump decomposed — 100% coverage, zero fai
 
 ## Verdict
 
-**Lattice scales universally at the radical level. KC3 exposes a criterion calibration issue, not an architectural failure.**
+**Radical scales universally at the radical level. KC3 exposes a criterion calibration issue, not an architectural failure.**
 
 The data reveal a two-tier architecture:
 
@@ -125,7 +125,7 @@ The data reveal a two-tier architecture:
 
 - **Characters (domain-permeable function classes):** 33% cross-product reuse at this level is lower than the 50% KC3 threshold, but reflects correct architectural behaviour. Characters encode domain-specific function classes. The 38 single-product characters are genuinely domain-specific — not reuse failures.
 
-**The coherence rule held under full pressure.** KC4 is the architecturally most significant test. The refrigerant cycle stayed atomic. Lattice can model thermodynamic subsystems without fragmenting them into sub-archetype dependency graphs — critical for production use on complex mechatronic products.
+**The coherence rule held under full pressure.** KC4 is the architecturally most significant test. The refrigerant cycle stayed atomic. Radical can model thermodynamic subsystems without fragmenting them into sub-archetype dependency graphs — critical for production use on complex mechatronic products.
 
 ---
 
@@ -143,4 +143,4 @@ The data reveal a two-tier architecture:
 
 ---
 
-*Decomposition performed manually against post-Week-2 library. Zero LLM API costs. No production pipeline code touched. Fully sandboxed in lattice/week-3/.*
+*Decomposition performed manually against post-Week-2 library. Zero LLM API costs. No production pipeline code touched. Fully sandboxed in radical/week-3/.*
