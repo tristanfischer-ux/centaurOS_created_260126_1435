@@ -1,0 +1,256 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "drone",
+  "product_description": "Consumer Cinematography Drone \u2014 sub-899g, 4K 60fps, 40-min endurance",
+  "data_source": "decomposition_json",
+  "bom_line_count": 26,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 1,
+    "new_characters": 14,
+    "new_archetypes": 26
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "Folding Carbon-Fibre Airframe \u2014 main body + motor arm tubes",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_folding_airframe_drone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "Carbon-Fibre Propeller Guards (optional, folding)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cfrp_propeller_guard_folding",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "Brushless Outrunner Motor (\u00d74) \u2014 2306, 2400KV",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "brushless_outrunner_2306_2400KV",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "Electronic Speed Controller \u2014 ESC 40A BLHeli (\u00d74)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "esc_40a_blheli_drone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "Propellers \u2014 5-inch tri-blade (\u00d74 + 2 spare sets)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "propeller_5inch_triblade_drone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "4S Lithium Polymer Battery Pack \u2014 4000mAh, 15C",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "lipo_pack_4s_4000mah_15c",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "Battery Management System PCB (4S BMS)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "bms_pcb_4s_lipo_drone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Smart Battery Connector + Latch",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "smart_battery_connector_latch_50a",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "3-Axis Brushless Gimbal (Tilt + Roll + Pan)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "brushless_gimbal_3axis_cinema",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "1-inch CMOS Camera Module (4K 60fps, 10-bit)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cmos_1inch_4k60_10bit_module",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "Camera Lens (4.5mm, f/2.8, wide-angle)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "drone_lens_4_5mm_f2_8",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Flight Controller (F7 SoC, ArduPilot-compatible)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "flight_controller_f7_ardupilot",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "IMU Module (6-axis MEMS \u2014 accelerometer + gyroscope)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "imu_6axis_mems_drone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "Barometric Pressure Sensor",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "barometric_pressure_sensor_drone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "Multi-constellation GNSS Module (GPS + GLONASS + BeiDou)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "gnss_module_multi_constellation",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "Electronic Compass (magnetometer, HMC5983)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "magnetometer_compass_drone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "Obstacle Avoidance Vision Sensor Array (front + rear + downward)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "stereo_vision_sensor_obstacle_avoidance",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "5.8GHz Digital Video Transmission System (OcuSync-class)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "digital_video_radio_5_8ghz_10km",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Remote ID Module (ASTM F3322, broadcast BT + WiFi)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "remote_id_module_astm_f3322",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "Controller Handset (5.8GHz, built-in 5.5-inch screen)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "drone_controller_handset_5_5inch",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "Power Distribution Board (drone PDB, 4-in-4-out, 30A/ch)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "power_distribution_board_drone_30a",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Payload Dampening Mount (3D-printed TPU vibration isolator)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "tpu_vibration_isolator_gimbal",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "Aluminium Heatsink \u2014 ESC stack thermal management",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "aluminium_heatsink_esc_stack",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "Status LED Array (arm-tip + status indicator, RGB)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "rgb_status_led_array_drone_arm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 25,
+      "name": "Wiring Harness \u2014 main power + signal loom",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "wiring_harness_drone_lightweight",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 26,
+      "name": "M3 Titanium Screws + Nylon Standoffs (structural fasteners)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "titanium_screw_M3_drone",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

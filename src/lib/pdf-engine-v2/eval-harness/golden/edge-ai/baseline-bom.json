@@ -1,0 +1,238 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "edge-ai",
+  "product_description": "1U Rack-Mount Edge AI Inference Server \u2014 200W, 2 TOPS INT8, x86 + PCIe Accelerator",
+  "data_source": "decomposition_json",
+  "bom_line_count": 24,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 0,
+    "new_characters": 10,
+    "new_archetypes": 24
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "Custom AI Inference Accelerator PCIe Card (NPU/GPU, 75W)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "ai_accelerator_pcie_75w_npu",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "x86 Compute Module (CPU SoC, embedded, \u226435W TDP)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "x86_compute_module_35w_embedded",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "DDR5 ECC Memory (32 GB, 2\u00d7 DIMM)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ddr5_ecc_32gb_dimm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "NVMe Boot Drive (512 GB, M.2 2280)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "nvme_boot_512gb_m2",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "NVMe Cache Drive (2 TB, M.2 2280)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "nvme_cache_2tb_m2",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "1U Server Chassis (steel, tool-less, hot-swap drive bays)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "1u_chassis_steel_hot_swap",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "Hot-Swap Fan Tray (4\u00d7 40mm blower fans)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "blower_fan_tray_4x40mm_1u",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Platinum-Rated PSU (200W, 80+ Platinum, ATX12V)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "psu_200w_80plus_platinum_atx",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Power Distribution Board (ATX to PCIe + SATA + aux rails)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "power_distribution_board_atx_server",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "Aluminium CPU Heatsink (direct-contact heatpipe, 65W)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "aluminium_heatsink_heatpipe_65w",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "Aluminium GPU/NPU Heatsink (direct-die, 75W)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "aluminium_heatsink_direct_die_75w",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Heat Pipes (copper, 6mm, CPU-to-fin stack)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "heat_pipe_6mm_sintered_cpu",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "Dual 10GBASE-T Network Controller PCB (rear I/O)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "nic_dual_10gbase_t",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "Dual 2.5GBASE-T Network Controller PCB (BMC/management)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "nic_dual_2_5gbase_t_bmc",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "BMC IPMI Module (baseboard management controller)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "bmc_ipmi_management_module",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "USB Hub PCB (4\u00d7 USB-A 3.2 + Type-C, rear I/O)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "usb_hub_4port_3_2",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "Front-Panel Status LED Array (system / storage / network, RGB)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "rgb_led_array_front_panel_server",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "Front-Panel LCD (2-line, status display, 16\u00d72)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "lcd_16x2_front_panel_server",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Wiring Harness \u2014 internal signal + power loom",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "wiring_harness_server_internal",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "Thermal Interface Material (TIM, graphite + phase-change pads)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "tim_graphite_phase_change_server",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "PCIe Riser Card (x16 slot, 1U low-profile)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "pcie_riser_x16_1u_low_profile",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Rack Mounting Ears + Rails (1U, standard 19-inch)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "rack_ears_1u_19inch_server",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "M3 Screws + Standoffs (internal assembly fasteners)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "m3_screw_standoff_server",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "Power Button + Reset Switch Assembly",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "power_button_reset_server_front",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

@@ -8,6 +8,27 @@
  * Grammar rules fire against Archetype, not against MPNs.
  */
 
+// ---------------------------------------------------------------------------
+// Schema versioning — Phase 0 addition (council mandate)
+// ---------------------------------------------------------------------------
+
+/**
+ * Current version of the Radical spec.
+ * Bump the major version when the tree structure changes incompatibly.
+ * Bump minor for additive changes (new optional fields).
+ * Patch for clarifications with no structural impact.
+ */
+export const CURRENT_RADICAL_SPEC_VERSION = "1.0.0"
+
+/**
+ * Version compatibility range: versions with the same major are compatible.
+ */
+export function isVersionCompatible(version: string): boolean {
+  const currentMajor = parseInt(CURRENT_RADICAL_SPEC_VERSION.split('.')[0], 10)
+  const loadedMajor = parseInt((version || '0').split('.')[0], 10)
+  return loadedMajor === currentMajor
+}
+
 export type PropertyValue = number | string | boolean
 export type PropertyMap = Record<string, PropertyValue>
 
@@ -95,4 +116,30 @@ export type Composition = {
   root: CompositionNode
   // flat environment tags (e.g. "marine", "indoor")
   environment: string[]
+}
+
+// ---------------------------------------------------------------------------
+// RadicalTree — versioned root container (Phase 0 addition)
+// The tree is the serialisable, storable unit that carries spec version.
+// A Composition is the in-memory representation; RadicalTree is the
+// at-rest / over-the-wire representation.
+// ---------------------------------------------------------------------------
+
+export type RadicalTree = {
+  /**
+   * Version of the Radical spec this tree was authored against.
+   * Used by the version-compatibility check in property-api.ts.
+   * Format: "MAJOR.MINOR.PATCH" (semver).
+   */
+  radical_spec_version: string
+  composition: Composition
+  /**
+   * Optional metadata for audit trails.
+   */
+  meta?: {
+    created_at?: string
+    product_slug?: string
+    pipeline_run_id?: string
+    authored_by?: string
+  }
 }

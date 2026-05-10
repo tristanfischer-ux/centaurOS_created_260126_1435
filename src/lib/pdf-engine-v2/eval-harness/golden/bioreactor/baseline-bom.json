@@ -1,0 +1,256 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "bioreactor",
+  "product_description": "200 L Single-Use Pharma Bioreactor Skid \u2014 Mammalian Cell Culture, ISO 7 Cleanroom",
+  "data_source": "decomposition_json",
+  "bom_line_count": 26,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 1,
+    "new_characters": 8,
+    "new_archetypes": 26
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "316L Stainless-Steel Skid Frame (electropolished, Ra \u22640.5\u00b5m)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "316L_skid_frame_electropolished_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "Levelling Feet + Castors (stainless, cleanroom-grade)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "levelling_foot_316L_cleanroom",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "200L Single-Use Bioprocess Bag (USP Class VI, gamma-validated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "single_use_bag_200L_USP_gamma",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "Stainless-Steel Bag Holder Cradle (removable, 200L)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "bag_holder_cradle_316L_200L",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "Magnetic Impeller Drive \u2014 servomotor + magnetic coupling",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "magnetic_impeller_drive_200L",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "Servomotor (bottom-mount drive, variable speed)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "servomotor_variable_speed_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "Electric Jacket Heater (10 kW, silicone band)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "electric_jacket_heater_10kw_silicone",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Chilled-Water Loop Coil + Pump (cooling, \u00b10.2\u00b0C control)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "chilled_water_cooling_coil_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Gas Mass-Flow Controller \u2014 Air (0-10 slpm)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "gas_mfc_air_0_10_slpm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "Gas Mass-Flow Controller \u2014 O\u2082 (0-10 slpm)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "gas_mfc_o2_0_10_slpm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "Gas Mass-Flow Controller \u2014 CO\u2082 (0-10 slpm)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "gas_mfc_co2_0_10_slpm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Gas Mass-Flow Controller \u2014 N\u2082 (0-10 slpm)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "gas_mfc_n2_0_10_slpm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "Macro + Micro Ring Sparger Assembly (single-use, gamma-validated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "single_use_sparger_macro_micro",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "Peristaltic Feed Pump \u2014 pH base (24V DC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "peristaltic_pump_ph_base_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "Peristaltic Feed Pump \u2014 glucose + antifoam (24V DC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "peristaltic_pump_glucose_antifoam_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "Single-Use Dissolved Oxygen (DO) Sensor Mount + Optical Transmitter",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "do_optical_sensor_single_use",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "Single-Use pH Sensor Mount + Optical Transmitter",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ph_optical_sensor_single_use",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "Temperature Sensor (PT100, immersion, 316L)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "pt100_temp_sensor_316L_bioprocess",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Load Cells / Weigh Frame (10 kg, 4 cells, GMP-certified)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "load_cell_10kg_gmp_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "15-inch HMI Touchscreen (GAMP 5 validated recipe engine)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hmi_touchscreen_15inch_gamp5",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "PLC + 21 CFR Part 11 Audit Log Module",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "plc_21cfr_part11_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "HEPA Exhaust Filter Housing (cleanroom gas exhaust, cleanroom-grade)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hepa_filter_housing_cleanroom_exhaust",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "Single-Use Sampling + Harvest Port Manifold",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "single_use_port_manifold_harvest",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "IP54 Control Panel Enclosure (316L, cleanroom)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "steel_enclosure_316L_ip54_cleanroom",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 25,
+      "name": "DIN Rail PSU (24V DC, controls + sensors)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "din_rail_psu_24v_bioreactor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 26,
+      "name": "Solenoid Valves \u2014 gas manifold (N2 sparging + overlay)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "solenoid_valve_gas_316L_bioreactor",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

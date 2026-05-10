@@ -40,6 +40,7 @@ import PdfRendererV3 from './stages/7-pdf-v3'
 // available for generateErrorPdf() and getActivePdfRenderer() which are
 // called outside runPipeline's closure.
 import { isPaPipeline, getPdfRenderer } from './env'
+import { isPhaseZeroSliceEnabled, runPhaseZeroSlice } from './radical/phase-0-slice/pipeline'
 
 function getActivePdfRenderer(renderer: 'v2' | 'v3') {
   return renderer === 'v3' ? PdfRendererV3 : PdfRenderer
@@ -274,6 +275,33 @@ export async function runPipeline(
     sourceAttributions: [],
     llmAttributions: [],
     sectionScores: [],
+  }
+
+  // ── Phase 0 Radical vertical slice (feature-flagged) ────────────────────────
+  // When RADICAL_PHASE_0_SLICE=true AND the brief is for BESS, run the
+  // Radical pipeline and attach the trace to the pipeline state.
+  // The existing per-class pipeline still runs — this is strictly additive.
+  // Runs BEFORE stage 1 so the trace is available for any stage that wants it.
+  if (isPhaseZeroSliceEnabled()) {
+    const isBessBrief = briefText.toLowerCase().includes('bess') ||
+      briefText.toLowerCase().includes('battery energy storage') ||
+      briefText.toLowerCase().includes('lfp')
+    if (isBessBrief) {
+      console.info('[pipeline] RADICAL_PHASE_0_SLICE=true + BESS brief detected — running Phase 0 slice')
+      try {
+        const sliceResult = await runPhaseZeroSlice()
+        // Attach to state for observability — does NOT affect existing BoM/PDF output
+        ;(state as any).radicalPhase0Slice = sliceResult
+        console.info(
+          `[pipeline] Phase 0 slice: ok=${sliceResult.ok} grammar=${sliceResult.grammar.verdict} ` +
+          `cost=£${sliceResult.cost_rollup.system_total_gbp.toLocaleString('en-GB', { maximumFractionDigits: 0 })} ` +
+          `nodes=${sliceResult.tree_node_count} leaves=${sliceResult.tree_leaf_count}`
+        )
+      } catch (sliceErr) {
+        // Slice errors must NEVER affect the main pipeline
+        console.error('[pipeline] Phase 0 slice threw unexpectedly:', (sliceErr as Error).message)
+      }
+    }
   }
 
   // B1 FIX (2026-05-09): stage source labels for AuditLogSection.

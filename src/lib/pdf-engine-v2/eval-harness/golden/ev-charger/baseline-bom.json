@@ -1,0 +1,256 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "ev-charger",
+  "product_description": "150 kW DC Fast EV Charger \u2014 Dual CCS2, OCPP 2.0.1, UK Commercial",
+  "data_source": "decomposition_json",
+  "bom_line_count": 26,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 0,
+    "new_characters": 9,
+    "new_archetypes": 26
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "25 kW Isolated DC/DC Power Module (\u00d76, paralleled to 150 kW)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "isolated_dcdc_module_25kw_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "3-Phase PFC Rectifier (400V AC \u2192 800V DC bus, 165 kW peak)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "3phase_pfc_rectifier_165kw",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "G99 Protection Relay (grid connection, UK)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "g99_protection_relay_uk",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "Input 3-Phase Isolation Contactor (400V AC, 230A)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ac_contactor_3phase_230a_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "DC Output Isolation Contactors (\u00d72, per CCS2 port, 500A)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "dc_contactor_500a_ccs2_port",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "CCS2 Dispenser Head + Liquid-Cooled Cable (\u00d72, 5m, 400A)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ccs2_dispenser_liquid_cooled_5m_400a",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "Liquid Cooling Loop \u2014 pump + plate HX + reservoir + fan",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "liquid_cooling_loop_ev_charger_glycol",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Copper DC Busbar (800V bus, 200A continuous)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "copper_busbar_800v_200a",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Calibrated Energy Meter (MID-compliant, 0.5% accuracy)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "energy_meter_mid_0_5pct",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "10-inch HMI Touchscreen",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hmi_touchscreen_10inch_outdoor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "Contactless Card Reader (RFID/NFC, ISO 14443)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "rfid_nfc_reader_iso14443",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Cellular 4G Backhaul Modem (OCPP 2.0.1 primary link)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cellular_modem_4g_ocpp",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "Ethernet Network Switch (GbE, for ISO 15118 PLC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ethernet_switch_gbe_iso15118",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "Master Controller / EVSE Management PCB",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "evse_master_controller_ocpp_iso15118",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "Auxiliary LVAC UPS (24V / 48V DC for controls, 15 min hold-up)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "auxiliary_ups_lvdc_15min",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "DIN Rail PSU (24V DC, 10A \u2014 controls rail)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "din_rail_psu_24v_10a_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "Miniature Circuit Breakers (MCBs, LVAC distribution)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "mcb_lvac_distribution_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "IK10 Stainless-Steel Weatherproof Enclosure",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "stainless_enclosure_ip54_ik10_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Thermal Insulation Padding (enclosure interior, IP-class sealing foam)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "thermal_insulation_ip54_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "Levelling Feet + Floor Anchors (M16 stainless)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "steel_levelling_foot_M16_316L_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "DC Current Shunt + Voltage Sensor (per-port current sense)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "current_shunt_500a_ev_port",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Surge Protection Device (SPD, Type 2, AC input)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "spd_type2_400v_ac",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "Cable Glands + Conduit Fittings (cable entry IP54)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cable_gland_ip54_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "Aluminium Heatsink Assemblies (for power modules)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "aluminium_heatsink_power_module_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 25,
+      "name": "Door Lock + Access Keyswitch (enclosure security)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "door_lock_keyswitch_ev",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 26,
+      "name": "Status Indicator Lights (LED RGB, front panel)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "rgb_status_led_front_panel_ev",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

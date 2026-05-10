@@ -1,0 +1,238 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "cgm-wearable",
+  "product_description": "Flash CGM Patch \u2014 14-day disposable sensor + BLE bridge, MDR Class IIb",
+  "data_source": "decomposition_json",
+  "bom_line_count": 24,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 0,
+    "new_characters": 12,
+    "new_archetypes": 24
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "Enzyme-Coated Glucose Oxidase Microneedle Array (working electrode)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "glucose_oxidase_microneedle_working_electrode",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "Silver/Silver-Chloride Reference Electrode (microneedle, Ag/AgCl)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "agagcl_reference_microneedle_electrode",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "Counter Electrode (Pt or carbon-paste, current sink)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "carbon_paste_counter_microneedle_electrode",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "Biocompatible Glucose-Limiting Membrane (polyurethane, diffusion rate control)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "glucose_limiting_diffusion_membrane_PU",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "ASIC Analog Front End \u2014 Potentiostat + ADC (single-chip, <1\u00b5A quiescent)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "potentiostat_asic_cgm_1ua",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "Ultra-Low-Power MCU (ARM Cortex-M0+, sleep current <1\u00b5A)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "mcu_cortex_m0_ulp_cgm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "BLE 5.2 Radio SoC (2.4 GHz, integrated antenna matching)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ble_52_soc_cgm_wearable",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Flexible Polyimide PCB (sensor interconnect, sub-0.1 mm flex)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "flex_pcb_polyimide_cgm_sensor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Coin Cell Primary Battery \u2014 CR2032 or LiMnO2 equivalent (14-day life)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cr2032_coin_cell_cgm_sensor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "Medical-Grade Acrylate Skin Adhesive Patch (35\u00d730 mm, ISO 10993-1 tested)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "medical_acrylate_patch_35x30_cgm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "Overmoulded Waterproof Housing \u2014 sensor capsule (PA12, IP68 equivalent)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "overmould_pa12_ip68_cgm_housing",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Sterile Blister Pack (Tyvek lid, PET tray, EO or gamma sterilised)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "sterile_blister_tyvek_PET_cgm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "Printed Carton (FSC cardboard, instruction leaflet)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "fsc_carton_cgm_printed",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "Applicator Device \u2014 spring-loaded needle insertion + retraction (ABS)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "spring_loaded_cgm_applicator_ABS",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "BLE Bridge PCB \u2014 rigid FR4 with antenna (reader + display driver)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "ble_bridge_pcb_fr4_reader",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "E-Ink Display or OLED segment display (glucose readout, bridge)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "eink_glucose_display_bridge",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "Rechargeable LiPo Battery \u2014 bridge (100\u2013150 mAh, USB-C rechargeable)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "lipo_100mAh_ble_bridge",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "USB-C Charging Port + Protection Circuit",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "usb_c_port_bridge_cgm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Bridge Housing \u2014 ABS + TPE overmould, IP22 (shower-safe)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "abs_tpe_ip22_bridge_housing",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "Accelerometer + Temperature Sensor (body-worn activity + skin temp correction)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "mems_accel_temp_cgm_body",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "Power Management IC + LDO regulators (sensor PMIC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "pmic_ldo_cgm_wearable",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Crystal Oscillator \u2014 32.768 kHz (RTC, low-power timekeeping)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "crystal_32768hz_rtc_cgm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "NFC Anti-Collision Tag IC (secondary reader, ISO 15693 Flash Glucose)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "nfc_tag_iso15693_cgm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "Wiring Loom / Flex Cable \u2014 bridge to charging dock (optional snap-fit)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "flex_cable_bridge_dock_cgm",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

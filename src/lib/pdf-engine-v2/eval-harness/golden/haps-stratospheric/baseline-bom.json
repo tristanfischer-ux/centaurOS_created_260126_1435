@@ -1,0 +1,247 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "haps-stratospheric",
+  "product_description": "50 m Wingspan Solar-Electric HAPS \u2014 30-day stratospheric persistence, ISR / comms relay",
+  "data_source": "decomposition_json",
+  "bom_line_count": 25,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 1,
+    "new_characters": 9,
+    "new_archetypes": 25
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "CFRP Main Wing Spar (50 m span, T800/M21 prepreg, 4.5 kg)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_wing_spar_50m_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "CFRP Secondary Spars + Ribs (leading/trailing edge structure)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_secondary_spars_ribs_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "Ultralight Mylar Wing Skin (biaxially oriented PET film, 12 \u00b5m, heat-shrink tensioned)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "mylar_wing_skin_12um_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "CFRP Monocoque Fuselage Pod (avionics + battery bay, 3 m length, 0.3 m dia)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_monocoque_fuselage_3m_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "Crystalline Silicon Solar Panels \u2014 55 m\u00b2 array (24% efficiency, 2 \u00d7 27.5 m wing arrays)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "csi_solar_panel_24pct_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "MPPT Charge Controllers (8 \u00d7 distributed, 400W per string)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "mppt_controller_400w_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "Lithium-Sulphur Battery Pack (40 kWh, >350 Wh/kg, stratospheric rated \u221240\u00b0C)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "li_sulphur_40kwh_stratospheric_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Battery Management System \u2014 thermal + SOC management (stratospheric)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "bms_stratospheric_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Brushless Pusher Motors \u2014 2 \u00d7 (500W continuous, stratospheric optimised)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "brushless_pusher_500w_stratospheric_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "Variable-Pitch Propeller Hubs \u2014 2 \u00d7 (CFRP blades, 2.5 m dia, pitch range 10-35\u00b0)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cfrp_variable_pitch_prop_2p5m_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "ESC \u2014 2 \u00d7 (500W, sensorless BLDC, conformal-coated, \u221275\u00b0C rated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "esc_500w_minus75c_conformal_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Control Surface Servos \u2014 4 \u00d7 (ruddervator + spoilers + flaperons, lightweight BLDC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "servo_bldc_lightweight_stratospheric_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "Flight Control Computer \u2014 redundant (2 \u00d7 Kintex-7 FPGA + GR716 LEON3 MCU)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "fcc_redundant_fpga_rad_tolerant_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "Redundant MEMS IMU Cluster (2 \u00d7 tactical-grade IMU, conformal-coated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "imu_tactical_redundant_conformal_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "GNSS Receiver (dual-constellation GPS/Galileo, radiation-tolerant, L1/L2)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "gnss_gps_galileo_radtol_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "Ka-Band Communications Payload + Steerable Phased-Array Antenna",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ka_band_phased_array_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "Iridium Backup Telemetry Transceiver (emergency + command uplink)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "iridium_sbd_backup_telemetry_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "De-icing Heater Pads \u2014 leading edge + battery bay (PTC silicone, 150W total)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ptc_deicing_pad_leading_edge_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Radiation-Shielded Electronics Bay (Al alloy, 3 mm equivalent shielding)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "al_radiation_shielded_bay_3mm_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "Power Distribution Bus \u2014 48V DC regulated (solar + battery bus merge)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "power_dist_48v_solar_battery_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "Internal Wiring Harness \u2014 ultra-lightweight Litz wire + Kapton tape (total <500g)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "litz_kapton_harness_500g_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Modular Payload Bay Compartments \u2014 wet + dry (CFRP box, EMC shielded)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_payload_bay_emc_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "Control Surface Actuators \u2014 carbon-fibre control horns + pushrods (ultralight)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_control_horn_pushrod_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "Motor Mounting Pylons + Prop Shaft Bearings (CFRP, titanium bearings)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_motor_pylon_ti_bearing_haps",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 25,
+      "name": "Ground Station \u2014 spectrum + airspace management workstation (COTS ruggedised)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cots_ground_station_spectrum_haps",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

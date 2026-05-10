@@ -1,0 +1,292 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "vfarm",
+  "product_description": "Modular Vertical Farm Unit \u2014 Leafy Greens, 12 m\u00b2 DWC, 6-tier",
+  "data_source": "decomposition_json",
+  "bom_line_count": 30,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 1,
+    "new_characters": 19,
+    "new_archetypes": 30
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "T-Slot Aluminium Extrusion (40\u00d740mm) \u2014 growing rack frame",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "aluminium_extrusion_40x40_t_slot",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "PIR Insulated Sandwich Panel (40mm) \u2014 enclosure wall/ceiling",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "pir_insulated_sandwich_panel_40mm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "Heavy-Duty Levelling Feet (M16)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "steel_levelling_foot_M16",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "Grow Tray Assembly (DWC polypropylene channels)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "dwc_grow_tray_polypropylene_food_grade",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "LED Grow Lights (full-spectrum horticultural LED bar)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "horticultural_led_bar_fullspectrum",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "Dimmable LED Driver (400W, 0-10V)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "led_driver_400w_dimmable_0_10v",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "PE Reservoir Tank (150L) \u2014 nutrient solution",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "pe_reservoir_tank_150L",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Magnetic Drive Circulation Pump (nutrient recirculation)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "magnetic_drive_pump_food_grade",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Peristaltic Dosing Pump (24VDC) \u2014 nutrient dosing",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "peristaltic_dosing_pump_24vdc",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "Industrial EC/pH/Temp Sensor Probe",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ec_ph_temp_sensor_industrial",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "5L Chemical Stock Tank (nutrient concentrate)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "polymer_stock_tank_5L_chem_resistant",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "UPVC Bulkhead Fitting (32mm) \u2014 tank/pipe connections",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "upvc_bulkhead_fitting_32mm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "HVAC Fan Coil / Dehumidifier Unit",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "hvac_fan_coil_dehumidifier_vfarm",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "EC Axial Circulation Fan (120mm, IP55)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ec_axial_fan_120mm_ip55",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "HEPA Intake Filter Housing",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hepa_intake_filter_housing",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "Condensate Drain Pump",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "condensate_drain_pump",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "CO2 Cylinder (compressed gas, food-grade)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "co2_cylinder_food_grade",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "Dual-Stage CO2 Regulator",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "co2_regulator_dual_stage",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "CO2 Solenoid Valve (24VDC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "co2_solenoid_valve_24vdc",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "NDIR CO2 Sensor",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ndir_co2_sensor_indoor_ag",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "Micro-porous CO2 Distribution Tubing",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "microporous_co2_tubing",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Industrial PLC (CPU + I/O Modules)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "industrial_plc_cpu_io",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "7-inch HMI Touchscreen",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hmi_touchscreen_7inch",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "IP65 Electrical Enclosure (main control panel)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "electrical_enclosure_ip65",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 25,
+      "name": "4-Pole Contactor (25A) & Relays",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ac_contactor_4pole_25a",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 26,
+      "name": "DIN Rail Power Supply (24VDC, 10A)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "din_rail_psu_24v_10a",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 27,
+      "name": "Fertigation Controller (Priva / Netafim class)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "fertigation_controller_nutrient",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 28,
+      "name": "UV Steriliser (water treatment)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "uv_steriliser_water_treatment",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 29,
+      "name": "Fire Detection System (smoke + heat detectors, panel)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "fire_detection_system_panel",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 30,
+      "name": "50-Micron Inline Mesh Filter Housing",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "inline_mesh_filter_50um",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

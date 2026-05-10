@@ -1,0 +1,220 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "heat-pump",
+  "product_description": "30 kW Monobloc Air-to-Water Heat Pump \u2014 R290, UK Commercial Retrofit",
+  "data_source": "decomposition_json",
+  "bom_line_count": 22,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 0,
+    "new_characters": 14,
+    "new_archetypes": 22
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "Vapour-Compression Refrigerant Cycle \u2014 R290, 30kW (ATOMIC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "vapour_compression_cycle_R290_30kW",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "R290 Refrigerant Charge (\u2264500g)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "refrigerant_charge_R290_500g",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "Outdoor Fan Motor (variable speed, EC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ec_fan_motor_variable_speed_outdoor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "Fan Blade Assembly (axial, aerofoil section)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "axial_fan_blade_aerofoil",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "Refrigerant-to-Water Plate HX (water-side condenser)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "brazed_plate_hx_water_side_R290",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "Inverter Drive (compressor VFD, 3-phase)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "inverter_drive_compressor_vfd",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "Controller PCB (heat pump control, ATEX-adjacent R290)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "heat_pump_controller_pcb_R290",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Hydronic Circulation Pump (water circuit, 30kW)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hydronic_circulation_pump_30kw",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Refrigerant Lines (copper, pre-bent, insulated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "copper_refrigerant_line_R290_insulated",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "Acoustic Insulation Panels (enclosure lining)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "acoustic_insulation_panel_enclosure",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "Monobloc Enclosure / Chassis (galvanised steel, powder-coated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "steel_monobloc_chassis_outdoor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Defrost Heater Element (electric, crankcase + drain pan)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "defrost_heater_crankcase",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "Electrical Disconnect / Isolator (AC supply)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ac_isolator_400v_heat_pump",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "R290 Refrigerant Leak Detector (catalytic bead)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "r290_leak_detector_catalytic",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "Outdoor Air Temperature / RH Sensor",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "outdoor_temp_rh_sensor",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "Flow / Return Water Temperature Sensors (NTC pair)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "ntc_temperature_sensor_hydronic",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "High-Pressure / Low-Pressure Safety Switches",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hp_lp_pressure_switch_R290",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "Hydronic Safety Group (PRV + expansion vessel + air vent)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hydronic_safety_group_PRV_expansion",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Hydronic Manifold + Service Valves (flow/return connections)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "hydronic_manifold_brass_service_valves",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "Anti-vibration Mounting Feet",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "anti_vibration_mounting_foot",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "Wiring Harness + Cable Management",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "wiring_harness_outdoor_heat_pump",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Mounting Frame / Plinth (galvanised steel, ground-mount)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "steel_mounting_plinth_outdoor_galvanised",
+      "verification_grade": "grade_d"
+    }
+  ]
+}

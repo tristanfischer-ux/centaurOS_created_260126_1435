@@ -1,0 +1,247 @@
+{
+  "schema": "golden-baseline-bom/v1.0.0",
+  "captured_at": "2026-05-10",
+  "product_slug": "auv-coastal",
+  "product_description": "2-m Class Coastal AUV \u2014 100 m rated, 24-hour endurance, modular sonar payload",
+  "data_source": "decomposition_json",
+  "bom_line_count": 25,
+  "known_parts_total_gbp": 0,
+  "has_real_cost_rollup": false,
+  "library_growth": {
+    "new_radicals": 1,
+    "new_characters": 13,
+    "new_archetypes": 25
+  },
+  "tolerances": {
+    "bom_line_count_delta_max": 0,
+    "total_cost_pct_tolerance": 2.0,
+    "status_change_tolerance": 0
+  },
+  "parts": [
+    {
+      "line_id": 1,
+      "name": "Titanium Pressure Hull \u2014 Main Cylinder (Ti-6Al-4V, 100 m rated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "ti_6al4v_pressure_hull_100m_main",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 2,
+      "name": "Titanium Pressure Hull \u2014 Nose Cone (Ti-6Al-4V, hydrodynamic fairing)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "ti_6al4v_pressure_hull_nose_100m",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 3,
+      "name": "Titanium Pressure Hull \u2014 Tail Section (Ti-6Al-4V, thruster interface)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "ti_6al4v_pressure_hull_tail_100m",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 4,
+      "name": "Syntactic Foam Buoyancy Module (glass microballoon-epoxy, 100 m rated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "syntactic_foam_glass_100m_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 5,
+      "name": "12 kWh Li-Ion Battery Pack \u2014 oil-compensated pressure-balanced housing",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "oil_compensated_liion_12kwh_100m_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 6,
+      "name": "Battery Management System (BMS) \u2014 marine-rated, over-temperature + depth protection",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "bms_marine_depth_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 7,
+      "name": "Brushless Thruster Motor (2 \u00d7 main drive, 300W continuous, 24V DC)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "brushless_thruster_300w_24v_marine",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 8,
+      "name": "Propeller \u2014 carbon-fibre, 3-blade, 150mm dia, marine-antifouled",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "cfrp_propeller_3blade_150mm_marine",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 9,
+      "name": "Electronic Speed Controller (ESC) \u2014 2 \u00d7 300W brushless, 24V",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "esc_300w_24v_marine_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 10,
+      "name": "Control Surface Servos \u2014 4 \u00d7 (rudder + elevator + aileron + spoiler)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "servo_waterproof_100m_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 11,
+      "name": "Inertial Navigation System (INS) + IMU (MEMS, tactical grade)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "mems_ins_tactical_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 12,
+      "name": "Doppler Velocity Log (DVL) \u2014 4-beam ADCP, 600 kHz, bottom-lock",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "dvl_600khz_4beam_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 13,
+      "name": "Acoustic Modem Transducer (USBL, 2-way, 9.6 kbps, 2000 m range)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "acoustic_modem_usbl_2000m_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 14,
+      "name": "Pressure / Depth Sensor (Keller PAA-35X or equivalent, 0\u2013150 m, 0.1% FS)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "depth_pressure_sensor_150m_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 15,
+      "name": "GPS + Iridium Masthead Assembly (pop-up mast, surface only)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "gps_iridium_masthead_popup_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 16,
+      "name": "2.4 GHz Wi-Fi Pop-Up Antenna Module (surface comms, IEEE 802.11n)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "wifi_popup_2400mhz_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 17,
+      "name": "Forward-Looking Obstacle-Avoidance Sonar (mechanically scanned, 900 kHz)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "imaging_sonar_900khz_obstacle_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 18,
+      "name": "Main Mission Computer / Autopilot PCB (ARM SoC, 100BASE-T Ethernet backbone)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "arm_soc_autopilot_100baset_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 19,
+      "name": "Wet-Mate Payload Connector (SubConn or Cobalt, 12-pin, 150 m rated)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "wet_mate_connector_12pin_150m_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 20,
+      "name": "Leak Detector \u2014 resistive water ingress sensor (hull breach alert)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "resistive_leak_detector_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 21,
+      "name": "Emergency Drop Weight (electro-corrosive release, 2 kg lead ballast)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "drop_weight_2kg_lead_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 22,
+      "name": "Recovery Beacon + Strobe (RF 121.5 MHz + xenon flash, IP68)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Buy",
+      "archetype_id": "recovery_beacon_xenon_rf_121p5_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 23,
+      "name": "Power Distribution PCB + Fusing (24V bus, IP68 sealed)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "power_dist_pcb_24v_ip68_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 24,
+      "name": "Internal Wiring Harness \u2014 Ethernet + power + signal (Seacon connectors)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "wiring_harness_seacon_ip68_auv",
+      "verification_grade": "grade_d"
+    },
+    {
+      "line_id": 25,
+      "name": "Modular Payload Bay Shell (CFRP tube, wet-mate interface, 30 cm section)",
+      "qty_note": "1",
+      "unit_cost_gbp": null,
+      "make_buy": "Make",
+      "archetype_id": "cfrp_payload_bay_100m_auv",
+      "verification_grade": "grade_d"
+    }
+  ]
+}
