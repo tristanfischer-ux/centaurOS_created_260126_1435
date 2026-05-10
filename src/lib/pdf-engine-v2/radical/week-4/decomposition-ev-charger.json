@@ -1,0 +1,534 @@
+{
+  "meta": {
+    "product": "150 kW DC Fast EV Charger — Dual CCS2, OCPP 2.0.1, UK Commercial",
+    "bom_source": "Engineering knowledge construction from brief baseline-10/05-dc-fast-ev-charger.md. Representative 26-line BoM matching brief sub-modules: six 25 kW isolated DC/DC power modules, 3-phase PFC rectifier, auxiliary LVAC distribution + UPS, two CCS2 dispenser heads + liquid-cooled cables, liquid-cooling loop, 10-inch HMI touchscreen + contactless card reader, cellular 4G backhaul + Ethernet switch, metering + isolation contactors, G99 protection relay, stainless-steel weatherproof enclosure.",
+    "bom_line_count": 26,
+    "library_state_at_entry": {
+      "radicals": 19,
+      "characters": 75,
+      "archetypes": 113,
+      "note": "Post-drone: 18 + composite_fibre_material = 19 radicals; 61 + 14 drone chars = 75; 87 + 26 drone = 113."
+    },
+    "decomposition_methodology": "Manual: for each BoM line attempt mapping to post-drone library. Library grows incrementally.",
+    "decomposition_date": "2026-05-10"
+  },
+  "new_radicals_added_this_product": [],
+  "bom_lines": [
+    {
+      "line_id": 1,
+      "name": "25 kW Isolated DC/DC Power Module (×6, paralleled to 150 kW)",
+      "module": "power_stack",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "isolated_dcdc_power_module",
+        "modifiers_needed": ["25kW_module_grade", "galvanic_isolated_grade", "CCS2_output_grade"],
+        "new_modifiers_needed": ["25kW_module_grade", "galvanic_isolated_grade", "CCS2_output_grade"],
+        "new_archetype_needed": "isolated_dcdc_module_25kw_ev",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 2,
+      "name": "3-Phase PFC Rectifier (400V AC → 800V DC bus, 165 kW peak)",
+      "module": "power_stack",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["3phase_PFC_grade", "165kW_peak_grade"],
+        "new_modifiers_needed": ["3phase_PFC_grade", "165kW_peak_grade"],
+        "new_archetype_needed": "3phase_pfc_rectifier_165kw",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 3,
+      "name": "G99 Protection Relay (grid connection, UK)",
+      "module": "grid_connection",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "protection_relay",
+        "radicals_reused": ["electrical_conducting_function", "electromechanical_switching_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["G99_Issue6_grade", "400V_AC_rating"],
+        "new_modifiers_needed": ["G99_Issue6_grade"],
+        "new_archetype_needed": "g99_protection_relay_uk",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 4,
+      "name": "Input 3-Phase Isolation Contactor (400V AC, 230A)",
+      "module": "grid_connection",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "ac_contactor",
+        "radicals_reused": ["electrical_conducting_function", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["400V_AC_rating", "230A_rating"],
+        "new_modifiers_needed": ["230A_rating"],
+        "new_archetype_needed": "ac_contactor_3phase_230a_ev",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 5,
+      "name": "DC Output Isolation Contactors (×2, per CCS2 port, 500A)",
+      "module": "output_switching",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "dc_contactor",
+        "radicals_reused": ["electrical_conducting_function", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["500A_rating", "CCS2_port_grade"],
+        "new_modifiers_needed": ["500A_rating", "CCS2_port_grade"],
+        "new_archetype_needed": "dc_contactor_500a_ccs2_port",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 6,
+      "name": "CCS2 Dispenser Head + Liquid-Cooled Cable (×2, 5m, 400A)",
+      "module": "dispenser_head",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": null,
+        "radicals_reused": ["electrical_conducting_function", "fluid_flow_state", "polymer_thermoplastic", "copper", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "ev_charging_connector",
+        "modifiers_needed": ["CCS2_grade", "liquid_cooled_grade", "400A_rating", "5m_cable_grade"],
+        "new_modifiers_needed": ["CCS2_grade", "liquid_cooled_grade", "400A_rating", "5m_cable_grade"],
+        "new_archetype_needed": "ccs2_dispenser_liquid_cooled_5m_400a",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 7,
+      "name": "Liquid Cooling Loop — pump + plate HX + reservoir + fan",
+      "module": "thermal_management",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "liquid_cooling_system",
+        "radicals_reused": ["thermal_transfer_function", "fluid_flow_state", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["glycol_loop_grade", "cable_cooling_grade"],
+        "new_modifiers_needed": ["glycol_loop_grade", "cable_cooling_grade"],
+        "new_archetype_needed": "liquid_cooling_loop_ev_charger_glycol",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 8,
+      "name": "Copper DC Busbar (800V bus, 200A continuous)",
+      "module": "power_stack",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "copper_busbar",
+        "radicals_reused": ["copper", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["800V_DC_grade", "200A_rating"],
+        "new_modifiers_needed": ["800V_DC_grade", "200A_rating"],
+        "new_archetype_needed": "copper_busbar_800v_200a",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 9,
+      "name": "Calibrated Energy Meter (MID-compliant, 0.5% accuracy)",
+      "module": "metering_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "energy_meter",
+        "modifiers_needed": ["MID_compliant_grade", "0_5pct_accuracy_grade"],
+        "new_modifiers_needed": ["MID_compliant_grade", "0_5pct_accuracy_grade"],
+        "new_archetype_needed": "energy_meter_mid_0_5pct",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 10,
+      "name": "10-inch HMI Touchscreen",
+      "module": "hmi_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "hmi_touchscreen",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["10_inch_grade", "outdoor_sunlight_readable_grade"],
+        "new_modifiers_needed": ["10_inch_grade", "outdoor_sunlight_readable_grade"],
+        "new_archetype_needed": "hmi_touchscreen_10inch_outdoor",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 11,
+      "name": "Contactless Card Reader (RFID/NFC, ISO 14443)",
+      "module": "hmi_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "pcb_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "rfid_nfc_reader",
+        "modifiers_needed": ["NFC_ISO14443_grade"],
+        "new_modifiers_needed": ["NFC_ISO14443_grade"],
+        "new_archetype_needed": "rfid_nfc_reader_iso14443",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 12,
+      "name": "Cellular 4G Backhaul Modem (OCPP 2.0.1 primary link)",
+      "module": "hmi_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "network_switch",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "cellular_modem",
+        "modifiers_needed": ["4G_LTE_grade", "OCPP_grade"],
+        "new_modifiers_needed": ["4G_LTE_grade", "OCPP_grade"],
+        "new_archetype_needed": "cellular_modem_4g_ocpp",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 13,
+      "name": "Ethernet Network Switch (GbE, for ISO 15118 PLC)",
+      "module": "hmi_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "network_switch",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["GbE_grade", "ISO15118_PLC_grade"],
+        "new_modifiers_needed": ["GbE_grade", "ISO15118_PLC_grade"],
+        "new_archetype_needed": "ethernet_switch_gbe_iso15118",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 14,
+      "name": "Master Controller / EVSE Management PCB",
+      "module": "control_system",
+      "make_buy": "Make",
+      "decomposition": {
+        "character_match": "ems_controller",
+        "radicals_reused": ["silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["EVSE_OCPP_grade", "ISO15118_grade"],
+        "new_modifiers_needed": ["EVSE_OCPP_grade", "ISO15118_grade"],
+        "new_archetype_needed": "evse_master_controller_ocpp_iso15118",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 15,
+      "name": "Auxiliary LVAC UPS (24V / 48V DC for controls, 15 min hold-up)",
+      "module": "auxiliary_power",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "electrochemical_energy_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["UPS_grade", "15min_holdup_grade"],
+        "new_modifiers_needed": ["UPS_grade", "15min_holdup_grade"],
+        "new_archetype_needed": "auxiliary_ups_lvdc_15min",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 16,
+      "name": "DIN Rail PSU (24V DC, 10A — controls rail)",
+      "module": "auxiliary_power",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "power_converter",
+        "radicals_reused": ["electrical_conducting_function", "silicon_semiconductor_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["24V_DC_grade", "DIN_rail_grade"],
+        "new_modifiers_needed": [],
+        "new_archetype_needed": "din_rail_psu_24v_10a_ev",
+        "growth": "new_archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 17,
+      "name": "Miniature Circuit Breakers (MCBs, LVAC distribution)",
+      "module": "auxiliary_power",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "circuit_breaker",
+        "radicals_reused": ["electrical_conducting_function", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["MCB_LVAC_grade"],
+        "new_modifiers_needed": ["MCB_LVAC_grade"],
+        "new_archetype_needed": "mcb_lvac_distribution_ev",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 18,
+      "name": "IK10 Stainless-Steel Weatherproof Enclosure",
+      "module": "enclosure_structure",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "steel_chassis_enclosure",
+        "radicals_reused": ["steel", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["IP54_rated", "IK10_grade", "316L_grade"],
+        "new_modifiers_needed": ["IK10_grade"],
+        "new_archetype_needed": "stainless_enclosure_ip54_ik10_ev",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 19,
+      "name": "Thermal Insulation Padding (enclosure interior, IP-class sealing foam)",
+      "module": "enclosure_structure",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "thermal_insulation_panel",
+        "radicals_reused": ["mineral_fibre_material", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["IP54_seal_grade"],
+        "new_modifiers_needed": ["IP54_seal_grade"],
+        "new_archetype_needed": "thermal_insulation_ip54_ev",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 20,
+      "name": "Levelling Feet + Floor Anchors (M16 stainless)",
+      "module": "enclosure_structure",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "levelling_foot",
+        "radicals_reused": ["steel", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["M16", "316L_grade"],
+        "new_modifiers_needed": [],
+        "new_archetype_needed": "steel_levelling_foot_M16_316L_ev",
+        "growth": "new_archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 21,
+      "name": "DC Current Shunt + Voltage Sensor (per-port current sense)",
+      "module": "metering_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "resistor",
+        "radicals_reused": ["electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "current_shunt_sensor",
+        "modifiers_needed": ["500A_rating", "MID_compliant_grade"],
+        "new_modifiers_needed": [],
+        "new_archetype_needed": "current_shunt_500a_ev_port",
+        "growth": "new_character+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 22,
+      "name": "Surge Protection Device (SPD, Type 2, AC input)",
+      "module": "grid_connection",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "circuit_breaker",
+        "radicals_reused": ["electrical_conducting_function", "electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "surge_protection_device",
+        "modifiers_needed": ["Type2_SPD_grade", "400V_AC_rating"],
+        "new_modifiers_needed": ["Type2_SPD_grade"],
+        "new_archetype_needed": "spd_type2_400v_ac",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 23,
+      "name": "Cable Glands + Conduit Fittings (cable entry IP54)",
+      "module": "enclosure_structure",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "polymer_bulkhead_fitting",
+        "radicals_reused": ["polymer_thermoplastic", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["IP54_rated", "cable_gland_grade"],
+        "new_modifiers_needed": ["cable_gland_grade"],
+        "new_archetype_needed": "cable_gland_ip54_ev",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 24,
+      "name": "Aluminium Heatsink Assemblies (for power modules)",
+      "module": "thermal_management",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "aluminium_heatsink",
+        "radicals_reused": ["solid_state_of_matter", "thermal_transfer_function"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["power_module_grade"],
+        "new_modifiers_needed": ["power_module_grade"],
+        "new_archetype_needed": "aluminium_heatsink_power_module_ev",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 25,
+      "name": "Door Lock + Access Keyswitch (enclosure security)",
+      "module": "enclosure_structure",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "dc_contactor",
+        "radicals_reused": ["electromechanical_switching_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": "access_lock_mechanism",
+        "modifiers_needed": ["keyed_access_grade", "IP54_rated"],
+        "new_modifiers_needed": ["keyed_access_grade"],
+        "new_archetype_needed": "door_lock_keyswitch_ev",
+        "growth": "new_character+modifier+archetype",
+        "reuse_level": "radical",
+        "coverage": "decomposed"
+      }
+    },
+    {
+      "line_id": 26,
+      "name": "Status Indicator Lights (LED RGB, front panel)",
+      "module": "hmi_comms",
+      "make_buy": "Buy",
+      "decomposition": {
+        "character_match": "indicator_led_array",
+        "radicals_reused": ["photon_emission_function", "silicon_semiconductor_function", "electrical_conducting_function", "solid_state_of_matter"],
+        "new_radicals_needed": [],
+        "new_character_needed": null,
+        "modifiers_needed": ["RGB_status_grade", "front_panel_grade"],
+        "new_modifiers_needed": ["front_panel_grade"],
+        "new_archetype_needed": "rgb_status_led_front_panel_ev",
+        "growth": "new_modifier+archetype",
+        "reuse_level": "character",
+        "coverage": "decomposed"
+      }
+    }
+  ],
+  "growth_accounting": {
+    "new_radicals": {
+      "count": 0,
+      "entries": [],
+      "cap": 4,
+      "pass": true,
+      "note": "EV charger adds ZERO new radicals. Power electronics, thermal management, sensing, and structural concepts all decompose from existing library."
+    },
+    "new_characters": {
+      "count": 9,
+      "entries": [
+        "isolated_dcdc_power_module", "ev_charging_connector", "energy_meter",
+        "rfid_nfc_reader", "cellular_modem", "current_shunt_sensor",
+        "surge_protection_device", "access_lock_mechanism"
+      ],
+      "note": "protection_relay, ac_contactor, dc_contactor, power_converter, liquid_cooling_system, copper_busbar, network_switch, hmi_touchscreen, ems_controller, circuit_breaker, levelling_foot, steel_chassis_enclosure, thermal_insulation_panel, aluminium_heatsink, polymer_bulkhead_fitting, resistor, indicator_led_array — ALL reused."
+    },
+    "new_archetypes": {
+      "count": 26,
+      "note": "One per BoM line"
+    }
+  },
+  "reuse_rates": {
+    "radical_reuse": {
+      "definition": "Lines where ALL radicals for the character were already in post-drone library (no new radical needed)",
+      "lines_with_full_radical_reuse": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26],
+      "count": 26,
+      "lines_needing_new_radical": [],
+      "rate_pct": 100.0
+    },
+    "character_reuse": {
+      "definition": "Lines where an existing character was directly matched",
+      "lines_with_character_reuse": [2, 3, 4, 5, 7, 8, 10, 13, 14, 15, 16, 17, 18, 19, 20, 23, 24, 26],
+      "count": 18,
+      "rate_pct": 69.2
+    }
+  },
+  "coverage": {
+    "total_lines": 26,
+    "decomposed": 26,
+    "not_decomposed": 0,
+    "coverage_pct": 100.0
+  },
+  "kill_criterion_verdicts": {
+    "KC1_radical_reuse": "PASS — 100% (>85% threshold). Zero new radicals needed.",
+    "KC2_radical_growth_cap": "PASS — 0 new radicals (≤4 cap).",
+    "KC4_coverage": "PASS — 26/26 lines decomposed (100%)."
+  }
+}
