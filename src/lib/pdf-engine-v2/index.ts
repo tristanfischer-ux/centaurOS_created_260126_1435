@@ -68,6 +68,7 @@ import { extractSpecs, summariseSpecs } from './lib/spec-extraction'
 import { mapProductClassToIndustryDomain } from './lib/industry-domain'
 import { validateModuleAssignments } from './lib/module-assignment-validator'
 import { isPhase2ResolutionEnabled, runRadicalResolution } from './stages/4b-radical-resolution'
+import { isPhase3CostRollupEnabled, runRadicalCostRollup, logCostSummaryDiff } from './stages/4c-radical-cost-rollup'
 
 export interface EngineResult {
   ok: boolean
@@ -1150,6 +1151,39 @@ export async function runPipeline(
       }
     } else if (isPhase2ResolutionEnabled() && !state.radicalTree) {
       console.warn('[pipeline] Radical Phase 2: RADICAL_PHASE_2_RESOLUTION=true but state.radicalTree is absent — Phase 1 must run first')
+    }
+
+    // ── Radical Phase 3: Cost Rollup (behind RADICAL_PHASE_3_COSTROLLUP flag) ─
+    // Walks state.resolvedRadicalTree depth-first and applies per-level assembly
+    // markups (character 15%, word 20%, sentence 25%) to produce radicalCostSummary.
+    // Requires Phase 2 (state.resolvedRadicalTree) to be populated first.
+    // Strictly additive — state.costSummary (refactor b) is UNCHANGED.
+    if (isPhase3CostRollupEnabled() && state.resolvedRadicalTree) {
+      console.log('[pipeline] Radical Phase 3: RADICAL_PHASE_3_COSTROLLUP=true, running cost rollup...')
+      try {
+        // Extract the cost ceiling from the brief (if available)
+        const ceilingGbp: number | null =
+          state.parsedBrief?.constraints?.unit_cost_ceiling?.value ?? null
+
+        const radicalSummary = runRadicalCostRollup(state.resolvedRadicalTree, ceilingGbp)
+        state.radicalCostSummary = radicalSummary
+
+        console.log(
+          `[pipeline] Radical Phase 3: cost rollup complete. ` +
+          `BoM total: £${radicalSummary.finalUnitCost.toLocaleString('en-GB', { maximumFractionDigits: 0 })}, ` +
+          `Priced leaves: ${radicalSummary.radicalMeta.priced_leaves}/${radicalSummary.radicalMeta.total_leaves}`
+        )
+
+        // Shadow-mode diff: log comparison with existing costSummary when both exist
+        if (state.costSummary) {
+          logCostSummaryDiff(radicalSummary, state.costSummary)
+        }
+      } catch (phase3Err) {
+        // Non-fatal — Phase 3 failure must NEVER block the main pipeline
+        console.warn(`[pipeline] Radical Phase 3: exception (non-fatal): ${(phase3Err as Error).message}`)
+      }
+    } else if (isPhase3CostRollupEnabled() && !state.resolvedRadicalTree) {
+      console.warn('[pipeline] Radical Phase 3: RADICAL_PHASE_3_COSTROLLUP=true but state.resolvedRadicalTree is absent — Phase 2 must run first')
     }
 
     // ── Module Assignment Plausibility Validation (UNIVERSAL-ROBUSTNESS) ──

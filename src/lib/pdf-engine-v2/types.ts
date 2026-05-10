@@ -770,6 +770,17 @@ export interface PipelineState {
    * Phase 5 renderer will eventually consume this; Phase 7 cuts over.
    */
   resolvedRadicalTree?: import('./stages/4b-radical-resolution.js').ResolvedRadicalTree
+  /**
+   * Phase 3 — Radical Cost Summary.
+   * Populated when RADICAL_PHASE_3_COSTROLLUP=true AND resolvedRadicalTree exists.
+   * Same shape as CostSummary but computed by walking the resolved tree with
+   * per-level assembly markups (character 15%, word 20%, sentence 25%).
+   *
+   * COEXISTS alongside state.costSummary during the migration.
+   * Phase 7 cutover will make this the canonical SoT.
+   * Renderer (Phase 5) reads radicalCostSummary when RADICAL_PHASE_3_COSTROLLUP=true.
+   */
+  radicalCostSummary?: import('./stages/4c-radical-cost-rollup.js').RadicalCostSummary
   pipelineError?: {
     stage: string
     message: string
