@@ -736,9 +736,20 @@ export async function runPipeline(
   // the gate). The solver uses domain-derived envelopes and brief constraints;
   // the module-level placement detail is filled in after Decompose runs.
   console.log('\n[pipeline] === Stage 3: Size + Layout ===')
+  // Precedence: brief-stated dimensions ALWAYS win; class default is the fallback
+  // when brief omits geometry. See V7 council 1e4adaf2 for the regression.
+  const _briefDims = state.parsedBrief?.constraints?.max_dimensions_mm
+  const _briefEnvelope =
+    _briefDims && _briefDims.w != null && _briefDims.d != null && _briefDims.h != null
+      ? { w_mm: _briefDims.w, d_mm: _briefDims.d, h_mm: _briefDims.h }
+      : undefined
+  if (_briefEnvelope) {
+    console.log(`[pipeline] Brief-stated envelope found: ${_briefEnvelope.w_mm}×${_briefEnvelope.d_mm}×${_briefEnvelope.h_mm} mm — will override class default in sizing solver`)
+  }
   const sizeResult = await runSizeLayout(state.modules, {
     domain: options?.domain || state.research.industryDomain,
     paMode,
+    briefEnvelope: _briefEnvelope,
   })
   trackStage('size_layout', sizeResult)
   if (sizeResult.ok && sizeResult.data) {

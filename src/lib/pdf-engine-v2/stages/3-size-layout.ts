@@ -193,12 +193,36 @@ const MODULE_DIMENSIONS: Record<string, { w: number; d: number; h: number; mass:
 function solveSizing(
   modules: Module[],
   domain: string,
-  targets: Record<string, number>
+  targets: Record<string, number>,
+  briefEnvelope?: { w_mm: number; d_mm: number; h_mm: number },
 ): DimensionSheet {
   let envelope: Envelope;
   let floor_budget_m2: number;
-  
-  if (domain === 'battery_energy_storage') {
+
+  // ── Brief-stated dimensions ALWAYS win; class default is the fallback when
+  // brief omits geometry. See V7 council 1e4adaf2 for the regression that
+  // motivated this comment.
+  //
+  // If briefEnvelope is provided (from parsedBrief.constraints.max_dimensions_mm),
+  // build the envelope from those dimensions regardless of domain — they represent
+  // the founder's explicit physical constraints and must not be overridden by any
+  // class default. Class defaults are only authoritative when the brief is silent.
+  if (briefEnvelope && briefEnvelope.w_mm > 0 && briefEnvelope.d_mm > 0 && briefEnvelope.h_mm > 0) {
+    const w_m = briefEnvelope.w_mm / 1000
+    const d_m = briefEnvelope.d_mm / 1000
+    const h_m = briefEnvelope.h_mm / 1000
+    envelope = {
+      kind: 'brief_stated',
+      label: `Brief-stated envelope (${w_m.toFixed(2)}×${d_m.toFixed(2)}×${h_m.toFixed(2)} m)`,
+      interior_w_mm: briefEnvelope.w_mm,
+      interior_d_mm: briefEnvelope.d_mm,
+      interior_h_mm: briefEnvelope.h_mm,
+      interior_floor_m2: Number((w_m * d_m).toFixed(3)),
+      interior_volume_m3: Number((w_m * d_m * h_m).toFixed(3)),
+    }
+    floor_budget_m2 = envelope.interior_floor_m2 * 0.85
+    console.log(`[size-layout] Brief-stated envelope overrides class default: ${w_m.toFixed(3)}m × ${d_m.toFixed(3)}m × ${h_m.toFixed(3)}m`)
+  } else if (domain === 'battery_energy_storage') {
     // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): use CLASS_ENVELOPE lookup.
     // Previously hardcoded; now consistent with the class-aware table.
     const spec = CLASS_ENVELOPE.battery_energy_storage
@@ -781,10 +805,22 @@ export function runSizingSecondPass(
   modules: Module[],
 ): DimensionSheetPA {
   const domain = existingSheet.rules_domain || 'generic'
+  // Preserve brief-stated envelope through the second pass: if the first pass
+  // used a brief-stated envelope (kind === 'brief_stated'), reconstruct the
+  // briefEnvelope argument so solveSizing uses the same dimensions for
+  // module placement calculations, not the class default.
+  const firstPassBriefEnvelope =
+    existingSheet.envelope?.kind === 'brief_stated'
+      ? {
+          w_mm: existingSheet.envelope.interior_w_mm,
+          d_mm: existingSheet.envelope.interior_d_mm,
+          h_mm: existingSheet.envelope.interior_h_mm,
+        }
+      : undefined
   // Re-run module dimensions for the real modules using the same domain logic.
   // We re-call solveSizing with the real modules so module_dimensions are
   // populated correctly before extendSizingSheetPA aggregates them into zones.
-  const refreshedSheet = solveSizing(modules, domain, existingSheet.target || {})
+  const refreshedSheet = solveSizing(modules, domain, existingSheet.target || {}, firstPassBriefEnvelope)
   // Preserve the first-pass envelope constants (which were set from domain
   // constants, not module data) so the renderer keeps the correct 40ft
   // container dimensions.  Merge module_dimensions from the refreshed sheet.
@@ -805,7 +841,15 @@ export function runSizingSecondPass(
 // Calls the existing sizing solver which is pure physics (no pipeline coupling)
 export async function runSizeLayout(
   modules: Module[],
-  options?: { domain?: string; targets?: Record<string, number>; paMode?: boolean }
+  options?: {
+    domain?: string
+    targets?: Record<string, number>
+    paMode?: boolean
+    /** Brief-stated external envelope in mm. When present, overrides class default.
+     *  Precedence: brief-stated dimensions ALWAYS win; class default is the fallback
+     *  when brief omits geometry. See V7 council 1e4adaf2. */
+    briefEnvelope?: { w_mm: number; d_mm: number; h_mm: number }
+  }
 ): Promise<StageResult<(DimensionSheet | DimensionSheetPA) & { spatialPlan: { placements: Array<{ moduleId: string; x: number; y: number; w: number; d: number }> } }>> {
   const start = Date.now()
   try {
@@ -819,7 +863,7 @@ export async function runSizeLayout(
     console.log(`[size-layout] raw domain "${rawDomain}" → normalised "${domain}"`)
     const targets = options?.targets || {}
 
-    const dimensionSheet = solveSizing(modules, domain, targets)
+    const dimensionSheet = solveSizing(modules, domain, targets, options?.briefEnvelope)
     const spatialPlan = buildSpatialPlan(dimensionSheet, modules)
 
     // PA Stage 7a: extend with renderer fields when paMode=true.

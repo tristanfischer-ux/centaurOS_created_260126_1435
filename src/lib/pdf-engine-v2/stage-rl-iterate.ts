@@ -382,9 +382,17 @@ async function runPipelineUpToStage(
       if (!state.modules?.length) {
         console.warn(`  [${briefSlug}] size_layout: no modules available, skipping`)
       } else {
+        // Precedence: brief-stated dimensions ALWAYS win; class default is the
+        // fallback when brief omits geometry. See V7 council 1e4adaf2.
+        const _rlBriefDims = state.parsedBrief?.constraints?.max_dimensions_mm
+        const _rlBriefEnvelope =
+          _rlBriefDims && _rlBriefDims.w != null && _rlBriefDims.d != null && _rlBriefDims.h != null
+            ? { w_mm: _rlBriefDims.w, d_mm: _rlBriefDims.d, h_mm: _rlBriefDims.h }
+            : undefined
         const r = await runSizeLayout(state.modules, {
           domain: state.research?.industryDomain,
           paMode: true,
+          briefEnvelope: _rlBriefEnvelope,
         })
         if (r.ok && r.data) state.dimensionSheet = r.data
       }
