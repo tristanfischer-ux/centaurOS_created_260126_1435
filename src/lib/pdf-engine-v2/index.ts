@@ -21,6 +21,7 @@ import { runReview } from './stages/6-review'
 import { runFmeaGeneration } from './stages/6b-fmea-generation'
 import PdfRenderer from './stages/7-pdf'
 import PdfRendererV3 from './stages/7-pdf-v3'
+import PdfRendererV3Radical from './stages/7b-pdf-v3-radical-document'
 
 // ── Phase H: runtime getters (F-9 fix) ───────────────────────────────────────
 //
@@ -70,6 +71,7 @@ import { validateModuleAssignments } from './lib/module-assignment-validator'
 import { isPhase2ResolutionEnabled, runRadicalResolution } from './stages/4b-radical-resolution'
 import { isPhase3CostRollupEnabled, runRadicalCostRollup, logCostSummaryDiff } from './stages/4c-radical-cost-rollup'
 import { isPhase4GrammarEnabled, runRadicalGrammar } from './stages/4d-radical-grammar'
+import { isPhase5RenderEnabled } from './stages/7b-pdf-v3-radical'
 
 export interface EngineResult {
   ok: boolean
@@ -1227,6 +1229,40 @@ export async function runPipeline(
       console.warn('[pipeline] Radical Phase 4: RADICAL_PHASE_4_GRAMMAR=true but state.resolvedRadicalTree is absent — Phase 2 must run first')
     }
 
+    // ── Radical Phase 5: Renderer flag check (behind RADICAL_PHASE_5_RENDER) ─
+    // Phase 5 does not run a new stage here — the renderer (7b-pdf-v3-radical.tsx)
+    // is wired into Stage 7 (PDF) below. This block logs readiness and validates
+    // that all required upstream state is present before Stage 7 runs.
+    //
+    // Requires: state.resolvedRadicalTree (Phase 2) for BOM + Modules sections.
+    // Optional: state.radicalCostSummary (Phase 3) for Cost Waterfall.
+    // Optional: state.grammarVerdicts (Phase 4) for inline WARN/BLOCK callouts.
+    //
+    // Council mandate D5: INCREMENTAL — the existing renderer is UNCHANGED.
+    // When RADICAL_PHASE_5_RENDER=false (or unset), Stage 7 calls the existing
+    // per-class renderer exactly as before. No behaviour change.
+    if (isPhase5RenderEnabled()) {
+      if (!state.resolvedRadicalTree) {
+        console.warn(
+          '[pipeline] Radical Phase 5: RADICAL_PHASE_5_RENDER=true but state.resolvedRadicalTree is absent. ' +
+          'Phase 2 (RADICAL_PHASE_2_RESOLUTION=true) must run first. Stage 7 will use fallback renderer.'
+        )
+      } else {
+        const phase5Flags = {
+          hasResolvedTree: true,
+          hasCostSummary: !!state.radicalCostSummary,
+          hasGrammarVerdicts: !!state.grammarVerdicts,
+        }
+        console.log(
+          `[pipeline] Radical Phase 5: RADICAL_PHASE_5_RENDER=true — ready for Radical renderer. ` +
+          `resolvedTree=✓ radicalCostSummary=${phase5Flags.hasCostSummary ? '✓' : '—'} ` +
+          `grammarVerdicts=${phase5Flags.hasGrammarVerdicts ? '✓' : '—'}`
+        )
+        // Store Phase 5 readiness on state for Stage 7 PDF branch
+        ;(state as any).phase5RadicalReady = phase5Flags
+      }
+    }
+
     // ── Module Assignment Plausibility Validation (UNIVERSAL-ROBUSTNESS) ──
     // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): deterministic check that each
     // part belongs to a module that makes physical sense. Catches:
@@ -1759,6 +1795,59 @@ export async function runPipeline(
     const pdfMs = Date.now() - pdfStart
     stages.push({ name: 'pdf', ok: true, durationMs: pdfMs })
     console.log(`[pipeline] pdf (renderer=${renderer}): OK (${pdfMs}ms)`)
+
+    // ── Phase 5: Parallel Radical render (shadow mode) ─────────────────
+    // When RADICAL_PHASE_5_RENDER=true AND state.resolvedRadicalTree exists,
+    // render a second PDF using the Radical tree renderer alongside the
+    // existing per-class renderer. Both PDFs are written to disk.
+    // Council mandate D5: INCREMENTAL — existing renderer output is unchanged.
+    // The Radical PDF is for shadow-mode comparison ONLY until Phase 7 cutover.
+    if (isPhase5RenderEnabled() && state.resolvedRadicalTree) {
+      console.log('[pipeline] Radical Phase 5: rendering parallel Radical PDF (shadow mode)...')
+      const phase5Start = Date.now()
+      try {
+        const radicalDoc = React.createElement(PdfRendererV3Radical, { state }) as any
+        const radicalBlob = await pdf(radicalDoc).toBlob()
+        const radicalBuffer = Buffer.from(await radicalBlob.arrayBuffer())
+        const phase5Ms = Date.now() - phase5Start
+        // Write Radical PDF to disk alongside standard PDF (shadow mode artifact)
+        const radicalPath = join(process.cwd(), `radical-phase5-${state.projectId ?? Date.now()}.pdf`)
+        writeFileSync(radicalPath, radicalBuffer)
+        stages.push({ name: 'pdf_radical_phase5', ok: true, durationMs: phase5Ms })
+        console.log(
+          `[pipeline] Radical Phase 5: PDF OK (${phase5Ms}ms, ${Math.round(radicalBuffer.length / 1024)}KB) → ${radicalPath}`
+        )
+        // Store the Radical PDF path on state for run.ts to surface
+        ;(state as any).radicalPhase5PdfPath = radicalPath
+        ;(state as any).radicalPhase5PdfSizeBytes = radicalBuffer.length
+      } catch (phase5Err) {
+        const phase5Ms = Date.now() - phase5Start
+        // Non-fatal — Phase 5 render failure must NEVER block the primary PDF
+        console.warn(`[pipeline] Radical Phase 5: render FAILED (${phase5Ms}ms, non-fatal): ${(phase5Err as Error).message}`)
+        stages.push({ name: 'pdf_radical_phase5', ok: false, durationMs: phase5Ms, error: (phase5Err as Error).message })
+      }
+    } else if (isPhase5RenderEnabled() && !state.resolvedRadicalTree) {
+      console.warn('[pipeline] Radical Phase 5: RADICAL_PHASE_5_RENDER=true but no resolvedRadicalTree — skipping Radical render')
+    }
+
+    // When Phase 5 is enabled, write a minimal state JSON for the eval harness
+    if (isPhase5RenderEnabled() && state.resolvedRadicalTree) {
+      try {
+        const statePath = join(process.cwd(), `radical-phase5-state-${state.projectId ?? Date.now()}.json`)
+        const minimalState = {
+          projectId: state.projectId,
+          resolvedRadicalTree: state.resolvedRadicalTree,
+          radicalCostSummary: state.radicalCostSummary ?? null,
+          grammarVerdicts: state.grammarVerdicts ?? null,
+          savedAt: new Date().toISOString(),
+        }
+        writeFileSync(statePath, JSON.stringify(minimalState, null, 2))
+        console.log(`[pipeline] Radical Phase 5: state snapshot written → ${statePath}`)
+        ;(state as any).radicalPhase5StatePath = statePath
+      } catch (stateErr) {
+        console.warn(`[pipeline] Radical Phase 5: state snapshot write failed (non-fatal): ${(stateErr as Error).message}`)
+      }
+    }
 
     // After PDF generation, write QA scores to separate file
     if (state.sectionScores.length > 0) {
