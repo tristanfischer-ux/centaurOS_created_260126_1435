@@ -820,6 +820,20 @@ const GRADE_D_SUBSYSTEM_ESTIMATES_GBP: Record<string, {
   // These are per-cell prices; the Grade D fallback is applied per-line (unit × qty).
   lfp_prismatic_cell_280ah: { min: 45, typical: 60, max: 80, basis: 'CATL/EVE/BYD LFP prismatic 280 Ah, 3.2 V — OEM spot price 2025' },
   lfp_prismatic_cell_generic: { min: 40, typical: 55, max: 75, basis: 'LFP prismatic cell (any capacity), OEM channel 2025 — fallback when Ah not specified' },
+  // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): safety-critical parts that slipped
+  // through at £1 because the Grade D table had no entry for them.
+  arc_flash_detection_sensor: { min: 350, typical: 650, max: 1200, basis: 'Arc flash detection sensor (Littelfuse LFGR / Arcteq class), IEC 62606 compliant — per-zone unit' },
+  hv_contactor_dc_isolator: { min: 180, typical: 350, max: 800, basis: 'High-voltage DC contactor / isolator for BESS/EV charger (Gigavac / Sensata class)' },
+  led_grow_light_panel: { min: 400, typical: 800, max: 2000, basis: 'Full-spectrum LED grow light panel (Fluence / Signify Agro class) per 1.2×0.6 m panel' },
+  hvac_fan_coil_unit: { min: 800, typical: 1800, max: 4500, basis: 'HVAC fan coil unit / dehumidifier for CEA (Munters / Carel class) per zone' },
+  fertigation_controller: { min: 1200, typical: 3000, max: 8000, basis: 'Fertigation controller / dosing system (Priva / Netafim class) per zone' },
+  flight_controller_autopilot: { min: 200, typical: 500, max: 2000, basis: 'Drone flight controller / autopilot (Pixhawk 6X / Cube Orange class)' },
+  dvl_acoustic_navigation: { min: 8000, typical: 20000, max: 45000, basis: 'Doppler velocity log / acoustic navigation (Teledyne Wayfinder / WL Navigator class)' },
+  gpu_compute_module: { min: 300, typical: 1200, max: 5000, basis: 'Industrial GPU / NPU compute module (NVIDIA Jetson AGX Orin / Hailo-8 class)' },
+  parachute_recovery_haps: { min: 4000, typical: 8000, max: 20000, basis: 'HAPS emergency parachute recovery system (Airborne Systems class) stratospheric deployment' },
+  pressure_hull_penetrator: { min: 200, typical: 350, max: 800, basis: 'Subsea pressure hull penetrator (Blue Robotics / SubConn class) per cable entry' },
+  sterility_filter_bioreactor: { min: 120, typical: 220, max: 500, basis: '0.2 µm sterility filter for bioreactor SIP (Millipore Durapore / Sartorius Sartopore class)' },
+  co2_dosing_system: { min: 800, typical: 2000, max: 5000, basis: 'CO2 enrichment dosing system for CEA grow room (Priva / Ridder class) per zone' },
 }
 
 /**
@@ -880,6 +894,39 @@ function classifySubsystemForGradeD(name: string): string | null {
     return 'lfp_prismatic_cell_generic'
   }
   if (n.includes('lfp') && n.includes('prismatic')) return 'lfp_prismatic_cell_280ah'
+
+  // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): safety-critical and class-specific
+  // parts that previously slipped through at £1 (no Grade D key).
+
+  // Arc flash detection
+  if (n.includes('arc flash') || (n.includes('arc') && n.includes('detect'))) return 'arc_flash_detection_sensor'
+
+  // HV contactor / DC isolator
+  if ((n.includes('contactor') || n.includes('isolator')) && (n.includes('hv') || n.includes('high voltage') || n.includes('high-voltage') || n.includes('dc'))) return 'hv_contactor_dc_isolator'
+
+  // CEA / vertical farm
+  if (n.includes('led') && (n.includes('grow') || n.includes('horticultural') || n.includes('ppfd') || n.includes('light'))) return 'led_grow_light_panel'
+  if (n.includes('hvac') || n.includes('fan coil') || (n.includes('dehumidif') && !n.includes('pump'))) return 'hvac_fan_coil_unit'
+  if (n.includes('fertigation') || (n.includes('dosing') && (n.includes('nutrient') || n.includes('controller') || n.includes('system')))) return 'fertigation_controller'
+  if (n.includes('co2') && (n.includes('dosing') || n.includes('enrichment') || n.includes('inject') || n.includes('system'))) return 'co2_dosing_system'
+
+  // Drone flight controller
+  if (n.includes('flight controller') || n.includes('autopilot') || n.includes('pixhawk') || n.includes('cube orange')) return 'flight_controller_autopilot'
+
+  // AUV navigation
+  if (n.includes('dvl') || n.includes('doppler velocity') || (n.includes('acoustic') && n.includes('navigation'))) return 'dvl_acoustic_navigation'
+
+  // Edge AI GPU
+  if ((n.includes('gpu') || n.includes('npu') || n.includes('jetson') || n.includes('hailo')) && (n.includes('module') || n.includes('compute') || n.includes('card'))) return 'gpu_compute_module'
+
+  // HAPS recovery
+  if (n.includes('parachute') || (n.includes('recovery') && (n.includes('system') || n.includes('chute') || n.includes('haps')))) return 'parachute_recovery_haps'
+
+  // AUV pressure hull penetrator
+  if (n.includes('penetrator') || (n.includes('pressure hull') && n.includes('penetrat'))) return 'pressure_hull_penetrator'
+
+  // Bioreactor sterility filter
+  if ((n.includes('sterility filter') || n.includes('0.2') || n.includes('0.2 micron') || n.includes('membrane filter')) && (n.includes('filter') || n.includes('membrane'))) return 'sterility_filter_bioreactor'
 
   return null
 }
@@ -1359,7 +1406,7 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       }
     }
 
-    // ── Phase 4c: Grade D fallback for zero-cost lines ───────────────────
+    // ── Phase 4c: Grade D fallback for zero-cost / placeholder-cost lines ───
     // After distributor lookup (4a) and supplier search (4b), any line that
     // renders as £0 in the PDF (unitCostGbp < 1.0) is a DATA GAP — whether
     // VERIFIED or ESTIMATED. A VERIFIED sub-£1 line is a false-positive
@@ -1368,6 +1415,15 @@ Return ALL four sub-task results in the JSON structure specified in the system p
     //
     // Guard: use < 1.0 (not === 0) to catch near-zero distributor prices that
     // Intl.NumberFormat rounds to "£0" in the rendered PDF.
+    //
+    // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): Extended to catch safety-critical
+    // parts priced at £1 (a common LLM placeholder value). The fix:
+    // - If a line has a Grade D key AND its current price is < that key's minimum
+    //   floor → apply Grade D regardless of whether it's ≥ £1.0. This catches
+    //   "BMS Master Controller at £1" and "Arc Flash Sensor at £1" without
+    //   touching legitimate sub-£10 commodity parts (screws, passives).
+    // - The CGM / miniature-class false-positive problem: Grade D keys for CGM
+    //   parts don't exist (no key → no upgrade), so small coins/passives are safe.
     //
     // Hierarchy applied: VERIFIED (non-zero, ≥£1) > LLM ESTIMATE (≥£1) > GRADE D > LLM price hint > DATA GAP
     //
@@ -1382,6 +1438,27 @@ Return ALL four sub-task results in the JSON structure specified in the system p
       let llmFallbackApplied = 0
       let zeroSanitised = 0
       for (const line of integratedLines) {
+        // UNIVERSAL-ROBUSTNESS FIX (2026-05-10): check if this line has a Grade D
+        // key FIRST, before the ≥ £1.0 guard. If the key's minimum floor is higher
+        // than the current price, apply Grade D even for lines priced ≥ £1.0
+        // (e.g. BMS Master at £1, Arc Flash Sensor at £1).
+        const subsystemKeyEarly = classifySubsystemForGradeD(line.name)
+        const entryEarly = subsystemKeyEarly ? GRADE_D_SUBSYSTEM_ESTIMATES_GBP[subsystemKeyEarly] : null
+        if (entryEarly && line.unitCostGbp < entryEarly.min) {
+          // Current price is below the known minimum for this subsystem class.
+          // Apply Grade D regardless of whether unitCostGbp ≥ 1.0.
+          const previousPrice = line.unitCostGbp
+          line.unitCostGbp = entryEarly.typical
+          line.gradeD_estimate_basis = `${entryEarly.basis} (Grade D ±50%, typical of range £${entryEarly.min.toLocaleString()}–£${entryEarly.max.toLocaleString()}). Previous price £${previousPrice.toFixed(0)} was below minimum floor.`
+          line.costSource = 'estimated'
+          line.verification_status = 'estimated'
+          line.bestDistributor = undefined
+          line.distributors = undefined
+          gradeDApplied++
+          console.log(`[bom-v2] Grade D floor fix for "${line.name}" → ${subsystemKeyEarly}: £${entryEarly.typical.toLocaleString()} (was £${previousPrice} < min £${entryEarly.min})`)
+          continue
+        }
+
         if (line.unitCostGbp >= 1.0) continue  // already meaningfully costed — leave alone
 
         // ── Tier 1: Grade D table ─────────────────────────────────────────
