@@ -46,6 +46,7 @@ const INK         = '#1a1a1a'
 const INK_DARK    = '#0d0d0d'
 const MUTED       = '#666666'
 const HEADER_RULE = '#cccccc'
+const BG_SOFT     = '#f9fafb'
 
 // Minimal shared styles
 const pageStyle = {
@@ -446,6 +447,157 @@ const RadicalCoverPage = ({ state }: { state: PipelineState }) => {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Sources and References page
+// Mirrors the Research Sources + Source Attribution logic from 7-pdf-v3.tsx.
+// Reads from (in priority order):
+//   1. state.research.designBrief.sources — user-provided brief sources
+//   2. state.sourceAttributions — pipeline-stage attribution records
+// ---------------------------------------------------------------------------
+
+function gradeLabel(grade: string | undefined | null): string {
+  switch (grade) {
+    case 'A': return 'A — Primary test data'
+    case 'B': return 'B — Engineering analysis'
+    case 'C': return 'C — Published industry reports'
+    case 'D': return 'D — Expert estimate'
+    case 'E': return 'E — LLM hypothesis'
+    default:  return grade ?? '?'
+  }
+}
+
+const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
+  const brief = state.research?.designBrief
+  const projectId = dash(state.projectId)
+
+  // --- Build research sources rows (from brief.sources OR sourceAttributions) ---
+  const briefSources = brief?.sources ?? []
+  const sourceAttribs = state.sourceAttributions ?? []
+
+  type SourceRow = { title: string; type: string; grade: string; relevance: string }
+  let sourceRows: SourceRow[] = []
+
+  if (briefSources.length > 0) {
+    sourceRows = briefSources.map(src => ({
+      title: dash((src as any).title),
+      type: dash((src as any).type),
+      grade: gradeLabel((src as any).source_grade ?? (src as any).sourceGrade),
+      relevance: dash((src as any).relevance),
+    }))
+  } else if (sourceAttribs.length > 0) {
+    // Mirror pipeline-stage attributions when no brief sources exist
+    const gradeForSource = (source: string) => {
+      if (source === 'deterministic') return 'B'
+      if (source === 'database') return 'C'
+      if (source === 'search') return 'C'
+      if (source === 'user') return 'A'
+      return 'D'
+    }
+    sourceRows = sourceAttribs.map(attr => ({
+      title: dash(attr.section),
+      type: dash(attr.source),
+      grade: gradeLabel(gradeForSource(attr.source)),
+      relevance: dash(attr.detail || attr.source),
+    }))
+  }
+
+  // --- Build distributor MPN source stats from resolvedRadicalTree ---
+  const resolvedTree = state.resolvedRadicalTree
+  const rMeta = resolvedTree?.resolution_meta?.stats
+  const distributorSources: Array<{ label: string; count: number; pct: string }> = []
+  if (rMeta) {
+    const total = rMeta.total_leaves || 1
+    distributorSources.push({ label: 'Verified by Distributor (MPN)', count: rMeta.verified_by_distributor, pct: ((rMeta.verified_by_distributor / total) * 100).toFixed(0) })
+    distributorSources.push({ label: 'Vendor Catalog Reference', count: rMeta.from_vendor_catalog, pct: ((rMeta.from_vendor_catalog / total) * 100).toFixed(0) })
+    distributorSources.push({ label: 'LLM Estimate (Grade D)', count: rMeta.from_llm_estimate + (rMeta.grade_d ?? 0), pct: (((rMeta.from_llm_estimate + (rMeta.grade_d ?? 0)) / total) * 100).toFixed(0) })
+    distributorSources.push({ label: 'Stub / Data Gap', count: rMeta.stub + (rMeta.data_gap ?? 0), pct: (((rMeta.stub + (rMeta.data_gap ?? 0)) / total) * 100).toFixed(0) })
+  }
+
+  // --- Research summary claims requiring verification ---
+  const claimsRequiringVerification = (state.research as any)?.synthesis?.claims_requiring_verification ?? []
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | Sources and References`} />
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+        Sources and References
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+      {/* Source grade key */}
+      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 12, fontFamily: 'Helvetica-Oblique' }}>
+        Grade key: A = primary test data · B = engineering analysis · C = published industry reports · D = expert estimate · E = LLM hypothesis
+      </Text>
+
+      {/* Research Sources table */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+        Research Sources
+      </Text>
+      {sourceRows.length > 0 ? (
+        <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 14 }}>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+            <Text style={{ width: '36%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 7, paddingHorizontal: 7 }}>Source / Title</Text>
+            <Text style={{ width: '18%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 7, paddingHorizontal: 7 }}>Type</Text>
+            <Text style={{ width: '14%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 7, paddingHorizontal: 7 }}>Grade</Text>
+            <Text style={{ width: '32%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 7, paddingHorizontal: 7 }}>Relevance</Text>
+          </View>
+          {sourceRows.map((row, i) => (
+            <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === sourceRows.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
+              <Text style={{ width: '36%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK, paddingVertical: 5, paddingHorizontal: 7 }}>{row.title}</Text>
+              <Text style={{ width: '18%', fontSize: 8, color: INK, paddingVertical: 5, paddingHorizontal: 7 }}>{row.type}</Text>
+              <Text style={{ width: '14%', fontSize: 8, color: MUTED, paddingVertical: 5, paddingHorizontal: 7 }}>{row.grade.split(' — ')[0]}</Text>
+              <Text style={{ width: '32%', fontSize: 8, color: INK, paddingVertical: 5, paddingHorizontal: 7, lineHeight: 1.3 }}>{row.relevance}</Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 14 }}>
+          No explicit research sources recorded — refer to pipeline stage attributions below.
+        </Text>
+      )}
+
+      {/* Distributor and vendor data sources (from resolved tree) */}
+      {distributorSources.length > 0 && (
+        <>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+            BOM Data Sources
+          </Text>
+          <Text style={{ fontSize: 9, color: MUTED, marginBottom: 8 }}>
+            Sourcing breakdown for {rMeta?.total_leaves ?? 0} BOM leaf nodes:
+          </Text>
+          <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 14 }}>
+            {distributorSources.map((src, i) => (
+              <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === distributorSources.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER }} wrap={false}>
+                <Text style={{ width: '60%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, paddingVertical: 5, paddingHorizontal: 8 }}>{src.label}</Text>
+                <Text style={{ width: '15%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>{src.count}</Text>
+                <Text style={{ width: '25%', fontSize: 9, color: MUTED, paddingVertical: 5, paddingHorizontal: 8 }}>{src.pct}% of BOM</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      {/* Claims requiring verification */}
+      {claimsRequiringVerification.length > 0 && (
+        <>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_AMBER, marginBottom: 8 }}>
+            Claims Requiring Independent Verification
+          </Text>
+          {claimsRequiringVerification.slice(0, 6).map((claim: string, i: number) => (
+            <View key={i} style={{ flexDirection: 'row', marginBottom: 6 }} wrap={false}>
+              <Text style={{ fontSize: 9, color: BESS_AMBER, fontFamily: 'Helvetica-Bold', width: 16 }}>►</Text>
+              <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>{claim}</Text>
+            </View>
+          ))}
+        </>
+      )}
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
 // Grammar Verdicts detail page — all WARN and BLOCK verdicts
 const GrammarVerdictsPage = ({ state }: { state: PipelineState }) => {
   const grammarVerdicts = state.grammarVerdicts
@@ -608,7 +760,10 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §6 Feasibility Assessment — P2 fix: 4-field structured section (no new LLM call) */}
       <FeasibilityAssessmentPage state={safe} />
 
-      {/* §7 Design Rule Check detail page */}
+      {/* §7 Sources and References — Fix A: restore section missing from P1+P2+P3 bundle */}
+      <SourcesReferencesPage state={safe} />
+
+      {/* §8 Design Rule Check detail page */}
       {grammarVerdicts && (
         <GrammarVerdictsPage state={safe} />
       )}

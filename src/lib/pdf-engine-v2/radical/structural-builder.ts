@@ -446,10 +446,10 @@ export function deriveClassMandatoryCharacters(
     return {
       mandatoryCharacters: deriveCgmMandatoryCharacters(),
       preferredWordIds: {
-        'pcb_controller': 'biosensor_hardware',     // CGM analogue front-end (biosensor_system), not bms_master
-        'copper_wire': 'biosensor_hardware',        // flex harness wiring, not refrigerant_distribution
-        'polymer_enclosure': 'hull_structure',      // waterproof medical shell (hull_and_buoyancy)
-        'polymer_gasket': 'bioreactor_vessel_body', // sealing gasket (bioreactor_vessel), not refrigerant
+        'pcb_controller': 'biosensor_hardware',  // CGM analogue front-end (biosensor_system), not bms_master
+        'copper_wire': 'biosensor_hardware',     // flex harness wiring, not refrigerant_distribution
+        'polymer_enclosure': 'hull_structure',   // waterproof medical shell (hull_and_buoyancy)
+        'polymer_gasket': 'hull_structure',      // IP67 O-ring seal (hull_and_buoyancy), NOT bioreactor_vessel_body
       },
     }
   }
