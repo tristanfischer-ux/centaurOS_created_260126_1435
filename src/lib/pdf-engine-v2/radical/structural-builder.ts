@@ -409,6 +409,7 @@ export function deriveClassMandatoryCharacters(
 ): {
   mandatoryCharacters: string[]
   quantityOverrides?: Record<string, number>
+  preferredWordIds?: Record<string, string>
 } {
   const cls = classification.toLowerCase()
 
@@ -426,47 +427,132 @@ export function deriveClassMandatoryCharacters(
 
   // Drone / UAV
   if (cls.includes('drone') || cls.includes('uav') || cls.includes('quadcopter') || cls.includes('multirotor')) {
-    return { mandatoryCharacters: deriveDroneMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveDroneMandatoryCharacters(),
+      preferredWordIds: {
+        'pcb_controller': 'avionics_compute',    // flight computer (flight_computer sentence), not bms_master
+        'polymer_enclosure': 'airframe_body',    // airframe housing (airframe_structure), not hp_enclosure_structure
+        'aluminium_extrusion': 'airframe_body',  // airframe frame (airframe_structure), not hp_enclosure_structure
+        'steel_bolt': 'airframe_body',           // airframe fasteners, not hp/farm
+        'copper_wire': 'avionics_compute',       // avionics wiring (flight_computer), not refrigerant_distribution
+        'power_converter': 'propulsion_motors',  // ESC/motor driver (propulsion_system), not charger_pcs
+        'network_switch': 'avionics_compute',    // avionics comm hub, not ems
+      },
+    }
   }
 
   // CGM / wearable medical
   if (cls.includes('cgm') || cls.includes('glucose') || cls.includes('wearable') || cls.includes('biosensor')) {
-    return { mandatoryCharacters: deriveCgmMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveCgmMandatoryCharacters(),
+      preferredWordIds: {
+        'pcb_controller': 'biosensor_hardware',     // CGM analogue front-end (biosensor_system), not bms_master
+        'copper_wire': 'biosensor_hardware',        // flex harness wiring, not refrigerant_distribution
+        'polymer_enclosure': 'hull_structure',      // waterproof medical shell (hull_and_buoyancy)
+        'polymer_gasket': 'bioreactor_vessel_body', // sealing gasket (bioreactor_vessel), not refrigerant
+      },
+    }
   }
 
   // Heat pump / thermal system
   if (cls.includes('heat_pump') || cls.includes('thermal_system') || cls.includes('heat pump')) {
-    return { mandatoryCharacters: deriveHeatPumpMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveHeatPumpMandatoryCharacters(),
+      preferredWordIds: {
+        'liquid_cooling_system': 'refrigerant_cycle',    // refrigerant loop (refrigerant_circuit), not active_cooling
+        'pcb_controller': 'hp_controls_compute',         // HP controller (heat_pump_controls), not bms_master
+        // copper_wire, polymer_gasket, copper_terminal already first-map to heat pump words
+        // polymer_enclosure, aluminium_extrusion, steel_plate, steel_bolt already first-map to hp_enclosure_structure
+      },
+    }
   }
 
   // Vertical farm / CEA
   if (cls.includes('vertical_farm') || cls.includes('farm') || cls.includes('cea') || cls.includes('greenhouse')) {
-    return { mandatoryCharacters: deriveVerticalFarmMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveVerticalFarmMandatoryCharacters(),
+      preferredWordIds: {
+        'liquid_cooling_system': 'fertigation_flow',    // fertigation/hydroponics (fertigation_loop), not active_cooling
+        'pcb_controller': 'lighting_fixtures',           // grow light controller (lighting_system), not bms_master
+        'copper_wire': 'fertigation_flow',               // fertigation wiring, not refrigerant_distribution
+        'polymer_gasket': 'fertigation_flow',            // fertigation seals, not refrigerant_distribution
+        'aluminium_extrusion': 'rack_structure_vfarm',   // grow rack frame (growing_rack_system), not hp_enclosure_structure
+        'steel_bolt': 'rack_structure_vfarm',            // rack fasteners, not hp_enclosure_structure
+      },
+    }
   }
 
   // EV charger
   if (cls.includes('ev_charger') || cls.includes('charger') || cls.includes('ev charger')) {
-    return { mandatoryCharacters: deriveEvChargerMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveEvChargerMandatoryCharacters(),
+      preferredWordIds: {
+        'polymer_enclosure': 'charger_enclosure_structure', // charger housing (charger_enclosure), not hp_enclosure_structure
+        'power_converter': 'charger_pcs',                   // DC power stack (charger_power_conversion), not propulsion_motors
+        // pcb_controller: bms_master is first; charger may not have a better word in hierarchy
+        // copper_wire: refrigerant_distribution is first; keep as there's no charger-specific wire word
+      },
+    }
   }
 
   // Bioreactor
   if (cls.includes('bioreactor') || cls.includes('ferment')) {
-    return { mandatoryCharacters: deriveBioreactorMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveBioreactorMandatoryCharacters(),
+      preferredWordIds: {
+        'pcb_controller': 'bioreactor_sensing',       // bioreactor control (bioreactor_controls), not bms_master
+        'copper_wire': 'bioreactor_sensing',          // sensor wiring, not refrigerant_distribution
+        'polymer_gasket': 'bioreactor_vessel_body',   // vessel seals (bioreactor_vessel), not refrigerant_distribution
+        'pressure_vessel': 'bioreactor_vessel_body',  // bioreactor vessel body (bioreactor_vessel)
+      },
+    }
   }
 
   // Edge AI / server
   if (cls.includes('edge_ai') || cls.includes('edge ai') || cls.includes('server') || cls.includes('compute')) {
-    return { mandatoryCharacters: deriveEdgeAiMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveEdgeAiMandatoryCharacters(),
+      preferredWordIds: {
+        'pcb_controller': 'edge_compute_hardware',   // compute board (edge_compute_system), not bms_master
+        'copper_wire': 'edge_compute_hardware',      // board wiring, not refrigerant_distribution
+        'network_switch': 'edge_compute_hardware',   // networking hardware, not ems_controller_board
+        'liquid_cooling_system': 'active_cooling',   // server thermal (thermal_management_system) — already first
+      },
+    }
   }
 
   // AUV / underwater
   if (cls.includes('auv') || cls.includes('underwater') || cls.includes('subsea') || cls.includes('rov')) {
-    return { mandatoryCharacters: deriveAuvMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveAuvMandatoryCharacters(),
+      preferredWordIds: {
+        'pcb_controller': 'avionics_compute',   // AUV nav computer (flight_computer), not bms_master
+        'polymer_enclosure': 'hull_structure',  // pressure hull (hull_and_buoyancy), already first
+        'polymer_gasket': 'hull_structure',     // hull O-rings (hull_and_buoyancy), not refrigerant_distribution
+        'copper_wire': 'avionics_compute',      // avionics wiring (flight_computer), not refrigerant_distribution
+        'power_converter': 'propulsion_motors', // thruster ESC (propulsion_system), not charger_pcs
+        'pressure_vessel': 'hull_structure',    // hull pressure body (hull_and_buoyancy)
+        'aluminium_extrusion': 'hull_structure', // hull structure (hull_and_buoyancy), not hp_enclosure_structure
+        'network_switch': 'avionics_compute',   // AUV comms (flight_computer), not ems
+      },
+    }
   }
 
   // HAPS / stratospheric
   if (cls.includes('haps') || cls.includes('stratospheric') || cls.includes('pseudo-satellite')) {
-    return { mandatoryCharacters: deriveHapsMandatoryCharacters() }
+    return {
+      mandatoryCharacters: deriveHapsMandatoryCharacters(),
+      preferredWordIds: {
+        'pcb_controller': 'avionics_compute',    // HAPS avionics (flight_computer), not bms_master
+        'aluminium_extrusion': 'haps_structure', // HAPS airframe spar (haps_airframe), not hp_enclosure_structure
+        'polymer_enclosure': 'haps_structure',   // HAPS nacelle (haps_airframe), not hp_enclosure_structure
+        'steel_bolt': 'haps_structure',          // HAPS fasteners (haps_airframe), not hp_enclosure_structure
+        'copper_wire': 'avionics_compute',       // avionics wiring (flight_computer), not refrigerant_distribution
+        'power_converter': 'propulsion_motors',  // motor ESC (propulsion_system), not charger_pcs
+        'network_switch': 'avionics_compute',    // avionics comms (flight_computer), not ems
+        'liquid_cooling_system': 'active_cooling', // payload thermal (thermal_management_system) — already first
+      },
+    }
   }
 
   // Unknown class — return empty (no contamination protection, but no false mandatory chars)
@@ -485,6 +571,12 @@ export function deriveClassMandatoryCharacters(
  *                            Any character in this list that the LLM did not identify is
  *                            added with quantity=1 (or from quantityOverrides if present).
  *                            This ensures tree SHAPE is deterministic regardless of LLM variance.
+ * @param preferredWordIds    Optional map of character_id → preferred word_id.
+ *                            When a character maps to multiple words, this override takes
+ *                            precedence over the default words[0] selection. Used to prevent
+ *                            cross-class contamination: e.g. pcb_controller first maps to
+ *                            bms_master (BESS) by insertion order, but for a heat pump it
+ *                            should map to hp_controls_compute (heat_pump_controls).
  * @returns BuildResult containing the tree and diagnostics
  */
 export function buildTreeFromLeaves(
@@ -493,6 +585,7 @@ export function buildTreeFromLeaves(
   productClass: string,
   quantityOverrides?: QuantityOverrideMap,
   mandatoryCharacters?: string[],
+  preferredWordIds?: Record<string, string>,
 ): BuildResult {
   const characterToWords = buildCharacterToWords()
   const wordToSentence = buildWordToSentence()
@@ -554,10 +647,17 @@ export function buildTreeFromLeaves(
       continue
     }
 
-    // Pick the first word (most canonical — hierarchy file orders words by
-    // primacy within each sentence). Words are stable — same character always
-    // maps to the same primary word.
-    const word = words[0]
+    // Pick the word: check preferredWordIds first (class-specific override to prevent
+    // cross-contamination), then fall back to words[0] (WORDS insertion order).
+    let word = words[0]
+    if (preferredWordIds && leaf.character_id in preferredWordIds) {
+      const preferredId = preferredWordIds[leaf.character_id]
+      const preferred = words.find(w => w.id === preferredId)
+      if (preferred) {
+        word = preferred
+      }
+      // If preferred word not found (not in this character's word list), fall back to words[0]
+    }
     const sentence = wordToSentence.get(word.id)
     if (!sentence) {
       unmappedCharacters.push(leaf.character_id)

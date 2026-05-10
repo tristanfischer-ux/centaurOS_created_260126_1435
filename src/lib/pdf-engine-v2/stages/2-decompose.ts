@@ -420,20 +420,23 @@ export async function runDecomposeRadical(
   // Without mandatory character sets, non-BESS classes get cross-contaminated: generic
   // shared characters (liquid_cooling_system, pcb_controller) map to BESS/heat-pump sentences
   // in the hierarchy because they appear there first. Mandatory sets pin the class-appropriate
-  // characters and filter out cross-class characters.
+  // characters AND preferredWordIds overrides route shared characters to class-correct words
+  // (e.g. pcb_controller → hp_controls_compute for heat pump, not bms_master for BESS).
   const classResult = deriveClassMandatoryCharacters(classification, parsedBrief.constraints)
   const mandatoryCharacters: string[] | undefined = classResult.mandatoryCharacters.length > 0 ? classResult.mandatoryCharacters : undefined
   const quantityOverrides: Record<string, number> | undefined = classResult.quantityOverrides
+  const preferredWordIds: Record<string, string> | undefined = classResult.preferredWordIds
 
   if (mandatoryCharacters) {
-    console.log(`[decompose-radical] Stage 2: mandatory characters resolved for class="${classification}" (${mandatoryCharacters.length} chars)${quantityOverrides ? ' + quantity overrides' : ''}`)
+    const wordPinCount = preferredWordIds ? Object.keys(preferredWordIds).length : 0
+    console.log(`[decompose-radical] Stage 2: mandatory characters resolved for class="${classification}" (${mandatoryCharacters.length} chars${wordPinCount > 0 ? `, ${wordPinCount} word-pins` : ''})${quantityOverrides ? ' + quantity overrides' : ''}`)
   } else {
     console.log(`[decompose-radical] Stage 2: no mandatory character set for class="${classification}" — tree shape depends on LLM output`)
   }
 
   let buildResult
   try {
-    buildResult = buildTreeFromLeaves(leaves, productSlug, classification, quantityOverrides, mandatoryCharacters)
+    buildResult = buildTreeFromLeaves(leaves, productSlug, classification, quantityOverrides, mandatoryCharacters, preferredWordIds)
   } catch (err) {
     return {
       ok: false,
