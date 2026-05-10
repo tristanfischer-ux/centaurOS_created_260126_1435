@@ -1,0 +1,511 @@
+{
+  "archetypes": [
+    {
+      "archetype_id": "lfp_prismatic_cell_280Ah",
+      "name": "LFP Prismatic Cell 280Ah",
+      "qty": 4375,
+      "unit_price_gbp": 60,
+      "line_total_gbp": 262500,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "steel_battery_rack_frame",
+      "name": "Battery Rack Assembly (structural)",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "stub"
+    },
+    {
+      "archetype_id": "bms_master_controller",
+      "name": "Battery Management System (BMS)",
+      "qty": 1,
+      "unit_price_gbp": 4500,
+      "line_total_gbp": 4500,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "bms_slave_cell_monitor",
+      "name": "BMS Slave Module (cell monitoring board)",
+      "qty": 10,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "pcs_inverter_1mw_bidirectional",
+      "name": "1 MW Bidirectional PCS Inverter",
+      "qty": 1,
+      "unit_price_gbp": 95000,
+      "line_total_gbp": 95000,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "step_up_transformer_400v_11kv",
+      "name": "Step-up Transformer (400V → 11kV)",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "dc_contactor_1500v_300a",
+      "name": "1500V DC Contactor (300A)",
+      "qty": 2,
+      "unit_price_gbp": 139.16,
+      "line_total_gbp": 278.32,
+      "verification_grade": "verified"
+    },
+    {
+      "archetype_id": "dc_mccb_1500v_2000a",
+      "name": "1500V DC 2000A MCCB",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "ac_acb_400v_2000a",
+      "name": "400V 2000A Air Circuit Breaker (ACB)",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "ac_output_circuit_breaker",
+      "name": "AC Output Circuit Breaker",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "dc_busbar_800v_2000a",
+      "name": "DC Busbar Assembly (800V, 2000A)",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "precharge_resistor_hv",
+      "name": "Pre-charge Resistor",
+      "qty": 2,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "g99_protection_relay",
+      "name": "G99 Protection Relay",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "liquid_cooling_loop_1mw",
+      "name": "Liquid Cooling Loop (chiller + pumps + manifolds)",
+      "qty": 1,
+      "unit_price_gbp": 35000,
+      "line_total_gbp": 35000,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "mineral_wool_insulation_panel",
+      "name": "Thermal Insulation (mineral wool panels)",
+      "qty": 1,
+      "unit_price_gbp": 600,
+      "line_total_gbp": 600,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "container_fire_suppression_system",
+      "name": "Fire Detection and Suppression System",
+      "qty": 1,
+      "unit_price_gbp": 18000,
+      "line_total_gbp": 18000,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "fire_suppression_cylinder_novec",
+      "name": "Fire Suppression Cylinder (Novec/FM-200)",
+      "qty": 2,
+      "unit_price_gbp": 18000,
+      "line_total_gbp": 36000,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "li_ion_offgas_detector",
+      "name": "Lithium-Ion Off-Gas Detector",
+      "qty": 4,
+      "unit_price_gbp": 5.09,
+      "line_total_gbp": 20.36,
+      "verification_grade": "verified"
+    },
+    {
+      "archetype_id": "arc_flash_detection_sensor",
+      "name": "Arc Flash Detection Sensor",
+      "qty": 2,
+      "unit_price_gbp": 650,
+      "line_total_gbp": 1300,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "ems_scada_controller",
+      "name": "EMS / SCADA Controller",
+      "qty": 1,
+      "unit_price_gbp": 18000,
+      "line_total_gbp": 18000,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "managed_ethernet_switch_industrial",
+      "name": "Managed Ethernet Switch",
+      "qty": 2,
+      "unit_price_gbp": 985.53,
+      "line_total_gbp": 1971.06,
+      "verification_grade": "verified"
+    },
+    {
+      "archetype_id": "ups_3kva_industrial",
+      "name": "Uninterruptible Power Supply (UPS)",
+      "qty": 1,
+      "unit_price_gbp": 2562,
+      "line_total_gbp": 2562,
+      "verification_grade": "verified"
+    },
+    {
+      "archetype_id": "fire_rated_steel_door_panic",
+      "name": "Personnel Access Door with Panic Hardware",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "estimated"
+    },
+    {
+      "archetype_id": "cable_transit_frame_ip55",
+      "name": "IP55 Cable Entry Transit Frame (Roxtec)",
+      "qty": 6,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "grade_d"
+    },
+    {
+      "archetype_id": "ac_distribution_board_ip55",
+      "name": "Auxiliary AC Distribution Board",
+      "qty": 1,
+      "unit_price_gbp": null,
+      "line_total_gbp": null,
+      "verification_grade": "estimated"
+    }
+  ],
+  "words": [
+    {
+      "module_id": "battery_rack_assembly",
+      "module_label": "Battery Rack Assembly",
+      "archetype_costs": [
+        {
+          "archetype_id": "lfp_prismatic_cell_280Ah",
+          "name": "LFP Prismatic Cell 280Ah",
+          "qty": 4375,
+          "unit_price_gbp": 60,
+          "line_total_gbp": 262500,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "steel_battery_rack_frame",
+          "name": "Battery Rack Assembly (structural)",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "stub"
+        }
+      ],
+      "subtotal_parts_gbp": 262500,
+      "markup_pct": 35,
+      "markup_gbp": 99750,
+      "total_gbp": 362250
+    },
+    {
+      "module_id": "battery_management_system_bms",
+      "module_label": "Battery Management System (BMS)",
+      "archetype_costs": [
+        {
+          "archetype_id": "bms_master_controller",
+          "name": "Battery Management System (BMS)",
+          "qty": 1,
+          "unit_price_gbp": 4500,
+          "line_total_gbp": 4500,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "bms_slave_cell_monitor",
+          "name": "BMS Slave Module (cell monitoring board)",
+          "qty": 10,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        }
+      ],
+      "subtotal_parts_gbp": 4500,
+      "markup_pct": 35,
+      "markup_gbp": 1710,
+      "total_gbp": 6210
+    },
+    {
+      "module_id": "power_conversion_system_pcs",
+      "module_label": "Power Conversion System (PCS)",
+      "archetype_costs": [
+        {
+          "archetype_id": "pcs_inverter_1mw_bidirectional",
+          "name": "1 MW Bidirectional PCS Inverter",
+          "qty": 1,
+          "unit_price_gbp": 95000,
+          "line_total_gbp": 95000,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "step_up_transformer_400v_11kv",
+          "name": "Step-up Transformer (400V → 11kV)",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "estimated"
+        }
+      ],
+      "subtotal_parts_gbp": 95000,
+      "markup_pct": 35,
+      "markup_gbp": 36100,
+      "total_gbp": 131100
+    },
+    {
+      "module_id": "dc_distribution_switchgear",
+      "module_label": "DC Distribution & Switchgear",
+      "archetype_costs": [
+        {
+          "archetype_id": "dc_contactor_1500v_300a",
+          "name": "1500V DC Contactor (300A)",
+          "qty": 2,
+          "unit_price_gbp": 139.16,
+          "line_total_gbp": 278.32,
+          "verification_grade": "verified"
+        },
+        {
+          "archetype_id": "dc_mccb_1500v_2000a",
+          "name": "1500V DC 2000A MCCB",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        },
+        {
+          "archetype_id": "ac_acb_400v_2000a",
+          "name": "400V 2000A Air Circuit Breaker (ACB)",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        },
+        {
+          "archetype_id": "ac_output_circuit_breaker",
+          "name": "AC Output Circuit Breaker",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        },
+        {
+          "archetype_id": "dc_busbar_800v_2000a",
+          "name": "DC Busbar Assembly (800V, 2000A)",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        },
+        {
+          "archetype_id": "precharge_resistor_hv",
+          "name": "Pre-charge Resistor",
+          "qty": 2,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        },
+        {
+          "archetype_id": "g99_protection_relay",
+          "name": "G99 Protection Relay",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        }
+      ],
+      "subtotal_parts_gbp": 278.32,
+      "markup_pct": 35,
+      "markup_gbp": 105.76159999999999,
+      "total_gbp": 384.0816
+    },
+    {
+      "module_id": "thermal_management_system",
+      "module_label": "Thermal Management System",
+      "archetype_costs": [
+        {
+          "archetype_id": "liquid_cooling_loop_1mw",
+          "name": "Liquid Cooling Loop (chiller + pumps + manifolds)",
+          "qty": 1,
+          "unit_price_gbp": 35000,
+          "line_total_gbp": 35000,
+          "verification_grade": "estimated"
+        }
+      ],
+      "subtotal_parts_gbp": 35000,
+      "markup_pct": 35,
+      "markup_gbp": 13300,
+      "total_gbp": 48300
+    },
+    {
+      "module_id": "container_enclosure_fit_out",
+      "module_label": "Container Enclosure & Fit-Out",
+      "archetype_costs": [
+        {
+          "archetype_id": "mineral_wool_insulation_panel",
+          "name": "Thermal Insulation (mineral wool panels)",
+          "qty": 1,
+          "unit_price_gbp": 600,
+          "line_total_gbp": 600,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "fire_rated_steel_door_panic",
+          "name": "Personnel Access Door with Panic Hardware",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "cable_transit_frame_ip55",
+          "name": "IP55 Cable Entry Transit Frame (Roxtec)",
+          "qty": 6,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "grade_d"
+        },
+        {
+          "archetype_id": "ac_distribution_board_ip55",
+          "name": "Auxiliary AC Distribution Board",
+          "qty": 1,
+          "unit_price_gbp": null,
+          "line_total_gbp": null,
+          "verification_grade": "estimated"
+        }
+      ],
+      "subtotal_parts_gbp": 600,
+      "markup_pct": 35,
+      "markup_gbp": 228,
+      "total_gbp": 828
+    },
+    {
+      "module_id": "fire_detection_and_suppression_system_fss",
+      "module_label": "Fire Detection & Suppression System",
+      "archetype_costs": [
+        {
+          "archetype_id": "container_fire_suppression_system",
+          "name": "Fire Detection and Suppression System",
+          "qty": 1,
+          "unit_price_gbp": 18000,
+          "line_total_gbp": 18000,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "fire_suppression_cylinder_novec",
+          "name": "Fire Suppression Cylinder (Novec/FM-200)",
+          "qty": 2,
+          "unit_price_gbp": 18000,
+          "line_total_gbp": 36000,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "li_ion_offgas_detector",
+          "name": "Lithium-Ion Off-Gas Detector",
+          "qty": 4,
+          "unit_price_gbp": 5.09,
+          "line_total_gbp": 20.36,
+          "verification_grade": "verified"
+        },
+        {
+          "archetype_id": "arc_flash_detection_sensor",
+          "name": "Arc Flash Detection Sensor",
+          "qty": 2,
+          "unit_price_gbp": 650,
+          "line_total_gbp": 1300,
+          "verification_grade": "estimated"
+        }
+      ],
+      "subtotal_parts_gbp": 55320.36,
+      "markup_pct": 35,
+      "markup_gbp": 21021.7368,
+      "total_gbp": 76342.0968
+    },
+    {
+      "module_id": "energy_management_system_ems_scada",
+      "module_label": "EMS / SCADA",
+      "archetype_costs": [
+        {
+          "archetype_id": "ems_scada_controller",
+          "name": "EMS / SCADA Controller",
+          "qty": 1,
+          "unit_price_gbp": 18000,
+          "line_total_gbp": 18000,
+          "verification_grade": "estimated"
+        },
+        {
+          "archetype_id": "managed_ethernet_switch_industrial",
+          "name": "Managed Ethernet Switch",
+          "qty": 2,
+          "unit_price_gbp": 985.53,
+          "line_total_gbp": 1971.06,
+          "verification_grade": "verified"
+        },
+        {
+          "archetype_id": "ups_3kva_industrial",
+          "name": "Uninterruptible Power Supply (UPS)",
+          "qty": 1,
+          "unit_price_gbp": 2562,
+          "line_total_gbp": 2562,
+          "verification_grade": "verified"
+        }
+      ],
+      "subtotal_parts_gbp": 22533.06,
+      "markup_pct": 35,
+      "markup_gbp": 8562.562800000002,
+      "total_gbp": 31095.6228
+    }
+  ],
+  "sentence": {
+    "id": "bess_container_3_5mwh",
+    "label": "BESS Container 3.5 MWh / 1 MW System",
+    "word_subtotal_gbp": 656509.8011999999,
+    "sentence_markup_pct": 25,
+    "sentence_markup_gbp": 164127.45029999997,
+    "total_gbp": 820637.2514999998,
+    "top_cost_drivers": [
+      {
+        "name": "LFP Prismatic Cell 280Ah",
+        "total_gbp": 262500,
+        "pct_of_system": 31.987336611906176
+      },
+      {
+        "name": "1 MW Bidirectional PCS Inverter",
+        "total_gbp": 95000,
+        "pct_of_system": 11.576369440499379
+      },
+      {
+        "name": "Fire Suppression Cylinder (Novec/FM-200)",
+        "total_gbp": 36000,
+        "pct_of_system": 4.386834735347133
+      }
+    ]
+  }
+}

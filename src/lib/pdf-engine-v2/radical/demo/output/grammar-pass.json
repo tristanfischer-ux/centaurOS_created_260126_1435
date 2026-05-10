@@ -1,0 +1,62 @@
+{
+  "compositionId": "bess_container_3_5mwh",
+  "overallVerdict": "PASS",
+  "ruleResults": [
+    {
+      "ruleId": "KCL_node_balance",
+      "ruleDescription": "KCL: ΣI_in = ΣI_out at every electrical node (Kirchhoff's Current Law)",
+      "hardness": "hard",
+      "weight": null,
+      "verdict": "PASS",
+      "reason": "KCL satisfied at all 1 electrical node(s)",
+      "relaxed": false
+    },
+    {
+      "ruleId": "galvanic_aluminium_copper_contact",
+      "ruleDescription": "Galvanic: copper and aluminium in direct contact in humid/marine environment causes corrosion (anodic index > 0.25V). Requires dielectric isolator.",
+      "hardness": "hard",
+      "weight": null,
+      "verdict": "PASS",
+      "reason": "Copper + aluminium present but environment is not humid/marine — galvanic risk acceptable",
+      "relaxed": false
+    },
+    {
+      "ruleId": "voltage_derate_80pct",
+      "ruleDescription": "Voltage derating: operating voltage must be ≤ 80% of rated voltage. WARN if 80–100%, BLOCK if > 100%.",
+      "hardness": "adjustable",
+      "weight": 6,
+      "verdict": "WARN",
+      "reason": "Voltage 80–100% rated (derating not met): lfp_prismatic_cell_280Ah: operating=3.2V is 87.7% of rated=3.65V (threshold 80%); step_up_transformer_400v_11kv: operating=11000V is 100.0% of rated=11000V (threshold 80%); ac_acb_400v_2000a: operating=400V is 100.0% of rated=400V (threshold 80%); ac_output_circuit_breaker: operating=400V is 100.0% of rated=400V (threshold 80%)",
+      "relaxation_cost": 3,
+      "relaxed": false
+    },
+    {
+      "ruleId": "mass_balance_closed_loop",
+      "ruleDescription": "Fluid mass balance: Σ mass-flow-in = Σ mass-flow-out (steady state, closed loop). Checks composition-level declared totals.",
+      "hardness": "hard",
+      "weight": null,
+      "verdict": "PASS",
+      "reason": "Fluid mass balance satisfied: in=2.5 kg/s = out=2.5 kg/s",
+      "relaxed": false
+    },
+    {
+      "ruleId": "thermal_capacity_vs_load",
+      "ruleDescription": "Cooling capacity ≥ thermal load + 20% margin. WARN if margin 0–20%, BLOCK if cooling < load.",
+      "hardness": "adjustable",
+      "weight": 7,
+      "verdict": "PASS",
+      "reason": "Thermal margin OK: capacity=1200000W ≥ load=1000000W × 1.2 = 1200000W",
+      "relaxed": false
+    },
+    {
+      "ruleId": "material_marine_corrosion",
+      "ruleDescription": "Steel grade with marine_corrosion_resistant=false in marine environment = BLOCK unless a modifier has overridden to true.",
+      "hardness": "adjustable",
+      "weight": 5,
+      "verdict": "PASS",
+      "reason": "Environment is not marine — rule not applicable",
+      "relaxed": false
+    }
+  ],
+  "relaxationSummary": []
+}
