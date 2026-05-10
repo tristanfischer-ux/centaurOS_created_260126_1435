@@ -354,14 +354,29 @@ Return ONLY valid JSON:
     'mistralai/mistral-large',      // B5: replaced GLM-5.1 — Mistral lineage, reliable JSON compliance
   ]
 
+  // B6 (2026-05-10): per-judge retry + timeout config.
+  // Mistral is capped at 1 retry (2 attempts total) with a 30s per-call
+  // timeout. GLM-5.1 exhibited the simultaneous-failure-accumulation pattern
+  // that killed pipelines (B5 above). Mistral hardening prevents the same
+  // failure mode from re-emerging if Mistral degrades: 1 retry × 11 sections
+  // × 30s cap = worst-case 660s overhead, versus an unbounded 60s × 3 × 11
+  // that previously timed out the entire pipeline.
+  // Other judges keep the default (2 retries = 3 attempts, 60s timeout).
+  interface JudgeConfig { maxAttempts: number; timeoutMs: number }
+  const JUDGE_CONFIG: Record<string, JudgeConfig> = {
+    'mistralai/mistral-large': { maxAttempts: 2, timeoutMs: 30_000 },
+  }
+  const DEFAULT_JUDGE_CONFIG: JudgeConfig = { maxAttempts: 3, timeoutMs: 60_000 }
+
   // F8: track which model produced each vote so we can build a per-judge breakdown.
   type JudgeVote = CouncilScore & { model: string }
   const votes: JudgeVote[] = []
 
   const judgePromises = judges.map(async (model) => {
-    for (let attempt = 0; attempt < 2; attempt++) {
+    const cfg = JUDGE_CONFIG[model] ?? DEFAULT_JUDGE_CONFIG
+    for (let attempt = 0; attempt < cfg.maxAttempts; attempt++) {
       try {
-        const result = await callJudge(model, prompt)
+        const result = await callJudge(model, prompt, cfg.timeoutMs)
         if (result && Number.isFinite(result.overall_score)) {
           return {
             model,
@@ -374,13 +389,17 @@ Return ONLY valid JSON:
           } as JudgeVote
         }
       } catch (err) {
-        if (attempt === 0) {
-          console.warn(`[council-scorer] ${section} judge ${model} failed (attempt 1), retrying...`)
+        if (attempt < cfg.maxAttempts - 1) {
+          console.warn(`[council-scorer] ${section} judge ${model} failed (attempt ${attempt + 1}), retrying...`)
           await new Promise(r => setTimeout(r, 2000)) // 2s backoff
         } else {
-          console.warn(`[council-scorer] ${section} judge ${model} failed (attempt 2), skipping`)
+          console.warn(`[council-scorer] ${section} judge ${model} failed (attempt ${attempt + 1}), skipping`)
         }
       }
+    }
+    // B6: if this is Mistral and it failed all attempts, log the skip-and-mean fallback
+    if (model === 'mistralai/mistral-large') {
+      console.warn(`[council-scorer] Mistral skipped for section ${section} — using 2-judge mean`)
     }
     return null
   })
@@ -441,9 +460,11 @@ Return ONLY valid JSON:
 
 // ─── Call a Single Judge ───────────────────────────────────────────────────
 
-async function callJudge(model: string, prompt: string): Promise<any> {
+// B6 (2026-05-10): timeoutMs param added — callers supply per-judge timeout.
+// Mistral uses 30_000; all others default to 60_000.
+async function callJudge(model: string, prompt: string, timeoutMs = 60_000): Promise<any> {
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 60_000)
+  const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
