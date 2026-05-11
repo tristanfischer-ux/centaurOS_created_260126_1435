@@ -1841,8 +1841,15 @@ const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
                 <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Source</Text>
               </View>
               {allLeaves.map((leaf, i) => {
+                // Bug P1-8 fix (2026-05-11): vendor-catalog hits get the new
+                // grade_c tier — manufacturer + lead time present, just no
+                // unit price. Render as amber alongside grade_d / estimated.
+                // grade_d (price-only fallback) keeps amber too — same colour
+                // for now; the proof HTML renderer differentiates them.
                 const gradeColour = leaf.verificationGrade === 'verified' ? BESS_GREEN
-                  : leaf.verificationGrade === 'estimated' || leaf.verificationGrade === 'grade_d' ? BESS_AMBER
+                  : (leaf.verificationGrade === 'estimated'
+                      || leaf.verificationGrade === 'grade_c'
+                      || leaf.verificationGrade === 'grade_d') ? BESS_AMBER
                   : BESS_RED
                 return (
                   <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === allLeaves.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>

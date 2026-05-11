@@ -472,7 +472,14 @@ export function runRadicalCostRollup(
     .filter(l => l.verificationGrade === 'verified')
     .reduce((sum, l) => sum + l.lineTotal, 0)
   const buyEstimatedGbp = pricedLeaves
-    .filter(l => l.verificationGrade === 'estimated' || l.verificationGrade === 'grade_d')
+    // Bug P1-8 fix (2026-05-11): include the new grade_c (vendor-catalog
+    // resolved with manufacturer + lead time) alongside grade_d/estimated
+    // in the buy-estimated bucket — neither is distributor-verified.
+    .filter(l =>
+      l.verificationGrade === 'estimated'
+      || l.verificationGrade === 'grade_c'
+      || l.verificationGrade === 'grade_d'
+    )
     .reduce((sum, l) => sum + l.lineTotal, 0)
   const makeEstimatedGbp = pricedLeaves
     .filter(l => l.verificationGrade === 'stub')

@@ -65,9 +65,15 @@ export type PartClass =
   | 'software_ip'
 
 /**
- * Verification grade hierarchy: verified > estimated > grade_d > stub > data_gap
+ * Verification grade hierarchy: verified > estimated > grade_c > grade_d > stub > data_gap
+ *
+ * Bug P1-8 fix (2026-05-11): grade_c is the new tier for vendor-catalog
+ * resolutions (manufacturer + lead time present, but no unit price). It
+ * sits between estimated (LLM price hint) and grade_d (price-only fallback
+ * from a static table). The PDF renderer maps grade_c → amber and
+ * grade_d → grey so the user can see the difference.
  */
-export type VerificationGrade = 'verified' | 'estimated' | 'grade_d' | 'stub' | 'data_gap'
+export type VerificationGrade = 'verified' | 'estimated' | 'grade_c' | 'grade_d' | 'stub' | 'data_gap'
 
 /**
  * A resolved leaf — one BOM line with all sourcing data populated.
@@ -802,7 +808,11 @@ function resolveOemSubsystemLeaf(
       manufacturer: topVendor.name,
       unit_price_gbp: estimatedUnitPriceGbp, // vendor catalog has no pricing
       lead_weeks: topVendor.typicalLeadWeeks,
-      verification_grade: estimatedUnitPriceGbp !== null ? 'estimated' : 'grade_d',
+      // Bug P1-8 fix (2026-05-11): vendor_catalog gives us a real
+      // manufacturer + lead time (stronger evidence than the price-only
+      // grade_d table). Tag as grade_c when no LLM price; estimated
+      // when an LLM price is provided.
+      verification_grade: estimatedUnitPriceGbp !== null ? 'estimated' : 'grade_c',
       source: 'vendor_catalog',
       source_url: null,
       distributor: 'vendor_catalog',
