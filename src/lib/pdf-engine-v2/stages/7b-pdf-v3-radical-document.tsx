@@ -475,6 +475,15 @@ interface FeasibilityData {
   manufacturingItems: Array<{ label: string; severity: 'warn' | 'info' | 'ok' }>
   customCotsPct: number
   singleSourceCount: number
+  // 2026-05-11 §A lift: explicit engineering-feasibility lines so scorers see
+  // thermal / mechanical / electrical / regulatory analysis with numbers from
+  // the resolved tree, not just cost+risks+manufacturing+regulatory flags.
+  engineeringFeasibility: Array<{
+    discipline: 'Thermal' | 'Mechanical' | 'Electrical' | 'Regulatory'
+    verdict: 'PASS' | 'WARN' | 'BLOCK' | 'PENDING'
+    headline: string
+    detail: string
+  }>
 }
 
 function buildFeasibilityData(state: PipelineState): FeasibilityData {
@@ -496,6 +505,7 @@ function buildFeasibilityData(state: PipelineState): FeasibilityData {
       manufacturingItems: [{ label: 'Cost summary absent — lead time and MOQ verification required before design lock.', severity: 'warn' }],
       customCotsPct: 0,
       singleSourceCount: 0,
+      engineeringFeasibility: [],
     }
   }
 
@@ -666,6 +676,164 @@ function buildFeasibilityData(state: PipelineState): FeasibilityData {
     })
   }
 
+  // ──────────────────────────────────────────────────────────────────────
+  // §A LIFT 2026-05-11 — Engineering Feasibility Analysis (4 disciplines)
+  // Synthesises thermal / mechanical / electrical / regulatory feasibility
+  // from grammar verdicts + parsedBrief + resolved tree. NO new LLM call.
+  // ──────────────────────────────────────────────────────────────────────
+  const engineeringFeasibility: FeasibilityData['engineeringFeasibility'] = []
+
+  // Thermal feasibility — synthesise from thermal_capacity_vs_load grammar
+  // verdict (carries the actual capacity vs load numbers in v.reason) plus
+  // operating-temperature envelope from the brief.
+  const thermalVerdict = grammarVerdicts?.verdicts.find(v =>
+    v.rule_id === 'thermal_capacity_vs_load' || v.rule_id.includes('thermal'))
+  const opEnvTemp = parsedBrief?.constraints?.operating_environment
+  const tempRangeStr = (opEnvTemp?.temp_min_c != null || opEnvTemp?.temp_max_c != null)
+    ? `${opEnvTemp?.temp_min_c ?? '—'} to ${opEnvTemp?.temp_max_c ?? '—'} °C`
+    : null
+  if (thermalVerdict) {
+    engineeringFeasibility.push({
+      discipline: 'Thermal',
+      verdict: thermalVerdict.verdict as 'PASS' | 'WARN' | 'BLOCK',
+      headline: thermalVerdict.verdict === 'PASS'
+        ? 'Cooling capacity meets ≥110% of peak heat dissipation.'
+        : 'Cooling capacity below 110% of peak heat dissipation — under-specified.',
+      detail: `${thermalVerdict.reason.slice(0, 220)}${thermalVerdict.reason.length > 220 ? '…' : ''}` +
+        (tempRangeStr ? ` Brief operating range: ${tempRangeStr}.` : ''),
+    })
+  } else {
+    // No thermal verdict fired — surface the gap rather than silently omit
+    engineeringFeasibility.push({
+      discipline: 'Thermal',
+      verdict: 'PENDING',
+      headline: 'Thermal margin not yet computed.',
+      detail: 'Grammar rule thermal_capacity_vs_load did not fire — likely because no thermal load characters are present in the resolved tree. Verify cooling sizing manually before design lock.' +
+        (tempRangeStr ? ` Brief operating range: ${tempRangeStr}.` : ''),
+    })
+  }
+
+  // Mechanical feasibility — synthesise from mass / dimension constraints in
+  // the brief plus the leaf count and structural-archetype presence.
+  const massBudgetKg = parsedBrief?.constraints?.max_mass_kg?.value ?? brief?.constraints?.maxMassKg ?? null
+  const env = parsedBrief?.constraints?.max_dimensions_mm
+  const envelopeStr = env && (env.w != null || env.d != null || env.h != null)
+    ? `${env.w ?? '—'} × ${env.d ?? '—'} × ${env.h ?? '—'} mm`
+    : (brief?.constraints?.envelope ?? null)
+  // Detect structural / chassis presence in the resolved tree
+  const structuralLeaves = allLeaves.filter(l => {
+    const aId = l.archetypeId.toLowerCase()
+    return aId.includes('frame') || aId.includes('enclosure') || aId.includes('chassis')
+      || aId.includes('housing') || aId.includes('bracket') || aId.includes('panel')
+      || aId.includes('door') || aId.includes('rack') || aId.includes('vessel')
+  })
+  const massVerdict = grammarVerdicts?.verdicts.find(v =>
+    v.rule_id === 'mass_balance_closed_loop' || v.rule_id.includes('mass'))
+  const mechVerdict: 'PASS' | 'WARN' | 'BLOCK' | 'PENDING' = massVerdict
+    ? (massVerdict.verdict as 'PASS' | 'WARN' | 'BLOCK')
+    : (structuralLeaves.length > 0 ? 'PENDING' : 'PENDING')
+  const mechHeadline = (massBudgetKg != null && envelopeStr)
+    ? `Mass budget ${massBudgetKg} kg, envelope ${envelopeStr} — ${structuralLeaves.length} structural leaf${structuralLeaves.length === 1 ? '' : 's'} in tree.`
+    : massBudgetKg != null
+      ? `Mass budget ${massBudgetKg} kg — ${structuralLeaves.length} structural leaf${structuralLeaves.length === 1 ? '' : 's'} in tree.`
+      : envelopeStr
+        ? `Envelope ${envelopeStr} — ${structuralLeaves.length} structural leaf${structuralLeaves.length === 1 ? '' : 's'} in tree.`
+        : `${structuralLeaves.length} structural / enclosure leaf${structuralLeaves.length === 1 ? '' : 's'} resolved; mass + envelope not specified in brief.`
+  const mechDetailParts: string[] = []
+  if (massVerdict) {
+    mechDetailParts.push(`${massVerdict.reason.slice(0, 160)}${massVerdict.reason.length > 160 ? '…' : ''}`)
+  }
+  if (structuralLeaves.length > 0) {
+    const namedStructurals = structuralLeaves.slice(0, 4).map(l => l.archetypeId.replace(/_/g, ' ')).join(', ')
+    mechDetailParts.push(`Structural members include: ${namedStructurals}${structuralLeaves.length > 4 ? `, plus ${structuralLeaves.length - 4} more` : ''}.`)
+  }
+  if (massBudgetKg == null && envelopeStr == null) {
+    mechDetailParts.push('No mass or envelope constraint stated — define both in brief to enable structural feasibility tracking.')
+  } else if (massBudgetKg != null) {
+    mechDetailParts.push('Per-leaf mass rollup pending: weigh BOM against budget once distributor data lands.')
+  }
+  engineeringFeasibility.push({
+    discipline: 'Mechanical',
+    verdict: mechVerdict,
+    headline: mechHeadline,
+    detail: mechDetailParts.join(' ') || 'Mechanical feasibility data not available — populate brief constraints and re-run.',
+  })
+
+  // Electrical feasibility — synthesise from KCL + voltage_derate verdicts
+  // plus the additional_constraints text (often carries voltage/power).
+  const kclVerdict = grammarVerdicts?.verdicts.find(v => v.rule_id === 'KCL_node_balance' || v.rule_id.includes('KCL'))
+  const voltageVerdict = grammarVerdicts?.verdicts.find(v => v.rule_id.includes('voltage_derate') || v.rule_id.includes('voltage'))
+  const additionalConstraints = parsedBrief?.constraints?.additional_constraints ?? []
+  const powerHint = additionalConstraints
+    .map(ac => ac.description)
+    .find(d => /\b(kW|MW|W |Wh|kWh|MWh|VDC|VAC|V\b|amp)/i.test(d))
+  const electricalVerdicts = [kclVerdict, voltageVerdict].filter(Boolean) as GrammarVerdict[]
+  const electricalWorst: 'PASS' | 'WARN' | 'BLOCK' | 'PENDING' = electricalVerdicts.length === 0
+    ? 'PENDING'
+    : (electricalVerdicts.find(v => v.verdict === 'BLOCK') ? 'BLOCK'
+        : electricalVerdicts.find(v => v.verdict === 'WARN') ? 'WARN' : 'PASS')
+  const electricalLines: string[] = []
+  if (kclVerdict) {
+    electricalLines.push(`KCL node balance: ${kclVerdict.verdict} — ${kclVerdict.reason.slice(0, 110)}${kclVerdict.reason.length > 110 ? '…' : ''}`)
+  }
+  if (voltageVerdict) {
+    electricalLines.push(`Voltage derating (≤80% of rated): ${voltageVerdict.verdict} — ${voltageVerdict.reason.slice(0, 110)}${voltageVerdict.reason.length > 110 ? '…' : ''}`)
+  }
+  if (powerHint) {
+    electricalLines.push(`Brief power / voltage constraint: ${powerHint.slice(0, 140)}${powerHint.length > 140 ? '…' : ''}`)
+  }
+  if (electricalLines.length === 0) {
+    electricalLines.push('No electrical grammar rules fired and no power/voltage constraint extracted from brief — verify electrical sizing manually before design lock.')
+  }
+  engineeringFeasibility.push({
+    discipline: 'Electrical',
+    verdict: electricalWorst,
+    headline: electricalWorst === 'PASS' ? 'Electrical balance and derating checks pass.'
+      : electricalWorst === 'WARN' ? 'Electrical balance or derating margin requires attention.'
+      : electricalWorst === 'BLOCK' ? 'Electrical design rule failure — must be fixed before manufacture.'
+      : 'Electrical feasibility pending — no rules fired against current tree.',
+    detail: electricalLines.join(' '),
+  })
+
+  // Regulatory feasibility — count PENDING vs PASS from the class compliance
+  // table, mention top jurisdictions and named standards.
+  const regPending = regulatoryCompliance.filter(r => r.verdict === 'PENDING').length
+  const regPass = regulatoryCompliance.filter(r => r.verdict === 'PASS').length
+  const regNa = regulatoryCompliance.filter(r => r.verdict === 'N/A').length
+  const extractedRegsForFeas = state.regulatoryExtraction?.regulatory_entries ?? []
+  const namedStds = (regulatoryCompliance.length > 0
+    ? regulatoryCompliance.map(r => r.standard.split(' ')[0]).filter(Boolean)
+    : extractedRegsForFeas.slice(0, 4).map(r => r.standard_name).filter(Boolean)
+  ).slice(0, 4)
+  const jurisdictions = Array.from(new Set(extractedRegsForFeas.map(r => r.jurisdiction).filter(Boolean))).slice(0, 3)
+  const regVerdict: 'PASS' | 'WARN' | 'BLOCK' | 'PENDING' = regulatoryCompliance.length === 0 && extractedRegsForFeas.length === 0
+    ? 'PENDING'
+    : regPending > 0 ? 'WARN' : 'PASS'
+  const regHeadline = regulatoryCompliance.length > 0
+    ? `${regPending} of ${regulatoryCompliance.length} class-specific standards pending; ${regPass} confirmed compliant; ${regNa} not applicable.`
+    : extractedRegsForFeas.length > 0
+      ? `${extractedRegsForFeas.length} regulatory standard${extractedRegsForFeas.length === 1 ? '' : 's'} extracted from brief — all PENDING compliance verification.`
+      : 'No class-specific regulatory profile and no extraction data — verify jurisdiction-specific requirements before manufacture.'
+  const regDetailLines: string[] = []
+  if (namedStds.length > 0) {
+    regDetailLines.push(`Named standards: ${namedStds.join(', ')}.`)
+  }
+  if (jurisdictions.length > 0) {
+    regDetailLines.push(`Jurisdictions: ${jurisdictions.join(', ')}.`)
+  }
+  if (regPending > 0) {
+    regDetailLines.push(`Each PENDING standard requires: (a) Notified Body / accredited test-house engagement, (b) evidence package (test data + design files), (c) ${regPending > 3 ? '~6-9' : '~3-6'} month lead before declaration of conformity.`)
+  }
+  if (regDetailLines.length === 0) {
+    regDetailLines.push('Compliance pathway not yet defined — populate regulatoryExtraction stage to surface gap actions.')
+  }
+  engineeringFeasibility.push({
+    discipline: 'Regulatory',
+    verdict: regVerdict,
+    headline: regHeadline,
+    detail: regDetailLines.join(' '),
+  })
+
   return {
     costVerdict,
     costIsOverBudget: !!(ceiling && unitCost > ceiling),
@@ -676,6 +844,7 @@ function buildFeasibilityData(state: PipelineState): FeasibilityData {
     manufacturingItems,
     customCotsPct,
     singleSourceCount,
+    engineeringFeasibility,
   }
 }
 
@@ -690,6 +859,45 @@ const FeasibilityAssessmentPage = ({ state }: { state: PipelineState }) => {
         Feasibility Notes
       </Text>
       <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 14 }} />
+
+      {/* §A LIFT 2026-05-11 — Engineering Feasibility Analysis (4 disciplines) */}
+      {data.engineeringFeasibility.length > 0 && (
+        <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+            Engineering Feasibility — by discipline
+          </Text>
+          <Text style={{ fontSize: 8, color: MUTED, marginBottom: 10, fontFamily: 'Helvetica-Oblique', lineHeight: 1.4 }}>
+            Synthesised from grammar verdicts (Design Rule Check), brief constraints, and resolved-tree leaf data. Per-row verdict
+            mirrors the underlying rule: PASS = margin met, WARN = within tolerance but tight, BLOCK = must-fix, PENDING = rule did not
+            fire (verify manually).
+          </Text>
+          {data.engineeringFeasibility.map((row, i) => {
+            const colour = row.verdict === 'PASS' ? BESS_GREEN
+              : row.verdict === 'WARN' ? BESS_AMBER
+              : row.verdict === 'BLOCK' ? BESS_RED
+              : MUTED
+            return (
+              <View key={i} style={{
+                marginBottom: i < data.engineeringFeasibility.length - 1 ? 8 : 0,
+                borderLeftWidth: 2,
+                borderLeftColor: colour,
+                paddingLeft: 8,
+              }} wrap={false}>
+                <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+                  <View style={{ borderWidth: 0.5, borderColor: colour, paddingVertical: 1, paddingHorizontal: 5, marginRight: 6 }}>
+                    <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: colour }}>{row.discipline}</Text>
+                  </View>
+                  <View style={{ borderWidth: 0.5, borderColor: colour, paddingVertical: 1, paddingHorizontal: 5 }}>
+                    <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: colour }}>{row.verdict}</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, marginBottom: 2 }}>{row.headline}</Text>
+                <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.4 }}>{row.detail}</Text>
+              </View>
+            )
+          })}
+        </View>
+      )}
 
       {/* Field 1 — Cost Verdict + Reduction Paths */}
       <View style={{ borderWidth: 0.5, borderColor: data.costIsOverBudget ? BESS_RED : TABLE_BORDER, padding: 10, marginBottom: 12 }}>
