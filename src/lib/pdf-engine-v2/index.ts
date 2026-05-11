@@ -11,7 +11,8 @@ import { join } from 'path'
 import { runTrainingDataDump } from './stages/0-training-data'
 import { runBriefGeneration, runBriefParsing } from './stages/0-brief-generation'
 import { runResearch, runResearchSynthesis, extractResearchConstraints } from './stages/1-research'
-import { runDecompose, runDecomposePA, runDecomposeRadical, isPhaseOneTreeOutputEnabled } from './stages/2-decompose'
+import { runDecompose, runDecomposePA, runDecomposeRadical, runDecomposeRadicalPerModule, isPhaseOneTreeOutputEnabled, isPhase3PerModuleEnabled } from './stages/2-decompose'
+import { runModuleDecomposition } from './stages/1.7-module-decomposition'
 import { runRegulatoryExtraction } from './stages/1b-regulatory'
 import { runSizeLayout, runSizingSecondPass } from './stages/3-size-layout'
 import { runBomCost } from './stages/4-bom-cost'
@@ -1070,13 +1071,87 @@ export async function runPipeline(
     }
     state.modules = decomposeResult.data
 
+    // ── Iter 3 — Radical Phase 3: per-module decomposition (additive) ──────
+    // When RADICAL_PHASE_3_PER_MODULE=true AND paMode is active, run:
+    //   (a) Stage 1.5 module decomposition (LLM + 4-seat council), then
+    //   (b) per-module Stage 2 loop (one focused LLM call per ModuleSpec).
+    // The aggregated tree is written to state.radicalTree the same way the
+    // single-shot Phase 1 path does, so downstream Phase 2/3/4/5 are unaffected.
+    //
+    // Backward compatibility: gated behind RADICAL_PHASE_3_PER_MODULE. When the
+    // flag is OFF, the legacy Phase 1 single-shot path below runs unchanged.
+    // When BOTH Phase 1 and Phase 3 flags are on, Phase 3 takes precedence
+    // (single-shot is skipped) — this is the V10 dual-run methodology where
+    // each version is run with one flag-set, not interleaved within a run.
+    let phase3RanSuccessfully = false
+    if (paMode && state.parsedBrief && isPhase3PerModuleEnabled()) {
+      console.log('[pipeline] Radical Phase 3: RADICAL_PHASE_3_PER_MODULE=true, running module decomposition + per-module loop...')
+      try {
+        const productClassForRadical: string = typeof classification === 'string'
+          ? classification
+          : ((classification as any).productClass ?? 'UNKNOWN')
+
+        // Stage 1.5
+        const decompositionResult = await runModuleDecomposition(
+          state.parsedBrief,
+          productClassForRadical,
+          state.regulatoryExtraction,
+        )
+        if (decompositionResult.ok && decompositionResult.data) {
+          const moduleDecomposition = decompositionResult.data
+          ;(state as any).moduleDecomposition = moduleDecomposition
+          console.log(
+            `[pipeline] Stage 1.5 complete: ${moduleDecomposition.modules.length} modules, ` +
+            `${moduleDecomposition.excluded_modules.length} excluded, ` +
+            `council=${moduleDecomposition.council_verdict}, ` +
+            `cost≈£${moduleDecomposition.telemetry.estimated_cost_gbp.toFixed(3)}`
+          )
+
+          // Per-module Stage 2
+          const perModuleResult = await runDecomposeRadicalPerModule(
+            moduleDecomposition,
+            state.parsedBrief,
+            productClassForRadical,
+          )
+          if (perModuleResult.ok && perModuleResult.data) {
+            state.radicalTree = perModuleResult.data.radicalTree.tree
+            state.radicalTreeUnknowns = perModuleResult.data.radicalTree.unknowns
+            ;(state as any).perModuleDecomposition = perModuleResult.data.perModule
+            phase3RanSuccessfully = true
+            const tel = perModuleResult.data.perModule.aggregate_telemetry
+            console.log(
+              `[pipeline] Radical Phase 3: per-module Stage 2 complete. ` +
+              `${perModuleResult.data.perModule.sub_trees.length} sub-trees, ` +
+              `${perModuleResult.data.perModule.total_leaf_count} unique leaves, ` +
+              `${perModuleResult.data.perModule.empty_modules.length} empty modules. ` +
+              `Wall-clock ${tel.wall_clock_ms}ms vs serial ${tel.total_llm_call_ms_serial}ms, ` +
+              `cost≈£${tel.total_estimated_cost_gbp.toFixed(3)}`
+            )
+          } else {
+            console.warn(`[pipeline] Radical Phase 3: per-module Stage 2 failed (non-fatal): ${perModuleResult.error}`)
+          }
+        } else {
+          console.warn(`[pipeline] Radical Phase 3: Stage 1.5 failed (non-fatal): ${decompositionResult.error}`)
+        }
+      } catch (phase3Err) {
+        // Non-fatal — Iter 3 failure must NEVER block the main pipeline
+        console.warn(`[pipeline] Radical Phase 3: exception (non-fatal): ${(phase3Err as Error).message}`)
+      }
+    }
+
     // ── Radical Phase 1: tree emission (BESS only, behind feature flag) ────
     // When RADICAL_PHASE_1_TREE_OUTPUT=true AND paMode is active, run the
     // Radical decompose in parallel with the normal flat-list output.
     // This is STRICTLY ADDITIVE — state.modules is unchanged.
     // The tree is written to state.radicalTree + state.radicalTreeUnknowns.
     // Unknown radicals are surfaced to console but do NOT block the pipeline.
-    if (paMode && state.parsedBrief && isPhaseOneTreeOutputEnabled()) {
+    //
+    // Iter 3 precedence: if Phase 3 (RADICAL_PHASE_3_PER_MODULE) already wrote
+    // state.radicalTree above, Phase 1 is SKIPPED to avoid clobbering. Both
+    // flags being on simultaneously is a configuration mistake but not fatal —
+    // Phase 3 wins. To dual-compare V8 vs V10, run two separate pipelines, not
+    // both flags in the same process.
+    if (paMode && state.parsedBrief && isPhaseOneTreeOutputEnabled() && !phase3RanSuccessfully) {
       console.log('[pipeline] Radical Phase 1: RADICAL_PHASE_1_TREE_OUTPUT=true, running tree decomposition...')
       try {
         const productClassForRadical: string = typeof classification === 'string'
