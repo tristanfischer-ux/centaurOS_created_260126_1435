@@ -1468,13 +1468,21 @@ export async function runDecomposeRadicalPerModule(
   }
 
   // ── Step 2: union all leaves (dedup by (character_id, archetype_id)) ─────
+  // Council code-review (2026-05-11, Gemini + GLM seats): clone leaves before
+  // inserting into `seen` so the per-module sub_trees on the returned
+  // PerModuleDecompositionResult retain their original multiplicities. Without
+  // the clone, accumulation mutates the original leaf object held in the
+  // sub-tree's leaves[] array (shared object reference), which corrupts the
+  // per-module diagnostic that downstream callers may rely on.
   const seen = new Map<string, LeafRecord>()
   for (const st of subTrees) {
     for (const leaf of st.leaves) {
       const key = `${leaf.character_id}|${leaf.archetype_id ?? ''}`
       const existing = seen.get(key)
       if (!existing) {
-        seen.set(key, leaf)
+        // Shallow clone so subsequent multiplicity accumulation does not
+        // mutate the original leaf in subTrees[*].leaves.
+        seen.set(key, { ...leaf })
       } else {
         // Sum multiplicities for duplicate (character_id, archetype_id) pairs
         // — same logical part appearing under two modules (e.g. multi-classification).
