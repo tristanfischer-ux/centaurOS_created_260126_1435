@@ -226,7 +226,192 @@ export const MODULE_DEFAULT_ALLOWED_RADICALS: Record<UniversalModule, string[]> 
 }
 
 // ---------------------------------------------------------------------------
-// 2. ModuleSpec — per-module decomposition output
+// 2. Natural-language layer (Iter 4) — sub-modules, modifiers, grammar links
+// ---------------------------------------------------------------------------
+
+/**
+ * Engineering-grammar mechanism vocabulary.
+ *
+ * Closed enum of canonical link mechanisms that describe HOW two sub-modules
+ * within a ModuleSpec are coupled. The vocabulary covers the four major
+ * coupling families:
+ *
+ *   - Mechanical          — physical mounting, fastening, structural transit
+ *   - Electrical (bus)    — DC/AC busbars, voltage taps, sensor feedback
+ *   - Communications      — CAN, Modbus, I2C, SPI, alarm interlocks
+ *   - Fluid / thermal     — cooling loops, refrigerant lines, ducting
+ *
+ * OPEN-ENUM POLICY: extension is performed by union widening (eg
+ * `GrammarMechanism | 'new_mechanism'`) when a new domain genuinely needs
+ * a vocabulary entry that isn't here. Do NOT silently coerce to a string —
+ * losing the closed-enum check disables the structural validation that
+ * prevents typos and wrong-domain links from leaking through.
+ *
+ * Naming convention: snake_case, lowercase, mechanism-first (eg
+ * `dc_busbar` not `busbar_dc`).
+ */
+export type GrammarMechanism =
+  // Mechanical / structural
+  | 'mechanical_mount'
+  | 'pcb_mounting'
+  | 'cable_transit'
+  | 'fluid_routing'
+  | 'door_interlock'
+  // Electrical — power
+  | 'voltage_taps'
+  | 'dc_busbar'
+  | 'ac_busbar'
+  | 'high_voltage_dc'
+  // Electrical — control / signal
+  | 'contactor_command'
+  | 'pre_charge_enable'
+  | 'imd_trip'
+  | 'sensor_feedback'
+  | 'alarm_interlock'
+  | 'safety_isolation'
+  | 'manual_override'
+  | 'hmi_data'
+  // Comms — bus / protocol
+  | 'can_bus'
+  | 'modbus_tcp'
+  | 'i2c_bus'
+  | 'spi_bus'
+  | 'rf_path'
+  | 'fibre_optic'
+  // Fluid / thermal
+  | 'cooling_loop'
+  | 'refrigerant_line'
+  | 'air_duct'
+
+/**
+ * A single grammar link between two sub-modules within the SAME ModuleSpec.
+ *
+ *   - `from_sub_module` / `to_sub_module` reference `SubModuleSpec.id` values
+ *     within `ModuleSpec.sub_modules`. Validators reject dangling IDs.
+ *   - `mechanism` is the canonical coupling vocabulary (`GrammarMechanism`).
+ *   - `type` records direction:
+ *       * 'mutual'      — bidirectional (eg shared busbar, mounting transit).
+ *                         Renderer uses ↔ operator.
+ *       * 'directional' — one-way (eg command, alarm trip, sensor read-out).
+ *                         Renderer uses → operator.
+ *   - `detail` is a short free-form qualifier ("redundant pair", "1500 V DC",
+ *     "pack +/- rails"). NOT prose — keep under 80 chars; long descriptions
+ *     belong in `ModuleSpec.module_brief`.
+ *
+ * Round-tripping: `generateGrammarTrace()` consumes these into the canonical
+ * symbolic form (`x ↔[CAN bus] y`); the Iter 5 parser will recover the
+ * structured `GrammarLink` from the trace.
+ */
+export interface GrammarLink {
+  /** Identifier of the source sub-module — must match a SubModuleSpec.id within the same ModuleSpec. */
+  from_sub_module: string
+  /** Identifier of the target sub-module — must match a SubModuleSpec.id within the same ModuleSpec. */
+  to_sub_module: string
+  /** Canonical coupling mechanism. */
+  mechanism: GrammarMechanism
+  /** Direction: 'mutual' for bidirectional, 'directional' for one-way. */
+  type: 'mutual' | 'directional'
+  /** Short free-form qualifier (eg "redundant pair", "1500 V DC"). Optional. */
+  detail?: string
+}
+
+/**
+ * A modifying character — qualifier attached to a primary character within a
+ * sub-module (eg quantity ×3920, capacity 280 Ah, form prismatic, life 6k cyc).
+ *
+ * Modifiers are ORTHOGONAL to the primary character: each modifier kind
+ * captures a different dimension of qualification, and a single sub-module
+ * carries 0..N modifiers of mixed kinds.
+ *
+ * `kind` vocabulary (extensible — `string` fallback permitted, but prefer
+ * the canonical set so `modifierStripInline()` renders deterministically):
+ *
+ *   quantity      — multiplicity (eg "×3920")
+ *   capacity      — energy / power / volume rating with unit (eg 280 Ah)
+ *   form          — physical form factor (eg "prismatic", "cylindrical")
+ *   topology      — electrical / fluid topology (eg "112s", "delta-wye")
+ *   dimension     — geometric dimension with unit (eg "180×160×72 mm")
+ *   lifecycle     — durability / cycle life (eg "6000 cyc", "10 yr")
+ *   regulatory    — compliance certification (eg "IEC 62619", "UN 38.3")
+ *   performance   — efficiency / throughput (eg "≥95%", "1 MW")
+ *   tolerance     — accuracy / variation (eg "±0.5%", "Class B")
+ *   envelope      — operating envelope (eg "−20…+55 °C", "IP65")
+ */
+export type ModifierKind =
+  | 'quantity'
+  | 'capacity'
+  | 'form'
+  | 'topology'
+  | 'dimension'
+  | 'lifecycle'
+  | 'regulatory'
+  | 'performance'
+  | 'tolerance'
+  | 'envelope'
+  | (string & { __brand?: 'extensible' })
+
+export interface ModifyingCharacter {
+  /** Modifier dimension (see ModifierKind canonical vocabulary). */
+  kind: ModifierKind
+  /** Modifier value (the human-readable token, eg "×3920", "280", "prismatic"). */
+  value: string
+  /** Optional unit (eg "Ah", "mm", "°C"). Omitted for unitless modifiers (form, topology). */
+  unit?: string
+}
+
+/**
+ * A sub-module — one component group within a parent ModuleSpec.
+ *
+ * Maps to a "word" in the radical hierarchy (subsystem group). Each sub-module
+ * has a single PRIMARY character plus 0..N MODIFYING characters that qualify
+ * it. Sub-modules within a ModuleSpec are linked via `ModuleSpec.grammar_links`.
+ *
+ * Example (BESS energy_storage_source.cell_string):
+ *   {
+ *     id: 'cell_string',
+ *     name_human: 'cell string',
+ *     primary_character_id: 'lfp_prismatic_cell',
+ *     primary_character_name_human: 'LFP prismatic cell',
+ *     modifiers: [
+ *       { kind: 'quantity', value: '×3920' },
+ *       { kind: 'capacity', value: '280', unit: 'Ah' },
+ *       { kind: 'form',     value: 'prismatic' },
+ *       { kind: 'lifecycle', value: '6000 cyc' },
+ *     ],
+ *     role_verb: 'consists of',
+ *     topology_clause: 'wired in 112 modules of 35-cells in series',
+ *   }
+ *
+ * The deterministic generators in `radical/sentence-generator.ts` consume
+ * this shape directly — no LLM call required.
+ */
+export interface SubModuleSpec {
+  /** Stable identifier within the parent ModuleSpec (snake_case). Referenced by GrammarLink. */
+  id: string
+  /** Human-readable name of the sub-module ("cell string", "BMS slave"). */
+  name_human: string
+  /** Primary character ID (snake_case, must match a known character in the library). */
+  primary_character_id: string
+  /** Human-readable name of the primary character ("LFP prismatic cell"). */
+  primary_character_name_human: string
+  /** Modifying characters qualifying the primary character. Empty array if none. */
+  modifiers: ModifyingCharacter[]
+  /**
+   * Verb describing this sub-module's role within the parent ModuleSpec
+   * ("consists of", "monitors", "supervises", "distributes"). Used by
+   * `generateSubmoduleSentence()`. Defaults to "comprises" if absent.
+   */
+  role_verb?: string
+  /**
+   * Optional secondary clause describing topology / arrangement
+   * ("wired in 112 modules of 35-cells in series", "mounted on a steel rack
+   * with two redundant CAN slaves per module").
+   */
+  topology_clause?: string
+}
+
+// ---------------------------------------------------------------------------
+// 3. ModuleSpec — per-module decomposition output
 // ---------------------------------------------------------------------------
 
 /**
@@ -301,6 +486,44 @@ export interface ModuleSpec {
   applicability_confidence: ApplicabilityConfidence
 
   /**
+   * OPTIONAL — natural-language layer (Iter 4).
+   *
+   * Sub-modules within this ModuleSpec, each carrying a primary character +
+   * a list of modifying characters. Consumed by `generateSubmoduleSentence()`
+   * and `generateModuleParagraph()` in `radical/sentence-generator.ts` to
+   * emit canonical English prose alongside the engineering radical trace.
+   *
+   * Backward compatible: existing snapshots that lack this field continue
+   * to render via the legacy `RadicalModulesSection` tree view. New runs
+   * SHOULD populate it; legacy runs MUST still validate.
+   *
+   * See memory drawer `forgeos_decisions_393756e2f253f189` for the
+   * architectural framing (the missing natural-language layer between
+   * structured snapshot and PDF output).
+   */
+  sub_modules?: SubModuleSpec[]
+
+  /**
+   * OPTIONAL — natural-language layer (Iter 4).
+   *
+   * First-class declaration of how sub-modules within THIS module connect
+   * to each other (mechanical mounts, bus couplings, control links, etc.).
+   * Drives the grammar-trace output and the sub-module connection map in
+   * the PDF Design Modules section.
+   *
+   * Each link references sub-module identifiers from `sub_modules[]` above
+   * (ie `from_sub_module` and `to_sub_module` must match a `SubModuleSpec.id`
+   * within the same ModuleSpec). Cross-module links live at the
+   * ModuleDecomposition level (out of scope for Iter 4).
+   *
+   * Empty array semantics: an empty `grammar_links: []` means "no internal
+   * links declared". A missing/undefined value means "field not provided
+   * by upstream stage" — for new ModuleSpec construction sites, prefer
+   * `grammar_links: []` over omission to surface intent explicitly.
+   */
+  grammar_links?: GrammarLink[]
+
+  /**
    * Optional secondary classifications. A single component or sub-system
    * can legitimately serve more than one universal function — `secondary_modules`
    * lets the LLM express dual-classification on a single ModuleSpec without
@@ -333,7 +556,7 @@ export interface ModuleSpec {
 }
 
 // ---------------------------------------------------------------------------
-// 3. ModuleDecomposition — Stage 1.5 top-level output
+// 4. ModuleDecomposition — Stage 1.5 top-level output
 // ---------------------------------------------------------------------------
 
 /**
@@ -484,7 +707,7 @@ export interface ModuleDecompositionTelemetry {
 }
 
 // ---------------------------------------------------------------------------
-// 4. Per-module radical sub-tree (Stage 2 per-module output)
+// 5. Per-module radical sub-tree (Stage 2 per-module output)
 // ---------------------------------------------------------------------------
 
 /**
@@ -564,7 +787,7 @@ export interface AggregatePerModuleTelemetry {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Per-class module priors (mitigation for §8.1 hallucination risk)
+// 6. Per-class module priors (mitigation for §8.1 hallucination risk)
 // ---------------------------------------------------------------------------
 
 /**
@@ -597,7 +820,7 @@ export interface ModulePrior {
 export type ClassModulePriors = Partial<Record<ProductClass, ModulePrior>>
 
 // ---------------------------------------------------------------------------
-// 6. Validation result types (used by implementation, declared here for
+// 7. Validation result types (used by implementation, declared here for
 //    contract stability)
 // ---------------------------------------------------------------------------
 
