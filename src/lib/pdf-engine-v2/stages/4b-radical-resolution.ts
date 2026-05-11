@@ -262,6 +262,99 @@ function isDistributorResultPlausibleForClass(partClass: PartClass): boolean {
   return partClass === 'electronic_cots' || partClass === 'mechanical_cots'
 }
 
+/**
+ * Per-archetype manufacturer/description guards.
+ *
+ * Bug P0-3 fix (2026-05-11): the resolution semantic matcher previously
+ * accepted any keyword hit. copper_terminal MPN "476-9481" matched a
+ * Banner Engineering 476-9481 photoelectric sensor at £148.75 — semantically
+ * very wrong for a copper lug.
+ *
+ * For each archetype we declare:
+ *   - allowedManufacturers (substring match, lowercase) — if non-empty,
+ *     the distributor result must include one of these in its manufacturer
+ *     name OR the description.
+ *   - bannedManufacturers — if matched, the distributor result is rejected
+ *     even when other guards pass (defence in depth).
+ *   - requiredDescriptionKeywords — at least one must appear in description.
+ *
+ * Each guard is OPTIONAL. An archetype with no entry in this table is not
+ * guarded (existing behaviour).
+ */
+interface ArchetypeGuard {
+  allowedManufacturers?: string[]
+  bannedManufacturers?: string[]
+  requiredDescriptionKeywords?: string[]
+}
+
+const ARCHETYPE_RESULT_GUARDS: Record<string, ArchetypeGuard> = {
+  copper_terminal: {
+    // Lug / ring-terminal manufacturers
+    allowedManufacturers: [
+      'panduit', 'weidmüller', 'weidmuller', 'phoenix contact', 'te connectivity',
+      'molex', 'amphenol', 'klauke', 'thomas & betts', 'abb',
+    ],
+    bannedManufacturers: ['banner', 'omron', 'sick', 'keyence'],
+    requiredDescriptionKeywords: ['lug', 'terminal', 'crimp', 'ring tongue', 'ring terminal'],
+  },
+  copper_busbar: {
+    allowedManufacturers: ['storm', 'methode', 'mersen', 'erico', 'lugsdirect', 'eriks'],
+    requiredDescriptionKeywords: ['busbar', 'bus bar', 'bus-bar', 'copper bar'],
+  },
+  cable_transit_frame: {
+    allowedManufacturers: ['roxtec', 'mct', 'beele'],
+    requiredDescriptionKeywords: ['transit', 'cable seal', 'multi-cable', 'cable entry'],
+  },
+  thermal_insulation_panel: {
+    allowedManufacturers: ['rockwool', 'kingspan', 'armacell', 'paroc'],
+    requiredDescriptionKeywords: ['insulation', 'mineral wool', 'rockwool', 'pir'],
+  },
+  gas_sensor: {
+    bannedManufacturers: ['banner', 'sick', 'keyence'],   // photoelectric vendors
+    requiredDescriptionKeywords: ['gas', 'h2', 'hydrogen', 'co2', 'voc', 'mq', 'electrochem'],
+  },
+}
+
+/**
+ * Returns true when the distributor hit is consistent with the archetype's
+ * declared guard. Returns true (no-op) when no guard is declared.
+ *
+ * Bug P0-3 fix (2026-05-11).
+ */
+function isDistributorResultConsistentWithArchetype(
+  archetypeId: string,
+  result: AggregateResult,
+): { ok: boolean; reason?: string } {
+  const guard = ARCHETYPE_RESULT_GUARDS[archetypeId]
+  if (!guard) return { ok: true }
+
+  const mfg = (result.best.manufacturer ?? '').toLowerCase()
+  const desc = (result.best.description ?? '').toLowerCase()
+
+  if (guard.bannedManufacturers && guard.bannedManufacturers.some(b => mfg.includes(b))) {
+    return { ok: false, reason: `banned manufacturer "${result.best.manufacturer}" for ${archetypeId}` }
+  }
+  if (guard.allowedManufacturers && guard.allowedManufacturers.length > 0) {
+    const okMfg = guard.allowedManufacturers.some(a => mfg.includes(a) || desc.includes(a))
+    if (!okMfg) {
+      return {
+        ok: false,
+        reason: `manufacturer "${result.best.manufacturer}" not on allowlist for ${archetypeId}`,
+      }
+    }
+  }
+  if (guard.requiredDescriptionKeywords && guard.requiredDescriptionKeywords.length > 0) {
+    const okDesc = guard.requiredDescriptionKeywords.some(k => desc.includes(k))
+    if (!okDesc) {
+      return {
+        ok: false,
+        reason: `description "${result.best.description}" missing required keywords for ${archetypeId}`,
+      }
+    }
+  }
+  return { ok: true }
+}
+
 // ---------------------------------------------------------------------------
 // MPN hint table — canonical MPNs keyed by archetype_id (character_id)
 // These are the best-known queryable MPNs per character for the BESS class.
@@ -369,8 +462,12 @@ const MPN_HINTS_BY_CHARACTER: Record<string, string[]> = {
   'steel_threaded_rod': ['527-0104', '278-6090'],
   // 2.5 mm² LSZH single-core copper building wire (Prysmian H07Z1-U) — RS
   'copper_wire': ['224-4488', '879-7004'],
-  // 16 mm² copper ring terminal M10 — RS / Panduit
-  'copper_terminal': ['476-9481', 'RB16-10-X'],
+  // 16 mm² copper ring terminal M10 — try Panduit first (RB16-10-X);
+  // 476-9481 is RS Components' lug catalogue number BUT collides with a
+  // Banner Engineering photoelectric sensor on Mouser/Farnell — bug P0-3.
+  // The archetype guard rejects the Banner hit; ordering Panduit first
+  // gives us the right resolution on the first call.
+  'copper_terminal': ['RB16-10-X', 'LCD16-14R-Q', 'P14-14R-T'],
   // Silicone O-ring cord stock (Ø 3.5 mm) — RS / Eriks
   'polymer_gasket': ['614-3249', '614-3231'],
   // 60 W black anodised aluminium heatsink — Fischer Elektronik / Aavid
@@ -521,8 +618,22 @@ async function resolveDistributorLeaf(
     callsUsed.count++
     console.log(`  [Phase2/API #${callsUsed.count}] ${archetypeId} → querying MPN: ${mpn}`)
     try {
-      result = await findSkuForPart(mpn)
-      if (result) break
+      const candidate = await findSkuForPart(mpn)
+      if (!candidate) continue
+      // Bug P0-3 fix: check the result against per-archetype manufacturer /
+      // category guards. If the hit is for a wrong-category part (e.g.
+      // copper_terminal MPN matching a Banner photoelectric sensor), reject
+      // and try the next hint.
+      const guardCheck = isDistributorResultConsistentWithArchetype(archetypeId, candidate)
+      if (!guardCheck.ok) {
+        console.warn(
+          `  [Phase2/guard] rejected ${candidate.best.source} hit for ${archetypeId} ` +
+          `(MPN ${mpn} → ${candidate.best.manufacturer} "${candidate.best.description}"): ${guardCheck.reason}`
+        )
+        continue
+      }
+      result = candidate
+      break
     } catch (err) {
       console.warn(`  [Phase2/warn] MPN lookup failed for ${mpn}: ${(err as Error).message}`)
     }
