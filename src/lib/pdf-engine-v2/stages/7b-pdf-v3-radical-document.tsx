@@ -1226,6 +1226,317 @@ const GrammarVerdictsPage = ({ state }: { state: PipelineState }) => {
 }
 
 // ---------------------------------------------------------------------------
+// §E — Technical Appendix Page
+// Full appendix: BOM table (all leaves), resolved tree outline, grammar rule
+// definitions (6 v1 rules), and glossary of Radical/character archetypes used.
+// Always renders — sections show "no data" when underlying data absent.
+// No new LLM call — pure synthesis from state.
+// ---------------------------------------------------------------------------
+
+// Grammar rule definitions — the 6 v1 rules with engineering descriptions
+const GRAMMAR_RULE_DEFINITIONS = [
+  {
+    id: 'KCL_node_balance',
+    category: 'Safety (weight: ∞)',
+    description: 'Kirchhoff Current Law node balance — checks that all electrical current entering a node equals current leaving. Violation is a fundamental design error; no relaxation permitted.',
+  },
+  {
+    id: 'galvanic_aluminium_copper_contact',
+    category: 'Safety (weight: ∞)',
+    description: 'Galvanic corrosion check — flags direct contact between aluminium and copper nodes without an isolating barrier. In wet environments (marine, outdoor, BESS enclosures), galvanic coupling accelerates structural failure.',
+  },
+  {
+    id: 'mass_balance_closed_loop',
+    category: 'Safety (weight: ∞)',
+    description: 'Mass balance in closed-loop fluid systems — verifies that fluid mass entering a loop equals mass exiting. Violated by missing return paths, phantom sinks, or unmodelled accumulation.',
+  },
+  {
+    id: 'voltage_derate_80pct',
+    category: 'Efficiency (adjustable)',
+    description: '80% voltage derating rule — all electrical components must be rated for at least 125% of their operating voltage (i.e. operated at ≤80% of rating). Relaxable at higher temperature derating.',
+  },
+  {
+    id: 'thermal_capacity_vs_load',
+    category: 'Efficiency (adjustable)',
+    description: 'Thermal capacity vs load — verifies that thermal management capacity (heat sink, liquid cooling) is ≥110% of worst-case heat dissipation. Flags under-specified cooling.',
+  },
+  {
+    id: 'material_marine_corrosion',
+    category: 'Cost / Material (adjustable)',
+    description: 'Marine corrosion material check — for AUV, offshore, and coastal products, flags uncoated ferrous nodes without corrosion protection. Lower weight; relaxable with surface treatment evidence.',
+  },
+]
+
+// Glossary terms for the Radical language
+const RADICAL_GLOSSARY = [
+  { term: 'Radical', definition: 'The indivisible atomic unit of a hardware system — a single part, component, or material with a known archetype ID. Radicals are the leaves of the composition tree.' },
+  { term: 'Character', definition: 'One level above radicals — a group of radicals that form a functional unit (e.g. a motor driver PCB). Characters carry the grammar rule targets.' },
+  { term: 'Word', definition: 'A group of characters forming a subsystem component (e.g. a battery module). Words are cost-rolled up with a word-level assembly markup.' },
+  { term: 'Sentence', definition: 'A group of words forming a major system subsystem (e.g. energy storage bank). Sentences are the top-level groupings in the composition tree.' },
+  { term: 'Paragraph', definition: 'The entire product — the root of the composition tree. The paragraph total is the Radical BOM total.' },
+  { term: 'Grammar Rule', definition: 'An engineering constraint checked deterministically against the composition tree. Rules fire against specific node pairs or node properties.' },
+  { term: 'Verdict', definition: 'The result of a grammar rule check: PASS, WARN, or BLOCK. BLOCK rules with weight ∞ cannot be relaxed.' },
+  { term: 'Resolution', definition: 'The process of annotating each leaf node with real-world sourcing data: MPN, manufacturer, unit price, lead time, and verification grade.' },
+  { term: 'Verification Grade', definition: 'Confidence in the price/sourcing data: verified (distributor API), estimated (vendor catalog or LLM), grade_d (industry table), stub (no data).' },
+  { term: 'Archetype ID', definition: 'The unique identifier for a radical in the seed library, e.g. lfp_prismatic_cell_280ah. Archetypes standardise naming across product classes.' },
+]
+
+const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
+  const projectId = dash(state.projectId)
+  const resolvedTree = state.resolvedRadicalTree
+  const grammarVerdicts = state.grammarVerdicts
+
+  // Collect all leaves for the full BOM table
+  const allLeaves: Array<{
+    archetypeId: string
+    subsystem: string
+    qty: number
+    unitPriceGbp: number | null
+    lineTotal: number
+    verificationGrade: string
+    source: string
+    mpn: string | null
+    manufacturer: string | null
+    leadWeeks: number | null
+  }> = []
+
+  if (resolvedTree) {
+    function walkAppendix(
+      node: import('./4b-radical-resolution').ResolvedCompositionNode,
+      subsystem: string,
+    ): void {
+      if (!node.children || node.children.length === 0) {
+        const res = node.resolution
+        const unitPrice = res?.unit_price_gbp ?? null
+        const qty = res?.qty ?? node.quantity ?? 1
+        const lineTotal = unitPrice !== null ? unitPrice * qty : 0
+        allLeaves.push({
+          archetypeId: node.archetypeId,
+          subsystem,
+          qty,
+          unitPriceGbp: unitPrice,
+          lineTotal,
+          verificationGrade: res?.verification_grade ?? 'data_gap',
+          source: res?.source ?? 'stub',
+          mpn: res?.mpn ?? null,
+          manufacturer: res?.manufacturer ?? null,
+          leadWeeks: res?.lead_weeks ?? null,
+        })
+      } else {
+        // Use the top-level child's archetypeId as the subsystem label
+        for (const child of node.children) {
+          walkAppendix(child, subsystem || child.archetypeId)
+        }
+      }
+    }
+
+    const root = resolvedTree.composition.root
+    if (root.children && root.children.length > 0) {
+      for (const topChild of root.children) {
+        walkAppendix(topChild, topChild.archetypeId)
+      }
+    } else {
+      walkAppendix(root, root.archetypeId)
+    }
+  }
+
+  // Tree outline — one line per top-level sentence with child count
+  const treeOutline: Array<{ sentenceId: string; wordCount: number; leafCount: number; total: number }> = []
+  if (resolvedTree) {
+    const root = resolvedTree.composition.root
+    const sentences = root.children?.length ? root.children : [root]
+    for (const sentence of sentences) {
+      const wordCount = sentence.children?.length ?? 0
+      // Count leaves
+      let leafCount = 0
+      function countLeaves(n: import('./4b-radical-resolution').ResolvedCompositionNode): void {
+        if (!n.children || n.children.length === 0) { leafCount++; return }
+        for (const c of n.children) countLeaves(c)
+      }
+      countLeaves(sentence)
+      const sentenceTotal = allLeaves
+        .filter(l => l.subsystem === sentence.archetypeId)
+        .reduce((s, l) => s + l.lineTotal, 0)
+      treeOutline.push({ sentenceId: sentence.archetypeId, wordCount, leafCount, total: sentenceTotal })
+    }
+  }
+
+  return (
+    <>
+      {/* Appendix A — Full BOM Table */}
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | Appendix A — Full BOM`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Appendix A — Full Bill of Materials
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 12 }} />
+
+        {allLeaves.length === 0 ? (
+          <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+            BOM data unavailable — run Phase 2 (RADICAL_PHASE_2_RESOLUTION=true) to populate.
+          </Text>
+        ) : (
+          <>
+            <Text style={{ fontSize: 8, color: MUTED, marginBottom: 8 }}>
+              {allLeaves.length} parts across all subsystems. Prices in GBP.
+            </Text>
+            <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER }}>
+              {/* Header */}
+              <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+                <Text style={{ width: '28%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Part / Archetype</Text>
+                <Text style={{ width: '16%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Subsystem</Text>
+                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>MPN</Text>
+                <Text style={{ width: '6%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Qty</Text>
+                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Unit £</Text>
+                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Total £</Text>
+                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Lead</Text>
+                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Source</Text>
+              </View>
+              {allLeaves.map((leaf, i) => {
+                const gradeColour = leaf.verificationGrade === 'verified' ? BESS_GREEN
+                  : leaf.verificationGrade === 'estimated' || leaf.verificationGrade === 'grade_d' ? BESS_AMBER
+                  : BESS_RED
+                return (
+                  <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === allLeaves.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
+                    <Text style={{ width: '28%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, fontFamily: 'Helvetica-Bold' }}>
+                      {leaf.archetypeId.replace(/_/g, ' ')}
+                    </Text>
+                    <Text style={{ width: '16%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 5 }}>
+                      {leaf.subsystem.replace(/_/g, ' ')}
+                    </Text>
+                    <Text style={{ width: '10%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5 }}>
+                      {dash(leaf.mpn)}
+                    </Text>
+                    <Text style={{ width: '6%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
+                      {leaf.qty}
+                    </Text>
+                    <Text style={{ width: '10%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
+                      {leaf.unitPriceGbp !== null ? fmtGbp(leaf.unitPriceGbp) : 'TBD'}
+                    </Text>
+                    <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: leaf.lineTotal > 0 ? INK : MUTED, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
+                      {leaf.lineTotal > 0 ? fmtGbp(leaf.lineTotal) : 'TBD'}
+                    </Text>
+                    <Text style={{ width: '10%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
+                      {leaf.leadWeeks != null ? `${leaf.leadWeeks}w` : '—'}
+                    </Text>
+                    <Text style={{ width: '10%', fontSize: 7, color: gradeColour, paddingVertical: 4, paddingHorizontal: 5 }}>
+                      {leaf.source}
+                    </Text>
+                  </View>
+                )
+              })}
+            </View>
+          </>
+        )}
+        <DocPageFooter />
+      </Page>
+
+      {/* Appendix B — Resolved Tree Outline */}
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | Appendix B — Tree Outline`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Appendix B — Resolved Tree Outline
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 12 }} />
+
+        {treeOutline.length === 0 ? (
+          <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+            Tree data unavailable — run Phase 2 to populate.
+          </Text>
+        ) : (
+          <>
+            <Text style={{ fontSize: 9, color: MUTED, marginBottom: 12 }}>
+              Structured outline of the Radical composition tree. Paragraph → Sentences → Words → Characters → Leaves.
+            </Text>
+            <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+                <Text style={{ width: '46%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8 }}>Sentence (Subsystem)</Text>
+                <Text style={{ width: '18%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8, textAlign: 'right' }}>Words</Text>
+                <Text style={{ width: '18%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8, textAlign: 'right' }}>Leaves</Text>
+                <Text style={{ width: '18%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8, textAlign: 'right' }}>BOM Total</Text>
+              </View>
+              {treeOutline.map((row, i) => (
+                <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === treeOutline.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
+                  <Text style={{ width: '46%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, paddingVertical: 5, paddingHorizontal: 8 }}>
+                    {row.sentenceId.replace(/_/g, ' ')}
+                  </Text>
+                  <Text style={{ width: '18%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>{row.wordCount}</Text>
+                  <Text style={{ width: '18%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>{row.leafCount}</Text>
+                  <Text style={{ width: '18%', fontSize: 9, color: BESS_TEAL, fontFamily: 'Helvetica-Bold', paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>
+                    {row.total > 0 ? fmtGbp(row.total) : '—'}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </>
+        )}
+
+        {/* Appendix C — Grammar Rule Definitions */}
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8, marginTop: 16 }}>
+          Appendix C — Grammar Rule Definitions
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 12 }} />
+        <Text style={{ fontSize: 9, color: MUTED, marginBottom: 12 }}>
+          The 6 v1 Design Rule Check (DRC) rules applied to every Radical composition. Safety rules (weight ∞) cannot be relaxed.
+        </Text>
+        {GRAMMAR_RULE_DEFINITIONS.map((rule, i) => (
+          <View key={i} style={{ marginBottom: 10, borderLeftWidth: 3, borderLeftColor: rule.category.includes('Safety') ? BESS_RED : rule.category.includes('Efficiency') ? BESS_AMBER : BESS_TEAL, paddingLeft: 10 }} wrap={false}>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, marginBottom: 2 }}>
+              {rule.id}
+            </Text>
+            <Text style={{ fontSize: 8, color: rule.category.includes('Safety') ? BESS_RED : rule.category.includes('Efficiency') ? BESS_AMBER : BESS_TEAL, marginBottom: 4 }}>
+              {rule.category}
+            </Text>
+            <Text style={{ fontSize: 8, color: INK, lineHeight: 1.4 }}>
+              {rule.description}
+            </Text>
+          </View>
+        ))}
+
+        {/* Grammar results for this document */}
+        {grammarVerdicts && (
+          <View style={{ marginTop: 12, borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 8 }}>
+            <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 4 }}>
+              DRC Results for This Document
+            </Text>
+            <Text style={{ fontSize: 9, color: INK }}>
+              Overall: {grammarVerdicts.overall_verdict} — {grammarVerdicts.pass_count} PASS · {grammarVerdicts.warn_count} WARN · {grammarVerdicts.block_count} BLOCK · {grammarVerdicts.rules_fired} rules fired
+            </Text>
+          </View>
+        )}
+
+        <DocPageFooter />
+      </Page>
+
+      {/* Appendix D — Glossary */}
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | Appendix D — Glossary`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Appendix D — Glossary
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 12 }} />
+        <Text style={{ fontSize: 9, color: MUTED, marginBottom: 12 }}>
+          Terminology used throughout this report. Radical language terms describe the hierarchical composition model.
+        </Text>
+        <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER }}>
+          {RADICAL_GLOSSARY.map((entry, i) => (
+            <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === RADICAL_GLOSSARY.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
+              <Text style={{ width: '28%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, paddingVertical: 6, paddingHorizontal: 8 }}>
+                {entry.term}
+              </Text>
+              <Text style={{ width: '72%', fontSize: 8, color: INK, paddingVertical: 6, paddingHorizontal: 8, lineHeight: 1.4 }}>
+                {entry.definition}
+              </Text>
+            </View>
+          ))}
+        </View>
+        <DocPageFooter />
+      </Page>
+    </>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main export — full Radical PDF document
 // ---------------------------------------------------------------------------
 
@@ -1301,8 +1612,11 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §7 Sources and References — Fix A: restore section missing from P1+P2+P3 bundle */}
       <SourcesReferencesPage state={safe} />
 
-      {/* §8 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
+      {/* §9 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
       <GrammarVerdictsPage state={safe} />
+
+      {/* §10 Technical Appendix — §E fix: full BOM table, tree dump, grammar defs, glossary */}
+      <TechnicalAppendixPage state={safe} />
     </Document>
   )
 }
