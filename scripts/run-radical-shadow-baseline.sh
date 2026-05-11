@@ -28,8 +28,17 @@ set -eo pipefail
 MAX_CONCURRENT=4
 REPO_ROOT="/Users/tristanfischer/Developer/CentaurOS created 260126 1435"
 TIMESTAMP="$(date -u +%Y%m%dT%H%M)"
-EVIDENCE_ROOT="$HOME/Downloads/engine-evidence/radical-shadow-${TIMESTAMP}"
-LABEL="radical-shadow-${TIMESTAMP}"
+# Honour EVIDENCE_ROOT_OVERRIDE if set (V10 dual-run campaign uses this to
+# pre-create timestamped sub-dirs that won't collide when launched back-to-back).
+# When override is set, LABEL is derived from the override basename so that
+# per-PDF output prefixes also don't collide with parallel batches.
+if [ -n "${EVIDENCE_ROOT_OVERRIDE:-}" ]; then
+  EVIDENCE_ROOT="$EVIDENCE_ROOT_OVERRIDE"
+  LABEL="$(basename "$EVIDENCE_ROOT_OVERRIDE")"
+else
+  EVIDENCE_ROOT="$HOME/Downloads/engine-evidence/radical-shadow-${TIMESTAMP}"
+  LABEL="radical-shadow-${TIMESTAMP}"
+fi
 
 DRY_RUN=0
 [ "${1:-}" = "--dry-run" ] && DRY_RUN=1
