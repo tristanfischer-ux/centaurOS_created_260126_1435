@@ -85,6 +85,35 @@ function collectNodes(node: CompositionNode): CompositionNode[] {
 // Hard rule (weight: Infinity) — conservation law cannot be relaxed.
 // ---------------------------------------------------------------------------
 
+/**
+ * Character IDs that are inherently electrical components. Presence of any
+ * of these means the system has electrical nodes — even if the upstream
+ * composition didn't annotate them with explicit electricalNode payloads.
+ *
+ * Bug P0-7 fix (2026-05-11): KCL previously gave a silent PASS with reason
+ * "no electrical nodes declared" whenever the composition lacked explicit
+ * .electricalNode annotations. For the heat pump and CGM that meant a tree
+ * full of pcb_controllers, contactors, etc. silently passed KCL without
+ * any topology check. Inferring from character presence and emitting a
+ * WARN is more honest.
+ */
+const INFERRED_ELECTRICAL_CHARACTERS = new Set<string>([
+  'pcb_controller',
+  'dc_contactor',
+  'circuit_breaker',
+  'protection_relay',
+  'network_switch',
+  'transformer',
+  'power_converter',
+  'ems_controller',
+  'gas_sensor',
+  'optical_arc_sensor',
+  'high_pressure_transducer',
+  'low_pressure_transducer',
+  'safety_pressure_switch',
+  'ec_fan_motor',
+])
+
 export const KCL_NODE_BALANCE: GrammarRule = {
   id: "KCL_node_balance",
   description:
@@ -92,10 +121,30 @@ export const KCL_NODE_BALANCE: GrammarRule = {
   weight: Infinity,
   hardness: "hard",
   evaluate(composition, _library) {
-    const nodes = collectNodes(composition.root).filter(
-      (n) => n.electricalNode !== undefined
-    )
+    const allNodes = collectNodes(composition.root)
+    const nodes = allNodes.filter((n) => n.electricalNode !== undefined)
+
     if (nodes.length === 0) {
+      // Bug P0-7 fix: when no explicit electrical nodes are declared, fall
+      // back to *inferring* the presence of electrical components from
+      // character ids. If any are present we emit a soft WARN instead of
+      // a silent PASS — the operator should annotate the topology.
+      const electricalLeaves = allNodes.filter(n =>
+        INFERRED_ELECTRICAL_CHARACTERS.has(n.archetypeId)
+      )
+      if (electricalLeaves.length > 0) {
+        const sample = electricalLeaves
+          .slice(0, 5)
+          .map(n => n.archetypeId)
+          .join(', ')
+        return {
+          verdict: "WARN",
+          reason:
+            `Electrical components present (${electricalLeaves.length}: ${sample}` +
+            `${electricalLeaves.length > 5 ? ', …' : ''}) but no node topology declared. ` +
+            `Add electricalNode annotations to enable KCL verification.`,
+        }
+      }
       return { verdict: "PASS", reason: "No electrical nodes declared — KCL not applicable" }
     }
 
