@@ -609,6 +609,278 @@ const BriefRequirementsPage = ({ state }: { state: PipelineState }) => {
   )
 }
 
+// ---------------------------------------------------------------------------
+// §D — Sourcing Strategy Page
+// Aggregates over all resolved tree leaves to produce distributor breakdown,
+// lead-time histogram, verified-MPN coverage, and top single-source risks.
+// No new LLM call — reads from resolvedRadicalTree and resolution_meta.stats.
+// Always renders — shows placeholder when resolvedRadicalTree absent.
+// ---------------------------------------------------------------------------
+
+interface SourcingLeaf {
+  archetypeId: string
+  source: string
+  distributor: string | null
+  leadWeeks: number | null
+  unitPriceGbp: number | null
+  verificationGrade: string
+  mpn: string | null
+  manufacturer: string | null
+}
+
+function collectAllSourcingLeaves(state: PipelineState): SourcingLeaf[] {
+  const resolvedTree = state.resolvedRadicalTree
+  if (!resolvedTree) return []
+
+  const leaves: SourcingLeaf[] = []
+
+  function walk(node: import('./4b-radical-resolution').ResolvedCompositionNode): void {
+    if (!node.children || node.children.length === 0) {
+      const res = node.resolution
+      leaves.push({
+        archetypeId: node.archetypeId,
+        source: res?.source ?? 'stub',
+        distributor: res?.distributor ?? null,
+        leadWeeks: res?.lead_weeks ?? null,
+        unitPriceGbp: res?.unit_price_gbp ?? null,
+        verificationGrade: res?.verification_grade ?? 'data_gap',
+        mpn: res?.mpn ?? null,
+        manufacturer: res?.manufacturer ?? null,
+      })
+    } else {
+      for (const child of node.children) {
+        walk(child)
+      }
+    }
+  }
+
+  walk(resolvedTree.composition.root)
+  return leaves
+}
+
+function buildSourcingStrategyData(state: PipelineState): {
+  distributorBreakdown: Array<{ name: string; count: number; pct: number }>
+  oemDirectCount: number
+  oemManufacturers: string[]
+  leadTimeMedianWeeks: number | null
+  leadTimeP95Weeks: number | null
+  verifiedMpnPct: number
+  singleSourceRisks: Array<{ archetypeId: string; source: string; leadWeeks: number | null }>
+  totalLeaves: number
+} {
+  const leaves = collectAllSourcingLeaves(state)
+  const totalLeaves = leaves.length
+
+  if (totalLeaves === 0) {
+    return {
+      distributorBreakdown: [],
+      oemDirectCount: 0,
+      oemManufacturers: [],
+      leadTimeMedianWeeks: null,
+      leadTimeP95Weeks: null,
+      verifiedMpnPct: 0,
+      singleSourceRisks: [],
+      totalLeaves: 0,
+    }
+  }
+
+  // Distributor breakdown
+  const distMap = new Map<string, number>()
+  for (const leaf of leaves) {
+    const label = sourceDisplayName(leaf.source, leaf.distributor)
+    distMap.set(label, (distMap.get(label) ?? 0) + 1)
+  }
+  const distributorBreakdown = [...distMap.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .map(([name, count]) => ({ name, count, pct: Math.round((count / totalLeaves) * 100) }))
+
+  // OEM direct
+  const oemLeaves = leaves.filter(l => l.source === 'vendor_catalog' || l.source === 'llm_estimate')
+  const oemDirectCount = oemLeaves.length
+  const oemManufacturers = [...new Set(
+    oemLeaves
+      .map(l => l.manufacturer)
+      .filter((m): m is string => m !== null && m.trim() !== '')
+  )].slice(0, 5)
+
+  // Lead-time histogram
+  const leadTimes = leaves.map(l => l.leadWeeks).filter((w): w is number => w !== null).sort((a, b) => a - b)
+  const leadTimeMedianWeeks = leadTimes.length > 0
+    ? leadTimes[Math.floor(leadTimes.length / 2)]
+    : null
+  const leadTimeP95Weeks = leadTimes.length > 0
+    ? leadTimes[Math.floor(leadTimes.length * 0.95)]
+    : null
+
+  // Verified MPN coverage
+  const verifiedMpnCount = leaves.filter(l => l.mpn !== null && l.verificationGrade === 'verified').length
+  const verifiedMpnPct = Math.round((verifiedMpnCount / totalLeaves) * 100)
+
+  // Single-source risks: leaves with a single source that is not a major distributor
+  // (i.e. vendor_catalog, llm_estimate, stub) — these have no alternative supply
+  const singleSourceRisks = leaves
+    .filter(l => ['vendor_catalog', 'llm_estimate', 'bom_estimate', 'stub'].includes(l.source))
+    .sort((a, b) => {
+      // Sort by lead time descending (longest lead time = highest risk)
+      const aLt = a.leadWeeks ?? 0
+      const bLt = b.leadWeeks ?? 0
+      return bLt - aLt
+    })
+    .slice(0, 5)
+
+  return {
+    distributorBreakdown,
+    oemDirectCount,
+    oemManufacturers,
+    leadTimeMedianWeeks,
+    leadTimeP95Weeks,
+    verifiedMpnPct,
+    singleSourceRisks,
+    totalLeaves,
+  }
+}
+
+function sourceDisplayName(source: string, distributor: string | null): string {
+  if (distributor === 'mouser' || source === 'mouser') return 'Mouser'
+  if (distributor === 'digikey' || source === 'digikey') return 'Digi-Key'
+  if (distributor === 'farnell' || source === 'farnell') return 'Farnell'
+  if (distributor === 'lcsc' || source === 'lcsc') return 'LCSC'
+  if (source === 'vendor_catalog') return 'Vendor Catalog (OEM direct)'
+  if (source === 'llm_estimate' || source === 'bom_estimate') return 'LLM Estimate (no distributor)'
+  if (source === 'grade_d_table') return 'Grade D Table'
+  if (source === 'stub' || source === 'budget_exhausted') return 'Stub / Data Gap'
+  return source ?? 'Unknown'
+}
+
+const SourcingStrategyPage = ({ state }: { state: PipelineState }) => {
+  const projectId = dash(state.projectId)
+  const {
+    distributorBreakdown,
+    oemDirectCount,
+    oemManufacturers,
+    leadTimeMedianWeeks,
+    leadTimeP95Weeks,
+    verifiedMpnPct,
+    singleSourceRisks,
+    totalLeaves,
+  } = buildSourcingStrategyData(state)
+
+  // Also read resolution_meta.stats for the high-level block
+  const rMeta = state.resolvedRadicalTree?.resolution_meta?.stats
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | Sourcing Strategy`} />
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+        Sourcing Strategy
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+      {totalLeaves === 0 ? (
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Sourcing data unavailable — run Phase 2 (RADICAL_PHASE_2_RESOLUTION=true) to populate.
+        </Text>
+      ) : (
+        <>
+          {/* Summary block */}
+          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+            {[
+              { label: 'Total BOM Lines', value: String(totalLeaves) },
+              { label: 'Verified MPN', value: `${verifiedMpnPct}%` },
+              { label: 'OEM / Custom Parts', value: String(oemDirectCount) },
+              { label: 'Lead Time (median)', value: leadTimeMedianWeeks != null ? `${leadTimeMedianWeeks} wk` : '—' },
+              { label: 'Lead Time (p95)', value: leadTimeP95Weeks != null ? `${leadTimeP95Weeks} wk` : '—' },
+            ].map((kpi, i) => (
+              <View key={i} style={{ flex: 1, borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 8, alignItems: 'center' }}>
+                <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 2 }}>{kpi.value}</Text>
+                <Text style={{ fontSize: 7, color: MUTED, textAlign: 'center' }}>{kpi.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Distributor breakdown table */}
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+            Distributor Breakdown ({totalLeaves} BOM lines)
+          </Text>
+          {distributorBreakdown.length > 0 ? (
+            <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 16 }}>
+              <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+                <Text style={{ width: '50%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8 }}>Source</Text>
+                <Text style={{ width: '18%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8, textAlign: 'right' }}>Count</Text>
+                <Text style={{ width: '32%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8 }}>% of BOM</Text>
+              </View>
+              {distributorBreakdown.map((row, i) => (
+                <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === distributorBreakdown.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
+                  <Text style={{ width: '50%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, paddingVertical: 5, paddingHorizontal: 8 }}>{row.name}</Text>
+                  <Text style={{ width: '18%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>{row.count}</Text>
+                  <Text style={{ width: '32%', fontSize: 9, color: MUTED, paddingVertical: 5, paddingHorizontal: 8 }}>
+                    {/* Bar visualisation using text */}
+                    {'█'.repeat(Math.max(1, Math.round(row.pct / 10)))} {row.pct}%
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+
+          {/* OEM / named manufacturers */}
+          {oemManufacturers.length > 0 && (
+            <>
+              <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+                OEM Direct — Named Manufacturers
+              </Text>
+              <Text style={{ fontSize: 9, color: INK, marginBottom: 12, lineHeight: 1.5 }}>
+                {oemDirectCount} part{oemDirectCount !== 1 ? 's' : ''} require OEM or custom sourcing (no distributor match).
+                Named manufacturers: {oemManufacturers.join(', ')}{oemManufacturers.length === 5 ? ' and others' : ''}.
+              </Text>
+            </>
+          )}
+
+          {/* Single-source risks */}
+          {singleSourceRisks.length > 0 && (
+            <>
+              <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_RED, marginBottom: 8 }}>
+                Top Single-Source Risks ({singleSourceRisks.length})
+              </Text>
+              <Text style={{ fontSize: 8, color: MUTED, marginBottom: 8, fontFamily: 'Helvetica-Oblique' }}>
+                Parts with only one supplier path or no distributor match — highest procurement risk:
+              </Text>
+              <View style={{ borderWidth: 0.5, borderColor: BESS_RED, marginBottom: 16 }}>
+                <View style={{ flexDirection: 'row', backgroundColor: BESS_RED }}>
+                  <Text style={{ width: '46%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8 }}>Part / Archetype</Text>
+                  <Text style={{ width: '28%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8 }}>Source</Text>
+                  <Text style={{ width: '26%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 6, paddingHorizontal: 8, textAlign: 'right' }}>Lead Time</Text>
+                </View>
+                {singleSourceRisks.map((risk, i) => (
+                  <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === singleSourceRisks.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER }} wrap={false}>
+                    <Text style={{ width: '46%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_RED, paddingVertical: 5, paddingHorizontal: 8 }}>
+                      {risk.archetypeId.replace(/_/g, ' ')}
+                    </Text>
+                    <Text style={{ width: '28%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8 }}>
+                      {sourceDisplayName(risk.source, null)}
+                    </Text>
+                    <Text style={{ width: '26%', fontSize: 9, color: MUTED, paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>
+                      {risk.leadWeeks != null ? `${risk.leadWeeks} weeks` : 'Unknown'}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </>
+          )}
+
+          {/* Resolution stats from meta — if available */}
+          {rMeta && (
+            <Text style={{ fontSize: 8, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+              Resolution summary: {rMeta.verified_by_distributor} verified by distributor · {rMeta.from_vendor_catalog} from vendor catalog · {(rMeta.from_llm_estimate ?? 0) + (rMeta.grade_d ?? 0)} estimated · {(rMeta.stub ?? 0) + (rMeta.data_gap ?? 0)} stub/data-gap.
+            </Text>
+          )}
+        </>
+      )}
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
 // Simplified Cover page for Radical shadow PDF
 const RadicalCoverPage = ({ state }: { state: PipelineState }) => {
   const brief = state.research?.designBrief
@@ -1013,7 +1285,10 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
         projectId={projectId}
       />
 
-      {/* §5 Cost Waterfall — from radicalCostSummary */}
+      {/* §6 Sourcing Strategy — §D fix: aggregates resolved tree by distributor + lead time + risk */}
+      <SourcingStrategyPage state={safe} />
+
+      {/* §7 Cost Waterfall — from radicalCostSummary */}
       <RadicalCostSection
         radicalCostSummary={radicalCostSummary}
         fallbackCostSummary={safe.costSummary}
