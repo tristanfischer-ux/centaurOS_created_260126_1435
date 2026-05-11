@@ -277,11 +277,30 @@ export function deriveCgmMandatoryCharacters(): string[] {
  * Mandatory character list for Heat Pump briefs.
  * Pins to refrigerant_circuit, hydronic_circuit, heat_pump_controls, heat_pump_enclosure.
  * Excludes BESS/battery characters.
+ *
+ * Bug P0-6 fix (2026-05-11): the refrigerant circuit was previously just
+ * liquid_cooling_system + copper_wire + polymer_gasket. A real 30 kW
+ * R290 heat pump needs a scroll compressor (the single largest line),
+ * brazed-plate heat exchanger × 2, expansion valve, pressure transducers,
+ * EC fan motor. These are now mandatory.
  */
 export function deriveHeatPumpMandatoryCharacters(): string[] {
   return [
-    // Refrigerant cycle
+    // Refrigerant cycle (legacy hint — kept for back-compat with hydronic loop)
     'liquid_cooling_system',  // refrigerant_cycle (compressor + loop)
+    // Bug P0-6: real compressor + heat exchanger + valve + pressure stack
+    'compressor_unit',           // compressor_word (scroll/rotary)
+    'refrigerant_lubricant',     // compressor_word (POE/PAG oil charge)
+    'evaporator',                // heat_exchanger_word (low-side BPHE)
+    'condenser',                 // heat_exchanger_word (high-side BPHE)
+    'txv_or_eev',                // expansion_valve_word (electronic expansion valve)
+    'refrigerant_drier_filter',  // expansion_valve_word (filter-drier)
+    'high_pressure_transducer',  // pressure_monitoring_word
+    'low_pressure_transducer',   // pressure_monitoring_word
+    'safety_pressure_switch',    // pressure_monitoring_word
+    'ec_fan_motor',              // fan_word (EC condenser fan)
+    'fan_impeller',              // fan_word
+    // Distribution / sealing
     'copper_wire',            // refrigerant_distribution (wiring)
     'polymer_gasket',         // refrigerant_distribution (seals)
     // Hydronic connections

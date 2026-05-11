@@ -162,6 +162,10 @@ const ELECTRONIC_COTS_CHARACTERS = new Set<string>([
   'dc_contactor',
   'circuit_breaker',
   'protection_relay',
+  // Bug P0-6: refrigerant-circuit pressure transducers and safety switch.
+  'high_pressure_transducer',
+  'low_pressure_transducer',
+  'safety_pressure_switch',
 ])
 
 /** Characters that map to mechanical COTS */
@@ -176,6 +180,8 @@ const MECHANICAL_COTS_CHARACTERS = new Set<string>([
   'copper_terminal',
   'polymer_gasket',
   'aluminium_heatsink',
+  // Bug P0-6: small lubricants / consumables on the heat-pump refrigerant circuit.
+  'refrigerant_lubricant',
 ])
 
 /** Characters that map to OEM subsystem */
@@ -188,6 +194,18 @@ const OEM_SUBSYSTEM_CHARACTERS = new Set<string>([
   'switchboard_enclosure',
   'steel_door',
   'pressure_vessel',
+  // Bug P0-6 fix (2026-05-11): heat-pump refrigerant subsystem characters.
+  // These are quoted vendor units (Copeland scroll compressors, SWEP BPHEs,
+  // Carel EEV, EBM-Papst EC fans) — classified as OEM so the engine looks
+  // them up via the vendor catalog, then falls through to the new Grade-D
+  // entries below.
+  'compressor_unit',
+  'evaporator',
+  'condenser',
+  'txv_or_eev',
+  'refrigerant_drier_filter',
+  'ec_fan_motor',
+  'fan_impeller',
 ])
 
 /** Characters that map to structural fabricated */
@@ -558,6 +576,18 @@ const GRADE_D_BY_CHARACTER: Record<string, GradeD> = {
   'aluminium_extrusion': { typical: 35, basis: '40 × 40 mm T-slot aluminium profile, per metre (Bosch Rexroth / MiniTec class)' },
   'steel_plate': { typical: 180, basis: '3 mm S235 HR steel plate 1000 × 500 mm, laser-cut (UK fabrication, per sheet)' },
   'polymer_enclosure': { typical: 280, basis: 'ABS or GRP moulded enclosure, mid-size (Spelsberg / nVent Hoffman class; per unit)' },
+  // Bug P0-6 fix (2026-05-11): refrigerant-circuit characters for heat pump.
+  'compressor_unit': { typical: 1100, basis: 'Scroll compressor, R290-rated, 30 kW class (Copeland ZH-class / Embraco). Single largest line in a heat pump BoM.' },
+  'refrigerant_lubricant': { typical: 18, basis: 'POE/PAG oil charge (≈1 kg per compressor)' },
+  'evaporator': { typical: 320, basis: 'Brazed-plate heat exchanger, low-side, 30 kW class (SWEP / Alfa Laval / Kaori)' },
+  'condenser': { typical: 380, basis: 'Brazed-plate heat exchanger, high-side, 30 kW class (SWEP / Alfa Laval / Kaori)' },
+  'txv_or_eev': { typical: 145, basis: 'Electronic expansion valve, R290-compatible (Carel E2V / Sanhua)' },
+  'refrigerant_drier_filter': { typical: 28, basis: 'Filter-drier, brazed, R290 service' },
+  'high_pressure_transducer': { typical: 78, basis: '0–60 bar pressure transducer, refrigerant service (Carel SPKT / Danfoss AKS)' },
+  'low_pressure_transducer': { typical: 78, basis: '0–10 bar pressure transducer, refrigerant service (Carel SPKT / Danfoss AKS)' },
+  'safety_pressure_switch': { typical: 35, basis: 'High-side safety pressure switch (Honeywell / Danfoss)' },
+  'ec_fan_motor': { typical: 240, basis: 'EC fan motor for condenser, axial 800 mm class (EBM-Papst, Ziehl-Abegg)' },
+  'fan_impeller': { typical: 65, basis: 'Composite axial fan impeller, 800 mm class' },
 }
 
 // ---------------------------------------------------------------------------

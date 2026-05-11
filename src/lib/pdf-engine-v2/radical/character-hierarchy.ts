@@ -325,11 +325,44 @@ export const WORDS: HierarchyWord[] = [
     characters: ['cable_transit_frame', 'switchboard_enclosure', 'thermal_insulation_panel'],
   },
   // ── refrigerant_circuit ──────────────────────────────────────────────────
+  // Bug P0-6 fix (2026-05-11): a real 30 kW R290 heat pump's refrigerant
+  // circuit decomposes into compressor + heat exchanger + expansion valve +
+  // pressure monitoring + fan, not just "liquid_cooling_system".
   {
     id: 'refrigerant_cycle',
     label: 'Refrigerant Cycle',
     sentence_id: 'refrigerant_circuit',
     characters: ['liquid_cooling_system'],
+  },
+  {
+    id: 'compressor_word',
+    label: 'Compressor',
+    sentence_id: 'refrigerant_circuit',
+    characters: ['compressor_unit', 'refrigerant_lubricant'],
+  },
+  {
+    id: 'heat_exchanger_word',
+    label: 'Heat Exchanger',
+    sentence_id: 'refrigerant_circuit',
+    characters: ['evaporator', 'condenser'],
+  },
+  {
+    id: 'expansion_valve_word',
+    label: 'Expansion Valve and Drier',
+    sentence_id: 'refrigerant_circuit',
+    characters: ['txv_or_eev', 'refrigerant_drier_filter'],
+  },
+  {
+    id: 'pressure_monitoring_word',
+    label: 'Pressure Monitoring',
+    sentence_id: 'refrigerant_circuit',
+    characters: ['high_pressure_transducer', 'low_pressure_transducer', 'safety_pressure_switch'],
+  },
+  {
+    id: 'fan_word',
+    label: 'EC Fan',
+    sentence_id: 'refrigerant_circuit',
+    characters: ['ec_fan_motor', 'fan_impeller'],
   },
   {
     id: 'refrigerant_distribution',
