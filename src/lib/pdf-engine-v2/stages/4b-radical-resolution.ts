@@ -379,10 +379,26 @@ function isDistributorResultConsistentWithArchetype(
  * Class-key matching is substring-on-lowercase against productClass.
  */
 const CLASS_AWARE_MPN_HINTS: Record<string, Record<string, string[]>> = {
+  // BESS → keep ISL94212 default for pcb_controller; BUT gas_sensor must
+  // be a calibrated Li-ion off-gas detector (Nexceris Li-ion Tamer-class
+  // or NevadaNano MPS), NOT the hobbyist MQ135 air-quality sensor.
+  // Bug P0-4 fix (2026-05-11).
+  bess: {
+    gas_sensor: ['LIT-MS', 'NEVNAN-MPS', 'KSD-G-COMBO', 'TGS6812-D00'],
+  },
+  // Same override for energy-storage / battery_energy_storage class names.
+  energy_storage: {
+    gas_sensor: ['LIT-MS', 'NEVNAN-MPS', 'KSD-G-COMBO', 'TGS6812-D00'],
+  },
+  battery_energy_storage: {
+    gas_sensor: ['LIT-MS', 'NEVNAN-MPS', 'KSD-G-COMBO', 'TGS6812-D00'],
+  },
   // Heat pump → STM32F407 family (HVAC control MCU; widely used in heat-pump
-  // controller boards by EBM-Papst, Honeywell, Carel).
+  // controller boards by EBM-Papst, Honeywell, Carel). gas_sensor here is
+  // an R290 leak detector — keep MQ-style as fallback.
   heat_pump: {
     pcb_controller: ['STM32F407VGT6', 'STM32F407VET6'],
+    gas_sensor: ['MQ-6', 'MQ-2'],   // propane leak detection
   },
   // CGM / wearable medical → Nordic nRF52832 (low-power BLE SoC, the
   // workhorse for Dexcom-class continuous glucose monitor patches).
@@ -517,7 +533,12 @@ const GRADE_D_BY_CHARACTER: Record<string, GradeD> = {
   'liquid_cooling_system': { typical: 35000, basis: 'Liquid cooling loop with chiller for 1 MW heat load' },
   'fire_suppression_system': { typical: 18000, basis: 'Aerosol or clean-agent panel for ~30 m³ container' },
   'pressure_vessel': { typical: 18000, basis: 'Fire suppression cylinder (Novec/FM-200) — per-cylinder' },
-  'gas_sensor': { typical: 15, basis: 'Li-ion off-gas / H2 sensor (MQ class), per zone' },
+  // Bug P0-4 fix (2026-05-11): MQ-class hobbyist sensors (£5-15) are NOT
+  // appropriate for UL 9540A BESS off-gas detection. Calibrated Li-ion
+  // off-gas detectors (Nexceris Li-ion Tamer, NevadaNano MPS) cost
+  // £600-£900 per zone. Default Grade-D revised upward to reflect the
+  // industrial-grade product class.
+  'gas_sensor': { typical: 750, basis: 'Calibrated Li-ion off-gas / H2 sensor for UL 9540A BESS (Nexceris Li-ion Tamer / NevadaNano MPS class), per zone. MQ-class hobbyist sensors are NOT suitable.' },
   'optical_arc_sensor': { typical: 650, basis: 'Arc flash detection sensor (Littelfuse LFGR / Arcteq class)' },
   'ems_controller': { typical: 18000, basis: 'Energy management system / SCADA with grid-tie' },
   'network_switch': { typical: 450, basis: 'Industrial managed Ethernet switch (Moxa EDS class)' },
