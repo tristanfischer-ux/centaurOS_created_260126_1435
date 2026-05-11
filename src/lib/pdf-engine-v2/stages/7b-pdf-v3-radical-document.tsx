@@ -602,9 +602,24 @@ const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
 }
 
 // Grammar Verdicts detail page — all WARN and BLOCK verdicts
+// Always renders: placeholder when grammarVerdicts absent (eliminates §8 silent-drop, council be8de574)
 const GrammarVerdictsPage = ({ state }: { state: PipelineState }) => {
   const grammarVerdicts = state.grammarVerdicts
-  if (!grammarVerdicts) return <></>
+  if (!grammarVerdicts) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${dash(state.projectId)} | Forge Engineering Report (Radical v1) | Design Rule Check`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Design Rule Check (DRC) Verdicts
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 10, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Grammar verdicts pending — run pipeline stage 4d (radical-grammar) to generate DRC results.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
 
   const nonPassVerdicts = grammarVerdicts.verdicts.filter(v => v.verdict !== 'PASS')
   const passVerdicts = grammarVerdicts.verdicts.filter(v => v.verdict === 'PASS')
@@ -766,10 +781,8 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §7 Sources and References — Fix A: restore section missing from P1+P2+P3 bundle */}
       <SourcesReferencesPage state={safe} />
 
-      {/* §8 Design Rule Check detail page */}
-      {grammarVerdicts && (
-        <GrammarVerdictsPage state={safe} />
-      )}
+      {/* §8 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
+      <GrammarVerdictsPage state={safe} />
     </Document>
   )
 }
