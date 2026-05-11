@@ -95,72 +95,195 @@ const DocPageFooter = () => (
 // Synthesises from existing pipeline data — no new LLM call.
 // ---------------------------------------------------------------------------
 
+// Helper: count tree nodes at each Radical level
+function countTreeLevels(resolvedTree: PipelineState['resolvedRadicalTree']): {
+  sentences: number; words: number; characters: number; leaves: number
+} {
+  if (!resolvedTree) return { sentences: 0, words: 0, characters: 0, leaves: 0 }
+  let sentences = 0, words = 0, characters = 0, leaves = 0
+
+  function walk(node: import('./4b-radical-resolution').ResolvedCompositionNode, depth: number): void {
+    if (!node.children || node.children.length === 0) {
+      leaves++
+      return
+    }
+    if (depth === 1) sentences++
+    else if (depth === 2) words++
+    else if (depth === 3) characters++
+    for (const child of node.children) walk(child, depth + 1)
+  }
+
+  const root = resolvedTree.composition.root
+  if (root.children && root.children.length > 0) {
+    for (const child of root.children) walk(child, 1)
+  }
+  return { sentences, words, characters, leaves }
+}
+
 function buildExecutiveSummary(state: PipelineState): { p1: string; p2: string; p3: string } {
   const brief = state.research?.designBrief
+  const parsedBrief = state.parsedBrief
   const cs = state.radicalCostSummary ?? state.costSummary
   const grammarVerdicts = state.grammarVerdicts
   const resolvedTree = state.resolvedRadicalTree
   const productClass = dash(state.productClass)
-  const useCase = dash(brief?.useCase)
+  const productDesc = parsedBrief?.product_description ?? brief?.useCase ?? null
+  const useCase = dash(productDesc)
+  const briefName = parsedBrief?.mission_statement ?? brief?.useCase ?? 'this product'
 
-  // §1 Product description paragraph
+  // §1 Product description paragraph — counts system-level architecture depth
   const radicalCs = state.radicalCostSummary
   const bomLineCount = radicalCs
     ? Math.round(radicalCs.radicalMeta?.total_leaves ?? cs?.topDrivers?.length ?? 0)
     : Math.round(cs?.topDrivers?.length ?? 0)
   const unitCostGbp = cs ? fmtGbp(cs.finalUnitCost) : '—'
+  const { sentences: sentenceCount, words: wordCount, characters: charCount } = countTreeLevels(resolvedTree)
   const moduleCount = resolvedTree
-    ? resolvedTree.composition.root.children.length
+    ? resolvedTree.composition.root.children?.length ?? 0
     : (state.modules?.length ?? 0)
-  const p1 =
-    `${useCase} — product class: ${productClass}. ` +
-    `System comprises ${moduleCount} top-level module${moduleCount !== 1 ? 's' : ''} across ${bomLineCount} bill-of-materials lines. ` +
-    `Total system cost estimate: ${unitCostGbp}.`
 
-  // §2 Design outcome paragraph
+  let p1: string
+  if (resolvedTree && (sentenceCount > 0 || wordCount > 0)) {
+    p1 =
+      `This report covers the ${productClass} design for ${briefName}. ` +
+      `The system architecture comprises ${sentenceCount} subsystem${sentenceCount !== 1 ? 's' : ''} (sentences), ` +
+      `${wordCount} functional group${wordCount !== 1 ? 's' : ''} (words), ` +
+      `and ${charCount} component set${charCount !== 1 ? 's' : ''} (characters), ` +
+      `with a total bill of materials of ${unitCostGbp} across ${bomLineCount} line item${bomLineCount !== 1 ? 's' : ''}. ` +
+      `${useCase !== '—' ? useCase : ''}`
+  } else {
+    p1 =
+      `This report covers the ${productClass} design for ${briefName}. ` +
+      `System comprises ${moduleCount} top-level module${moduleCount !== 1 ? 's' : ''} across ${bomLineCount} bill-of-materials lines. ` +
+      `Total system cost estimate: ${unitCostGbp}.`
+  }
+
+  // §2 Design outcome paragraph — named verdict + rule counts + cost gap % + spatial fit
   const passCount = grammarVerdicts?.pass_count ?? 0
   const warnCount = grammarVerdicts?.warn_count ?? 0
   const blockCount = grammarVerdicts?.block_count ?? 0
   const totalRules = passCount + warnCount + blockCount
   const overallVerdict = grammarVerdicts?.overall_verdict ?? 'N/A'
-  const overBudgetStr = cs?.isOverBudget
-    ? `Exceeds cost ceiling by ${cs.overBudgetPct != null ? cs.overBudgetPct.toFixed(0) + '%' : 'an unknown margin'}.`
-    : cs?.ceilingCost
-    ? 'Within cost ceiling.'
-    : 'No cost ceiling specified.'
-  const spaceFit = state.dimensionSheet?.feasible
-    ? 'Within spatial envelope.'
-    : state.dimensionSheet
-    ? 'Spatial fit: conflicts identified.'
-    : 'Spatial envelope not evaluated.'
-  const p2 =
-    `Design Rule Check: ${overallVerdict} — ${passCount}/${totalRules} rules pass, ${warnCount} WARN, ${blockCount} BLOCK. ` +
-    `${spaceFit} ${overBudgetStr}`
 
-  // §3 Next-step recommendation paragraph
-  const topWarns = grammarVerdicts?.verdicts
-    .filter(v => v.verdict === 'WARN' || v.verdict === 'BLOCK')
-    .slice(0, 2)
-    .map(v => v.rule_id.replace(/_/g, ' '))
-  const ruleNotes = topWarns && topWarns.length > 0
-    ? `(a) address design rule findings: ${topWarns.join(', ')}; `
-    : ''
-  const costNotes = cs?.isOverBudget
-    ? `(b) re-evaluate cost ceiling — current estimate ${unitCostGbp}${cs.ceilingCost ? ` vs target ${fmtGbp(cs.ceilingCost)}` : ''}; `
-    : ''
-  const certNote = `(c) validate regulatory requirements for ${productClass} before procurement commitment.`
-  const p3 = `Recommended next steps: ${ruleNotes}${costNotes}${certNote}`
+  // DRC human-readable verdict
+  const drcLabel = overallVerdict === 'PASS' ? 'PASSES'
+    : overallVerdict === 'PASS_WITH_RELAXATION' ? 'PASSES WITH WARNINGS'
+    : overallVerdict === 'BLOCK' ? 'REQUIRES REWORK'
+    : 'PENDING EVALUATION'
+
+  // Cost gap with explicit percentage
+  let costStr: string
+  if (cs?.isOverBudget && cs.overBudgetPct != null && cs.ceilingCost) {
+    costStr = `exceeds the ${fmtGbp(cs.ceilingCost)} target by ${cs.overBudgetPct.toFixed(0)}%`
+  } else if (cs?.ceilingCost && !cs.isOverBudget) {
+    const headroom = cs.ceilingCost - cs.finalUnitCost
+    const headroomPct = ((headroom / cs.ceilingCost) * 100).toFixed(0)
+    costStr = `is within the ${fmtGbp(cs.ceilingCost)} target (${headroomPct}% headroom)`
+  } else if (cs) {
+    costStr = `is estimated at ${unitCostGbp} (no ceiling in brief)`
+  } else {
+    costStr = 'is not yet estimated'
+  }
+
+  // Spatial fit derived from dimensionSheet
+  const spaceFit = state.dimensionSheet?.feasible
+    ? 'is feasible within the stated envelope'
+    : state.dimensionSheet
+    ? 'has envelope conflicts — re-sizing required'
+    : 'has not been evaluated against a spatial envelope'
+
+  const p2 =
+    `The design ${drcLabel} the engineering rule check ` +
+    `(${passCount} PASS / ${warnCount} WARN / ${blockCount} BLOCK across ${totalRules} v1 grammar rules). ` +
+    `The cost ${costStr}. ` +
+    `Spatial fit ${spaceFit}.`
+
+  // §3 Next-step recommendation — 3 derived actions from specific data sources
+  // (a) Highest cost driver or highest-RPN grammar risk
+  let actionA: string
+  const topBlock = grammarVerdicts?.verdicts.find(v => v.verdict === 'BLOCK')
+  const topWarn = grammarVerdicts?.verdicts.find(v => v.verdict === 'WARN')
+  if (topBlock) {
+    actionA = `resolve the BLOCK design rule violation: ${topBlock.rule_id.replace(/_/g, ' ')} — ${topBlock.reason.slice(0, 80)}${topBlock.reason.length > 80 ? '...' : ''}`
+  } else if (cs?.topDrivers && cs.topDrivers.length > 0) {
+    const d = cs.topDrivers[0]
+    actionA = `address the top cost driver: ${d.partName} represents ${d.pct.toFixed(0)}% of BOM total (${fmtGbp(d.totalGbp)}) — evaluate specification or sourcing alternatives`
+  } else if (topWarn) {
+    actionA = `address design rule warning: ${topWarn.rule_id.replace(/_/g, ' ')} — ${topWarn.reason.slice(0, 80)}${topWarn.reason.length > 80 ? '...' : ''}`
+  } else {
+    actionA = `complete pipeline stages (cost analysis, grammar check) to surface engineering risks`
+  }
+
+  // (b) Grammar BLOCKs or regulatory flags
+  let actionB: string
+  const blockCount2 = grammarVerdicts?.verdicts.filter(v => v.verdict === 'BLOCK').length ?? 0
+  const regsPresent = (state.regulatoryExtraction?.regulatory_entries?.length ?? 0) > 0
+  if (blockCount2 > 0) {
+    const blocks = grammarVerdicts!.verdicts.filter(v => v.verdict === 'BLOCK')
+    actionB = `clear ${blockCount2} BLOCK rule${blockCount2 > 1 ? 's' : ''} before design lock: ${blocks.map(b => b.rule_id.replace(/_/g, ' ')).join('; ')}`
+  } else if (regsPresent) {
+    const reg = state.regulatoryExtraction!.regulatory_entries[0]
+    actionB = `progress ${reg.standard_name} compliance — ${reg.gap_action.slice(0, 80)}${reg.gap_action.length > 80 ? '...' : ''}`
+  } else {
+    actionB = `validate jurisdiction-specific regulatory requirements (${productClass}) before procurement commitment`
+  }
+
+  // (c) Procurement / lead-time / single-source
+  let actionC: string
+  const leaves = resolvedTree ? collectSourcingLeafData(resolvedTree) : []
+  const longLeadLeaves = leaves.filter(l => (l.leadWeeks ?? 0) > 12)
+  const singleSourceLeaves = leaves.filter(l => ['vendor_catalog', 'llm_estimate', 'stub'].includes(l.source))
+  if (longLeadLeaves.length > 0) {
+    actionC = `address long-lead procurement: ${longLeadLeaves.length} part${longLeadLeaves.length > 1 ? 's' : ''} exceed 12-week lead time — initiate supplier engagement or identify alternatives`
+  } else if (singleSourceLeaves.length > 0) {
+    actionC = `mitigate single-source exposure: ${singleSourceLeaves.length} part${singleSourceLeaves.length > 1 ? 's' : ''} lack a verified distributor alternative — qualify second sources or hold safety stock`
+  } else {
+    actionC = `complete distributor verification for all BOM lines before production commitment`
+  }
+
+  const p3 = `Recommended next steps: (a) ${actionA}; (b) ${actionB}; (c) ${actionC}.`
 
   return { p1, p2, p3 }
 }
 
+// Minimal leaf data collector for executive summary (avoids duplication with SourcingStrategyPage)
+function collectSourcingLeafData(resolvedTree: NonNullable<PipelineState['resolvedRadicalTree']>): Array<{
+  archetypeId: string; source: string; leadWeeks: number | null
+}> {
+  const out: Array<{ archetypeId: string; source: string; leadWeeks: number | null }> = []
+  function walk(node: import('./4b-radical-resolution').ResolvedCompositionNode): void {
+    if (!node.children || node.children.length === 0) {
+      out.push({
+        archetypeId: node.archetypeId,
+        source: node.resolution?.source ?? 'stub',
+        leadWeeks: node.resolution?.lead_weeks ?? null,
+      })
+    } else {
+      for (const child of node.children) walk(child)
+    }
+  }
+  walk(resolvedTree.composition.root)
+  return out
+}
+
 // ---------------------------------------------------------------------------
-// P3 — Executive Summary Page
+// §B — Executive Summary Page (3-paragraph narrative from state — no new LLM call)
+// Synthesises: product description, design outcome verdict, next-step actions.
+// Always renders — placeholder when state is thin.
 // ---------------------------------------------------------------------------
 
 const ExecutiveSummaryPage = ({ state }: { state: PipelineState }) => {
   const { p1, p2, p3 } = buildExecutiveSummary(state)
   const projectId = dash(state.projectId)
+  const cs = state.radicalCostSummary ?? state.costSummary
+  const grammarVerdicts = state.grammarVerdicts
+
+  // Derive DRC verdict colour for the design outcome banner
+  const overallVerdict = grammarVerdicts?.overall_verdict ?? null
+  const verdictBannerColour = overallVerdict === 'PASS' ? BESS_GREEN
+    : overallVerdict === 'PASS_WITH_RELAXATION' ? BESS_AMBER
+    : overallVerdict === 'BLOCK' ? BESS_RED
+    : MUTED
 
   return (
     <Page size="A4" style={pageStyle}>
@@ -170,29 +293,100 @@ const ExecutiveSummaryPage = ({ state }: { state: PipelineState }) => {
       </Text>
       <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
 
-      {/* §1 Product description */}
-      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: MUTED, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        Product Description
+      {/* §1 Product Description */}
+      <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 6 }}>
+        1. Product Description
       </Text>
-      <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 16 }}>
-        {p1}
-      </Text>
-
-      {/* §2 Design outcome */}
-      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: MUTED, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        Design Outcome
-      </Text>
-      <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 16 }}>
-        {p2}
+      <Text style={{ fontSize: 10, color: INK, lineHeight: 1.7, marginBottom: 16 }}>
+        {p1 || 'Product description unavailable — run brief parsing and pipeline stages to populate.'}
       </Text>
 
-      {/* §3 Next steps */}
-      <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: MUTED, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-        Next Steps
+      {/* §2 Design Outcome — framed with a verdict-colour left border */}
+      <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 6 }}>
+        2. Design Outcome
       </Text>
-      <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginBottom: 16 }}>
-        {p3}
+      <View style={{
+        borderLeftWidth: 3,
+        borderLeftColor: verdictBannerColour,
+        paddingLeft: 10,
+        marginBottom: 16,
+        backgroundColor: BG_SOFT,
+        padding: 10,
+      }}>
+        {/* DRC verdict badge row */}
+        {grammarVerdicts ? (
+          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+            <View style={{ borderWidth: 1, borderColor: verdictBannerColour, paddingVertical: 2, paddingHorizontal: 6, marginRight: 8 }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: verdictBannerColour }}>
+                DRC: {grammarVerdicts.overall_verdict}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 8, color: MUTED, marginTop: 2 }}>
+              {grammarVerdicts.pass_count} PASS · {grammarVerdicts.warn_count} WARN · {grammarVerdicts.block_count} BLOCK
+            </Text>
+          </View>
+        ) : null}
+        {/* Cost verdict badge row */}
+        {cs ? (
+          <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+            <View style={{ borderWidth: 1, borderColor: cs.isOverBudget ? BESS_RED : BESS_GREEN, paddingVertical: 2, paddingHorizontal: 6, marginRight: 8 }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: cs.isOverBudget ? BESS_RED : BESS_GREEN }}>
+                COST: {cs.isOverBudget ? 'OVER BUDGET' : 'WITHIN BUDGET'}
+              </Text>
+            </View>
+            {cs.ceilingCost ? (
+              <Text style={{ fontSize: 8, color: MUTED, marginTop: 2 }}>
+                {fmtGbp(cs.finalUnitCost)} vs {fmtGbp(cs.ceilingCost)} target
+                {cs.isOverBudget && cs.overBudgetPct != null ? ` (+${cs.overBudgetPct.toFixed(0)}% over)` : ''}
+              </Text>
+            ) : (
+              <Text style={{ fontSize: 8, color: MUTED, marginTop: 2 }}>
+                {fmtGbp(cs.finalUnitCost)} (no ceiling specified)
+              </Text>
+            )}
+          </View>
+        ) : null}
+        <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, marginTop: 4 }}>
+          {p2 || 'Design outcome data not available — run all pipeline stages.'}
+        </Text>
+      </View>
+
+      {/* §3 Recommended Next Steps — 3 lettered actions */}
+      <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 6 }}>
+        3. Recommended Next Steps
       </Text>
+      {p3 ? (
+        <View>
+          {/* Parse p3 into (a), (b), (c) items for visual bulleting */}
+          {['(a)', '(b)', '(c)'].map((label, i) => {
+            // Extract each lettered action from the p3 string
+            const pattern = label === '(a)'
+              ? /\(a\)(.*?)(?=\(b\)|$)/s
+              : label === '(b)'
+              ? /\(b\)(.*?)(?=\(c\)|$)/s
+              : /\(c\)(.*?)\.?\s*$/s
+            const match = p3.match(pattern)
+            const text = match ? match[1].trim().replace(/;$/, '') : null
+            if (!text) return null
+            return (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 8 }} wrap={false}>
+                <View style={{ width: 22, height: 18, backgroundColor: BESS_TEAL, borderRadius: 2, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 1 }}>
+                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT }}>
+                    {String.fromCharCode(65 + i)}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, flex: 1 }}>
+                  {text}
+                </Text>
+              </View>
+            )
+          })}
+        </View>
+      ) : (
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Next steps unavailable — complete pipeline stages to generate recommendations.
+        </Text>
+      )}
 
       <DocPageFooter />
     </Page>
