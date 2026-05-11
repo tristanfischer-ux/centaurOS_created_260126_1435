@@ -234,8 +234,11 @@ def build_messages(pngs: list[Path], slug: str) -> list[dict]:
 
     content = [{"type": "text", "text": f"PDF being scored: {slug}\n\n{prompt_text}\n\nPDF pages follow:"}]
 
-    # Add up to 12 pages (avoid token limits)
-    for png in pngs[:12]:
+    # Send all pages — judges must see the full PDF.
+    # Previous `pngs[:12]` cap silently truncated sections past page 12 (e.g. §E
+    # Appendix on pages 15-19, V6 BoM after a renderer reorder pushed it to page
+    # 11+). See V6-BOM-INVESTIGATION-2026-05-11.md.
+    for png in pngs:
         content.append({
             "type": "image_url",
             "image_url": {"url": f"data:image/png;base64,{encode_image(png)}"},
@@ -251,7 +254,8 @@ def build_messages_anthropic(pngs: list[Path], slug: str) -> list[dict]:
 
     content: list[dict] = [{"type": "text", "text": f"PDF being scored: {slug}\n\n{prompt_text}\n\nPDF pages follow:"}]
 
-    for png in pngs[:12]:
+    # Send all pages — judges must see the full PDF. See note in build_messages().
+    for png in pngs:
         content.append({
             "type": "image",
             "source": {
