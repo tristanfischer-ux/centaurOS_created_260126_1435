@@ -646,3 +646,179 @@ export const RENDERING_RULES = {
   internalLanguage: 'Never expose "pipeline step", "LLM-generated", or "source grade E" in customer-facing sections. Use "engineering estimate", "requires verification".',
   numberFormatting: 'All costs in the same currency with consistent decimal places. All dimensions in mm. All masses in kg. No mixing of units.',
 }
+
+// ─── Iter 3 — Stage 1.7 Module Decomposition (12 universal modules) ─────────
+// Activated when RADICAL_PHASE_3_PER_MODULE=true. Spec: §4 of
+// `radical/ITER3-ARCHITECTURE-DESIGN.md`. The catalog returned by this prompt
+// is then validated by a 4-seat council and consumed by per-module Stage 2.
+
+export const MODULE_DECOMPOSITION_TAXONOMY_PROMPT = `You are decomposing a hardware product into a fixed set of 12 universal engineering modules. Your output is a JSON object naming which of the 12 modules apply to THIS product, with a 2-3 sentence module_brief for each, derived parameters, and the subset of the 22 universal radicals that are appropriate for this module on this product.
+
+You MUST output ONLY valid JSON — no preamble, no markdown fences, no commentary.
+
+A module MAY be marked as PRIMARY for a component AND SECONDARY for another universal function it also serves (e.g. a pump is primary actuation_kinematics and secondary mass_fluid_transport_process; a solar panel is primary energy_conversion_transduction and secondary structure_containment). Use the secondary_modules array on a ModuleSpec to express this dual-classification — do NOT force a single choice when both apply.
+
+=== THE 12 UNIVERSAL MODULES ===
+
+1. energy_storage_source — Stores or sources the primary working energy/material the product uses (battery, fuel tank, capacitor bank, accumulator, biomass feedstock, water reservoir).
+
+2. energy_conversion_transduction — Converts energy or material between forms (inverter, motor, heat exchanger, fermenter, RO membrane, solar cell, turbine generator).
+
+3. structure_containment — Carries load, contains pressure/fluid, and provides geometric form (pressure vessel, frame, enclosure, container shell, hull, chassis). PASSIVE integrity only — active hazard mitigation belongs to safety_protection.
+
+4. sensing_instrumentation — Measures physical state — temperature, pressure, flow, voltage, biochemistry, position, gas concentration.
+
+5. control_compute_communication — Closed-loop control, supervisory compute, and on/off-board comms (PLC, MCU, EMS, SCADA, radio, CAN bus, edge inference).
+
+6. safety_protection — Detects and mitigates hazards via ACTIVE mitigation devices (fire suppression, surge protection, pressure relief valves, e-stops, interlocks, BMS protection circuits). Operation-time hazards only.
+
+7. environmental_interface — Handles the physical boundary with the operating environment (thermal management, ingress protection, EMC shielding, lightning, anti-icing, biofouling protection).
+
+8. power_distribution — Distributes electrical or fluid power within the product via UNINTERRUPTED routing only (busbars, switchgear cabling, harnesses, manifolds, conduit). Interrupting devices live in safety_protection.
+
+9. maintenance_serviceability — Affords OFFLINE inspection, swap, calibration, decommissioning (access doors, lifting eyes, drain valves, test points, spare-parts kits, labels). Operation-time protection lives in safety_protection.
+
+10. actuation_kinematics — Applies converted energy to KINEMATIC INTENT: joints, gears, linkages, propellers, rotors, control surfaces, end-effector jaws, dish actuators, turbine blades, impellers, agitators. Distinct from energy_conversion_transduction (which only changes energy domain).
+
+11. mass_fluid_transport_process — Internal pumping, valving, mixing, filtration, separation, phase change, biological/chemical processing — distinct from passive containment in structure_containment and from environmental heat/mass exchange in environmental_interface. The product's INTERNAL matter flow lives here.
+
+12. hmi_ergonomics — Operator-facing touchpoints and ergonomic surfaces: touchscreens, haptics, displays, manual controls, sight glasses, ergonomic grips, biocompatible/wearable interfaces. Operator-facing only; external connectors stay in power_distribution (electrical) or mass_fluid_transport_process (fluid).
+
+=== ALLOWED RADICALS (default per module — refine for the product if needed) ===
+
+energy_storage_source: electrochemical_energy_function, lithium_iron_phosphate_chemistry, fluid_flow_state, pressure_vessel_function
+
+energy_conversion_transduction: silicon_semiconductor_function, magnetic_coupling_function, electromechanical_switching_function, thermal_transfer_function, mechanical_kinetic_function, optical_transduction_function, biochemical_sensing_function, electrochemical_reaction_function, refrigerant_fluid
+
+structure_containment: steel, aluminium_alloy, carbon_fibre_composite, polymer_thermoplastic, mineral_fibre_material, pressure_vessel_function
+
+sensing_instrumentation: silicon_semiconductor_function, optical_sensing_function, chemical_sensing_function, biochemical_sensing_function, digital_logic_function
+
+control_compute_communication: silicon_semiconductor_function, digital_logic_function, electrical_conducting_function, copper
+
+safety_protection: chemical_suppressant_material, optical_sensing_function, chemical_sensing_function, electromechanical_switching_function, pressure_vessel_function
+
+environmental_interface: thermal_transfer_function, refrigerant_fluid, fluid_flow_state, polymer_thermoplastic, mineral_fibre_material
+
+power_distribution: copper, electrical_conducting_function, electromechanical_switching_function, polymer_thermoplastic, fluid_flow_state
+
+maintenance_serviceability: steel, polymer_thermoplastic, electrical_conducting_function
+
+actuation_kinematics: silicon_semiconductor_function, copper, magnetic_coupling_function, electromechanical_switching_function, polymer_thermoplastic, mineral_fibre_material, mechanical_kinetic_function
+
+mass_fluid_transport_process: pressure_vessel_function, fluid_flow_state, copper, steel, polymer_thermoplastic, chemical_sensing_function, refrigerant_fluid, electrochemical_reaction_function
+
+hmi_ergonomics: silicon_semiconductor_function, polymer_thermoplastic, optical_sensing_function, mechanical_kinetic_function, digital_logic_function, thermal_transfer_function
+
+=== OUTPUT SCHEMA (return EXACTLY this JSON shape) ===
+
+{
+  "product_class": "<echoed classification string>",
+  "modules": [
+    {
+      "module": "<one of the 12 module keys above>",
+      "module_brief": "<2-3 sentences specific to THIS product, NOT a generic definition>",
+      "derived_parameters": { "<key>": <number|string> },
+      "allowed_radicals": ["<radical_id>", ...],
+      "applicability_confidence": "high" | "medium" | "low",
+      "secondary_modules": ["<universal_module>", ...]   // OMIT if no secondary
+    }
+  ],
+  "excluded_modules": ["<module>", ...],
+  "rationale_excluded": { "<module>": "<why N/A for this product>" }
+}
+
+=== HARD CONSTRAINTS (validator will reject otherwise) ===
+
+- modules.length + excluded_modules.length MUST equal 12 — every universal module must appear EITHER in modules OR in excluded_modules.
+- modules.length MUST be between 3 and 12 inclusive.
+- Every module key MUST be exactly one of the 12 above (no inventions, no abbreviations).
+- Every entry in allowed_radicals MUST be a valid radical_id (do NOT invent new radicals).
+- secondary_modules entries MUST also be drawn from the 12 module keys.
+- derived_parameters: numeric values MUST be finite and non-negative. String values MUST be a single short phrase, not prose.
+- rationale_excluded MUST contain a one-line "why N/A" for EVERY module listed in excluded_modules.
+
+=== APPLICABILITY CONFIDENCE GUIDANCE ===
+
+- "high" — the brief unambiguously describes this module's role (e.g. brief explicitly mentions a battery → energy_storage_source = high).
+- "medium" — the module is implied by the product class but not explicitly described.
+- "low" — the module MAY apply but the brief is silent and the class doesn't strongly imply it. Use sparingly — 2+ "low" entries triggers council scrutiny.`
+
+export const MODULE_DECOMPOSITION_COUNCIL_PROMPT = `You are one seat on a 4-seat code-and-engineering council reviewing a freshly-emitted module catalog for a hardware product. The catalog claims which of 12 universal engineering modules apply to this specific product, what each module does on it, and what radicals/materials it uses.
+
+Your job is to vote OK | NEEDS_MINOR | NEEDS_MAJOR on the catalog as a whole, and to give specific, actionable notes.
+
+The 4-seat synthesis rule (you don't apply this — the aggregator does):
+- 2+ NEEDS_MAJOR votes → BLOCK (regenerate Stage 1.5 once with notes attached).
+- 1 NEEDS_MAJOR + others NEEDS_MINOR/OK → NEEDS_MINOR (proceed with notes).
+- All OK → OK (proceed clean).
+
+So vote NEEDS_MAJOR ONLY when you genuinely believe the catalog is structurally wrong (missing critical module, or includes a clearly inapplicable module, or derived_parameters are off by an order of magnitude).
+Vote NEEDS_MINOR when there's a real issue worth surfacing but the catalog is workable.
+Vote OK when the catalog is complete, orthogonal, and the parameters are plausible.
+
+Answer THREE explicit questions in your notes:
+
+Q1. Does the module list cover the product's functional surface? (yes / no — if no, name the missing modules)
+Q2. Are any listed modules genuinely N/A for this product? (yes / no — if yes, name them)
+Q3. Are derived_parameters numerically plausible? (yes / no — if no, cite the specific value and your reason)
+
+Then give your overall verdict.
+
+=== OUTPUT SCHEMA (return EXACTLY this JSON shape, no markdown) ===
+
+{
+  "verdict": "OK" | "NEEDS_MINOR" | "NEEDS_MAJOR",
+  "coverage_ok": true | false,
+  "no_spurious_modules": true | false,
+  "parameters_plausible": true | false,
+  "notes": ["<short specific issue or recommendation>", ...]
+}
+
+Output ONLY the JSON object — no preamble, no markdown fences, no commentary.`
+
+export const PER_MODULE_LEAF_PROMPT = `You are a systems engineer identifying the LEAF COMPONENTS of a SINGLE module within a hardware product.
+
+You are NOT decomposing the whole product. You are decomposing ONE module — its leaves only. A separate deterministic algorithm aggregates all per-module leaves into the full product tree.
+
+You MUST output ONLY a JSON array — no preamble, no markdown fences, no commentary.
+
+=== UNKNOWN RULE ===
+If a part CANNOT be mapped to any character in your allowed library, emit:
+  { "character_id": "<UNKNOWN>", "description": "describe the part clearly", "multiplicity": N, ... }
+Do NOT invent new character_id values. Do NOT use an existing ID for something it does not represent.
+
+=== OUTPUT SCHEMA ===
+Respond with ONLY a JSON array of objects:
+[
+  {
+    "character_id": string,         // MUST be from the per-module character library OR "<UNKNOWN>"
+    "archetype_id": string|null,
+    "multiplicity": integer,        // count of this component type in this module (>= 1)
+    "mpn_hint": string|null,
+    "manufacturer_hint": string|null,
+    "estimated_unit_price_gbp": number|null,
+    "description": string|null      // REQUIRED if character_id is "<UNKNOWN>"
+  },
+  ...
+]
+
+=== QUANTITY RULES ===
+- multiplicity is the count of this SPECIFIC component type within THIS module of a SINGLE unit of the product.
+- Derive from the module's derived_parameters where possible (e.g. capacity_kwh, rated_thermal_kw, dish_diameter_m).
+- Show calculation in description for non-trivial counts.
+
+=== CONSTRAINTS ===
+- Aim for 15-30 leaves PER MODULE. Stop at 60 leaves max.
+- Do NOT emit leaves for OTHER modules — they are decomposed in their own calls.
+- Do NOT wrap the array in an object. Return the bare array [ ... ].
+- No duplicate (character_id, archetype_id) pairs — differentiate by archetype_id or add description.
+- Sort records by character_id alphabetically — helps determinism.
+
+The user message will give you:
+[Module brief] — what THIS module does on THIS product
+[Derived parameters] — quantitative inputs
+[Allowed character_ids] — narrow library subset; you may ONLY use these IDs (or "<UNKNOWN>")
+[Allowed radicals] — narrow radical subset
+[Product context] — short context about the whole product`
+
