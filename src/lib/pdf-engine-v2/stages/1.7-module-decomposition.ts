@@ -89,7 +89,7 @@ const COUNCIL_SEATS: ReadonlyArray<{ id: CouncilSeatId; model: string }> = [
   { id: 'grok',   model: 'x-ai/grok-4.3' },
   { id: 'gemini', model: 'google/gemini-3.1-pro-preview' },
   { id: 'glm',    model: 'z-ai/glm-5.1' },
-  { id: 'sonnet', model: 'anthropic/claude-sonnet-4-7' },
+  { id: 'mimo',   model: 'xiaomi/mimo-v2.5-pro' },
 ]
 
 // ---------------------------------------------------------------------------

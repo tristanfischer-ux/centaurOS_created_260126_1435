@@ -369,8 +369,14 @@ export type CouncilVerdict = 'OK' | 'NEEDS_MINOR' | 'NEEDS_MAJOR'
 /**
  * The 4 council seats (canonical names, in invocation order).
  * Models pinned in env config; do not change without a re-validation run.
+ *
+ * Sonnet was swapped for MiMo v2.5 Pro on 2026-05-11 — Anthropic Sonnet 4.7
+ * via OpenRouter direct calls was driving up per-pipeline-run cost without
+ * a measured quality lift over MiMo (which already serves the same role in
+ * coding councils via ask_alt_llm — see memory drawer
+ * `forgeos_gotchas_73b0a9291c9acebf` for the canonical substitution rationale).
  */
-export type CouncilSeatId = 'grok' | 'gemini' | 'glm' | 'sonnet'
+export type CouncilSeatId = 'grok' | 'gemini' | 'glm' | 'mimo'
 
 /**
  * One council seat's structured review of the decomposition.
@@ -442,7 +448,7 @@ export interface ModuleDecomposition {
 
   /**
    * Per-seat reviews retained for diagnostics. Length: 4.
-   * Order matches `CouncilSeatId` declaration: grok, gemini, glm, sonnet.
+   * Order matches `CouncilSeatId` declaration: grok, gemini, glm, mimo.
    */
   council_seats: CouncilSeatReview[]
 
