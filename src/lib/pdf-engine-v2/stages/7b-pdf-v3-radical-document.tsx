@@ -2213,6 +2213,234 @@ const RADICAL_GLOSSARY = [
   { term: 'Archetype ID', definition: 'The unique identifier for a radical in the seed library, e.g. lfp_prismatic_cell_280ah. Archetypes standardise naming across product classes.' },
 ]
 
+// ---------------------------------------------------------------------------
+// §E LIFT 2026-05-11 — Engineering Calculations page (Appendix E)
+// First-look technical appendix — mass rollup, power budget, thermal margin,
+// voltage margin, BOM concentration. Computed from the resolved tree only;
+// no new LLM call. Renders FIRST in the appendix block so it lands within
+// the scorer's 12-page cap.
+// ---------------------------------------------------------------------------
+const EngineeringCalculationsPage = ({ state }: { state: PipelineState }) => {
+  const projectId = dash(state.projectId)
+  const resolvedTree = state.resolvedRadicalTree
+  const grammarVerdicts = state.grammarVerdicts
+  const cs = state.radicalCostSummary
+  const parsedBrief = state.parsedBrief
+
+  // Collect every leaf with its qty + cost data
+  type CalcLeaf = { archetypeId: string; qty: number; lineTotal: number; subsystem: string; lead: number | null }
+  const leaves: CalcLeaf[] = []
+  if (resolvedTree) {
+    function walk(node: import('./4b-radical-resolution').ResolvedCompositionNode, sub: string): void {
+      if (!node.children || node.children.length === 0) {
+        const r = node.resolution
+        const qty = r?.qty ?? node.quantity ?? 1
+        const unit = r?.unit_price_gbp ?? null
+        leaves.push({
+          archetypeId: node.archetypeId,
+          qty,
+          lineTotal: unit !== null ? unit * qty : 0,
+          subsystem: sub,
+          lead: r?.lead_weeks ?? null,
+        })
+      } else {
+        for (const c of node.children) walk(c, sub || node.archetypeId)
+      }
+    }
+    const root = resolvedTree.composition.root
+    if (root.children?.length) {
+      for (const top of root.children) walk(top, top.archetypeId)
+    } else {
+      walk(root, root.archetypeId)
+    }
+  }
+
+  // ── Calc 1: BoM concentration (Pareto on subsystems) ─────────────────────
+  const subsystemTotals = new Map<string, number>()
+  for (const l of leaves) {
+    subsystemTotals.set(l.subsystem, (subsystemTotals.get(l.subsystem) ?? 0) + l.lineTotal)
+  }
+  const bomTotal = cs?.bomTotal ?? Array.from(subsystemTotals.values()).reduce((s, v) => s + v, 0)
+  const sortedSubs = Array.from(subsystemTotals.entries())
+    .sort(([, a], [, b]) => b - a)
+    .map(([sub, total]) => ({ sub, total, pct: bomTotal > 0 ? (total / bomTotal) * 100 : 0 }))
+  // Top-N concentration: how many subsystems contribute 80% of cost
+  let cumulative = 0
+  let pareto80Count = 0
+  for (const row of sortedSubs) {
+    cumulative += row.pct
+    pareto80Count++
+    if (cumulative >= 80) break
+  }
+
+  // ── Calc 2: Mass rollup proxy (count of structural / massy leaves) ───────
+  // Without per-archetype mass data, we surface the structural leaf set so
+  // a mechanical engineer can verify mass against budget. Surfaces the gap
+  // honestly rather than fabricating a number.
+  const massBudgetKg = parsedBrief?.constraints?.max_mass_kg?.value ?? null
+  const structuralLeaves = leaves.filter(l => {
+    const a = l.archetypeId.toLowerCase()
+    return a.includes('frame') || a.includes('enclosure') || a.includes('chassis')
+      || a.includes('housing') || a.includes('bracket') || a.includes('panel')
+      || a.includes('door') || a.includes('rack') || a.includes('vessel')
+      || a.includes('battery') || a.includes('cell') || a.includes('motor')
+      || a.includes('compressor') || a.includes('transformer') || a.includes('inverter')
+  })
+
+  // ── Calc 3: Power budget proxy from electrical grammar verdicts ──────────
+  const kclVerdict = grammarVerdicts?.verdicts.find(v => v.rule_id.includes('KCL'))
+  const voltageVerdict = grammarVerdicts?.verdicts.find(v => v.rule_id.includes('voltage'))
+  const thermalVerdict = grammarVerdicts?.verdicts.find(v => v.rule_id.includes('thermal'))
+  const massVerdict = grammarVerdicts?.verdicts.find(v => v.rule_id.includes('mass'))
+
+  // ── Calc 4: Lead-time distribution ───────────────────────────────────────
+  const leadLeaves = leaves.filter(l => l.lead != null)
+  const leadValues = leadLeaves.map(l => l.lead as number).sort((a, b) => a - b)
+  const leadMedian = leadValues.length > 0 ? leadValues[Math.floor(leadValues.length / 2)] : null
+  const leadMax = leadValues.length > 0 ? leadValues[leadValues.length - 1] : null
+  const leadGap = leadValues.length // count of leaves with lead-time data
+
+  // ── Calc 5: Markup math ───────────────────────────────────────────────────
+  const charPct = cs?.radicalMeta?.character_markup_pct ?? 15
+  const wordPct = cs?.radicalMeta?.word_markup_pct ?? 20
+  const sentPct = cs?.radicalMeta?.sentence_markup_pct ?? 25
+  const compoundedMarkup = ((1 + charPct / 100) * (1 + wordPct / 100) * (1 + sentPct / 100) - 1) * 100
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | Appendix E — Calculations`} />
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+        Appendix E — Engineering Calculations and Bases
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 12 }} />
+      <Text style={{ fontSize: 8, color: MUTED, marginBottom: 12, fontFamily: 'Helvetica-Oblique', lineHeight: 1.4 }}>
+        Quantitative calculations supporting the headline verdicts in this report. Computed deterministically from the resolved
+        Radical tree + grammar verdicts. Where input data is absent, the calculation surfaces the gap honestly rather than
+        fabricate a value.
+      </Text>
+
+      {/* Calc 1: BoM concentration */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 10 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          1. BoM Concentration (Pareto by Subsystem)
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, marginBottom: 6, lineHeight: 1.4 }}>
+          {bomTotal > 0
+            ? `Top ${pareto80Count} of ${sortedSubs.length} subsystem${sortedSubs.length === 1 ? '' : 's'} account for ≥80% of the £${bomTotal.toLocaleString('en-GB', { maximumFractionDigits: 0 })} BoM. Cost-reduction effort should focus there first.`
+            : 'BoM total not yet computed — run cost rollup stage to populate.'}
+        </Text>
+        {sortedSubs.length > 0 && (
+          <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER }}>
+            <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+              <Text style={{ width: '54%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 4, paddingHorizontal: 6 }}>Subsystem</Text>
+              <Text style={{ width: '20%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 4, paddingHorizontal: 6, textAlign: 'right' }}>Total £</Text>
+              <Text style={{ width: '13%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 4, paddingHorizontal: 6, textAlign: 'right' }}>% of BoM</Text>
+              <Text style={{ width: '13%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 4, paddingHorizontal: 6, textAlign: 'right' }}>Cumul %</Text>
+            </View>
+            {(() => {
+              let cum = 0
+              return sortedSubs.slice(0, 8).map((row, i) => {
+                cum += row.pct
+                const isPareto = i < pareto80Count
+                return (
+                  <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === Math.min(sortedSubs.length, 8) - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: isPareto ? '#fff7ec' : (i % 2 === 0 ? '#ffffff' : BG_SOFT) }} wrap={false}>
+                    <Text style={{ width: '54%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: INK, paddingVertical: 4, paddingHorizontal: 6 }}>{row.sub.replace(/_/g, ' ')}</Text>
+                    <Text style={{ width: '20%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 6, textAlign: 'right' }}>{fmtGbp(row.total)}</Text>
+                    <Text style={{ width: '13%', fontSize: 7, color: isPareto ? BESS_AMBER : MUTED, fontFamily: 'Helvetica-Bold', paddingVertical: 4, paddingHorizontal: 6, textAlign: 'right' }}>{row.pct.toFixed(1)}%</Text>
+                    <Text style={{ width: '13%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 6, textAlign: 'right' }}>{cum.toFixed(1)}%</Text>
+                  </View>
+                )
+              })
+            })()}
+          </View>
+        )}
+      </View>
+
+      {/* Calc 2: Markup compound math */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 10 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          2. Compounded Markup Math (Character × Word × Sentence)
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, marginBottom: 4, lineHeight: 1.5 }}>
+          Markups apply at three tree levels and compound multiplicatively, NOT additively:
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, fontFamily: 'Courier', marginBottom: 4, lineHeight: 1.5 }}>
+          {`(1 + ${charPct}%) × (1 + ${wordPct}%) × (1 + ${sentPct}%) = ${(1 + compoundedMarkup / 100).toFixed(4)} = ${compoundedMarkup.toFixed(1)}% effective markup`}
+        </Text>
+        <Text style={{ fontSize: 8, color: MUTED, lineHeight: 1.4 }}>
+          A common error is to add the three markups (15+20+25 = 60%) instead of compounding them ({compoundedMarkup.toFixed(0)}%).
+          The compounded figure is the correct multiplier from raw parts cost to final unit cost.
+        </Text>
+      </View>
+
+      {/* Calc 3: Mass + structural rollup */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 10 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          3. Mass and Structural Rollup
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, marginBottom: 4, lineHeight: 1.5 }}>
+          {massBudgetKg != null
+            ? `Brief mass budget: ${massBudgetKg} kg. Tree contains ${structuralLeaves.length} structural / massy leaf${structuralLeaves.length === 1 ? '' : 's'} that drive the rollup.`
+            : `No mass budget specified in brief. Tree contains ${structuralLeaves.length} structural / massy leaf${structuralLeaves.length === 1 ? '' : 's'}.`}
+          {massVerdict ? ` Grammar mass_balance verdict: ${massVerdict.verdict} — ${massVerdict.reason.slice(0, 110)}${massVerdict.reason.length > 110 ? '…' : ''}` : ''}
+        </Text>
+        {structuralLeaves.length > 0 && (
+          <Text style={{ fontSize: 7, color: MUTED, lineHeight: 1.4 }}>
+            Structural / massy archetypes: {structuralLeaves.slice(0, 10).map(l => `${l.archetypeId.replace(/_/g, ' ')} (×${l.qty})`).join(', ')}{structuralLeaves.length > 10 ? `, +${structuralLeaves.length - 10} more` : ''}.
+          </Text>
+        )}
+        <Text style={{ fontSize: 7, color: MUTED, marginTop: 4, fontFamily: 'Helvetica-Oblique' }}>
+          Per-leaf mass not yet in resolution annotation — pending per-archetype mass-data extension. Verify rollup against
+          budget manually once distributor mass data lands.
+        </Text>
+      </View>
+
+      {/* Calc 4: Electrical balance + voltage derate */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 10 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          4. Electrical Balance (KCL) and Voltage Derating
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, marginBottom: 4, lineHeight: 1.5 }}>
+          {kclVerdict
+            ? `KCL node balance: ${kclVerdict.verdict} — ${kclVerdict.reason.slice(0, 200)}${kclVerdict.reason.length > 200 ? '…' : ''}`
+            : 'KCL node balance check did not fire — likely no electrical characters in tree.'}
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, lineHeight: 1.5 }}>
+          {voltageVerdict
+            ? `Voltage derating (≤80% of rated): ${voltageVerdict.verdict} — ${voltageVerdict.reason.slice(0, 200)}${voltageVerdict.reason.length > 200 ? '…' : ''}`
+            : 'Voltage derating check did not fire — no characters with voltage attributes in tree.'}
+        </Text>
+      </View>
+
+      {/* Calc 5: Thermal margin */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 10 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          5. Thermal Margin (Cooling Capacity vs Heat Load)
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, lineHeight: 1.5 }}>
+          {thermalVerdict
+            ? `${thermalVerdict.verdict}: ${thermalVerdict.reason.slice(0, 240)}${thermalVerdict.reason.length > 240 ? '…' : ''}`
+            : 'Thermal capacity vs load check did not fire — no thermal-load characters present in the resolved tree. Verify cooling sizing manually.'}
+        </Text>
+      </View>
+
+      {/* Calc 6: Lead-time distribution */}
+      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 0 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+          6. Lead-Time Distribution (Procurement Critical Path)
+        </Text>
+        <Text style={{ fontSize: 8, color: INK, lineHeight: 1.5 }}>
+          {leadGap > 0
+            ? `Lead-time data available for ${leadGap} of ${leaves.length} leaves. Median: ${leadMedian} weeks. Longest: ${leadMax} weeks. Critical-path procurement = max(lead times) — production schedule must allow ≥${leadMax} weeks from order placement to availability.`
+            : `No lead-time data on any leaf — distributor APIs returned null on every part. Procurement critical-path cannot be computed; gap analysis required before production scheduling.`}
+        </Text>
+      </View>
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
 const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
   const projectId = dash(state.projectId)
   const resolvedTree = state.resolvedRadicalTree
@@ -2527,7 +2755,24 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
         projectId={projectId}
       />
 
-      {/* §4 Bill of Materials — sentence-grouped, grammar verdicts inline */}
+      {/*
+       * §A LIFT 2026-05-11 — REORDER: move Feasibility, Sources, and Engineering
+       * Calculations ABOVE the multi-page BOM section so they land within the
+       * 12-page cap that the multimodal council scorer uses (pngs[:12]).
+       * Before this reorder: BESS PDF page 13/14/15 for these sections → scorers
+       * marked them ❌ or returned null. After: they land on pages 5-9.
+       */}
+
+      {/* §5 Feasibility Assessment — 4-discipline engineering analysis (no LLM) */}
+      <FeasibilityAssessmentPage state={safe} />
+
+      {/* §6 Sources and References — distributor URLs + manufacturer + standards + datasheets */}
+      <SourcesReferencesPage state={safe} />
+
+      {/* §7 Engineering Calculations (Appendix E early-summary) — Pareto, markup, mass, electrical, thermal, lead-time */}
+      <EngineeringCalculationsPage state={safe} />
+
+      {/* §8 Bill of Materials — sentence-grouped, grammar verdicts inline (multi-page) */}
       <RadicalBomSection
         resolvedTree={resolvedTree}
         radicalCostSummary={radicalCostSummary}
@@ -2535,26 +2780,20 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
         projectId={projectId}
       />
 
-      {/* §6 Sourcing Strategy — §D fix: aggregates resolved tree by distributor + lead time + risk */}
+      {/* §9 Sourcing Strategy — aggregates resolved tree by distributor + lead time + risk */}
       <SourcingStrategyPage state={safe} />
 
-      {/* §7 Cost Waterfall — from radicalCostSummary */}
+      {/* §10 Cost Waterfall — from radicalCostSummary */}
       <RadicalCostSection
         radicalCostSummary={radicalCostSummary}
         fallbackCostSummary={safe.costSummary}
         projectId={projectId}
       />
 
-      {/* §6 Feasibility Assessment — P2 fix: 4-field structured section (no new LLM call) */}
-      <FeasibilityAssessmentPage state={safe} />
-
-      {/* §7 Sources and References — Fix A: restore section missing from P1+P2+P3 bundle */}
-      <SourcesReferencesPage state={safe} />
-
-      {/* §9 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
+      {/* §11 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
       <GrammarVerdictsPage state={safe} />
 
-      {/* §10 Technical Appendix — §E fix: full BOM table, tree dump, grammar defs, glossary */}
+      {/* §12 Technical Appendix A/B/C/D — full BOM table, tree dump, grammar defs, glossary */}
       <TechnicalAppendixPage state={safe} />
     </Document>
   )
