@@ -431,14 +431,59 @@ export function runRadicalCostRollup(
   const pricedLeaves = allLeaves.filter(l => l.lineTotal > 0)
   const unpricedLeaves = allLeaves.filter(l => l.lineTotal === 0)
 
-  const sortedLeaves = [...pricedLeaves].sort((a, b) => b.lineTotal - a.lineTotal)
-  const top5 = sortedLeaves.slice(0, 5)
+  // Bug P2-10 fix (2026-05-11): unpriced OEM subsystems (PCS inverter,
+  // cooling module, fire suppression, transformer …) realistically dwarf
+  // the line items in the priced bucket — silently excluding them from
+  // top-cost-drivers misleads the reader. Estimate from a typical-list
+  // table per archetype so they appear with a "[unpriced — needs quote]"
+  // label and a plausible figure derived from vendor catalog typicals.
+  // The figures here are conservative midpoints; they DO NOT change
+  // bomTotal / finalUnitCost — they only enrich the top-driver list.
+  const TYPICAL_OEM_LIST_GBP: Record<string, number> = {
+    'power_converter': 95000,
+    'lfp_prismatic_cell': 60,        // per cell — qty multiplied below
+    'liquid_cooling_system': 35000,
+    'transformer': 22000,
+    'fire_suppression_system': 18000,
+    'pressure_vessel': 18000,
+    'ems_controller': 18000,
+    'switchboard_enclosure': 3500,
+    'steel_door': 1200,
+    'compressor_unit': 1100,
+  }
+  const unpricedWithEstimate = unpricedLeaves
+    .map(l => {
+      const typical = TYPICAL_OEM_LIST_GBP[l.archetypeId]
+      if (typeof typical !== 'number') return null
+      const lineTotal = typical * l.qty
+      return {
+        archetypeId: l.archetypeId,
+        label: l.label,
+        qty: l.qty,
+        lineTotal,
+        verificationGrade: l.verificationGrade,
+        source: l.source,
+      }
+    })
+    .filter((l): l is NonNullable<typeof l> => l !== null)
+
+  // Build the combined ranking — priced items use real lineTotal, unpriced
+  // items use the typical estimate. The label is suffixed with
+  // "[unpriced — needs quote]" so the reader can tell.
+  const combinedDrivers = [
+    ...pricedLeaves.map(l => ({ ...l, isUnpricedEstimate: false })),
+    ...unpricedWithEstimate.map(l => ({ ...l, isUnpricedEstimate: true })),
+  ]
+  const sortedDrivers = combinedDrivers.sort((a, b) => b.lineTotal - a.lineTotal)
+  const top5 = sortedDrivers.slice(0, 5)
 
   const topDrivers: CostSummary['topDrivers'] = top5.map(leaf => ({
-    partName: leaf.label,
+    partName: leaf.isUnpricedEstimate
+      ? `${leaf.label} [unpriced — needs quote]`
+      : leaf.label,
     pct: paragraph.bomTotal > 0 ? (leaf.lineTotal / paragraph.bomTotal) * 100 : 0,
     totalGbp: leaf.lineTotal,
-    costSource: leaf.verificationGrade,
+    costSource: leaf.isUnpricedEstimate ? 'unpriced_typical' : leaf.verificationGrade,
   }))
 
   // ── Step 4: Compute CostSummary-compatible fields ──────────────────────────
