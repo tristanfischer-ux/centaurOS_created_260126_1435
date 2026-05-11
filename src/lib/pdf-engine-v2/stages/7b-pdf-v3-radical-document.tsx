@@ -514,8 +514,9 @@ const BriefRequirementsPage = ({ state }: { state: PipelineState }) => {
   }
 
   // Safety standards from parsedBrief or regulatoryExtraction
+  // council fix: full optional chain — parsedBrief can exist with undefined constraints
   const safetyStandards: string[] =
-    parsedBrief?.constraints.safety_standards.map(s => `${s.standard}${s.code ? ' (' + s.code + ')' : ''}`) ??
+    parsedBrief?.constraints?.safety_standards?.map(s => `${s.standard}${s.code ? ' (' + s.code + ')' : ''}`) ??
     regs.slice(0, 6).map(r => `${r.standard_name} — ${r.gap_action.slice(0, 60)}`)
 
   return (
@@ -783,15 +784,16 @@ const SourcingStrategyPage = ({ state }: { state: PipelineState }) => {
       ) : (
         <>
           {/* Summary block */}
-          <View style={{ flexDirection: 'row', gap: 12, marginBottom: 16 }}>
+          {/* gap not supported in react-pdf v3 — use marginRight on each child instead */}
+          <View style={{ flexDirection: 'row', marginBottom: 16 }}>
             {[
               { label: 'Total BOM Lines', value: String(totalLeaves) },
               { label: 'Verified MPN', value: `${verifiedMpnPct}%` },
               { label: 'OEM / Custom Parts', value: String(oemDirectCount) },
               { label: 'Lead Time (median)', value: leadTimeMedianWeeks != null ? `${leadTimeMedianWeeks} wk` : '—' },
               { label: 'Lead Time (p95)', value: leadTimeP95Weeks != null ? `${leadTimeP95Weeks} wk` : '—' },
-            ].map((kpi, i) => (
-              <View key={i} style={{ flex: 1, borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 8, alignItems: 'center' }}>
+            ].map((kpi, i, arr) => (
+              <View key={i} style={{ flex: 1, borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 8, alignItems: 'center', marginRight: i < arr.length - 1 ? 6 : 0 }}>
                 <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 2 }}>{kpi.value}</Text>
                 <Text style={{ fontSize: 7, color: MUTED, textAlign: 'center' }}>{kpi.label}</Text>
               </View>
@@ -815,7 +817,7 @@ const SourcingStrategyPage = ({ state }: { state: PipelineState }) => {
                   <Text style={{ width: '18%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>{row.count}</Text>
                   <Text style={{ width: '32%', fontSize: 9, color: MUTED, paddingVertical: 5, paddingHorizontal: 8 }}>
                     {/* Bar visualisation using text */}
-                    {'█'.repeat(Math.max(1, Math.round(row.pct / 10)))} {row.pct}%
+                    {'█'.repeat(Math.max(0, Math.round((row.pct ?? 0) / 10)))} {row.pct}%
                   </Text>
                 </View>
               ))}
