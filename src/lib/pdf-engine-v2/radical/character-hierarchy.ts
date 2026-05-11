@@ -310,6 +310,18 @@ export const SENTENCES: HierarchySentence[] = [
     words: ['hull_structure'],
     allowed_classes: ['auv'],
   },
+  // Phase B Iter 1 (2026-05-11): domain-specific AUV sentence to deepen the
+  // tree beyond hull_structure. A real AUV's pressure-vessel section is its
+  // single most expensive subsystem (pressure-rated end caps, dive-rated
+  // O-ring seals, ballast/buoyancy). hull_and_buoyancy currently flattens
+  // the whole vehicle into one structural word; this sentence splits out
+  // the pressure-vessel-specific characters that gate dive depth.
+  {
+    id: 'subsea_pressure_vessel',
+    label: 'Subsea Pressure Vessel',
+    words: ['pressure_hull_word', 'buoyancy_compensation_word'],
+    allowed_classes: ['auv'],
+  },
   {
     id: 'biosensor_system',
     label: 'Biosensor System',
@@ -619,6 +631,27 @@ export const WORDS: HierarchyWord[] = [
     label: 'Hull Structure',
     sentence_id: 'hull_and_buoyancy',
     characters: ['polymer_enclosure', 'aluminium_extrusion', 'polymer_gasket'],
+  },
+  // ── subsea_pressure_vessel (Phase B Iter 1, 2026-05-11) ──────────────────
+  // Pressure-rated end caps + dive-rated O-rings + structural ribs. Reuses
+  // existing characters (no new radicals) plus two new function-class IDs:
+  //   - 'pressure_rated_endcap' (pressure_vessel_function + steel/aluminium)
+  //   - 'dive_oring_seal' (polymer_thermoplastic + sealing function)
+  // Both ride on existing radicals via the convention used elsewhere in this
+  // file — full Character entries are not required for hierarchy routing.
+  {
+    id: 'pressure_hull_word',
+    label: 'Pressure Hull and End Caps',
+    sentence_id: 'subsea_pressure_vessel',
+    characters: ['pressure_rated_endcap', 'dive_oring_seal', 'aluminium_extrusion', 'pressure_vessel'],
+  },
+  {
+    id: 'buoyancy_compensation_word',
+    label: 'Buoyancy Compensation and Ballast',
+    sentence_id: 'subsea_pressure_vessel',
+    // Syntactic foam block + ballast trim weight + buoyancy control valve.
+    // Reuses steel_plate (trim weights) + polymer_gasket (foam encapsulation seals).
+    characters: ['syntactic_foam_block', 'ballast_trim_weight', 'steel_plate', 'polymer_gasket'],
   },
   // ── biosensor_system ─────────────────────────────────────────────────────
   {

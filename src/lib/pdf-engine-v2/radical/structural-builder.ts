@@ -385,7 +385,12 @@ export function deriveEdgeAiMandatoryCharacters(): string[] {
 
 /**
  * Mandatory character list for AUV (Autonomous Underwater Vehicle) briefs.
- * Pins to hull_and_buoyancy, edge_compute_system.
+ * Pins to hull_and_buoyancy, subsea_pressure_vessel, edge_compute_system.
+ *
+ * Phase B Iter 1 (2026-05-11): added subsea_pressure_vessel characters so the
+ * tree carries the AUV-specific pressure-rated end caps, dive-rated O-rings,
+ * syntactic foam buoyancy and trim weights — the parts that gate dive depth
+ * and dominate the BOM. hull_and_buoyancy alone was too thin.
  */
 export function deriveAuvMandatoryCharacters(): string[] {
   return [
@@ -393,6 +398,11 @@ export function deriveAuvMandatoryCharacters(): string[] {
     'polymer_enclosure',  // hull_structure (pressure hull)
     'aluminium_extrusion', // hull_structure (frame)
     'polymer_gasket',     // hull_structure (O-ring seals)
+    // Subsea pressure vessel (Phase B Iter 1)
+    'pressure_rated_endcap',  // pressure_hull_word (depth-rated end caps)
+    'dive_oring_seal',        // pressure_hull_word (high-pressure O-ring stack)
+    'syntactic_foam_block',   // buoyancy_compensation_word (positive buoyancy)
+    'ballast_trim_weight',    // buoyancy_compensation_word (trim/ballast)
     // Compute
     'pcb_controller',     // edge_compute_hardware (mission computer)
     'network_switch',     // edge_compute_hardware (acoustic/ethernet switch)
@@ -554,13 +564,18 @@ export function deriveClassMandatoryCharacters(
       mandatoryCharacters: deriveAuvMandatoryCharacters(),
       preferredWordIds: {
         'pcb_controller': 'avionics_compute',   // AUV nav computer (flight_computer), not bms_master
-        'polymer_enclosure': 'hull_structure',  // pressure hull (hull_and_buoyancy), already first
-        'polymer_gasket': 'hull_structure',     // hull O-rings (hull_and_buoyancy), not refrigerant_distribution
-        'copper_wire': 'avionics_compute',      // avionics wiring (flight_computer), not refrigerant_distribution
-        'power_converter': 'propulsion_motors', // thruster ESC (propulsion_system), not charger_pcs
-        'pressure_vessel': 'hull_structure',    // hull pressure body (hull_and_buoyancy)
-        'aluminium_extrusion': 'hull_structure', // hull structure (hull_and_buoyancy), not hp_enclosure_structure
-        'network_switch': 'avionics_compute',   // AUV comms (flight_computer), not ems
+        'polymer_enclosure': 'hull_structure',  // pressure hull (hull_and_buoyancy)
+        'polymer_gasket': 'hull_structure',     // hull O-rings (hull_and_buoyancy)
+        'copper_wire': 'avionics_compute',      // avionics wiring (flight_computer)
+        'power_converter': 'propulsion_motors', // thruster ESC (propulsion_system)
+        // Phase B Iter 1: pressure_vessel now routes to subsea_pressure_vessel
+        // (was hull_structure — but the new sentence is the better domain home).
+        'pressure_vessel': 'pressure_hull_word', // pressure-rated body (subsea_pressure_vessel)
+        'aluminium_extrusion': 'hull_structure', // hull frame (hull_and_buoyancy)
+        'network_switch': 'avionics_compute',   // AUV comms (flight_computer)
+        // New Phase B Iter 1 chars (pressure_rated_endcap, dive_oring_seal,
+        // syntactic_foam_block, ballast_trim_weight) are unique to
+        // subsea_pressure_vessel words — they self-route, no preferred id needed.
       },
     }
   }
