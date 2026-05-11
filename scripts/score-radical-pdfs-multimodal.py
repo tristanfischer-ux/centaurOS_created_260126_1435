@@ -40,6 +40,22 @@ from typing import Optional
 OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 ANTHROPIC_KEY  = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# Validate keys at startup — fail loud rather than produce silent "—" cells
+_missing_keys: list[str] = []
+if not ANTHROPIC_KEY:
+    _missing_keys.append("ANTHROPIC_API_KEY")
+if not OPENROUTER_KEY:
+    _missing_keys.append("OPENROUTER_API_KEY")
+if _missing_keys:
+    print(
+        f"ERROR: Missing required environment variables: {', '.join(_missing_keys)}\n"
+        "Export them before running, e.g.:\n"
+        "  source .env.local  # if using dotenv file\n"
+        "  export ANTHROPIC_API_KEY=sk-ant-...",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 MODELS = [
     {
         "id": "gemini",
