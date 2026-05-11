@@ -394,166 +394,424 @@ const ExecutiveSummaryPage = ({ state }: { state: PipelineState }) => {
 }
 
 // ---------------------------------------------------------------------------
-// P2 — Feasibility Assessment Page (4-field structured section)
+// §A — Feasibility Notes Page (4-field structured engineering analysis)
 // Synthesises from existing pipeline data — no new LLM call.
+// Always renders — placeholder when state missing (per silent-drop ban).
 // ---------------------------------------------------------------------------
 
-function buildFeasibilityFields(state: PipelineState): {
-  costVerdict: string
-  topRisks: string[]
-  regulatoryFlags: string[]
-  manufacturingFlags: string[]
-} {
-  const cs = state.radicalCostSummary ?? state.costSummary
-  // P0 null-guard: both cost summaries absent → return safe placeholder (council be8de574)
-  if (!cs) {
-    return {
-      costVerdict: '—',
-      topRisks: ['Cost data unavailable — run pipeline stage 4 to generate cost summary.'],
-      regulatoryFlags: ['No regulatory data available — verify jurisdiction-specific requirements before manufacture.'],
-      manufacturingFlags: ['Cost summary absent — lead time and minimum order quantity verification required before design lock.'],
-    }
+// Per-class regulatory compliance table — standard + compliance verdict + trigger field
+interface ClassRegulatoryEntry {
+  standard: string
+  verdict: 'PASS' | 'PENDING' | 'N/A'
+  trigger: string
+}
+
+const CLASS_REGULATORY_COMPLIANCE: Record<string, ClassRegulatoryEntry[]> = {
+  bess: [
+    { standard: 'G99 (Distribution Network Operator connection)', verdict: 'PENDING', trigger: 'grid_connection field' },
+    { standard: 'IEC 62619 (Li-ion safety)', verdict: 'PENDING', trigger: 'battery_chemistry field' },
+    { standard: 'BS EN 62040-3 (UPS performance)', verdict: 'N/A', trigger: 'ups_mode field' },
+    { standard: 'DNO pre-application consultation', verdict: 'PENDING', trigger: 'power_output_kw ≥ 16 kW' },
+  ],
+  heat_pump: [
+    { standard: 'F-Gas Regulation (EC 842/2006 successor)', verdict: 'PENDING', trigger: 'refrigerant_type field' },
+    { standard: 'ErP Directive (2009/125/EC)', verdict: 'PENDING', trigger: 'cop_target field' },
+    { standard: 'MCS Certificate (grant eligibility)', verdict: 'PENDING', trigger: 'market_jurisdiction = UK' },
+    { standard: 'REFCOM (refrigerant handling)', verdict: 'PENDING', trigger: 'refrigerant_charge_kg field' },
+  ],
+  cgm: [
+    { standard: 'ISO 13485 (Medical Device QMS)', verdict: 'PENDING', trigger: 'device_class field' },
+    { standard: 'IEC 60601-1 (Electrical safety for medical)', verdict: 'PENDING', trigger: 'powered_device = true' },
+    { standard: 'IVDR (EU In Vitro Diagnostic Regulation)', verdict: 'PENDING', trigger: 'market_jurisdiction = EU' },
+    { standard: 'MHRA Registration (UK market)', verdict: 'PENDING', trigger: 'market_jurisdiction = UK' },
+  ],
+  drone: [
+    { standard: 'UK Air Navigation Order (CAA)', verdict: 'PENDING', trigger: 'mtow_g > 250 g' },
+    { standard: 'CAA Operational Authorisation', verdict: 'PENDING', trigger: 'mtow_g > 250 g' },
+    { standard: 'EU EASA Category A1/A3 Drone Regulation', verdict: 'PENDING', trigger: 'market_jurisdiction = EU' },
+    { standard: 'RED Directive (2014/53/EU) for radio module', verdict: 'PENDING', trigger: 'radio_frequency field' },
+  ],
+  auv: [
+    { standard: 'IMO SOLAS / COLREGS (collision avoidance)', verdict: 'PENDING', trigger: 'operating_environment = marine' },
+    { standard: 'IEC 60529 IP68 (underwater enclosures)', verdict: 'PENDING', trigger: 'depth_rating_m field' },
+    { standard: 'ATEX/IECEx (explosive atmosphere)', verdict: 'N/A', trigger: 'explosive_zone field absent' },
+    { standard: 'ITAR/EAR export controls (navigation)', verdict: 'PENDING', trigger: 'navigation_hardware field' },
+  ],
+  bioreactor: [
+    { standard: 'ISO 10993 (biocompatibility)', verdict: 'PENDING', trigger: 'human_contact = true' },
+    { standard: 'ASME BPE (bioprocess equipment)', verdict: 'PENDING', trigger: 'product_class = bioreactor' },
+    { standard: 'GMP Annex 1 (sterile manufacturing)', verdict: 'PENDING', trigger: 'sterile_grade field' },
+    { standard: 'CE Marking / Machinery Directive (2006/42/EC)', verdict: 'PENDING', trigger: 'market_jurisdiction = EU' },
+  ],
+  farm: [
+    { standard: 'Water Framework Directive (irrigation)', verdict: 'PENDING', trigger: 'irrigation_system = true' },
+    { standard: 'CE Marking / Machinery Directive', verdict: 'PENDING', trigger: 'market_jurisdiction = EU' },
+    { standard: 'Health & Safety at Work Act 1974 (UK)', verdict: 'PENDING', trigger: 'market_jurisdiction = UK' },
+    { standard: 'Food Safety Act 1990 (produce contact)', verdict: 'PENDING', trigger: 'food_contact_surfaces = true' },
+  ],
+  ev_charger: [
+    { standard: 'IEC 61851 (EV conductive charging)', verdict: 'PENDING', trigger: 'product_class = ev_charger' },
+    { standard: 'BS 7671 / 18th Edition Wiring Regulations', verdict: 'PENDING', trigger: 'market_jurisdiction = UK' },
+    { standard: 'OZEV compliance (grant eligibility)', verdict: 'PENDING', trigger: 'ozev_grant = true' },
+    { standard: 'Smart Charging (UK SI 2021/1467)', verdict: 'PENDING', trigger: 'smart_charge_capability field' },
+  ],
+  edge_ai: [
+    { standard: 'RED Directive (2014/53/EU) for wireless', verdict: 'PENDING', trigger: 'wireless_module = true' },
+    { standard: 'CE / UKCA Marking (EMC Directive 2014/30/EU)', verdict: 'PENDING', trigger: 'market_jurisdiction = EU/UK' },
+    { standard: 'GDPR / UK Data Protection Act (data processing)', verdict: 'PENDING', trigger: 'data_processing = true' },
+    { standard: 'RoHS 3 (2015/863/EU) for electronics', verdict: 'PENDING', trigger: 'product_class = electronics' },
+  ],
+}
+
+function getClassRegulatoryCompliance(productClass: string | undefined | null): ClassRegulatoryEntry[] {
+  if (!productClass) return []
+  const cls = productClass.toLowerCase().replace(/[-\s]/g, '_')
+  if (CLASS_REGULATORY_COMPLIANCE[cls]) return CLASS_REGULATORY_COMPLIANCE[cls]
+  for (const [key, entries] of Object.entries(CLASS_REGULATORY_COMPLIANCE)) {
+    if (cls.includes(key) || key.includes(cls)) return entries
   }
+  return []
+}
+
+interface FeasibilityData {
+  costVerdict: string
+  costIsOverBudget: boolean
+  costReductionPaths: string[]
+  topRisks: Array<{ label: string; verdict: string; mitigation: string }>
+  regulatoryCompliance: ClassRegulatoryEntry[]
+  dynamicRegulatoryItems: string[]
+  manufacturingItems: Array<{ label: string; severity: 'warn' | 'info' | 'ok' }>
+  customCotsPct: number
+  singleSourceCount: number
+}
+
+function buildFeasibilityData(state: PipelineState): FeasibilityData {
+  const cs = state.radicalCostSummary ?? state.costSummary
   const grammarVerdicts = state.grammarVerdicts
   const brief = state.research?.designBrief
+  const parsedBrief = state.parsedBrief
+  const resolvedTree = state.resolvedRadicalTree
 
-  // Field 1 — Cost verdict + reduction path (cs is non-null after early return above)
-  let costVerdict = '—'
-  const unitCost = cs.finalUnitCost
-  const ceiling = cs.ceilingCost ?? brief?.constraints?.unitCostCeilingGbp
-  if (ceiling && unitCost > ceiling) {
-    const pct = ((unitCost - ceiling) / ceiling * 100).toFixed(0)
-    // Suggest reduction paths from topDrivers
-    const top2Drivers = cs.topDrivers?.slice(0, 2).map(d => d.partName) ?? []
-    const reductionSuggestions: string[] = []
-    if (top2Drivers[0]) reductionSuggestions.push(`substitute or batch-source ${top2Drivers[0]}`)
-    if (top2Drivers[1]) reductionSuggestions.push(`re-evaluate specification on ${top2Drivers[1]}`)
-    reductionSuggestions.push(`increase production volume from batch to series run`)
-    costVerdict =
-      `Over budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)} (+${pct}%). ` +
-      `Reduction paths: ${reductionSuggestions.slice(0, 2).join('; ')}.`
-  } else if (ceiling) {
-    costVerdict = `Within budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)}.`
-  } else {
-    costVerdict = `Estimated unit cost: ${fmtGbp(unitCost)}. No cost ceiling specified in brief.`
+  // Placeholder when cost data absent — P0 null-guard (council be8de574)
+  if (!cs) {
+    return {
+      costVerdict: 'Cost data unavailable — run pipeline stage 3 (cost rollup) to generate cost summary.',
+      costIsOverBudget: false,
+      costReductionPaths: [],
+      topRisks: [{ label: 'Pipeline incomplete', verdict: 'WARN', mitigation: 'Run all pipeline stages (cost, grammar, resolution) to surface engineering risks.' }],
+      regulatoryCompliance: getClassRegulatoryCompliance(state.productClass),
+      dynamicRegulatoryItems: [],
+      manufacturingItems: [{ label: 'Cost summary absent — lead time and MOQ verification required before design lock.', severity: 'warn' }],
+      customCotsPct: 0,
+      singleSourceCount: 0,
+    }
   }
 
-  // Field 2 — Top 3 risks (from grammar WARN + BLOCK verdicts)
-  const topRisks: string[] = []
+  // Field 1 — Cost verdict + reduction paths
+  const unitCost = cs.finalUnitCost
+  const ceiling = cs.ceilingCost ?? parsedBrief?.constraints?.unit_cost_ceiling?.value ?? brief?.constraints?.unitCostCeilingGbp
+  let costVerdict: string
+  const costReductionPaths: string[] = []
+
+  if (ceiling && unitCost > ceiling) {
+    const pct = ((unitCost - ceiling) / ceiling * 100).toFixed(0)
+    costVerdict = `Over budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)} (+${pct}%).`
+    // Derive reduction paths from topDrivers
+    const drivers = cs.topDrivers?.slice(0, 3) ?? []
+    if (drivers[0]) {
+      // Path 1: substitute high-cost OEM with vendor-catalog alternative
+      costReductionPaths.push(`Substitute ${drivers[0].partName} (${drivers[0].pct.toFixed(0)}% of BOM): source vendor-catalog or COTS alternative instead of OEM specification`)
+    }
+    if (drivers[1]) {
+      // Path 2: batch volume
+      const batchSizeRaw = parsedBrief?.constraints?.batch_size?.value ?? brief?.constraints?.batchSize
+      const batchSize = typeof batchSizeRaw === 'number' ? batchSizeRaw : null
+      if (batchSize !== null && batchSize > 0) {
+        costReductionPaths.push(`Increase ${drivers[1].partName} batch from ${batchSize} to ${Math.round(batchSize * 3)} units to unlock volume price breaks`)
+      } else {
+        costReductionPaths.push(`Re-evaluate specification on ${drivers[1].partName} — shift from custom to commercial-off-the-shelf where function allows`)
+      }
+    }
+    // Path 3: custom→COTS ratio
+    costReductionPaths.push(`Target custom-to-COTS ratio: increase COTS proportion from current level — each custom part carries 2-5× cost premium vs equivalent standard part`)
+  } else if (ceiling) {
+    const headroom = ceiling - unitCost
+    const headroomPct = ((headroom / ceiling) * 100).toFixed(0)
+    costVerdict = `Within budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)} (${headroomPct}% headroom remaining).`
+  } else {
+    costVerdict = `Estimated unit cost: ${fmtGbp(unitCost)}. No cost ceiling specified in brief — define ceiling before design lock to enable cost feasibility tracking.`
+  }
+
+  // Field 2 — Top 3 risks from grammar verdicts (with per-category mitigation)
+  const topRisks: Array<{ label: string; verdict: string; mitigation: string }> = []
   if (grammarVerdicts) {
     const nonPass = grammarVerdicts.verdicts.filter(v => v.verdict !== 'PASS')
     for (const v of nonPass.slice(0, 3)) {
       const ruleLabel = v.rule_id.replace(/_/g, ' ')
-      const riskText = `${v.verdict} — ${ruleLabel}: ${v.reason.slice(0, 120)}${v.reason.length > 120 ? '...' : ''}`
-      topRisks.push(riskText)
+      // Derive mitigation from rule category
+      let mitigation = 'Review design against this rule and resolve before manufacture.'
+      if (v.rule_id.includes('KCL') || v.rule_id.includes('current')) {
+        mitigation = 'Check node-level current balance; add missing return path or rebalance loads.'
+      } else if (v.rule_id.includes('galvanic') || v.rule_id.includes('corrosion')) {
+        mitigation = 'Insert isolating barrier (anodised aluminium, polymer washer, or surface coating) between dissimilar metals.'
+      } else if (v.rule_id.includes('mass') || v.rule_id.includes('balance')) {
+        mitigation = 'Verify fluid mass in = mass out; check for missing return lines or phantom accumulation nodes.'
+      } else if (v.rule_id.includes('voltage') || v.rule_id.includes('derate')) {
+        mitigation = 'Uprate component voltage rating to ≥125% of operating voltage, or reduce operating voltage.'
+      } else if (v.rule_id.includes('thermal') || v.rule_id.includes('heat')) {
+        mitigation = 'Increase thermal management capacity to ≥110% of peak heat dissipation; review cooling circuit sizing.'
+      } else if (v.rule_id.includes('material') || v.rule_id.includes('marine')) {
+        mitigation = 'Apply corrosion protection treatment (galvanising, anodising, or polymer coating) to flagged ferrous nodes.'
+      }
+      // Affected node info
+      const affectedStr = v.affected_nodes?.length
+        ? ` (affected: ${v.affected_nodes.slice(0, 2).join(', ')}${v.affected_nodes.length > 2 ? ` +${v.affected_nodes.length - 2}` : ''})`
+        : ''
+      topRisks.push({
+        label: `${ruleLabel}${affectedStr}: ${v.reason.slice(0, 100)}${v.reason.length > 100 ? '...' : ''}`,
+        verdict: v.verdict,
+        mitigation,
+      })
     }
   }
   if (topRisks.length === 0) {
-    topRisks.push('All design rule checks pass — no high-priority engineering risks identified.')
+    topRisks.push({
+      label: 'All design rule checks pass — no high-priority engineering risks identified.',
+      verdict: 'PASS',
+      mitigation: 'Monitor for risks as design evolves; re-run grammar check after any topology changes.',
+    })
   }
 
-  // Field 3 — Regulatory flags
-  const regulatoryFlags: string[] = []
-  if (state.regulatoryExtraction?.regulatory_entries) {
-    const regs = state.regulatoryExtraction.regulatory_entries.slice(0, 4)
-    for (const reg of regs) {
-      regulatoryFlags.push(`${reg.standard_name} (${reg.jurisdiction}): ${reg.gap_action}`)
+  // Field 3 — Regulatory: class-specific compliance table + dynamic items from extraction
+  const regulatoryCompliance = getClassRegulatoryCompliance(state.productClass)
+
+  // Override verdict to PASS if regulatoryExtraction confirms a standard is met
+  const extractedRegs = state.regulatoryExtraction?.regulatory_entries ?? []
+  for (const comp of regulatoryCompliance) {
+    const matched = extractedRegs.find(r =>
+      comp.standard.toLowerCase().includes(r.standard_name?.toLowerCase() ?? '') ||
+      (r.standard_name?.toLowerCase() ?? '').includes(comp.standard.split(' ')[0].toLowerCase())
+    )
+    if (matched && matched.gap_action?.toLowerCase().includes('compliant')) {
+      comp.verdict = 'PASS'
     }
-  } else if (state.research?.designBrief?.regulatory) {
-    const regs = state.research.designBrief.regulatory.slice(0, 4)
-    for (const reg of regs) {
-      regulatoryFlags.push(`${reg.code}: ${reg.summary}`)
-    }
-  }
-  if (regulatoryFlags.length === 0) {
-    regulatoryFlags.push('No specific regulatory items surfaced — verify jurisdiction-specific requirements before manufacture.')
   }
 
-  // Field 4 — Manufacturing flags (from grammar verdicts + cost structure)
-  // cs is non-null after early return above
-  const manufacturingFlags: string[] = []
+  // Dynamic regulatory items from extraction that aren't in the class table
+  const dynamicRegulatoryItems: string[] = []
+  for (const reg of extractedRegs.slice(0, 3)) {
+    const alreadyCovered = regulatoryCompliance.some(c =>
+      c.standard.toLowerCase().includes(reg.standard_name?.toLowerCase() ?? '')
+    )
+    if (!alreadyCovered) {
+      dynamicRegulatoryItems.push(`${reg.standard_name} (${reg.jurisdiction ?? 'jurisdiction TBC'}): ${reg.gap_action?.slice(0, 80) ?? 'review required'}`)
+    }
+  }
+
+  // Field 4 — Manufacturing flags: lead-time risks, MOQ vs production rate, custom/COTS ratio, single-source
+  const manufacturingItems: Array<{ label: string; severity: 'warn' | 'info' | 'ok' }> = []
+
+  // Price confidence
   const quotedPct = ((cs.quotedCostFraction ?? 0) * 100).toFixed(0)
-  manufacturingFlags.push(`Price confidence: ${quotedPct}% of BOM backed by distributor quotes; remainder is Grade-D or LLM estimate.`)
+  manufacturingItems.push({
+    label: `Price confidence: ${quotedPct}% of BOM backed by distributor quotes; remainder is Grade-D estimate or LLM approximation.`,
+    severity: Number(quotedPct) >= 70 ? 'ok' : Number(quotedPct) >= 40 ? 'info' : 'warn',
+  })
+
+  // Lead-time risks from resolved tree
+  const allLeaves = resolvedTree ? collectSourcingLeafData(resolvedTree) : []
+  const longLeadLeaves = allLeaves.filter(l => (l.leadWeeks ?? 0) > 12)
+  if (longLeadLeaves.length > 0) {
+    manufacturingItems.push({
+      label: `Long-lead risk: ${longLeadLeaves.length} part${longLeadLeaves.length > 1 ? 's' : ''} exceed 12-week lead time — longest: ${Math.max(...longLeadLeaves.map(l => l.leadWeeks ?? 0))} weeks. Initiate supplier engagement immediately or qualify alternatives.`,
+      severity: 'warn',
+    })
+  }
+
+  // MOQ vs production rate
+  const batchSizeRawMfg = parsedBrief?.constraints?.batch_size?.value ?? brief?.constraints?.batchSize
+  const batchSizeMfg = typeof batchSizeRawMfg === 'number' ? batchSizeRawMfg : null
+  const totalLeaves = allLeaves.length
+  if (batchSizeMfg !== null && batchSizeMfg > 0 && totalLeaves > 0) {
+    manufacturingItems.push({
+      label: `Production rate: brief specifies ${batchSizeMfg} unit${batchSizeMfg > 1 ? 's' : ''} batch. Verify minimum order quantities for all ${totalLeaves} BOM lines against this volume; volume breaks typically unlock at 3× and 10× batch.`,
+      severity: 'info',
+    })
+  }
+
+  // Custom vs COTS ratio from resolved tree
+  const customLeaves = allLeaves.filter(l =>
+    l.source === 'vendor_catalog' || l.source === 'llm_estimate' || l.source === 'bom_estimate'
+  )
+  const customCotsPct = totalLeaves > 0 ? Math.round((customLeaves.length / totalLeaves) * 100) : 0
+  if (customCotsPct > 0) {
+    manufacturingItems.push({
+      label: `Custom / OEM ratio: ${customCotsPct}% of BOM lines (${customLeaves.length}/${totalLeaves}) require OEM-direct or custom sourcing (no distributor match). Each represents a procurement risk without alternative supply.`,
+      severity: customCotsPct > 50 ? 'warn' : 'info',
+    })
+  }
+
+  // Single-source count
+  const singleSourceLeaves = allLeaves.filter(l =>
+    ['vendor_catalog', 'llm_estimate', 'stub', 'bom_estimate'].includes(l.source)
+  )
+  const singleSourceCount = singleSourceLeaves.length
+  if (singleSourceCount > 0) {
+    manufacturingItems.push({
+      label: `Single-source exposure: ${singleSourceCount} part${singleSourceCount > 1 ? 's' : ''} have no verified distributor alternative. Qualify second sources or hold safety stock to reduce supply chain risk.`,
+      severity: singleSourceCount > 5 ? 'warn' : 'info',
+    })
+  }
+
+  // Top cost driver
   if (cs.topDrivers && cs.topDrivers.length > 0) {
     const driver = cs.topDrivers[0]
-    manufacturingFlags.push(`Top cost driver: ${driver.partName} — ${driver.pct.toFixed(0)}% of BOM total (${fmtGbp(driver.totalGbp)}).`)
+    manufacturingItems.push({
+      label: `Top cost driver: ${driver.partName} — ${driver.pct.toFixed(0)}% of BOM total (${fmtGbp(driver.totalGbp)}). Verify pricing at target volume before design lock.`,
+      severity: driver.pct > 40 ? 'warn' : 'info',
+    })
   }
-  manufacturingFlags.push(`OEM/custom parts constitute the majority of cost — verify minimum order quantities and lead times before design lock.`)
 
-  return { costVerdict, topRisks, regulatoryFlags, manufacturingFlags }
+  return {
+    costVerdict,
+    costIsOverBudget: !!(ceiling && unitCost > ceiling),
+    costReductionPaths,
+    topRisks,
+    regulatoryCompliance,
+    dynamicRegulatoryItems,
+    manufacturingItems,
+    customCotsPct,
+    singleSourceCount,
+  }
 }
 
 const FeasibilityAssessmentPage = ({ state }: { state: PipelineState }) => {
-  const { costVerdict, topRisks, regulatoryFlags, manufacturingFlags } = buildFeasibilityFields(state)
+  const data = buildFeasibilityData(state)
   const projectId = dash(state.projectId)
 
   return (
     <Page size="A4" style={pageStyle}>
-      <DocPageHeader title={`${projectId} | Forge Engineering Report | Feasibility Assessment`} />
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | Feasibility Notes`} />
       <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
-        Feasibility Assessment
+        Feasibility Notes
       </Text>
-      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 14 }} />
 
-      {/* Field 1 — Cost verdict */}
-      <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
-        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+      {/* Field 1 — Cost Verdict + Reduction Paths */}
+      <View style={{ borderWidth: 0.5, borderColor: data.costIsOverBudget ? BESS_RED : TABLE_BORDER, padding: 10, marginBottom: 12 }}>
+        <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: data.costIsOverBudget ? BESS_RED : BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           1. Cost Verdict and Reduction Paths
         </Text>
-        <Text style={{ fontSize: 10, color: INK, lineHeight: 1.5 }}>
-          {costVerdict}
+        <Text style={{ fontSize: 10, color: data.costIsOverBudget ? BESS_RED : INK, lineHeight: 1.5, marginBottom: data.costReductionPaths.length > 0 ? 8 : 0 }}>
+          {data.costVerdict}
         </Text>
+        {data.costReductionPaths.length > 0 && (
+          <>
+            <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: BESS_AMBER, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+              Reduction Paths:
+            </Text>
+            {data.costReductionPaths.map((path, i) => (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }} wrap={false}>
+                <Text style={{ fontSize: 8, color: BESS_AMBER, fontFamily: 'Helvetica-Bold', width: 14 }}>{i + 1}.</Text>
+                <Text style={{ fontSize: 8, color: INK, lineHeight: 1.4, flex: 1 }}>{path}</Text>
+              </View>
+            ))}
+          </>
+        )}
       </View>
 
-      {/* Field 2 — Top 3 risks */}
+      {/* Field 2 — Top Engineering Risks with mitigation */}
       <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
         <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           2. Top Engineering Risks
         </Text>
-        {topRisks.map((risk, i) => (
-          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
-            <Text style={{ fontSize: 9, color: BESS_RED, fontFamily: 'Helvetica-Bold', width: 14 }}>
-              {i + 1}.
-            </Text>
-            <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>
-              {risk}
-            </Text>
-          </View>
-        ))}
+        {data.topRisks.map((risk, i) => {
+          const riskColour = risk.verdict === 'BLOCK' ? BESS_RED : risk.verdict === 'WARN' ? BESS_AMBER : BESS_GREEN
+          return (
+            <View key={i} style={{ marginBottom: 8, borderLeftWidth: 2, borderLeftColor: riskColour, paddingLeft: 8 }} wrap={false}>
+              <View style={{ flexDirection: 'row', marginBottom: 2 }}>
+                <View style={{ borderWidth: 0.5, borderColor: riskColour, paddingVertical: 1, paddingHorizontal: 5, marginRight: 6 }}>
+                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: riskColour }}>{risk.verdict}</Text>
+                </View>
+              </View>
+              <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, marginBottom: 2 }}>{risk.label}</Text>
+              <Text style={{ fontSize: 8, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.3 }}>
+                Mitigation: {risk.mitigation}
+              </Text>
+            </View>
+          )
+        })}
       </View>
 
-      {/* Field 3 — Regulatory flags */}
+      {/* Field 3 — Regulatory Flags: class compliance table */}
       <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
         <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
-          3. Regulatory Flags
+          3. Regulatory Flags — {dash(state.productClass)}
         </Text>
-        {regulatoryFlags.map((flag, i) => (
-          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
-            <Text style={{ fontSize: 9, color: BESS_AMBER, fontFamily: 'Helvetica-Bold', width: 14 }}>
-              ►
-            </Text>
-            <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>
-              {flag}
-            </Text>
+        {data.regulatoryCompliance.length > 0 ? (
+          <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: data.dynamicRegulatoryItems.length > 0 ? 8 : 0 }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+              <Text style={{ width: '55%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 7 }}>Standard</Text>
+              <Text style={{ width: '15%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 7 }}>Status</Text>
+              <Text style={{ width: '30%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 7 }}>Trigger Field</Text>
+            </View>
+            {data.regulatoryCompliance.map((entry, i) => {
+              const verdictColour = entry.verdict === 'PASS' ? BESS_GREEN
+                : entry.verdict === 'N/A' ? MUTED
+                : BESS_AMBER
+              return (
+                <View key={i} style={{
+                  flexDirection: 'row',
+                  borderBottomWidth: i === data.regulatoryCompliance.length - 1 ? 0 : 0.5,
+                  borderBottomColor: TABLE_BORDER,
+                  backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT,
+                }} wrap={false}>
+                  <Text style={{ width: '55%', fontSize: 8, color: INK, paddingVertical: 4, paddingHorizontal: 7, lineHeight: 1.3 }}>
+                    {entry.standard}
+                  </Text>
+                  <Text style={{ width: '15%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: verdictColour, paddingVertical: 4, paddingHorizontal: 7 }}>
+                    {entry.verdict}
+                  </Text>
+                  <Text style={{ width: '30%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 7, lineHeight: 1.3 }}>
+                    {entry.trigger}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+        ) : (
+          <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 6 }}>
+            No class-specific regulatory table available — verify jurisdiction-specific requirements before manufacture.
+          </Text>
+        )}
+        {data.dynamicRegulatoryItems.map((item, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }} wrap={false}>
+            <Text style={{ fontSize: 8, color: BESS_AMBER, fontFamily: 'Helvetica-Bold', width: 14 }}>►</Text>
+            <Text style={{ fontSize: 8, color: INK, lineHeight: 1.3, flex: 1 }}>{item}</Text>
           </View>
         ))}
       </View>
 
-      {/* Field 4 — Manufacturing flags */}
+      {/* Field 4 — Manufacturing and Sourcing Flags */}
       <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 10, marginBottom: 12 }}>
         <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6, textTransform: 'uppercase', letterSpacing: 0.5 }}>
           4. Manufacturing and Sourcing Flags
         </Text>
-        {manufacturingFlags.map((flag, i) => (
-          <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }}>
-            <Text style={{ fontSize: 9, color: BESS_NAVY, fontFamily: 'Helvetica-Bold', width: 14 }}>
-              ►
-            </Text>
-            <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>
-              {flag}
-            </Text>
-          </View>
-        ))}
+        {data.manufacturingItems.map((item, i) => {
+          const bulletColour = item.severity === 'warn' ? BESS_RED : item.severity === 'info' ? BESS_AMBER : BESS_GREEN
+          return (
+            <View key={i} style={{ flexDirection: 'row', marginBottom: 5 }} wrap={false}>
+              <Text style={{ fontSize: 9, color: bulletColour, fontFamily: 'Helvetica-Bold', width: 14 }}>►</Text>
+              <Text style={{ fontSize: 9, color: INK, lineHeight: 1.4, flex: 1 }}>{item.label}</Text>
+            </View>
+          )
+        })}
+        {data.manufacturingItems.length === 0 && (
+          <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+            Manufacturing data unavailable — run Phase 2 (resolution) to populate lead times and sourcing data.
+          </Text>
+        )}
       </View>
 
       <DocPageFooter />
