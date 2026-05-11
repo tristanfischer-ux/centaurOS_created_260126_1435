@@ -355,7 +355,13 @@ export function deriveEvChargerMandatoryCharacters(): string[] {
 
 /**
  * Mandatory character list for Bioreactor briefs.
- * Pins to bioreactor_vessel, bioreactor_controls.
+ * Pins to bioreactor_vessel, bioreactor_controls, bioprocess_vessel.
+ *
+ * Phase B Iter 1 (2026-05-11): added bioprocess_vessel characters covering
+ * the agitator drive, sparger, thermal jacket and single-use bag interface.
+ * Without these the BOM is just a static vessel body + sensor stack and
+ * misses the actual bioprocess machinery (the largest cost driver on a
+ * 200 L mammalian-cell skid).
  */
 export function deriveBioreactorMandatoryCharacters(): string[] {
   return [
@@ -367,6 +373,12 @@ export function deriveBioreactorMandatoryCharacters(): string[] {
     'gas_sensor',         // bioreactor_sensing (pH/DO/temp sensor)
     'pcb_controller',     // bioreactor_sensing (controller)
     'optical_arc_sensor', // bioreactor_sensing (optical sensor for OD)
+    // Bioprocess vessel (Phase B Iter 1)
+    'sterile_agitator_drive',       // agitation_drive_word
+    'gas_sparger_assembly',         // gas_sparger_word
+    'sterile_filter_membrane',      // gas_sparger_word (0.2 um filter)
+    'thermal_jacket',               // thermal_jacket_word
+    'single_use_biocompatible_bag', // single_use_bag_word
   ]
 }
 

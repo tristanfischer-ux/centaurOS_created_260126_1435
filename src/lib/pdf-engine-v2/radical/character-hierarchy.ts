@@ -295,6 +295,18 @@ export const SENTENCES: HierarchySentence[] = [
     words: ['bioreactor_sensing'],
     allowed_classes: ['bioreactor'],
   },
+  // Phase B Iter 1 (2026-05-11): bioprocess-specific sentence covering the
+  // sterile-process subsystems that distinguish a single-use bioreactor skid
+  // from a generic stirred tank: the agitator/impeller drive, sparger gas
+  // delivery, single-use bag/sterilisation interface, and integrated thermal
+  // jacket. bioreactor_vessel + bioreactor_controls only cover the static
+  // body and the sensor stack — they miss the bioprocess machinery itself.
+  {
+    id: 'bioprocess_vessel',
+    label: 'Bioprocess Vessel',
+    words: ['agitation_drive_word', 'gas_sparger_word', 'thermal_jacket_word', 'single_use_bag_word'],
+    allowed_classes: ['bioreactor'],
+  },
   // ── Edge AI / AUV / CGM / HAPS ────────────────────────────────────────────
   {
     id: 'edge_compute_system',
@@ -630,6 +642,40 @@ export const WORDS: HierarchyWord[] = [
     label: 'Bioreactor Sensing',
     sentence_id: 'bioreactor_controls',
     characters: ['gas_sensor', 'pcb_controller', 'optical_arc_sensor'],
+  },
+  // ── bioprocess_vessel (Phase B Iter 1, 2026-05-11) ───────────────────────
+  // Sterile bioprocess machinery: agitator drive, sparger, thermal jacket,
+  // single-use bag interface. New function-class IDs:
+  //   - 'sterile_agitator_drive' (electromechanical_switching_function +
+  //     mechanical_kinetic_function radicals)
+  //   - 'gas_sparger_assembly' (chemical_sensing_function + fluid_flow_state)
+  //   - 'thermal_jacket' (thermal_transfer_function + steel)
+  //   - 'single_use_biocompatible_bag' (polymer_thermoplastic, sterile-grade)
+  //   - 'sterile_filter_membrane' (polymer_thermoplastic, 0.2 um filter)
+  // All ride existing radicals.
+  {
+    id: 'agitation_drive_word',
+    label: 'Sterile Agitator Drive',
+    sentence_id: 'bioprocess_vessel',
+    characters: ['sterile_agitator_drive', 'pcb_controller'],
+  },
+  {
+    id: 'gas_sparger_word',
+    label: 'Gas Sparger and Sterile Filter',
+    sentence_id: 'bioprocess_vessel',
+    characters: ['gas_sparger_assembly', 'sterile_filter_membrane', 'gas_sensor'],
+  },
+  {
+    id: 'thermal_jacket_word',
+    label: 'Integrated Thermal Jacket',
+    sentence_id: 'bioprocess_vessel',
+    characters: ['thermal_jacket', 'steel_plate'],
+  },
+  {
+    id: 'single_use_bag_word',
+    label: 'Single-Use Biocompatible Bag',
+    sentence_id: 'bioprocess_vessel',
+    characters: ['single_use_biocompatible_bag', 'polymer_gasket'],
   },
   // ── edge_compute_system ──────────────────────────────────────────────────
   {
