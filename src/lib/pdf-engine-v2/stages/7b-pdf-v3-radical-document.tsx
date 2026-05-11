@@ -120,7 +120,7 @@ function countTreeLevels(resolvedTree: PipelineState['resolvedRadicalTree']): {
   return { sentences, words, characters, leaves }
 }
 
-function buildExecutiveSummary(state: PipelineState): { p1: string; p2: string; p3: string } {
+function buildExecutiveSummary(state: PipelineState): { p1: string; p2: string; p3: string; actions: [string, string, string] } {
   const brief = state.research?.designBrief
   const parsedBrief = state.parsedBrief
   const cs = state.radicalCostSummary ?? state.costSummary
@@ -175,9 +175,10 @@ function buildExecutiveSummary(state: PipelineState): { p1: string; p2: string; 
   let costStr: string
   if (cs?.isOverBudget && cs.overBudgetPct != null && cs.ceilingCost) {
     costStr = `exceeds the ${fmtGbp(cs.ceilingCost)} target by ${cs.overBudgetPct.toFixed(0)}%`
-  } else if (cs?.ceilingCost && !cs.isOverBudget) {
+  } else if (cs?.ceilingCost && !cs.isOverBudget && typeof cs.finalUnitCost === 'number' && isFinite(cs.finalUnitCost)) {
+    // P1 council fix: guard finalUnitCost is a finite number before arithmetic (NaN risk)
     const headroom = cs.ceilingCost - cs.finalUnitCost
-    const headroomPct = ((headroom / cs.ceilingCost) * 100).toFixed(0)
+    const headroomPct = cs.ceilingCost > 0 ? ((headroom / cs.ceilingCost) * 100).toFixed(0) : '0'
     costStr = `is within the ${fmtGbp(cs.ceilingCost)} target (${headroomPct}% headroom)`
   } else if (cs) {
     costStr = `is estimated at ${unitCostGbp} (no ceiling in brief)`
@@ -215,15 +216,19 @@ function buildExecutiveSummary(state: PipelineState): { p1: string; p2: string; 
   }
 
   // (b) Grammar BLOCKs or regulatory flags
+  // P1 council fix: evaluate once, avoid non-null assertion after optional-chain (council 2026-05-11)
   let actionB: string
-  const blockCount2 = grammarVerdicts?.verdicts.filter(v => v.verdict === 'BLOCK').length ?? 0
+  const blockVerdicts = grammarVerdicts?.verdicts.filter(v => v.verdict === 'BLOCK') ?? []
   const regsPresent = (state.regulatoryExtraction?.regulatory_entries?.length ?? 0) > 0
-  if (blockCount2 > 0) {
-    const blocks = grammarVerdicts!.verdicts.filter(v => v.verdict === 'BLOCK')
-    actionB = `clear ${blockCount2} BLOCK rule${blockCount2 > 1 ? 's' : ''} before design lock: ${blocks.map(b => b.rule_id.replace(/_/g, ' ')).join('; ')}`
+  if (blockVerdicts.length > 0) {
+    actionB = `clear ${blockVerdicts.length} BLOCK rule${blockVerdicts.length > 1 ? 's' : ''} before design lock: ${blockVerdicts.map(b => b.rule_id.replace(/_/g, ' ')).join('; ')}`
   } else if (regsPresent) {
-    const reg = state.regulatoryExtraction!.regulatory_entries[0]
-    actionB = `progress ${reg.standard_name} compliance — ${reg.gap_action.slice(0, 80)}${reg.gap_action.length > 80 ? '...' : ''}`
+    const reg = state.regulatoryExtraction?.regulatory_entries?.[0]
+    if (reg) {
+      actionB = `progress ${reg.standard_name} compliance — ${reg.gap_action.slice(0, 80)}${reg.gap_action.length > 80 ? '...' : ''}`
+    } else {
+      actionB = `validate jurisdiction-specific regulatory requirements (${productClass}) before procurement commitment`
+    }
   } else {
     actionB = `validate jurisdiction-specific regulatory requirements (${productClass}) before procurement commitment`
   }
@@ -241,9 +246,11 @@ function buildExecutiveSummary(state: PipelineState): { p1: string; p2: string; 
     actionC = `complete distributor verification for all BOM lines before production commitment`
   }
 
+  // P1 council fix: return structured actions separately to avoid regex round-trip
+  // (council 2026-05-11: if actionA contains '(b)' as substring, regex mismatch)
   const p3 = `Recommended next steps: (a) ${actionA}; (b) ${actionB}; (c) ${actionC}.`
 
-  return { p1, p2, p3 }
+  return { p1, p2, p3, actions: [actionA, actionB, actionC] }
 }
 
 // Minimal leaf data collector for executive summary (avoids duplication with SourcingStrategyPage)
@@ -273,7 +280,7 @@ function collectSourcingLeafData(resolvedTree: NonNullable<PipelineState['resolv
 // ---------------------------------------------------------------------------
 
 const ExecutiveSummaryPage = ({ state }: { state: PipelineState }) => {
-  const { p1, p2, p3 } = buildExecutiveSummary(state)
+  const { p1, p2, p3, actions } = buildExecutiveSummary(state)
   const projectId = dash(state.projectId)
   const cs = state.radicalCostSummary ?? state.costSummary
   const grammarVerdicts = state.grammarVerdicts
@@ -351,42 +358,26 @@ const ExecutiveSummaryPage = ({ state }: { state: PipelineState }) => {
         </Text>
       </View>
 
-      {/* §3 Recommended Next Steps — 3 lettered actions */}
+      {/* §3 Recommended Next Steps — 3 lettered actions from structured `actions` array */}
+      {/* P1 council fix: use `actions` array directly, not regex on p3 string */}
+      {/* (council 2026-05-11: actionA may contain '(b)' substring, breaking regex match) */}
       <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 6 }}>
         3. Recommended Next Steps
       </Text>
-      {p3 ? (
-        <View>
-          {/* Parse p3 into (a), (b), (c) items for visual bulleting */}
-          {['(a)', '(b)', '(c)'].map((label, i) => {
-            // Extract each lettered action from the p3 string
-            const pattern = label === '(a)'
-              ? /\(a\)(.*?)(?=\(b\)|$)/s
-              : label === '(b)'
-              ? /\(b\)(.*?)(?=\(c\)|$)/s
-              : /\(c\)(.*?)\.?\s*$/s
-            const match = p3.match(pattern)
-            const text = match ? match[1].trim().replace(/;$/, '') : null
-            if (!text) return null
-            return (
-              <View key={i} style={{ flexDirection: 'row', marginBottom: 8 }} wrap={false}>
-                <View style={{ width: 22, height: 18, backgroundColor: BESS_TEAL, borderRadius: 2, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 1 }}>
-                  <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT }}>
-                    {String.fromCharCode(65 + i)}
-                  </Text>
-                </View>
-                <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, flex: 1 }}>
-                  {text}
-                </Text>
-              </View>
-            )
-          })}
-        </View>
-      ) : (
-        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
-          Next steps unavailable — complete pipeline stages to generate recommendations.
-        </Text>
-      )}
+      <View>
+        {actions.map((actionText, i) => (
+          <View key={i} style={{ flexDirection: 'row', marginBottom: 8 }} wrap={false}>
+            <View style={{ width: 22, height: 18, backgroundColor: BESS_TEAL, borderRadius: 2, alignItems: 'center', justifyContent: 'center', marginRight: 8, marginTop: 1 }}>
+              <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT }}>
+                {String.fromCharCode(65 + i)}
+              </Text>
+            </View>
+            <Text style={{ fontSize: 10, color: INK, lineHeight: 1.6, flex: 1 }}>
+              {actionText || `Action ${String.fromCharCode(65 + i)} unavailable — run pipeline stages to populate.`}
+            </Text>
+          </View>
+        ))}
+      </View>
 
       <DocPageFooter />
     </Page>
@@ -464,13 +455,14 @@ const CLASS_REGULATORY_COMPLIANCE: Record<string, ClassRegulatoryEntry[]> = {
 }
 
 function getClassRegulatoryCompliance(productClass: string | undefined | null): ClassRegulatoryEntry[] {
+  // P0 council fix: deep-clone so callers can mutate verdict without poisoning
+  // the module-level const across renders (cross-render state pollution — council 2026-05-11)
   if (!productClass) return []
   const cls = productClass.toLowerCase().replace(/[-\s]/g, '_')
-  if (CLASS_REGULATORY_COMPLIANCE[cls]) return CLASS_REGULATORY_COMPLIANCE[cls]
-  for (const [key, entries] of Object.entries(CLASS_REGULATORY_COMPLIANCE)) {
-    if (cls.includes(key) || key.includes(cls)) return entries
-  }
-  return []
+  const raw = CLASS_REGULATORY_COMPLIANCE[cls]
+    ?? Object.entries(CLASS_REGULATORY_COMPLIANCE).find(([key]) => cls.includes(key) || key.includes(cls))?.[1]
+  if (!raw) return []
+  return raw.map(e => ({ ...e })) // deep clone — verdict mutations must not reach the const
 }
 
 interface FeasibilityData {
@@ -623,7 +615,9 @@ function buildFeasibilityData(state: PipelineState): FeasibilityData {
   const longLeadLeaves = allLeaves.filter(l => (l.leadWeeks ?? 0) > 12)
   if (longLeadLeaves.length > 0) {
     manufacturingItems.push({
-      label: `Long-lead risk: ${longLeadLeaves.length} part${longLeadLeaves.length > 1 ? 's' : ''} exceed 12-week lead time — longest: ${Math.max(...longLeadLeaves.map(l => l.leadWeeks ?? 0))} weeks. Initiate supplier engagement immediately or qualify alternatives.`,
+      // P1 council fix: Math.max(...[]) = -Infinity when array empty — guard with length check
+      // (longLeadLeaves.length > 0 is guaranteed by the if-guard above, but be explicit)
+      label: `Long-lead risk: ${longLeadLeaves.length} part${longLeadLeaves.length > 1 ? 's' : ''} exceed 12-week lead time — longest: ${longLeadLeaves.length > 0 ? Math.max(...longLeadLeaves.map(l => l.leadWeeks ?? 0)) : 'N/A'} weeks. Initiate supplier engagement immediately or qualify alternatives.`,
       severity: 'warn',
     })
   }
