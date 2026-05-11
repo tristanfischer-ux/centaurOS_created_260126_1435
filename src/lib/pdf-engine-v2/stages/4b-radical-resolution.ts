@@ -172,6 +172,42 @@ const ELECTRONIC_COTS_CHARACTERS = new Set<string>([
   'high_pressure_transducer',
   'low_pressure_transducer',
   'safety_pressure_switch',
+  // Phase B Iter 2 (2026-05-11): expanded part library for depth.
+  // BMS electronics
+  'bms_isolation_ic', 'bms_slave_monitor_ic', 'can_transceiver_ic',
+  'isolation_transceiver_ic', 'esd_protection_diode',
+  // Sensors / detection
+  'smoke_detector_aspirating', 'thermal_linear_detector',
+  'door_intrusion_switch', 'access_control_reader', 'cctv_camera',
+  'coolant_temperature_sensor', 'coolant_flow_switch',
+  'water_temperature_sensor_ntc', 'outdoor_temp_sensor', 'defrost_sensor',
+  'flow_switch_safety', 'high_limit_thermostat',
+  // EMS / metering
+  'ems_hmi_panel', 'ems_gateway_modem', 'revenue_meter', 'metering_ct',
+  'monitoring_relay', 'mcb_low_voltage', 'safety_relay_compressor',
+  'hp_relay_board', 'hp_hmi_display', 'hp_user_interface_pcb',
+  // Drone / avionics electronics
+  'imu_6dof_module', 'magnetometer_3axis', 'barometer_pressure_sensor',
+  'gnss_receiver_module', 'telemetry_radio_modem', 'rc_receiver_module',
+  'avionics_pdb', 'avionics_bec_5v', 'avionics_current_sensor',
+  'electronic_speed_controller', 'propulsion_current_sensor',
+  // Bioreactor sensors
+  'ph_probe_sterilisable', 'do_probe_optical', 'level_sensor_capacitive',
+  // Vfarm sensors
+  'ec_conductivity_sensor', 'ph_sensor_inline',
+  // CGM electronics
+  'analogue_front_end_ic', 'ble_soc_module', 'radio_crystal_oscillator',
+  'biosensor_regulator_ldo', 'accelerometer_3axis_lp',
+  // EV charger electronics
+  'hmi_capacitive_touch_panel', 'rfid_reader_module', 'payment_terminal_module',
+  'rcd_type_b_module', 'emergency_stop_button', 'door_interlock_switch',
+  'dc_link_voltage_sensor', 'gate_driver_board',
+  // Edge AI passives
+  'ddr5_dimm_module', 'nvme_ssd_module',
+  // EMS / charger DC link sensing electronics
+  'ems_psu_24v', 'ups_module',
+  // Heat pump
+  'pump_motor_capacitor',
 ])
 
 /** Characters that map to mechanical COTS */
@@ -188,6 +224,75 @@ const MECHANICAL_COTS_CHARACTERS = new Set<string>([
   'aluminium_heatsink',
   // Bug P0-6: small lubricants / consumables on the heat-pump refrigerant circuit.
   'refrigerant_lubricant',
+  // Phase B Iter 2 (2026-05-11): expanded part library for depth.
+  // BMS / cell mechanicals
+  'cell_busbar_link', 'cell_compression_pad', 'cell_top_cap_assembly',
+  'cell_balance_resistor', 'cell_thermistor_ntc', 'cell_tap_connector',
+  'bms_master_connector', 'current_shunt_resistor', 'voltage_divider_resistor',
+  'bms_can_harness', 'can_termination_resistor',
+  // Rack mechanicals
+  'rack_caster_wheel', 'rack_earthing_strap', 'rack_lifting_eye',
+  // Switchgear mechanicals
+  'dc_isolator_switch', 'dc_fuse_holder', 'dc_fuse_link', 'pre_charge_contactor',
+  'busbar_support_insulator', 'busbar_heat_shrink',
+  'surge_arrester_dc', 'earthing_busbar', 'earth_fault_relay', 'earthing_lug',
+  // Thermal mechanicals
+  'cold_plate', 'coolant_distribution_manifold', 'thermal_interface_material',
+  'coolant_pump', 'coolant_reservoir_tank',
+  // FSS mechanicals
+  'pressure_gauge_fss', 'suppression_nozzle', 'suppression_discharge_pipe',
+  'manual_pull_station', 'fss_alarm_strobe', 'fss_warning_horn',
+  'fss_control_panel',
+  // Container fit-out mechanicals
+  'cable_tray', 'cable_gland', 'interior_led_luminaire', 'emergency_light',
+  'convenience_outlet', 'distribution_board_aux', 'earthing_electrode_rod',
+  'hvac_split_unit', 'hvac_condensate_pump', 'hvac_thermostat',
+  'ems_fibre_patch_panel',
+  // Heat pump mechanicals
+  'hydronic_flow_meter', 'hydronic_isolation_valve', 'hydronic_circulator_pump',
+  'expansion_vessel', 'pressure_relief_valve', 'air_separator_vent',
+  'hydronic_manifold', 'thermal_balance_valve', 'hydronic_pressure_gauge',
+  'vibration_isolator_mount', 'wall_bracket_assembly',
+  'condensate_drip_tray', 'condensate_drain_hose', 'condensate_heater_strip',
+  // Drone mechanicals
+  'carbon_fibre_arm', 'landing_skid_polymer', 'landing_gear_strut',
+  'battery_tray_polymer', 'battery_strap_velcro', 'payload_release_servo',
+  'propeller_carbon_blade', 'propeller_retention_nut', 'propeller_hub',
+  'motor_mount_aluminium', 'motor_bearing_set',
+  // Bioreactor mechanicals
+  'cip_sip_port_assembly', 'sample_port_aseptic', 'harvest_valve_sanitary',
+  'tri_clamp_fitting', 'sight_glass_assembly', 'vessel_inspection_light',
+  'foam_breaker_actuator', 'calibration_buffer_kit', 'temperature_calibration_probe',
+  // Vfarm mechanicals
+  'growing_tray_polymer', 'grow_media_rockwool', 'duct_fan_ec',
+  'co2_solenoid_valve', 'hepa_filter_element', 'pre_filter_g4',
+  'nutrient_dosing_pump', 'nutrient_reservoir_tank',
+  // CGM mechanicals
+  'glucose_electrode_strip', 'antenna_pcb', 'coin_cell_battery_cr1632',
+  'adhesive_skin_patch', 'applicator_housing_polymer',
+  'insertion_needle_assembly', 'silicone_overmould', 'biocompatible_label_layer',
+  // EV charger mechanicals
+  'pfc_inductor', 'ac_emi_filter', 'inrush_current_limiter', 'input_contactor',
+  'dc_link_capacitor', 'snubber_capacitor', 'ac_filter_inductor',
+  'ac_filter_capacitor', 'transformer_bushing', 'tap_changer_assembly',
+  'igbt_power_module', 'dc_link_busbar',
+  'ccs_charging_cable', 'ccs_connector_assembly', 'cable_management_arm',
+  // HAPS mechanicals
+  'haps_rib_assembly', 'haps_skin_film', 'haps_elevon_assembly',
+  'haps_aileron_assembly', 'mass_balance_weight',
+  'servo_actuator_high_torque', 'servo_pushrod_carbon',
+  // AUV mechanicals
+  'hull_internal_frame', 'instrument_mount_bracket', 'hydrodynamic_fairing',
+  'antifouling_coating',
+  // Edge AI mechanicals
+  'sata_storage_drive', 'server_psu_redundant', 'pdu_rack_outlet',
+  'cooling_fan_axial',
+  // Bioreactor process control
+  'mass_flow_controller_gas', 'peristaltic_dosing_pump',
+  // Vfarm light driver / DALI
+  'led_grow_module', 'led_constant_current_driver', 'lighting_dali_controller',
+  // Charger DC-DC
+  'dc_dc_module',
 ])
 
 /** Characters that map to OEM subsystem */
@@ -212,6 +317,9 @@ const OEM_SUBSYSTEM_CHARACTERS = new Set<string>([
   'refrigerant_drier_filter',
   'ec_fan_motor',
   'fan_impeller',
+  // Phase B Iter 2: large units sourced as vendor sub-assemblies.
+  'gpu_accelerator_module',     // NVIDIA / AMD board-level OEM
+  'brushless_dc_motor',         // T-Motor / KDE / U-MOTOR class
 ])
 
 /** Characters that map to structural fabricated */
@@ -340,10 +448,20 @@ const ARCHETYPE_RESULT_GUARDS: Record<string, ArchetypeGuard> = {
 }
 
 /**
+ * Word-boundary token match. Both haystack and needle assumed lowercased.
+ * Without this, 'mq' matched 'compose-mqsl' and 'abb' matched 'abbreviated' —
+ * the very 'mq' keyword undermined the BESS gas_sensor pricing fix it was
+ * meant to support.
+ */
+function tokenMatch(haystack: string, needle: string): boolean {
+  if (!needle) return false
+  const escaped = needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  return new RegExp(`(^|[^a-z0-9])${escaped}([^a-z0-9]|$)`, 'i').test(haystack)
+}
+
+/**
  * Returns true when the distributor hit is consistent with the archetype's
  * declared guard. Returns true (no-op) when no guard is declared.
- *
- * Bug P0-3 fix (2026-05-11).
  */
 function isDistributorResultConsistentWithArchetype(
   archetypeId: string,
@@ -355,11 +473,11 @@ function isDistributorResultConsistentWithArchetype(
   const mfg = (result.best.manufacturer ?? '').toLowerCase()
   const desc = (result.best.description ?? '').toLowerCase()
 
-  if (guard.bannedManufacturers && guard.bannedManufacturers.some(b => mfg.includes(b))) {
+  if (guard.bannedManufacturers && guard.bannedManufacturers.some(b => tokenMatch(mfg, b))) {
     return { ok: false, reason: `banned manufacturer "${result.best.manufacturer}" for ${archetypeId}` }
   }
   if (guard.allowedManufacturers && guard.allowedManufacturers.length > 0) {
-    const okMfg = guard.allowedManufacturers.some(a => mfg.includes(a) || desc.includes(a))
+    const okMfg = guard.allowedManufacturers.some(a => tokenMatch(mfg, a) || tokenMatch(desc, a))
     if (!okMfg) {
       return {
         ok: false,
@@ -368,7 +486,7 @@ function isDistributorResultConsistentWithArchetype(
     }
   }
   if (guard.requiredDescriptionKeywords && guard.requiredDescriptionKeywords.length > 0) {
-    const okDesc = guard.requiredDescriptionKeywords.some(k => desc.includes(k))
+    const okDesc = guard.requiredDescriptionKeywords.some(k => tokenMatch(desc, k))
     if (!okDesc) {
       return {
         ok: false,
@@ -465,7 +583,7 @@ export function getMpnHintsForArchetype(
 ): string[] {
   const cls = (productClass ?? '').toLowerCase()
   for (const [classKey, hintsByArch] of Object.entries(CLASS_AWARE_MPN_HINTS)) {
-    if (cls.includes(classKey) || cls.includes(classKey.replace('_', ''))) {
+    if (cls.includes(classKey) || cls.includes(classKey.replace(/_/g, ''))) {
       const classHints = hintsByArch[archetypeId]
       if (classHints) return classHints
     }
@@ -512,6 +630,57 @@ const MPN_HINTS_BY_CHARACTER: Record<string, string[]> = {
   'polymer_gasket': ['614-3249', '614-3231'],
   // 60 W black anodised aluminium heatsink — Fischer Elektronik / Aavid
   'aluminium_heatsink': ['460-1466', 'FA-T220-38E'],
+  // ── Phase B Iter 2 (2026-05-11) MPN hints for known parts ────────────────
+  // BMS isolation IC — Analog Devices ADuM family
+  'bms_isolation_ic': ['ADUM1411ARWZ', 'ISO7741DWR'],
+  // BMS slave cell-monitor IC — Analog Devices LTC6804 / Maxim MAX17841
+  'bms_slave_monitor_ic': ['LTC6804-1', 'MAX17841BGTL+T'],
+  // CAN transceiver — TI / NXP staples
+  'can_transceiver_ic': ['TCAN1042HDR', 'TJA1051T'],
+  // Isolated CAN/485 transceiver — TI ISO1042
+  'isolation_transceiver_ic': ['ISO1042BDWVR', 'ISO1500DBQ'],
+  // ESD diode — Bourns / Littelfuse SP05xx
+  'esd_protection_diode': ['SP1004-04UTG', 'SP3010-04UTG'],
+  // Smoke detector — Apollo / VESDA aspirating
+  'smoke_detector_aspirating': ['VESDA-VLP-002'],
+  // Vibration isolator — Vibratec / Kinetics
+  'vibration_isolator_mount': ['VIB-25-A', 'NM50R'],
+  // Pressure relief valve — Caleffi 3/4" 3 bar
+  'pressure_relief_valve': ['CAL-553560', '316030'],
+  // Expansion vessel — Reflex / Zilmet 18 L
+  'expansion_vessel': ['REFLEX-N-18', 'ZILMET-18L'],
+  // Hydronic circulator — Grundfos UPM3 / Wilo Yonos
+  'hydronic_circulator_pump': ['UPM3-25-70', 'WILO-YONOS-25-7'],
+  // RCD Type B — Doepke DFS4 040-4/0,03-B
+  'rcd_type_b_module': ['DFS4-040-4-003-B'],
+  // Emergency stop — Schlegel / Schneider XALK
+  'emergency_stop_button': ['XALK178', 'XB4BS8442'],
+  // CCS connector — Phoenix Contact CCS Type 2
+  'ccs_connector_assembly': ['1404577', 'CCSDC-200A-PHOENIX'],
+  // BLE SoC — Nordic nRF52
+  'ble_soc_module': ['NRF52832-QFAA-R', 'NRF52840-QIAA-R'],
+  // Coin cell battery — Renata / Murata
+  'coin_cell_battery_cr1632': ['CR1632', 'CR1632MFR'],
+  // 3-axis LP accelerometer — STMicro / Bosch
+  'accelerometer_3axis_lp': ['LIS2DW12TR', 'BMA400'],
+  // IMU 6-DOF — TDK / Bosch
+  'imu_6dof_module': ['ICM-42688-P', 'BMI088'],
+  // 3-axis magnetometer — STMicro / TDK
+  'magnetometer_3axis': ['LIS3MDLTR', 'IIS2MDC'],
+  // Barometer — Bosch BMP388
+  'barometer_pressure_sensor': ['BMP388', 'BMP585'],
+  // GNSS receiver — u-blox SAM-M10Q / NEO-M9
+  'gnss_receiver_module': ['SAM-M10Q-00B', 'NEO-M9N-00B'],
+  // Telemetry radio — RFD / Holybro
+  'telemetry_radio_modem': ['RFD-900X', 'HOLYBRO-SIK-V3'],
+  // RC receiver — FrSky R9
+  'rc_receiver_module': ['R9MINI', 'X8R'],
+  // Brushless DC motor — T-Motor / KDE
+  'brushless_dc_motor': ['T-MOTOR-MN605S', 'KDE-700XF-295'],
+  // ESC — Holybro Tekko32 / Hobbywing X-Rotor
+  'electronic_speed_controller': ['TEKKO32-F4-65A', 'XROTOR-PRO-80A'],
+  // Carbon prop — T-Motor / Master Airscrew
+  'propeller_carbon_blade': ['T-MOTOR-G29x9.5-CF', 'MA-19x10-CF'],
 }
 
 // ---------------------------------------------------------------------------
@@ -594,6 +763,224 @@ const GRADE_D_BY_CHARACTER: Record<string, GradeD> = {
   'safety_pressure_switch': { typical: 35, basis: 'High-side safety pressure switch (Honeywell / Danfoss)' },
   'ec_fan_motor': { typical: 240, basis: 'EC fan motor for condenser, axial 800 mm class (EBM-Papst, Ziehl-Abegg)' },
   'fan_impeller': { typical: 65, basis: 'Composite axial fan impeller, 800 mm class' },
+  // ── Phase B Iter 2 (2026-05-11) Grade-D entries for new characters ───────
+  // BESS — battery rack ancillaries
+  'cell_busbar_link': { typical: 12, basis: 'Inter-cell tin-plated copper busbar link, per pair (Mersen / Storm Power)' },
+  'cell_compression_pad': { typical: 6, basis: 'EPDM compression pad between prismatic cells (per cell)' },
+  'cell_top_cap_assembly': { typical: 18, basis: 'Cell top-cap interconnect with vent and tab' },
+  'rack_caster_wheel': { typical: 45, basis: 'Heavy-duty 4" castor with brake (per wheel; 4 per rack)' },
+  'rack_earthing_strap': { typical: 22, basis: 'Tinned copper braid earthing strap, M10' },
+  'rack_lifting_eye': { typical: 28, basis: 'M16 lifting eye bolt, DIN 580 (per eye; 4 per rack)' },
+  // BESS — BMS master
+  'bms_isolation_ic': { typical: 4.5, basis: 'Digital isolator IC (ADuM / ISO77xx class) per channel' },
+  'current_shunt_resistor': { typical: 8, basis: '50 µΩ Manganin current-shunt resistor for BMS pack' },
+  'voltage_divider_resistor': { typical: 0.4, basis: '0.1% precision divider resistor 0805 (per resistor; many per board)' },
+  'esd_protection_diode': { typical: 0.6, basis: 'TVS diode array (Bourns SP10xx class) per node' },
+  'bms_master_connector': { typical: 6, basis: 'Locked Molex / TE Mini-Fit connector with crimp contacts' },
+  // BESS — BMS slave
+  'bms_slave_monitor_ic': { typical: 38, basis: 'Cell-monitor IC (LTC6804 / MAX17841 class) per slave board' },
+  'cell_balance_resistor': { typical: 0.8, basis: 'Wirewound balance resistor 33 Ω 5 W (per cell)' },
+  'cell_thermistor_ntc': { typical: 1.2, basis: 'NTC thermistor 10 kΩ B25/85=3950 (per cell tap)' },
+  'cell_tap_connector': { typical: 4, basis: 'Per-rack cell-tap harness connector (Molex / TE)' },
+  // BESS — BMS comms
+  'can_transceiver_ic': { typical: 2.4, basis: 'CAN transceiver IC (TI TCAN1042 class)' },
+  'isolation_transceiver_ic': { typical: 9, basis: 'Galvanically isolated CAN/485 transceiver (TI ISO1042)' },
+  'bms_can_harness': { typical: 28, basis: 'Shielded twisted-pair CAN bus harness, per rack' },
+  'can_termination_resistor': { typical: 0.9, basis: '120 Ω termination resistor (per bus end)' },
+  // BESS — PCS
+  'transformer_bushing': { typical: 320, basis: 'HV bushing 17.5 kV outdoor, oil-filled (per bushing)' },
+  'tap_changer_assembly': { typical: 1800, basis: 'Off-load tap changer for 1 MVA transformer' },
+  'igbt_power_module': { typical: 950, basis: 'Six-pack IGBT module 1700 V 600 A (Infineon / SEMIKRON)' },
+  'gate_driver_board': { typical: 220, basis: 'Isolated IGBT gate driver board (Concept SCALE-2 class)' },
+  'dc_link_capacitor': { typical: 380, basis: 'DC-link film capacitor 1100 µF 1500 V (KEMET / TDK)' },
+  'snubber_capacitor': { typical: 28, basis: 'Snubber polypropylene capacitor 0.1 µF 1500 V' },
+  'ac_filter_inductor': { typical: 280, basis: 'Three-phase line filter inductor 100 A (Hammond / SBE)' },
+  'ac_filter_capacitor': { typical: 95, basis: 'Three-phase film capacitor for output filter' },
+  'ac_emi_filter': { typical: 240, basis: 'Three-phase EMI filter 100 A (Schaffner / Schurter)' },
+  // BESS — DC switchgear
+  'dc_isolator_switch': { typical: 420, basis: 'DC load break isolator 1500 V 400 A (ABB / Socomec)' },
+  'dc_fuse_holder': { typical: 65, basis: 'NH fuse holder for DC service (Mersen / Bussmann)' },
+  'dc_fuse_link': { typical: 110, basis: 'NH gPV fuse 1500 V DC, 250 A (Mersen / Bussmann)' },
+  'pre_charge_contactor': { typical: 180, basis: 'DC pre-charge contactor 1500 V 50 A (Gigavac / Sensata)' },
+  'busbar_support_insulator': { typical: 14, basis: 'Cycloaliphatic epoxy busbar standoff (per insulator)' },
+  'busbar_heat_shrink': { typical: 6, basis: '1500 V busbar heat-shrink, per metre' },
+  'surge_arrester_dc': { typical: 320, basis: 'DC surge arrester Type 2, 1500 V (Phoenix Contact / Mersen)' },
+  'earthing_busbar': { typical: 95, basis: 'Tinned copper earthing busbar 30×5 mm × 1 m' },
+  'earth_fault_relay': { typical: 580, basis: 'DC residual current monitor (Bender ISOMETER class)' },
+  'earthing_lug': { typical: 4, basis: 'Tinned copper earthing lug, M10 stud (per lug)' },
+  // BESS — thermal management
+  'cold_plate': { typical: 320, basis: 'Aluminium cold plate, 12-cell, brazed' },
+  'coolant_distribution_manifold': { typical: 380, basis: 'PEX manifold with QC fittings, 8-port' },
+  'thermal_interface_material': { typical: 18, basis: 'Thermal pad / paste per assembly (Bergquist / Henkel)' },
+  'coolant_pump': { typical: 480, basis: 'BLDC coolant pump 30 L/min (Grundfos UPM3 class)' },
+  'coolant_reservoir_tank': { typical: 280, basis: 'Stainless coolant reservoir 50 L with sight glass' },
+  'coolant_temperature_sensor': { typical: 22, basis: 'PT100 in-line coolant temperature sensor' },
+  'coolant_flow_switch': { typical: 95, basis: 'Paddle / vortex flow switch for coolant loop' },
+  // BESS — FSS
+  'pressure_gauge_fss': { typical: 65, basis: 'FSS bottle pressure gauge with low-pressure switch' },
+  'smoke_detector_aspirating': { typical: 420, basis: 'VESDA-class aspirating smoke detector head, per zone' },
+  'thermal_linear_detector': { typical: 280, basis: 'Linear heat-detection cable, per 30 m run' },
+  'suppression_nozzle': { typical: 95, basis: 'NOVEC 1230 nozzle (per nozzle, 4-6 per container)' },
+  'suppression_discharge_pipe': { typical: 28, basis: 'Stainless discharge pipework, per metre' },
+  'manual_pull_station': { typical: 110, basis: 'Manual release station, weatherproof' },
+  'fss_control_panel': { typical: 2200, basis: 'EN-54 fire-suppression panel (Honeywell / Notifier class)' },
+  'fss_alarm_strobe': { typical: 95, basis: 'EN-54 alarm strobe with horn' },
+  'fss_warning_horn': { typical: 65, basis: 'IP65 sounder/strobe combination' },
+  // BESS — EMS
+  'ems_hmi_panel': { typical: 1100, basis: '15" capacitive industrial HMI panel (Beijer / Pro-face)' },
+  'ems_gateway_modem': { typical: 480, basis: 'Industrial 4G/5G cellular gateway (Teltonika / Sierra Wireless)' },
+  'ems_fibre_patch_panel': { typical: 220, basis: '24-port fibre patch panel + LC patch leads' },
+  'ems_psu_24v': { typical: 180, basis: 'DIN-rail 24 V 240 W PSU (Mean Well / Phoenix QUINT)' },
+  'ups_module': { typical: 950, basis: 'DIN-rail 24 V 5 A UPS module with battery pack' },
+  'mcb_low_voltage': { typical: 28, basis: 'B-curve LV MCB 6 A 1P (per MCB; many per panel)' },
+  'revenue_meter': { typical: 850, basis: 'OFGEM-approved bidirectional revenue meter, MID-class B' },
+  'metering_ct': { typical: 95, basis: 'MID-class current transformer, 1000:5 A (per CT)' },
+  'monitoring_relay': { typical: 220, basis: 'Phase / voltage monitoring relay (Carlo Gavazzi / DOLD)' },
+  // BESS — container fit-out
+  'door_intrusion_switch': { typical: 65, basis: 'Magnetic / mechanical door switch with monitoring' },
+  'access_control_reader': { typical: 280, basis: 'Mifare reader + access controller (HID / Paxton)' },
+  'cable_tray': { typical: 28, basis: 'Galvanised cable tray 300 mm, per metre' },
+  'cable_gland': { typical: 8, basis: 'Brass M25 IP68 cable gland (per gland)' },
+  'hvac_split_unit': { typical: 2200, basis: 'Industrial HVAC 5 kW (containerised, Daikin / Mitsubishi)' },
+  'hvac_condensate_pump': { typical: 95, basis: 'Mini split condensate pump (Aspen / Sauermann)' },
+  'hvac_thermostat': { typical: 85, basis: 'DIN-rail HVAC thermostat with humidity (Honeywell)' },
+  'interior_led_luminaire': { typical: 65, basis: 'IP65 LED batten 1.5 m (per luminaire; ~6 per container)' },
+  'emergency_light': { typical: 95, basis: 'Maintained EN-1838 emergency luminaire' },
+  'convenience_outlet': { typical: 28, basis: 'Schuko / 13A outlet, IP54 (per outlet)' },
+  'distribution_board_aux': { typical: 480, basis: '12-way DIN-rail consumer unit with RCD' },
+  'cctv_camera': { typical: 320, basis: 'PoE IP CCTV dome camera, 5 MP, IK10' },
+  'earthing_electrode_rod': { typical: 95, basis: 'Copperbond earthing rod 1.2 m + clamp (per rod)' },
+  // ── Heat pump (Iter 2 ancillaries) ────────────────────────────────────────
+  'hydronic_flow_meter': { typical: 165, basis: 'Vortex / paddle flow meter for hydronic loop (Burkert / Kobold)' },
+  'hydronic_isolation_valve': { typical: 38, basis: 'Brass full-bore isolation valve, 1" BSP (per valve, ≥4 per HP)' },
+  'hydronic_circulator_pump': { typical: 380, basis: 'High-efficiency BLDC circulator (Grundfos UPM3 / Wilo Yonos)' },
+  'pump_motor_capacitor': { typical: 18, basis: 'Pump start/run capacitor' },
+  'expansion_vessel': { typical: 110, basis: '18 L diaphragm expansion vessel (Reflex N / Zilmet)' },
+  'pressure_relief_valve': { typical: 38, basis: '3 bar PRV with discharge tundish (Caleffi)' },
+  'air_separator_vent': { typical: 65, basis: 'Inline microbubble air separator + auto vent (Caleffi DiscalAir)' },
+  'hydronic_manifold': { typical: 220, basis: '6-port stainless manifold with isolation' },
+  'thermal_balance_valve': { typical: 95, basis: 'Thermostatic balancing valve (Caleffi 116/Honeywell)' },
+  'hydronic_pressure_gauge': { typical: 28, basis: '0-6 bar hydronic system pressure gauge' },
+  'hp_relay_board': { typical: 110, basis: 'Heat-pump relay-output board (8 channels, Schneider / Carel)' },
+  'hp_hmi_display': { typical: 280, basis: '4.3" colour HMI for heat pump (Carel pGD touch)' },
+  'hp_user_interface_pcb': { typical: 75, basis: 'User-interface PCB with rotary encoder and buttons' },
+  'water_temperature_sensor_ntc': { typical: 18, basis: 'NTC water temperature sensor 10 kΩ with brass pocket' },
+  'outdoor_temp_sensor': { typical: 22, basis: 'IP65 outdoor air temperature sensor' },
+  'defrost_sensor': { typical: 28, basis: 'Capillary defrost sensor on evaporator coil' },
+  'safety_relay_compressor': { typical: 145, basis: 'Compressor safety relay with phase loss + thermal protection' },
+  'flow_switch_safety': { typical: 95, basis: 'Paddle flow switch for hydronic safety interlock' },
+  'high_limit_thermostat': { typical: 65, basis: 'High-limit thermostat with manual reset' },
+  'vibration_isolator_mount': { typical: 28, basis: 'Anti-vibration rubber mount (per mount; 4 per heat pump)' },
+  'wall_bracket_assembly': { typical: 95, basis: 'Galvanised wall bracket for outdoor unit' },
+  'condensate_drip_tray': { typical: 65, basis: 'Stainless / galvanised condensate drip tray' },
+  'condensate_drain_hose': { typical: 18, basis: '2 m condensate drain hose with anti-syphon trap' },
+  'condensate_heater_strip': { typical: 55, basis: 'Self-regulating heater cable for drain tray (frost protection)' },
+  // ── Vfarm (Iter 2) ────────────────────────────────────────────────────────
+  'growing_tray_polymer': { typical: 38, basis: 'Food-grade HDPE growing tray, per tray' },
+  'grow_media_rockwool': { typical: 12, basis: 'Rockwool slab / cube, per growing-cell allotment' },
+  'led_grow_module': { typical: 120, basis: '120 W full-spectrum LED grow bar (Fluence VYPR-class, per bar)' },
+  'led_constant_current_driver': { typical: 65, basis: 'Mean Well HLG-class constant-current LED driver' },
+  'lighting_dali_controller': { typical: 280, basis: 'DALI-2 lighting controller, 64 ECG' },
+  'nutrient_dosing_pump': { typical: 220, basis: 'Peristaltic dosing pump for A/B nutrients (Stenner / Grundfos)' },
+  'nutrient_reservoir_tank': { typical: 180, basis: 'Polyethylene 200 L reservoir with vented lid' },
+  'ec_conductivity_sensor': { typical: 280, basis: 'Inline conductivity sensor 0-10 mS/cm (Atlas / Hanna)' },
+  'ph_sensor_inline': { typical: 220, basis: 'Inline pH probe with pre-amp (Atlas / Hach)' },
+  'duct_fan_ec': { typical: 380, basis: 'EC duct fan 250 mm 800 m³/h (Vortice / Helios)' },
+  'co2_solenoid_valve': { typical: 95, basis: 'CO2 solenoid valve with regulator and gauge' },
+  'hepa_filter_element': { typical: 220, basis: 'HEPA H14 filter element 600×600 mm' },
+  'pre_filter_g4': { typical: 45, basis: 'G4 pre-filter pad 600×600 mm (per pad)' },
+  // ── Drone (Iter 2) ────────────────────────────────────────────────────────
+  'carbon_fibre_arm': { typical: 38, basis: 'Carbon-fibre quadcopter arm (per arm; 4 per quad)' },
+  'landing_skid_polymer': { typical: 22, basis: 'Glass-reinforced nylon landing skid (per skid; 2 per drone)' },
+  'landing_gear_strut': { typical: 18, basis: 'Aluminium landing-gear strut (per strut)' },
+  'battery_tray_polymer': { typical: 28, basis: 'ABS battery tray with hold-downs' },
+  'battery_strap_velcro': { typical: 6, basis: 'Hook-and-loop battery strap, 25×300 mm' },
+  'payload_release_servo': { typical: 28, basis: 'Coreless analogue servo for payload release (Hitec HS-65)' },
+  'brushless_dc_motor': { typical: 85, basis: 'BLDC outrunner 380 KV (T-Motor MN605S / KDE class) per motor' },
+  'electronic_speed_controller': { typical: 95, basis: 'BLHeli32 / AM32 ESC, 65 A (Holybro Tekko32)' },
+  'propeller_carbon_blade': { typical: 28, basis: 'Carbon-fibre propeller, 30×9.5 (per propeller)' },
+  'propeller_retention_nut': { typical: 4, basis: 'Aluminium prop nut, M5 self-locking (per nut)' },
+  'propeller_hub': { typical: 14, basis: 'Aluminium prop hub adapter' },
+  'motor_mount_aluminium': { typical: 22, basis: 'CNC aluminium motor mount (per mount)' },
+  'motor_bearing_set': { typical: 18, basis: 'Pair of 6800 ZZ bearings per motor' },
+  'propulsion_current_sensor': { typical: 28, basis: 'Hall-effect current sensor 100 A (Mauch / Allegro)' },
+  'imu_6dof_module': { typical: 18, basis: '6-DoF IMU breakout (TDK ICM-42688 / Bosch BMI088)' },
+  'magnetometer_3axis': { typical: 12, basis: '3-axis magnetometer breakout (STM LIS3MDL)' },
+  'barometer_pressure_sensor': { typical: 14, basis: 'High-accuracy barometer (Bosch BMP388)' },
+  'gnss_receiver_module': { typical: 95, basis: 'L1/L5 GNSS receiver module (u-blox SAM-M10Q / NEO-M9N)' },
+  'telemetry_radio_modem': { typical: 220, basis: '900 MHz long-range telemetry pair (RFD-900X / Holybro)' },
+  'rc_receiver_module': { typical: 38, basis: 'FrSky / TBS RC receiver, S.BUS' },
+  'antenna_pcb': { typical: 12, basis: 'PCB chip antenna or stamped antenna (per antenna)' },
+  'avionics_pdb': { typical: 65, basis: 'Power distribution board with BEC' },
+  'avionics_bec_5v': { typical: 28, basis: 'Switching BEC 5 V 10 A' },
+  'avionics_current_sensor': { typical: 22, basis: 'Hall current sensor 100 A for avionics rail' },
+  // ── Bioreactor (Iter 2) ───────────────────────────────────────────────────
+  'cip_sip_port_assembly': { typical: 480, basis: 'CIP/SIP spray-ball port assembly with sanitary fittings' },
+  'sample_port_aseptic': { typical: 320, basis: 'Aseptic sample port (Watson-Marlow / Sartorius)' },
+  'harvest_valve_sanitary': { typical: 280, basis: 'Sanitary diaphragm valve (GEMU / ITT) with actuator' },
+  'tri_clamp_fitting': { typical: 32, basis: 'Sanitary tri-clamp fitting (per fitting; many per vessel)' },
+  'sight_glass_assembly': { typical: 220, basis: 'Borosilicate sight glass with light port' },
+  'vessel_inspection_light': { typical: 145, basis: 'Sanitary LED inspection light (ATEX-rated for some uses)' },
+  'ph_probe_sterilisable': { typical: 480, basis: 'Sterilisable pH probe (Mettler InPro 3253 class)' },
+  'do_probe_optical': { typical: 950, basis: 'Optical DO probe (Hamilton OneFerm / Mettler InPro 6970i)' },
+  'level_sensor_capacitive': { typical: 280, basis: 'Capacitive vessel level sensor (sanitary, KROHNE)' },
+  'mass_flow_controller_gas': { typical: 1100, basis: 'Mass-flow controller for sparge gas (Bronkhorst / MKS)' },
+  'peristaltic_dosing_pump': { typical: 380, basis: 'Lab-grade peristaltic pump for media addition (Watson-Marlow 120)' },
+  'foam_breaker_actuator': { typical: 220, basis: 'Mechanical foam-breaker drive with motor' },
+  'calibration_buffer_kit': { typical: 65, basis: 'pH buffer + DO calibration kit, single-use' },
+  'temperature_calibration_probe': { typical: 280, basis: 'NIST-traceable temperature calibration probe' },
+  // ── Edge AI (Iter 2) ──────────────────────────────────────────────────────
+  'gpu_accelerator_module': { typical: 8500, basis: 'NVIDIA L40S / H100 PCIe GPU accelerator (per card)' },
+  'ddr5_dimm_module': { typical: 220, basis: 'Server DDR5-4800 ECC RDIMM 32 GB (per DIMM)' },
+  'nvme_ssd_module': { typical: 380, basis: 'Enterprise NVMe SSD U.2 3.84 TB (per SSD)' },
+  'sata_storage_drive': { typical: 280, basis: 'Enterprise SATA HDD 16 TB (per drive)' },
+  'server_psu_redundant': { typical: 480, basis: '1600 W 80+ Titanium redundant server PSU (per PSU)' },
+  'pdu_rack_outlet': { typical: 380, basis: 'Switched managed PDU 32 A 24-outlet (Raritan / APC)' },
+  'cooling_fan_axial': { typical: 38, basis: 'Server-grade 80 mm axial fan with PWM' },
+  // ── AUV (Iter 2) ──────────────────────────────────────────────────────────
+  'hull_internal_frame': { typical: 580, basis: 'Internal aluminium frame for AUV hull, fabricated' },
+  'instrument_mount_bracket': { typical: 95, basis: 'Aluminium instrument-mounting bracket (per bracket)' },
+  'hydrodynamic_fairing': { typical: 380, basis: 'GRP hydrodynamic fairing, custom-moulded' },
+  'antifouling_coating': { typical: 220, basis: 'Antifouling coating per AUV (single application; International Paint)' },
+  // ── HAPS (Iter 2) ─────────────────────────────────────────────────────────
+  'haps_rib_assembly': { typical: 450, basis: 'CNC-machined CF rib assembly (per rib; many per wing)' },
+  'haps_skin_film': { typical: 320, basis: 'Mylar / Tedlar wing-skin film (per panel)' },
+  'haps_elevon_assembly': { typical: 950, basis: 'CF elevon control surface, fabricated' },
+  'haps_aileron_assembly': { typical: 850, basis: 'CF aileron control surface, fabricated' },
+  'mass_balance_weight': { typical: 65, basis: 'Tungsten mass-balance weight (per surface)' },
+  'servo_actuator_high_torque': { typical: 220, basis: 'High-torque digital servo for HAPS control surface (Volz / Hitec)' },
+  'servo_pushrod_carbon': { typical: 38, basis: 'Carbon-fibre servo pushrod with clevises (per pushrod)' },
+  // ── CGM (Iter 2) ──────────────────────────────────────────────────────────
+  'glucose_electrode_strip': { typical: 1.8, basis: 'Pt/Au-on-polymer enzymatic glucose electrode (per sensor)' },
+  'analogue_front_end_ic': { typical: 6, basis: 'Low-noise transimpedance AFE IC for biosensor' },
+  'ble_soc_module': { typical: 4.2, basis: 'BLE SoC (Nordic nRF52832 class) per device' },
+  // antenna_pcb already declared above (drone section) — same Grade-D applies.
+  'radio_crystal_oscillator': { typical: 0.4, basis: '32 MHz crystal oscillator for BLE SoC' },
+  'coin_cell_battery_cr1632': { typical: 0.6, basis: 'CR1632 lithium coin cell (per device)' },
+  'biosensor_regulator_ldo': { typical: 0.4, basis: 'Low-Iq LDO regulator (per device)' },
+  'accelerometer_3axis_lp': { typical: 1.4, basis: 'Low-power 3-axis accelerometer (STM LIS2DW12)' },
+  'adhesive_skin_patch': { typical: 0.45, basis: '3M Tegaderm-class skin adhesive layer (per patch)' },
+  'applicator_housing_polymer': { typical: 1.8, basis: 'Single-use applicator housing (medical PC)' },
+  'insertion_needle_assembly': { typical: 1.2, basis: 'Stainless insertion needle 26G (per applicator)' },
+  'silicone_overmould': { typical: 0.95, basis: 'Medical-grade silicone overmould (per device)' },
+  'biocompatible_label_layer': { typical: 0.25, basis: 'Printed biocompatible label / lot code' },
+  // ── EV charger (Iter 2) ───────────────────────────────────────────────────
+  'pfc_inductor': { typical: 220, basis: 'PFC boost inductor for charger rectifier' },
+  'dc_dc_module': { typical: 1800, basis: 'Isolated DC-DC module 50 kW (Infineon HybridPACK / SEMIKRON)' },
+  'inrush_current_limiter': { typical: 65, basis: 'NTC inrush limiter + bypass contactor' },
+  'input_contactor': { typical: 280, basis: 'AC input contactor 100 A 3-pole (Schneider TeSys)' },
+  'dc_link_busbar': { typical: 95, basis: 'Laminated DC-link busbar (custom, per assembly)' },
+  'dc_link_voltage_sensor': { typical: 38, basis: 'Isolated voltage sensor for DC-link (LEM)' },
+  'hmi_capacitive_touch_panel': { typical: 480, basis: 'Outdoor 7-15" capacitive touch HMI (Beijer / Pro-face)' },
+  'rfid_reader_module': { typical: 95, basis: 'OCPP-compatible RFID reader (Mifare DESFire)' },
+  'payment_terminal_module': { typical: 480, basis: 'PCI-PTS payment terminal module (Ingenico / Verifone)' },
+  'rcd_type_b_module': { typical: 220, basis: 'Type-B RCD 40 A 30 mA (Doepke DFS4)' },
+  'emergency_stop_button': { typical: 38, basis: 'Mushroom-head E-stop with safety contacts (Schneider XALK)' },
+  'door_interlock_switch': { typical: 65, basis: 'Safety-rated door interlock switch (Pilz / Euchner)' },
+  'ccs_charging_cable': { typical: 380, basis: 'CCS Type-2 liquid-cooled cable assembly, 200 A' },
+  'ccs_connector_assembly': { typical: 480, basis: 'CCS Type-2 connector head with sensors' },
+  'cable_management_arm': { typical: 380, basis: 'Cable retraction / spring-balanced arm assembly' },
+  // rack_caster_wheel already declared in the BESS section above.
 }
 
 // ---------------------------------------------------------------------------

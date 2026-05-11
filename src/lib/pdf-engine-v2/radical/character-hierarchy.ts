@@ -138,6 +138,8 @@ export function normaliseProductClass(classification: string): ProductClass | nu
 
 export const SENTENCES: HierarchySentence[] = [
   // ── BESS ─────────────────────────────────────────────────────────────────
+  // Phase B Iter 2 (2026-05-11): all BESS sentences expanded for depth.
+  // BoM target: 80-120 leaves vs ~21 from Iter 1.
   {
     id: 'battery_rack_assembly',
     label: 'Battery Rack Assembly',
@@ -147,26 +149,33 @@ export const SENTENCES: HierarchySentence[] = [
   {
     id: 'battery_management_system_bms',
     label: 'Battery Management System (BMS)',
-    words: ['bms_master', 'bms_slave'],
+    // Iter 2: split into master / slave / communication words. A real BMS has
+    // a master controller + isolators + current shunt; slave monitor ICs + balance
+    // resistors + thermistors per rack; CAN/RS-485 transceivers + harness for
+    // inter-rack comms. The single-pcb_controller stub massively under-counted.
+    words: ['bms_master', 'bms_slave', 'bms_communication'],
     allowed_classes: ['bess'],
   },
   {
     id: 'power_conversion_system_pcs',
     label: 'Power Conversion System (PCS)',
-    words: ['pcs_inverter_group', 'grid_transformer_group'],
+    // Iter 2: add DC-link cap bank + IGBT power modules + AC filter + bushings.
+    words: ['pcs_inverter_group', 'grid_transformer_group', 'pcs_power_stage', 'pcs_ac_filter'],
     allowed_classes: ['bess'],
   },
   {
     id: 'dc_distribution_switchgear',
     label: 'DC Distribution and Switchgear',
-    words: ['dc_switching', 'dc_protection', 'dc_buswork'],
+    // Iter 2: add earthing/grounding word (surge arrester, earth bus, EFR).
+    words: ['dc_switching', 'dc_protection', 'dc_buswork', 'dc_earthing'],
     // BESS only — EV chargers have their own AC/DC distribution under charger_pcs.
     allowed_classes: ['bess'],
   },
   {
     id: 'thermal_management_system',
     label: 'Thermal Management System',
-    words: ['active_cooling', 'passive_insulation'],
+    // Iter 2: add hydraulic word (pump, reservoir, sensor) and cold-plate.
+    words: ['active_cooling', 'passive_insulation', 'cooling_hydraulics'],
     // Active liquid cooling + insulation: BESS, edge AI server racks, EV chargers
     // (DC fast chargers liquid-cooled), HAPS payload thermal. NOT heat pump (it
     // has its own refrigerant_circuit / hydronic_circuit).
@@ -175,7 +184,8 @@ export const SENTENCES: HierarchySentence[] = [
   {
     id: 'fire_detection_and_suppression_system_fss',
     label: 'Fire Detection and Suppression System (FSS)',
-    words: ['suppression_hardware', 'detection_sensors'],
+    // Iter 2: add nozzle/discharge word + control panel word.
+    words: ['suppression_hardware', 'detection_sensors', 'suppression_discharge', 'fss_panel'],
     // BESS-style fire suppression (NOVEC, gas detect, arc detect, suppression
     // pressure vessel). Also legitimate on EV chargers (containerised DC fast
     // chargers carry similar suppression). NOT bioreactors / vfarm / drones —
@@ -185,13 +195,15 @@ export const SENTENCES: HierarchySentence[] = [
   {
     id: 'energy_management_system_ems_scada',
     label: 'Energy Management System / SCADA',
-    words: ['ems_compute', 'ems_network'],
+    // Iter 2: add power supply word + metering word + monitoring word.
+    words: ['ems_compute', 'ems_network', 'ems_power', 'ems_metering'],
     allowed_classes: ['bess'],
   },
   {
     id: 'container_enclosure_fit_out',
     label: 'Container Enclosure and Fit-Out',
-    words: ['container_access', 'container_services'],
+    // Iter 2: add HVAC, lighting/power, security/access, earthing words.
+    words: ['container_access', 'container_services', 'container_hvac', 'container_aux_power', 'container_security'],
     // Containerised systems: BESS containers, containerised EV chargers,
     // bioreactor skids (single-use bioreactor cleanrooms), vertical farm
     // shipping-container farms. NOT vehicle/airframe classes.
@@ -207,51 +219,61 @@ export const SENTENCES: HierarchySentence[] = [
   {
     id: 'hydronic_circuit',
     label: 'Hydronic Circuit',
-    words: ['hydronic_flow', 'hydronic_connections'],
+    // Iter 2: add pump + safety + manifold words. Real hydronic circuit has
+    // a circulator pump, pressure-relief valve, expansion vessel, isolation
+    // valves, manifold/distributor, and pressure/temp gauge.
+    words: ['hydronic_flow', 'hydronic_connections', 'hydronic_pump', 'hydronic_safety', 'hydronic_manifold'],
     allowed_classes: ['heat_pump'],
   },
   {
     id: 'heat_pump_controls',
     label: 'Heat Pump Controls',
-    words: ['hp_controls_compute'],
+    // Iter 2: split into compute + HMI + sensor + protection words.
+    words: ['hp_controls_compute', 'hp_controls_hmi', 'hp_controls_sensors', 'hp_controls_protection'],
     allowed_classes: ['heat_pump'],
   },
   {
     id: 'heat_pump_enclosure',
     label: 'Heat Pump Enclosure and Frame',
-    words: ['hp_enclosure_structure'],
+    // Iter 2: add mounting / vibration + drainage words.
+    words: ['hp_enclosure_structure', 'hp_enclosure_mounting', 'hp_enclosure_drainage'],
     allowed_classes: ['heat_pump'],
   },
   // ── Vertical farm ─────────────────────────────────────────────────────────
+  // Iter 2 (2026-05-11): expanded each sentence with realistic ancillary
+  // hardware — a vfarm has a tier irrigation manifold + drains + sensors,
+  // not just a pump.
   {
     id: 'growing_rack_system',
     label: 'Growing Rack System',
-    words: ['rack_structure_vfarm'],
+    words: ['rack_structure_vfarm', 'tray_and_grow_media'],
     allowed_classes: ['vfarm'],
   },
   {
     id: 'lighting_system',
     label: 'Lighting System',
-    words: ['lighting_fixtures'],
+    words: ['lighting_fixtures', 'lighting_drivers'],
     allowed_classes: ['vfarm'],
   },
   {
     id: 'fertigation_loop',
     label: 'Fertigation Loop',
-    words: ['fertigation_flow'],
+    words: ['fertigation_flow', 'fertigation_dosing', 'fertigation_sensors'],
     allowed_classes: ['vfarm'],
   },
   {
     id: 'hvac_co2_system',
     label: 'HVAC / CO2 Dosing System',
-    words: ['hvac_flow', 'co2_dosing'],
+    words: ['hvac_flow', 'co2_dosing', 'hvac_filtration'],
     allowed_classes: ['vfarm'],
   },
   // ── Drone / UAV ───────────────────────────────────────────────────────────
+  // Iter 2: real drone airframe has spar + landing skid + battery tray;
+  // propulsion has motor + ESC + propeller; avionics has IMU + GPS + radio.
   {
     id: 'airframe_structure',
     label: 'Airframe Structure',
-    words: ['airframe_body'],
+    words: ['airframe_body', 'airframe_landing', 'airframe_payload_bay'],
     allowed_classes: ['drone'],
   },
   {
@@ -259,40 +281,46 @@ export const SENTENCES: HierarchySentence[] = [
     label: 'Propulsion System',
     // Electric propulsion (motors + wiring) is shared between drones, AUVs
     // (thrusters), and HAPS (electric prop motors).
-    words: ['propulsion_motors'],
+    // Iter 2: add propeller, retention, motor mount/bearing words.
+    words: ['propulsion_motors', 'propulsion_propeller', 'propulsion_drive_train'],
     allowed_classes: ['drone', 'auv', 'haps'],
   },
   {
     id: 'flight_computer',
     label: 'Flight Computer and Avionics',
     // Avionics / nav-compute is shared by drones, AUVs (mission computer), HAPS.
-    words: ['avionics_compute'],
+    // Iter 2: add IMU/sensors + GNSS/radio + power management words.
+    words: ['avionics_compute', 'avionics_imu_sensors', 'avionics_gnss_radio', 'avionics_power'],
     allowed_classes: ['drone', 'auv', 'haps'],
   },
   // ── EV Charger ───────────────────────────────────────────────────────────
+  // Iter 2: a real DC fast charger has rectifier + DC-DC + filters + connector
+  // assembly + HMI + payment + safety circuits. The 1-word stub was a sketch.
   {
     id: 'charger_power_conversion',
     label: 'Charger Power Conversion',
-    words: ['charger_pcs'],
+    words: ['charger_pcs', 'charger_dc_dc', 'charger_input_filter', 'charger_dc_link'],
     allowed_classes: ['ev_charger'],
   },
   {
     id: 'charger_enclosure',
     label: 'Charger Enclosure',
-    words: ['charger_enclosure_structure'],
+    words: ['charger_enclosure_structure', 'charger_hmi_payment', 'charger_safety', 'charger_cable_assembly'],
     allowed_classes: ['ev_charger'],
   },
   // ── Bioreactor ────────────────────────────────────────────────────────────
+  // Iter 2: bioreactor_vessel needs CIP/SIP ports + sight glass + harvest
+  // valve + sample port. Sensing needs pH + DO + level + foam separately.
   {
     id: 'bioreactor_vessel',
     label: 'Bioreactor Vessel',
-    words: ['bioreactor_vessel_body'],
+    words: ['bioreactor_vessel_body', 'bioreactor_ports_and_valves', 'bioreactor_inspection'],
     allowed_classes: ['bioreactor'],
   },
   {
     id: 'bioreactor_controls',
     label: 'Bioreactor Controls and Sensing',
-    words: ['bioreactor_sensing'],
+    words: ['bioreactor_sensing', 'bioreactor_process_control', 'bioreactor_calibration_loop'],
     allowed_classes: ['bioreactor'],
   },
   // Phase B Iter 1 (2026-05-11): bioprocess-specific sentence covering the
@@ -308,10 +336,12 @@ export const SENTENCES: HierarchySentence[] = [
     allowed_classes: ['bioreactor'],
   },
   // ── Edge AI / AUV / CGM / HAPS ────────────────────────────────────────────
+  // Iter 2: edge compute needs a power-stage word + thermal word for
+  // the GPU/TPU board and storage (M.2 NVMe + DDR5).
   {
     id: 'edge_compute_system',
     label: 'Edge Compute System',
-    words: ['edge_compute_hardware'],
+    words: ['edge_compute_hardware', 'edge_compute_storage', 'edge_compute_power', 'edge_compute_thermal'],
     // The on-board compute substrate is shared by edge AI servers, AUVs and
     // HAPS payloads. CGM has its own biosensor_system.
     allowed_classes: ['edge_ai', 'auv', 'haps'],
@@ -319,7 +349,9 @@ export const SENTENCES: HierarchySentence[] = [
   {
     id: 'hull_and_buoyancy',
     label: 'Hull and Buoyancy System',
-    words: ['hull_structure'],
+    // Iter 2: AUV hull also has a frame, fairing, and mounting brackets
+    // (subsea_pressure_vessel handles the depth-rated end caps + ballast).
+    words: ['hull_structure', 'hull_frame_and_brackets', 'hull_fairing'],
     allowed_classes: ['auv'],
   },
   // Phase B Iter 1 (2026-05-11): domain-specific AUV sentence to deepen the
@@ -337,7 +369,9 @@ export const SENTENCES: HierarchySentence[] = [
   {
     id: 'biosensor_system',
     label: 'Biosensor System',
-    words: ['biosensor_hardware'],
+    // Iter 2: a real CGM has electrode + analogue front-end + BLE SoC + antenna +
+    // crystal + battery + accelerometer. Single-word stub was too thin.
+    words: ['biosensor_hardware', 'biosensor_radio', 'biosensor_power', 'biosensor_motion'],
     allowed_classes: ['cgm'],
   },
   // Bug P0-5 fix (2026-05-11): a medical wearable (CGM patch) is not a
@@ -347,13 +381,17 @@ export const SENTENCES: HierarchySentence[] = [
   {
     id: 'medical_wearable_enclosure',
     label: 'Medical Wearable Enclosure',
-    words: ['wearable_housing', 'wearable_skin_interface'],
+    // Iter 2: a CGM patch has overmould + adhesive patch + applicator interface
+    // + insertion needle. Two single-character words too thin.
+    words: ['wearable_housing', 'wearable_skin_interface', 'wearable_applicator', 'wearable_overmould'],
     allowed_classes: ['cgm'],
   },
   {
     id: 'haps_airframe',
     label: 'HAPS Airframe',
-    words: ['haps_structure'],
+    // Iter 2: HAPS airframe has ribs + skin + control surfaces (elevons,
+    // ailerons) + servo actuators + mass-balance hardware.
+    words: ['haps_structure', 'haps_control_surfaces', 'haps_servos'],
     allowed_classes: ['haps'],
   },
   // Phase B Iter 1 (2026-05-11): HAPS-specific power+thermal sentence. Real
@@ -377,33 +415,49 @@ export const SENTENCES: HierarchySentence[] = [
 
 export const WORDS: HierarchyWord[] = [
   // ── battery_rack_assembly ─────────────────────────────────────────────────
+  // Iter 2: cell-string ancillaries (busbar links, compression pads, cell-top
+  // cap), rack ancillaries (casters, earthing strap, lifting eye).
   {
     id: 'cell_string',
     label: 'Cell String',
     sentence_id: 'battery_rack_assembly',
-    characters: ['lfp_prismatic_cell'],
+    characters: ['lfp_prismatic_cell', 'cell_busbar_link', 'cell_compression_pad', 'cell_top_cap_assembly'],
   },
   {
     id: 'rack_structure',
     label: 'Rack Structure',
     sentence_id: 'battery_rack_assembly',
-    characters: ['steel_rack_frame'],
+    characters: ['steel_rack_frame', 'rack_caster_wheel', 'rack_earthing_strap', 'rack_lifting_eye'],
   },
   // ── battery_management_system_bms ────────────────────────────────────────
+  // Iter 2: split BMS into master + slave + comm, each with realistic part
+  // counts. Master = controller + isolators + current shunt + voltage divider +
+  // ESD diode + connector. Slave = cell-monitor IC + balance resistor +
+  // thermistor + cell-tap connector. Comm = CAN transceiver + isolation IC +
+  // harness + bus termination.
   {
     id: 'bms_master',
     label: 'BMS Master Controller',
     sentence_id: 'battery_management_system_bms',
-    characters: ['pcb_controller'],
+    characters: ['pcb_controller', 'bms_isolation_ic', 'current_shunt_resistor', 'voltage_divider_resistor', 'esd_protection_diode', 'bms_master_connector'],
   },
   {
     id: 'bms_slave',
     label: 'BMS Slave Cell Monitors',
     sentence_id: 'battery_management_system_bms',
-    // pcb_controller also used here — word distinguishes the role
-    characters: ['pcb_controller'],
+    // pcb_controller also used here — word distinguishes the role; cell-monitor
+    // ICs (LTC6804/MAX17841 class), per-cell balance resistor, NTC thermistor
+    // and cell-tap harness connector populate the slave board.
+    characters: ['pcb_controller', 'bms_slave_monitor_ic', 'cell_balance_resistor', 'cell_thermistor_ntc', 'cell_tap_connector'],
+  },
+  {
+    id: 'bms_communication',
+    label: 'BMS Communication Bus',
+    sentence_id: 'battery_management_system_bms',
+    characters: ['can_transceiver_ic', 'isolation_transceiver_ic', 'bms_can_harness', 'can_termination_resistor'],
   },
   // ── power_conversion_system_pcs ──────────────────────────────────────────
+  // Iter 2: add IGBT power stage + DC-link cap bank + AC filter + grid bushing.
   {
     id: 'pcs_inverter_group',
     label: 'PCS Inverter Group',
@@ -414,78 +468,151 @@ export const WORDS: HierarchyWord[] = [
     id: 'grid_transformer_group',
     label: 'Grid Step-up Transformer',
     sentence_id: 'power_conversion_system_pcs',
-    characters: ['transformer'],
+    characters: ['transformer', 'transformer_bushing', 'tap_changer_assembly'],
+  },
+  {
+    id: 'pcs_power_stage',
+    label: 'PCS Power Stage',
+    sentence_id: 'power_conversion_system_pcs',
+    characters: ['igbt_power_module', 'gate_driver_board', 'dc_link_capacitor', 'snubber_capacitor'],
+  },
+  {
+    id: 'pcs_ac_filter',
+    label: 'PCS AC Filter and EMI',
+    sentence_id: 'power_conversion_system_pcs',
+    characters: ['ac_filter_inductor', 'ac_filter_capacitor', 'ac_emi_filter'],
   },
   // ── dc_distribution_switchgear ───────────────────────────────────────────
+  // Iter 2: add fuse + isolator detail, surge arrester, earthing busbar, EFR.
   {
     id: 'dc_switching',
     label: 'DC Switching',
     sentence_id: 'dc_distribution_switchgear',
-    characters: ['dc_contactor'],
+    characters: ['dc_contactor', 'dc_isolator_switch', 'dc_fuse_holder', 'dc_fuse_link'],
   },
   {
     id: 'dc_protection',
     label: 'DC Protection',
     sentence_id: 'dc_distribution_switchgear',
-    characters: ['circuit_breaker', 'protection_relay', 'resistor'],
+    characters: ['circuit_breaker', 'protection_relay', 'resistor', 'pre_charge_contactor'],
   },
   {
     id: 'dc_buswork',
     label: 'DC Buswork',
     sentence_id: 'dc_distribution_switchgear',
-    characters: ['copper_busbar'],
+    characters: ['copper_busbar', 'busbar_support_insulator', 'busbar_heat_shrink'],
+  },
+  {
+    id: 'dc_earthing',
+    label: 'DC Earthing and Surge Protection',
+    sentence_id: 'dc_distribution_switchgear',
+    characters: ['surge_arrester_dc', 'earthing_busbar', 'earth_fault_relay', 'earthing_lug'],
   },
   // ── thermal_management_system ────────────────────────────────────────────
+  // Iter 2: split out hydraulics (pump + reservoir + sensor) and cold plate.
   {
     id: 'active_cooling',
     label: 'Active Liquid Cooling',
     sentence_id: 'thermal_management_system',
-    characters: ['liquid_cooling_system'],
+    characters: ['liquid_cooling_system', 'cold_plate', 'coolant_distribution_manifold'],
   },
   {
     id: 'passive_insulation',
     label: 'Passive Thermal Insulation',
     sentence_id: 'thermal_management_system',
-    characters: ['thermal_insulation_panel', 'aluminium_heatsink'],
+    characters: ['thermal_insulation_panel', 'aluminium_heatsink', 'thermal_interface_material'],
+  },
+  {
+    id: 'cooling_hydraulics',
+    label: 'Coolant Hydraulics',
+    sentence_id: 'thermal_management_system',
+    characters: ['coolant_pump', 'coolant_reservoir_tank', 'coolant_temperature_sensor', 'coolant_flow_switch'],
   },
   // ── fire_detection_and_suppression_system_fss ────────────────────────────
+  // Iter 2: add discharge-side hardware (nozzle, manifold) and FSS panel.
   {
     id: 'suppression_hardware',
     label: 'Suppression Hardware',
     sentence_id: 'fire_detection_and_suppression_system_fss',
-    characters: ['fire_suppression_system', 'pressure_vessel'],
+    characters: ['fire_suppression_system', 'pressure_vessel', 'pressure_gauge_fss'],
   },
   {
     id: 'detection_sensors',
     label: 'Detection Sensors',
     sentence_id: 'fire_detection_and_suppression_system_fss',
-    characters: ['gas_sensor', 'optical_arc_sensor'],
+    characters: ['gas_sensor', 'optical_arc_sensor', 'smoke_detector_aspirating', 'thermal_linear_detector'],
+  },
+  {
+    id: 'suppression_discharge',
+    label: 'Suppression Discharge Hardware',
+    sentence_id: 'fire_detection_and_suppression_system_fss',
+    characters: ['suppression_nozzle', 'suppression_discharge_pipe', 'manual_pull_station'],
+  },
+  {
+    id: 'fss_panel',
+    label: 'FSS Control Panel',
+    sentence_id: 'fire_detection_and_suppression_system_fss',
+    characters: ['fss_control_panel', 'fss_alarm_strobe', 'fss_warning_horn'],
   },
   // ── energy_management_system_ems_scada ───────────────────────────────────
+  // Iter 2: split into compute / network / power / metering. EMS panel needs
+  // its own 24 V PSU, a cellular gateway, revenue-grade meter + CTs.
   {
     id: 'ems_compute',
     label: 'EMS / SCADA Compute',
     sentence_id: 'energy_management_system_ems_scada',
-    characters: ['ems_controller'],
+    characters: ['ems_controller', 'ems_hmi_panel'],
   },
   {
     id: 'ems_network',
     label: 'EMS Network Infrastructure',
     sentence_id: 'energy_management_system_ems_scada',
-    characters: ['network_switch', 'power_converter'],
+    characters: ['network_switch', 'power_converter', 'ems_gateway_modem', 'ems_fibre_patch_panel'],
+  },
+  {
+    id: 'ems_power',
+    label: 'EMS Power Supply',
+    sentence_id: 'energy_management_system_ems_scada',
+    characters: ['ems_psu_24v', 'ups_module', 'mcb_low_voltage'],
+  },
+  {
+    id: 'ems_metering',
+    label: 'Revenue Metering and Monitoring',
+    sentence_id: 'energy_management_system_ems_scada',
+    characters: ['revenue_meter', 'metering_ct', 'monitoring_relay'],
   },
   // ── container_enclosure_fit_out ──────────────────────────────────────────
+  // Iter 2: a real BESS container has internal HVAC, lighting, sockets,
+  // CCTV, intrusion sensors, access reader, and earthing electrodes.
   {
     id: 'container_access',
     label: 'Container Access',
     sentence_id: 'container_enclosure_fit_out',
-    characters: ['steel_door'],
+    characters: ['steel_door', 'door_intrusion_switch', 'access_control_reader'],
   },
   {
     id: 'container_services',
     label: 'Container Services',
     sentence_id: 'container_enclosure_fit_out',
-    characters: ['cable_transit_frame', 'switchboard_enclosure', 'thermal_insulation_panel'],
+    characters: ['cable_transit_frame', 'switchboard_enclosure', 'thermal_insulation_panel', 'cable_tray', 'cable_gland'],
+  },
+  {
+    id: 'container_hvac',
+    label: 'Container HVAC',
+    sentence_id: 'container_enclosure_fit_out',
+    characters: ['hvac_split_unit', 'hvac_condensate_pump', 'hvac_thermostat'],
+  },
+  {
+    id: 'container_aux_power',
+    label: 'Container Auxiliary Power and Lighting',
+    sentence_id: 'container_enclosure_fit_out',
+    characters: ['interior_led_luminaire', 'emergency_light', 'convenience_outlet', 'distribution_board_aux'],
+  },
+  {
+    id: 'container_security',
+    label: 'Container Security and Earthing',
+    sentence_id: 'container_enclosure_fit_out',
+    characters: ['cctv_camera', 'earthing_electrode_rod'],
   },
   // ── refrigerant_circuit ──────────────────────────────────────────────────
   // Bug P0-6 fix (2026-05-11): a real 30 kW R290 heat pump's refrigerant
@@ -534,114 +661,309 @@ export const WORDS: HierarchyWord[] = [
     characters: ['copper_wire', 'polymer_gasket'],
   },
   // ── hydronic_circuit ─────────────────────────────────────────────────────
+  // Iter 2: real hydronic side has circulator pump + expansion vessel + PRV +
+  // isolation valves + manifold + flow/temp gauge.
   {
     id: 'hydronic_flow',
     label: 'Hydronic Flow',
     sentence_id: 'hydronic_circuit',
-    characters: ['liquid_cooling_system'],
+    characters: ['liquid_cooling_system', 'hydronic_flow_meter'],
   },
   {
     id: 'hydronic_connections',
     label: 'Hydronic Connections',
     sentence_id: 'hydronic_circuit',
-    characters: ['copper_terminal', 'polymer_gasket', 'copper_wire'],
+    characters: ['copper_terminal', 'polymer_gasket', 'copper_wire', 'hydronic_isolation_valve'],
+  },
+  {
+    id: 'hydronic_pump',
+    label: 'Hydronic Circulator Pump',
+    sentence_id: 'hydronic_circuit',
+    characters: ['hydronic_circulator_pump', 'pump_motor_capacitor'],
+  },
+  {
+    id: 'hydronic_safety',
+    label: 'Hydronic Safety',
+    sentence_id: 'hydronic_circuit',
+    characters: ['expansion_vessel', 'pressure_relief_valve', 'air_separator_vent'],
+  },
+  {
+    id: 'hydronic_manifold',
+    label: 'Hydronic Manifold and Distribution',
+    sentence_id: 'hydronic_circuit',
+    characters: ['hydronic_manifold', 'thermal_balance_valve', 'hydronic_pressure_gauge'],
   },
   // ── heat_pump_controls ───────────────────────────────────────────────────
+  // Iter 2: split into compute / HMI / sensors / protection.
   {
     id: 'hp_controls_compute',
     label: 'HP Controls Compute',
     sentence_id: 'heat_pump_controls',
-    characters: ['pcb_controller'],
+    characters: ['pcb_controller', 'hp_relay_board'],
+  },
+  {
+    id: 'hp_controls_hmi',
+    label: 'HP Controls HMI',
+    sentence_id: 'heat_pump_controls',
+    characters: ['hp_hmi_display', 'hp_user_interface_pcb'],
+  },
+  {
+    id: 'hp_controls_sensors',
+    label: 'HP Controls Sensors',
+    sentence_id: 'heat_pump_controls',
+    characters: ['water_temperature_sensor_ntc', 'outdoor_temp_sensor', 'defrost_sensor'],
+  },
+  {
+    id: 'hp_controls_protection',
+    label: 'HP Controls Protection',
+    sentence_id: 'heat_pump_controls',
+    characters: ['safety_relay_compressor', 'flow_switch_safety', 'high_limit_thermostat'],
   },
   // ── heat_pump_enclosure ──────────────────────────────────────────────────
+  // Iter 2: add mounting / vibration isolators + drainage / drip tray.
   {
     id: 'hp_enclosure_structure',
     label: 'HP Enclosure and Frame',
     sentence_id: 'heat_pump_enclosure',
     characters: ['polymer_enclosure', 'aluminium_extrusion', 'steel_plate', 'steel_bolt'],
   },
+  {
+    id: 'hp_enclosure_mounting',
+    label: 'HP Mounting and Vibration Isolation',
+    sentence_id: 'heat_pump_enclosure',
+    characters: ['vibration_isolator_mount', 'wall_bracket_assembly'],
+  },
+  {
+    id: 'hp_enclosure_drainage',
+    label: 'HP Condensate Drainage',
+    sentence_id: 'heat_pump_enclosure',
+    characters: ['condensate_drip_tray', 'condensate_drain_hose', 'condensate_heater_strip'],
+  },
   // ── growing_rack_system ──────────────────────────────────────────────────
+  // Iter 2: add tray + grow media (rockwool/coco/peat puck), pump fittings.
   {
     id: 'rack_structure_vfarm',
     label: 'Growing Rack Structure',
     sentence_id: 'growing_rack_system',
-    characters: ['aluminium_extrusion', 'steel_bolt'],
+    characters: ['aluminium_extrusion', 'steel_bolt', 'rack_caster_wheel'],
+  },
+  {
+    id: 'tray_and_grow_media',
+    label: 'Growing Tray and Media',
+    sentence_id: 'growing_rack_system',
+    characters: ['growing_tray_polymer', 'grow_media_rockwool'],
   },
   // ── lighting_system ──────────────────────────────────────────────────────
+  // Iter 2: split LED fixture from driver/PSU.
   {
     id: 'lighting_fixtures',
     label: 'Lighting Fixtures',
     sentence_id: 'lighting_system',
-    characters: ['pcb_controller', 'copper_wire'],
+    characters: ['pcb_controller', 'copper_wire', 'led_grow_module'],
+  },
+  {
+    id: 'lighting_drivers',
+    label: 'Lighting Drivers',
+    sentence_id: 'lighting_system',
+    characters: ['led_constant_current_driver', 'lighting_dali_controller'],
   },
   // ── fertigation_loop ─────────────────────────────────────────────────────
+  // Iter 2: dosing pump, EC/pH sensors.
   {
     id: 'fertigation_flow',
     label: 'Fertigation Flow',
     sentence_id: 'fertigation_loop',
     characters: ['liquid_cooling_system', 'polymer_gasket', 'copper_wire'],
   },
+  {
+    id: 'fertigation_dosing',
+    label: 'Fertigation Dosing',
+    sentence_id: 'fertigation_loop',
+    characters: ['nutrient_dosing_pump', 'nutrient_reservoir_tank'],
+  },
+  {
+    id: 'fertigation_sensors',
+    label: 'Fertigation Sensors',
+    sentence_id: 'fertigation_loop',
+    characters: ['ec_conductivity_sensor', 'ph_sensor_inline', 'water_temperature_sensor_ntc'],
+  },
   // ── hvac_co2_system ──────────────────────────────────────────────────────
   {
     id: 'hvac_flow',
     label: 'HVAC Flow',
     sentence_id: 'hvac_co2_system',
-    characters: ['liquid_cooling_system', 'copper_wire'],
+    characters: ['liquid_cooling_system', 'copper_wire', 'duct_fan_ec'],
   },
   {
     id: 'co2_dosing',
     label: 'CO2 Dosing',
     sentence_id: 'hvac_co2_system',
-    characters: ['pressure_vessel', 'gas_sensor'],
+    characters: ['pressure_vessel', 'gas_sensor', 'co2_solenoid_valve'],
+  },
+  {
+    id: 'hvac_filtration',
+    label: 'HVAC Filtration',
+    sentence_id: 'hvac_co2_system',
+    characters: ['hepa_filter_element', 'pre_filter_g4'],
   },
   // ── airframe_structure ────────────────────────────────────────────────────
+  // Iter 2: a real drone airframe has spar + landing gear + battery tray +
+  // payload bay, plus a battery hold-down strap.
   {
     id: 'airframe_body',
     label: 'Airframe Body',
     sentence_id: 'airframe_structure',
-    characters: ['aluminium_extrusion', 'steel_bolt', 'polymer_enclosure'],
+    characters: ['aluminium_extrusion', 'steel_bolt', 'polymer_enclosure', 'carbon_fibre_arm'],
+  },
+  {
+    id: 'airframe_landing',
+    label: 'Landing Gear',
+    sentence_id: 'airframe_structure',
+    characters: ['landing_skid_polymer', 'landing_gear_strut'],
+  },
+  {
+    id: 'airframe_payload_bay',
+    label: 'Payload Bay and Battery Tray',
+    sentence_id: 'airframe_structure',
+    characters: ['battery_tray_polymer', 'battery_strap_velcro', 'payload_release_servo'],
   },
   // ── propulsion_system ────────────────────────────────────────────────────
+  // Iter 2: split out propeller + drive train (motor mount, bearing).
   {
     id: 'propulsion_motors',
     label: 'Propulsion Motors',
     sentence_id: 'propulsion_system',
-    characters: ['power_converter', 'copper_wire'],
+    characters: ['power_converter', 'copper_wire', 'brushless_dc_motor', 'electronic_speed_controller'],
+  },
+  {
+    id: 'propulsion_propeller',
+    label: 'Propeller and Hub',
+    sentence_id: 'propulsion_system',
+    characters: ['propeller_carbon_blade', 'propeller_retention_nut', 'propeller_hub'],
+  },
+  {
+    id: 'propulsion_drive_train',
+    label: 'Motor Mount and Bearing',
+    sentence_id: 'propulsion_system',
+    characters: ['motor_mount_aluminium', 'motor_bearing_set', 'propulsion_current_sensor'],
   },
   // ── flight_computer ──────────────────────────────────────────────────────
+  // Iter 2: split out IMU/sensors, GNSS/radio, power management.
   {
     id: 'avionics_compute',
     label: 'Avionics Compute',
     sentence_id: 'flight_computer',
     characters: ['pcb_controller', 'network_switch'],
   },
+  {
+    id: 'avionics_imu_sensors',
+    label: 'IMU and Sensor Stack',
+    sentence_id: 'flight_computer',
+    characters: ['imu_6dof_module', 'magnetometer_3axis', 'barometer_pressure_sensor'],
+  },
+  {
+    id: 'avionics_gnss_radio',
+    label: 'GNSS and Telemetry Radios',
+    sentence_id: 'flight_computer',
+    characters: ['gnss_receiver_module', 'telemetry_radio_modem', 'rc_receiver_module', 'antenna_pcb'],
+  },
+  {
+    id: 'avionics_power',
+    label: 'Avionics Power Management',
+    sentence_id: 'flight_computer',
+    characters: ['avionics_pdb', 'avionics_bec_5v', 'avionics_current_sensor'],
+  },
   // ── charger_power_conversion ─────────────────────────────────────────────
+  // Iter 2: split into rectifier (PFC), DC-DC, input filter, DC-link.
   {
     id: 'charger_pcs',
     label: 'Charger PCS',
     sentence_id: 'charger_power_conversion',
-    characters: ['power_converter', 'transformer', 'circuit_breaker'],
+    characters: ['power_converter', 'transformer', 'circuit_breaker', 'pfc_inductor'],
+  },
+  {
+    id: 'charger_dc_dc',
+    label: 'Charger DC-DC Stage',
+    sentence_id: 'charger_power_conversion',
+    characters: ['dc_dc_module', 'igbt_power_module', 'gate_driver_board'],
+  },
+  {
+    id: 'charger_input_filter',
+    label: 'Charger Input Filter',
+    sentence_id: 'charger_power_conversion',
+    characters: ['ac_emi_filter', 'inrush_current_limiter', 'input_contactor'],
+  },
+  {
+    id: 'charger_dc_link',
+    label: 'Charger DC Link',
+    sentence_id: 'charger_power_conversion',
+    characters: ['dc_link_capacitor', 'dc_link_busbar', 'dc_link_voltage_sensor'],
   },
   // ── charger_enclosure ────────────────────────────────────────────────────
+  // Iter 2: HMI + payment + safety + cable assembly + RCD/RFID.
   {
     id: 'charger_enclosure_structure',
     label: 'Charger Enclosure',
     sentence_id: 'charger_enclosure',
     characters: ['switchboard_enclosure', 'polymer_enclosure'],
   },
+  {
+    id: 'charger_hmi_payment',
+    label: 'Charger HMI and Payment',
+    sentence_id: 'charger_enclosure',
+    characters: ['hmi_capacitive_touch_panel', 'rfid_reader_module', 'payment_terminal_module'],
+  },
+  {
+    id: 'charger_safety',
+    label: 'Charger Safety Circuits',
+    sentence_id: 'charger_enclosure',
+    characters: ['rcd_type_b_module', 'emergency_stop_button', 'door_interlock_switch'],
+  },
+  {
+    id: 'charger_cable_assembly',
+    label: 'Charger Cable and Connector',
+    sentence_id: 'charger_enclosure',
+    characters: ['ccs_charging_cable', 'ccs_connector_assembly', 'cable_management_arm'],
+  },
   // ── bioreactor_vessel ────────────────────────────────────────────────────
+  // Iter 2: real bioreactor vessel needs sample/CIP/SIP ports + sight glass.
   {
     id: 'bioreactor_vessel_body',
     label: 'Bioreactor Vessel Body',
     sentence_id: 'bioreactor_vessel',
     characters: ['pressure_vessel', 'polymer_gasket', 'steel_plate'],
   },
+  {
+    id: 'bioreactor_ports_and_valves',
+    label: 'Bioreactor Ports and Valves',
+    sentence_id: 'bioreactor_vessel',
+    characters: ['cip_sip_port_assembly', 'sample_port_aseptic', 'harvest_valve_sanitary', 'tri_clamp_fitting'],
+  },
+  {
+    id: 'bioreactor_inspection',
+    label: 'Bioreactor Inspection and Lighting',
+    sentence_id: 'bioreactor_vessel',
+    characters: ['sight_glass_assembly', 'vessel_inspection_light'],
+  },
   // ── bioreactor_controls ──────────────────────────────────────────────────
+  // Iter 2: split into sensors / process controllers / calibration loop.
   {
     id: 'bioreactor_sensing',
     label: 'Bioreactor Sensing',
     sentence_id: 'bioreactor_controls',
-    characters: ['gas_sensor', 'pcb_controller', 'optical_arc_sensor'],
+    characters: ['gas_sensor', 'pcb_controller', 'optical_arc_sensor', 'ph_probe_sterilisable', 'do_probe_optical', 'level_sensor_capacitive'],
+  },
+  {
+    id: 'bioreactor_process_control',
+    label: 'Bioreactor Process Control',
+    sentence_id: 'bioreactor_controls',
+    characters: ['mass_flow_controller_gas', 'peristaltic_dosing_pump', 'foam_breaker_actuator'],
+  },
+  {
+    id: 'bioreactor_calibration_loop',
+    label: 'Bioreactor Calibration Loop',
+    sentence_id: 'bioreactor_controls',
+    characters: ['calibration_buffer_kit', 'temperature_calibration_probe'],
   },
   // ── bioprocess_vessel (Phase B Iter 1, 2026-05-11) ───────────────────────
   // Sterile bioprocess machinery: agitator drive, sparger, thermal jacket,
@@ -678,18 +1000,50 @@ export const WORDS: HierarchyWord[] = [
     characters: ['single_use_biocompatible_bag', 'polymer_gasket'],
   },
   // ── edge_compute_system ──────────────────────────────────────────────────
+  // Iter 2: real edge AI server has GPU + storage (NVMe) + DDR5 + PSU + fan.
   {
     id: 'edge_compute_hardware',
     label: 'Edge Compute Hardware',
     sentence_id: 'edge_compute_system',
-    characters: ['pcb_controller', 'network_switch', 'copper_wire'],
+    characters: ['pcb_controller', 'network_switch', 'copper_wire', 'gpu_accelerator_module', 'ddr5_dimm_module'],
+  },
+  {
+    id: 'edge_compute_storage',
+    label: 'Edge Compute Storage',
+    sentence_id: 'edge_compute_system',
+    characters: ['nvme_ssd_module', 'sata_storage_drive'],
+  },
+  {
+    id: 'edge_compute_power',
+    label: 'Edge Compute Power Supply',
+    sentence_id: 'edge_compute_system',
+    characters: ['server_psu_redundant', 'pdu_rack_outlet'],
+  },
+  {
+    id: 'edge_compute_thermal',
+    label: 'Edge Compute Thermal',
+    sentence_id: 'edge_compute_system',
+    characters: ['cooling_fan_axial', 'thermal_interface_material'],
   },
   // ── hull_and_buoyancy ────────────────────────────────────────────────────
+  // Iter 2: AUV hull also has frame + brackets + fairing.
   {
     id: 'hull_structure',
     label: 'Hull Structure',
     sentence_id: 'hull_and_buoyancy',
     characters: ['polymer_enclosure', 'aluminium_extrusion', 'polymer_gasket'],
+  },
+  {
+    id: 'hull_frame_and_brackets',
+    label: 'Hull Frame and Brackets',
+    sentence_id: 'hull_and_buoyancy',
+    characters: ['hull_internal_frame', 'instrument_mount_bracket'],
+  },
+  {
+    id: 'hull_fairing',
+    label: 'Hull Fairing',
+    sentence_id: 'hull_and_buoyancy',
+    characters: ['hydrodynamic_fairing', 'antifouling_coating'],
   },
   // ── subsea_pressure_vessel (Phase B Iter 1, 2026-05-11) ──────────────────
   // Pressure-rated end caps + dive-rated O-rings + structural ribs. Reuses
@@ -713,15 +1067,37 @@ export const WORDS: HierarchyWord[] = [
     characters: ['syntactic_foam_block', 'ballast_trim_weight', 'steel_plate', 'polymer_gasket'],
   },
   // ── biosensor_system ─────────────────────────────────────────────────────
+  // Iter 2: real CGM hardware = electrode + AFE + BLE SoC + antenna + crystal +
+  // battery + accelerometer. Single-word stub was a sketch.
   {
     id: 'biosensor_hardware',
     label: 'Biosensor Hardware',
     sentence_id: 'biosensor_system',
-    characters: ['pcb_controller', 'copper_wire'],
+    characters: ['pcb_controller', 'copper_wire', 'glucose_electrode_strip', 'analogue_front_end_ic'],
+  },
+  {
+    id: 'biosensor_radio',
+    label: 'Biosensor Radio and Antenna',
+    sentence_id: 'biosensor_system',
+    characters: ['ble_soc_module', 'antenna_pcb', 'radio_crystal_oscillator'],
+  },
+  {
+    id: 'biosensor_power',
+    label: 'Biosensor Power',
+    sentence_id: 'biosensor_system',
+    characters: ['coin_cell_battery_cr1632', 'biosensor_regulator_ldo'],
+  },
+  {
+    id: 'biosensor_motion',
+    label: 'Biosensor Motion Sensing',
+    sentence_id: 'biosensor_system',
+    characters: ['accelerometer_3axis_lp'],
   },
   // ── medical_wearable_enclosure ───────────────────────────────────────────
   // Bug P0-5 fix: CGM-class enclosure characters must NOT map to
   // hull_structure (under hull_and_buoyancy / AUV).
+  // Iter 2: a CGM patch has overmould (silicone) + adhesive patch + applicator
+  // interface + insertion needle.
   {
     id: 'wearable_housing',
     label: 'Wearable Housing',
@@ -732,14 +1108,39 @@ export const WORDS: HierarchyWord[] = [
     id: 'wearable_skin_interface',
     label: 'Skin Interface and Sealing',
     sentence_id: 'medical_wearable_enclosure',
-    characters: ['polymer_gasket'],
+    characters: ['polymer_gasket', 'adhesive_skin_patch'],
+  },
+  {
+    id: 'wearable_applicator',
+    label: 'Wearable Applicator',
+    sentence_id: 'medical_wearable_enclosure',
+    characters: ['applicator_housing_polymer', 'insertion_needle_assembly'],
+  },
+  {
+    id: 'wearable_overmould',
+    label: 'Wearable Overmould',
+    sentence_id: 'medical_wearable_enclosure',
+    characters: ['silicone_overmould', 'biocompatible_label_layer'],
   },
   // ── haps_airframe ────────────────────────────────────────────────────────
+  // Iter 2: add ribs / control surfaces / servos.
   {
     id: 'haps_structure',
     label: 'HAPS Airframe Structure',
     sentence_id: 'haps_airframe',
-    characters: ['aluminium_extrusion', 'steel_bolt', 'polymer_enclosure'],
+    characters: ['aluminium_extrusion', 'steel_bolt', 'polymer_enclosure', 'haps_rib_assembly', 'haps_skin_film'],
+  },
+  {
+    id: 'haps_control_surfaces',
+    label: 'HAPS Control Surfaces',
+    sentence_id: 'haps_airframe',
+    characters: ['haps_elevon_assembly', 'haps_aileron_assembly', 'mass_balance_weight'],
+  },
+  {
+    id: 'haps_servos',
+    label: 'HAPS Servo Actuators',
+    sentence_id: 'haps_airframe',
+    characters: ['servo_actuator_high_torque', 'servo_pushrod_carbon'],
   },
   // ── solar_electric_airframe (Phase B Iter 1, 2026-05-11) ─────────────────
   // Wing-integrated PV + composite spar + Li-S night-storage battery —

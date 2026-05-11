@@ -175,28 +175,115 @@ export function deriveBessQuantityOverrides(params: {
   const bmsSlaveCount = derivedRackCount * 12
 
   // All BESS characters that must appear in the tree — defines the mandatory shape
+  // Phase B Iter 2 (2026-05-11): expanded from 21 → ~75 characters to give the
+  // tree the depth a real 3.5 MWh BESS BoM would have. Each new character maps
+  // into the words added to character-hierarchy.ts in the same iteration.
   const mandatoryCharacters = [
+    // Battery rack (cell-string + structure ancillaries)
     'lfp_prismatic_cell',
+    'cell_busbar_link',
+    'cell_compression_pad',
+    'cell_top_cap_assembly',
     'steel_rack_frame',
+    'rack_caster_wheel',
+    'rack_earthing_strap',
+    'rack_lifting_eye',
+    // BMS — master + slave + comm
     'pcb_controller',
+    'bms_isolation_ic',
+    'current_shunt_resistor',
+    'voltage_divider_resistor',
+    'esd_protection_diode',
+    'bms_master_connector',
+    'bms_slave_monitor_ic',
+    'cell_balance_resistor',
+    'cell_thermistor_ntc',
+    'cell_tap_connector',
+    'can_transceiver_ic',
+    'isolation_transceiver_ic',
+    'bms_can_harness',
+    'can_termination_resistor',
+    // PCS power conversion
     'dc_contactor',
     'circuit_breaker',
     'resistor',
     'protection_relay',
     'transformer',
     'power_converter',
+    'transformer_bushing',
+    'tap_changer_assembly',
+    'igbt_power_module',
+    'gate_driver_board',
+    'dc_link_capacitor',
+    'snubber_capacitor',
+    'ac_filter_inductor',
+    'ac_filter_capacitor',
+    'ac_emi_filter',
+    // DC switchgear
+    'dc_isolator_switch',
+    'dc_fuse_holder',
+    'dc_fuse_link',
+    'pre_charge_contactor',
+    'busbar_support_insulator',
+    'busbar_heat_shrink',
+    'surge_arrester_dc',
+    'earthing_busbar',
+    'earth_fault_relay',
+    'earthing_lug',
+    // Thermal management
     'liquid_cooling_system',
+    'cold_plate',
+    'coolant_distribution_manifold',
+    'thermal_insulation_panel',
+    'thermal_interface_material',
+    'coolant_pump',
+    'coolant_reservoir_tank',
+    'coolant_temperature_sensor',
+    'coolant_flow_switch',
+    // FSS
     'fire_suppression_system',
     'pressure_vessel',
+    'pressure_gauge_fss',
     'gas_sensor',
     'optical_arc_sensor',
+    'smoke_detector_aspirating',
+    'thermal_linear_detector',
+    'suppression_nozzle',
+    'suppression_discharge_pipe',
+    'manual_pull_station',
+    'fss_control_panel',
+    'fss_alarm_strobe',
+    'fss_warning_horn',
+    // EMS / SCADA
     'ems_controller',
+    'ems_hmi_panel',
     'network_switch',
+    'ems_gateway_modem',
+    'ems_fibre_patch_panel',
+    'ems_psu_24v',
+    'ups_module',
+    'mcb_low_voltage',
+    'revenue_meter',
+    'metering_ct',
+    'monitoring_relay',
+    // Container fit-out
     'copper_busbar',
-    'thermal_insulation_panel',
     'steel_door',
+    'door_intrusion_switch',
+    'access_control_reader',
     'cable_transit_frame',
     'switchboard_enclosure',
+    'cable_tray',
+    'cable_gland',
+    'hvac_split_unit',
+    'hvac_condensate_pump',
+    'hvac_thermostat',
+    'interior_led_luminaire',
+    'emergency_light',
+    'convenience_outlet',
+    'distribution_board_aux',
+    'cctv_camera',
+    'earthing_electrode_rod',
   ]
 
   const quantities: QuantityOverrideMap = {
@@ -241,16 +328,47 @@ export function deriveBessQuantityOverrides(params: {
  */
 export function deriveDroneMandatoryCharacters(): string[] {
   return [
-    // Airframe structure
+    // Airframe body
     'aluminium_extrusion',  // airframe_body
     'steel_bolt',           // airframe_body fasteners
     'polymer_enclosure',    // airframe_body housing
-    // Propulsion
+    'carbon_fibre_arm',     // airframe_body (Iter 2)
+    // Landing gear (Iter 2)
+    'landing_skid_polymer',
+    'landing_gear_strut',
+    // Payload bay (Iter 2)
+    'battery_tray_polymer',
+    'battery_strap_velcro',
+    'payload_release_servo',
+    // Propulsion motors
     'power_converter',      // propulsion_motors (ESC / motor driver)
     'copper_wire',          // propulsion_motors wiring
-    // Avionics
+    'brushless_dc_motor',         // Iter 2
+    'electronic_speed_controller', // Iter 2
+    // Propeller (Iter 2)
+    'propeller_carbon_blade',
+    'propeller_retention_nut',
+    'propeller_hub',
+    // Drive train (Iter 2)
+    'motor_mount_aluminium',
+    'motor_bearing_set',
+    'propulsion_current_sensor',
+    // Avionics compute
     'pcb_controller',       // avionics_compute (flight computer)
     'network_switch',       // avionics_compute (comm hub)
+    // IMU/sensors (Iter 2)
+    'imu_6dof_module',
+    'magnetometer_3axis',
+    'barometer_pressure_sensor',
+    // GNSS / radios (Iter 2)
+    'gnss_receiver_module',
+    'telemetry_radio_modem',
+    'rc_receiver_module',
+    'antenna_pcb',
+    // Avionics power (Iter 2)
+    'avionics_pdb',
+    'avionics_bec_5v',
+    'avionics_current_sensor',
   ]
 }
 
@@ -265,12 +383,30 @@ export function deriveDroneMandatoryCharacters(): string[] {
  */
 export function deriveCgmMandatoryCharacters(): string[] {
   return [
-    // Biosensor system
+    // Biosensor system — hardware
     'pcb_controller',   // biosensor_hardware (analogue front-end + MCU)
     'copper_wire',      // biosensor_hardware (flex harness)
-    // Medical wearable enclosure
+    'glucose_electrode_strip',   // Iter 2 — Pt/Au-on-polymer electrode
+    'analogue_front_end_ic',     // Iter 2
+    // Biosensor radio (Iter 2)
+    'ble_soc_module',
+    'antenna_pcb',
+    'radio_crystal_oscillator',
+    // Biosensor power (Iter 2)
+    'coin_cell_battery_cr1632',
+    'biosensor_regulator_ldo',
+    // Biosensor motion (Iter 2)
+    'accelerometer_3axis_lp',
+    // Wearable enclosure (existing + Iter 2)
     'polymer_enclosure',  // wearable_housing (outer biocompatible shell)
-    'polymer_gasket',     // wearable_skin_interface (skin seal / IP67 boundary)
+    'polymer_gasket',     // wearable_skin_interface
+    'adhesive_skin_patch', // Iter 2 — 3M Tegaderm-class
+    // Wearable applicator (Iter 2)
+    'applicator_housing_polymer',
+    'insertion_needle_assembly',
+    // Wearable overmould (Iter 2)
+    'silicone_overmould',
+    'biocompatible_label_layer',
   ]
 }
 
@@ -304,15 +440,40 @@ export function deriveHeatPumpMandatoryCharacters(): string[] {
     // Distribution / sealing
     'copper_wire',            // refrigerant_distribution (wiring)
     'polymer_gasket',         // refrigerant_distribution (seals)
-    // Hydronic connections
+    // Hydronic side (Iter 2 expansion)
     'copper_terminal',        // hydronic_connections
-    // Controls
+    'hydronic_flow_meter',         // hydronic_flow (Iter 2)
+    'hydronic_isolation_valve',    // hydronic_connections (Iter 2)
+    'hydronic_circulator_pump',    // hydronic_pump (Iter 2)
+    'pump_motor_capacitor',        // hydronic_pump (Iter 2)
+    'expansion_vessel',            // hydronic_safety (Iter 2)
+    'pressure_relief_valve',       // hydronic_safety (Iter 2)
+    'air_separator_vent',          // hydronic_safety (Iter 2)
+    'hydronic_manifold',           // hydronic_manifold (Iter 2)
+    'thermal_balance_valve',       // hydronic_manifold (Iter 2)
+    'hydronic_pressure_gauge',     // hydronic_manifold (Iter 2)
+    // Controls (Iter 2)
     'pcb_controller',         // hp_controls_compute
+    'hp_relay_board',         // hp_controls_compute (Iter 2)
+    'hp_hmi_display',         // hp_controls_hmi (Iter 2)
+    'hp_user_interface_pcb',  // hp_controls_hmi (Iter 2)
+    'water_temperature_sensor_ntc', // hp_controls_sensors (Iter 2)
+    'outdoor_temp_sensor',         // hp_controls_sensors (Iter 2)
+    'defrost_sensor',              // hp_controls_sensors (Iter 2)
+    'safety_relay_compressor',     // hp_controls_protection (Iter 2)
+    'flow_switch_safety',          // hp_controls_protection (Iter 2)
+    'high_limit_thermostat',       // hp_controls_protection (Iter 2)
     // Enclosure
     'polymer_enclosure',      // hp_enclosure_structure
     'aluminium_extrusion',    // hp_enclosure_structure frame
     'steel_plate',            // hp_enclosure_structure sheet metal
     'steel_bolt',             // hp_enclosure_structure fasteners
+    // Mounting / drainage (Iter 2)
+    'vibration_isolator_mount',
+    'wall_bracket_assembly',
+    'condensate_drip_tray',
+    'condensate_drain_hose',
+    'condensate_heater_strip',
   ]
 }
 
@@ -325,15 +486,31 @@ export function deriveVerticalFarmMandatoryCharacters(): string[] {
     // Growing rack
     'aluminium_extrusion',    // rack_structure_vfarm
     'steel_bolt',             // rack_structure_vfarm fasteners
+    'rack_caster_wheel',      // rack_structure_vfarm (Iter 2 — mobile racks)
+    // Tray + grow media (Iter 2)
+    'growing_tray_polymer',
+    'grow_media_rockwool',
     // Lighting
     'pcb_controller',         // lighting_fixtures (LED driver board)
     'copper_wire',            // lighting_fixtures wiring
+    'led_grow_module',                 // Iter 2
+    'led_constant_current_driver',     // Iter 2
+    'lighting_dali_controller',        // Iter 2
     // Fertigation
     'liquid_cooling_system',  // fertigation_flow (pump/loop — closest character)
     'polymer_gasket',         // fertigation_flow (seals)
+    'nutrient_dosing_pump',         // Iter 2
+    'nutrient_reservoir_tank',      // Iter 2
+    'ec_conductivity_sensor',       // Iter 2
+    'ph_sensor_inline',             // Iter 2
+    'water_temperature_sensor_ntc', // Iter 2 — shared
     // HVAC/CO2
     'pressure_vessel',        // co2_dosing (CO2 cylinder)
     'gas_sensor',             // co2_dosing (CO2 sensor)
+    'duct_fan_ec',            // hvac_flow (Iter 2)
+    'co2_solenoid_valve',     // co2_dosing (Iter 2)
+    'hepa_filter_element',    // hvac_filtration (Iter 2)
+    'pre_filter_g4',          // hvac_filtration (Iter 2)
   ]
 }
 
@@ -347,9 +524,34 @@ export function deriveEvChargerMandatoryCharacters(): string[] {
     'power_converter',        // charger_pcs (rectifier/PFC)
     'transformer',            // charger_pcs (isolation transformer)
     'circuit_breaker',        // charger_pcs (protection)
+    'pfc_inductor',           // charger_pcs (Iter 2)
+    // DC-DC stage (Iter 2)
+    'dc_dc_module',
+    'igbt_power_module',
+    'gate_driver_board',
+    // Input filter (Iter 2)
+    'ac_emi_filter',
+    'inrush_current_limiter',
+    'input_contactor',
+    // DC link (Iter 2)
+    'dc_link_capacitor',
+    'dc_link_busbar',
+    'dc_link_voltage_sensor',
     // Enclosure
     'switchboard_enclosure',  // charger_enclosure_structure
     'polymer_enclosure',      // charger_enclosure_structure (door/front)
+    // HMI / payment (Iter 2)
+    'hmi_capacitive_touch_panel',
+    'rfid_reader_module',
+    'payment_terminal_module',
+    // Safety circuits (Iter 2)
+    'rcd_type_b_module',
+    'emergency_stop_button',
+    'door_interlock_switch',
+    // Cable assembly (Iter 2)
+    'ccs_charging_cable',
+    'ccs_connector_assembly',
+    'cable_management_arm',
   ]
 }
 
@@ -369,10 +571,28 @@ export function deriveBioreactorMandatoryCharacters(): string[] {
     'pressure_vessel',  // bioreactor_vessel_body (steel autoclave vessel)
     'polymer_gasket',   // bioreactor_vessel_body (seals)
     'steel_plate',      // bioreactor_vessel_body (flanges)
+    // Vessel ports + valves (Iter 2)
+    'cip_sip_port_assembly',
+    'sample_port_aseptic',
+    'harvest_valve_sanitary',
+    'tri_clamp_fitting',
+    // Vessel inspection (Iter 2)
+    'sight_glass_assembly',
+    'vessel_inspection_light',
     // Controls and sensing
     'gas_sensor',         // bioreactor_sensing (pH/DO/temp sensor)
     'pcb_controller',     // bioreactor_sensing (controller)
     'optical_arc_sensor', // bioreactor_sensing (optical sensor for OD)
+    'ph_probe_sterilisable',  // Iter 2 (Mettler InPro 3253)
+    'do_probe_optical',       // Iter 2 (Hamilton OneFerm)
+    'level_sensor_capacitive', // Iter 2
+    // Process control (Iter 2)
+    'mass_flow_controller_gas',
+    'peristaltic_dosing_pump',
+    'foam_breaker_actuator',
+    // Calibration loop (Iter 2)
+    'calibration_buffer_kit',
+    'temperature_calibration_probe',
     // Bioprocess vessel (Phase B Iter 1)
     'sterile_agitator_drive',       // agitation_drive_word
     'gas_sparger_assembly',         // gas_sparger_word
@@ -392,6 +612,17 @@ export function deriveEdgeAiMandatoryCharacters(): string[] {
     'pcb_controller',  // edge_compute_hardware (GPU/TPU board)
     'network_switch',  // edge_compute_hardware (comm switch)
     'copper_wire',     // edge_compute_hardware (harness)
+    'gpu_accelerator_module',   // Iter 2 (NVIDIA H100/L40 class)
+    'ddr5_dimm_module',         // Iter 2
+    // Storage (Iter 2)
+    'nvme_ssd_module',
+    'sata_storage_drive',
+    // Power (Iter 2)
+    'server_psu_redundant',
+    'pdu_rack_outlet',
+    // Thermal (Iter 2)
+    'cooling_fan_axial',
+    'thermal_interface_material',
   ]
 }
 
@@ -410,15 +641,36 @@ export function deriveAuvMandatoryCharacters(): string[] {
     'polymer_enclosure',  // hull_structure (pressure hull)
     'aluminium_extrusion', // hull_structure (frame)
     'polymer_gasket',     // hull_structure (O-ring seals)
+    // Hull frame + brackets + fairing (Iter 2)
+    'hull_internal_frame',
+    'instrument_mount_bracket',
+    'hydrodynamic_fairing',
+    'antifouling_coating',
     // Subsea pressure vessel (Phase B Iter 1)
     'pressure_rated_endcap',  // pressure_hull_word (depth-rated end caps)
     'dive_oring_seal',        // pressure_hull_word (high-pressure O-ring stack)
     'syntactic_foam_block',   // buoyancy_compensation_word (positive buoyancy)
     'ballast_trim_weight',    // buoyancy_compensation_word (trim/ballast)
-    // Compute
+    // Compute (existing + Iter 2)
     'pcb_controller',     // edge_compute_hardware (mission computer)
     'network_switch',     // edge_compute_hardware (acoustic/ethernet switch)
     'copper_wire',        // edge_compute_hardware (harness)
+    'ddr5_dimm_module',
+    'nvme_ssd_module',
+    'cooling_fan_axial',
+    // Avionics (Iter 2 — flight_computer sentence; AUV uses flight_computer for nav)
+    'imu_6dof_module',
+    'magnetometer_3axis',
+    'barometer_pressure_sensor',
+    'gnss_receiver_module',
+    'antenna_pcb',
+    // Propulsion (Iter 2)
+    'power_converter',
+    'brushless_dc_motor',
+    'electronic_speed_controller',
+    'propeller_carbon_blade',
+    'motor_mount_aluminium',
+    'motor_bearing_set',
   ]
 }
 
@@ -438,17 +690,39 @@ export function deriveHapsMandatoryCharacters(): string[] {
     'aluminium_extrusion', // haps_structure (spar/frame)
     'steel_bolt',          // haps_structure (fasteners)
     'polymer_enclosure',   // haps_structure (nacelle/pod)
+    'haps_rib_assembly',   // haps_structure (Iter 2)
+    'haps_skin_film',      // haps_structure (Iter 2)
+    // Control surfaces + servos (Iter 2)
+    'haps_elevon_assembly',
+    'haps_aileron_assembly',
+    'mass_balance_weight',
+    'servo_actuator_high_torque',
+    'servo_pushrod_carbon',
     // Solar-electric airframe (Phase B Iter 1)
     'composite_spar',                 // composite_spar_word (carbon-fibre primary spar)
     'wing_integrated_pv_module',      // photovoltaic_array_word (wing-skin PV)
     'mppt_charge_controller',         // photovoltaic_array_word (MPPT)
     'lithium_sulfur_night_battery',   // night_storage_battery_word (Li-S 30-day pack)
-    // Propulsion
+    // Propulsion (existing + Iter 2)
     'power_converter',     // propulsion_motors (motor driver)
     'copper_wire',         // propulsion_motors (wiring)
-    // Avionics / compute
+    'brushless_dc_motor',                // Iter 2
+    'electronic_speed_controller',       // Iter 2
+    'propeller_carbon_blade',            // Iter 2
+    'motor_mount_aluminium',             // Iter 2
+    'motor_bearing_set',                 // Iter 2
+    // Avionics (existing + Iter 2)
     'pcb_controller',      // edge_compute_hardware (flight computer)
     'network_switch',      // edge_compute_hardware (comms)
+    'imu_6dof_module',                   // Iter 2
+    'magnetometer_3axis',                // Iter 2
+    'barometer_pressure_sensor',         // Iter 2
+    'gnss_receiver_module',              // Iter 2
+    'antenna_pcb',                       // Iter 2
+    'telemetry_radio_modem',             // Iter 2
+    // Edge compute payload (Iter 2 — HAPS often carries payload server)
+    'ddr5_dimm_module',
+    'nvme_ssd_module',
   ]
 }
 
