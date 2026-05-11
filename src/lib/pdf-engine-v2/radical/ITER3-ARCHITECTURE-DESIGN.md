@@ -1,0 +1,322 @@
+# Iter 3 Architecture — Module Decomposition Stage (Stage 1.5)
+
+**Status:** DESIGN ONLY — no engine code modified.
+**Author:** sub-agent, 2026-05-11.
+**Validated by:** Tristan (architectural diagnosis at `~/Downloads/missing-stage-architectural-diagnosis.md`).
+**Predecessors:** Iter 1 (wrong-domain leakage fix), Iter 2 (library expanded to 335 mandatory characters).
+**Successor:** Iter 3 implementation (separate hand-off; this doc is the contract).
+
+---
+
+## §1 Current pipeline (post-Iter 2)
+
+```
+Brief (English)  →  Stage 2: brief → RadicalTree (one LLM call)  →  Resolution → BoM
+```
+
+The single LLM call in `runDecomposeRadical()` is asked to (a) read a free-form brief, (b) infer the product class, (c) produce a flat leaf list spanning all subsystems, (d) map each leaf to a known character_id. Iter 2 propped this up by inflating `deriveClassMandatoryCharacters()` to 335 baseline characters per class — but the LLM still emits a sketch (~20–40 leaves per call) and the mandatory-character backfill papers over the gap. Real BESS depth is ~150 unique characters; the gap is a structural ceiling on what one LLM call can produce, not a library gap.
+
+---
+
+## §2 Proposed pipeline (Iter 3)
+
+```
+Brief  →  Stage 1.5: Module Decomposition  →  Stage 2: per-module radical sub-trees  →  Union  →  Resolution → BoM
+                  (1 LLM call: ~9 modules)        (N LLM calls: 1 per applicable module)
+```
+
+`Stage 1.5` is the new artefact. It produces a `ModuleDecomposition` (catalog of 5–9 universal modules instantiated for THIS product). `Stage 2` then loops over the modules — each LLM call sees a focused subset of the library and decomposes a single module deeply, instead of being asked to produce the whole product in one shot.
+
+---
+
+## §3 Universal functional taxonomy (9 modules)
+
+A product class never selects a bespoke module catalog. Every product is decomposed against the same 9 universal functions; an "excluded" set marks the ones N/A for this class. This is what makes the engine generalise to unseen classes (tidal, RO desal, surgical robot) without per-class hand-coding.
+
+| # | `UniversalModule` key | One-sentence definition |
+|---|---|---|
+| 1 | `energy_storage_source` | Stores or sources the primary working energy/material the product uses (battery, fuel tank, capacitor bank, accumulator, biomass feedstock, water reservoir). |
+| 2 | `energy_conversion_transduction` | Converts energy or material between forms (inverter, motor, heat exchanger, pump, fermenter, RO membrane, solar cell, turbine). |
+| 3 | `structure_containment` | Carries load, contains pressure/fluid, and provides geometric form (pressure vessel, frame, enclosure, container shell, hull, chassis). |
+| 4 | `sensing_instrumentation` | Measures physical state — temperature, pressure, flow, voltage, biochemistry, position, gas concentration. |
+| 5 | `control_compute_communication` | Closed-loop control, supervisory compute, and on/off-board comms (PLC, MCU, EMS, SCADA, radio, CAN bus, edge inference). |
+| 6 | `safety_protection` | Detects and mitigates hazards (fire suppression, surge protection, pressure relief, e-stops, interlocks, BMS protection circuits). |
+| 7 | `environmental_interface` | Handles the physical boundary with the operating environment (thermal management, ingress protection, EMC shielding, lightning, anti-icing, biofouling protection). |
+| 8 | `power_distribution` | Distributes electrical or fluid power within the product (busbars, switchgear, harnesses, manifolds, valves, conduit). |
+| 9 | `maintenance_serviceability` | Affords inspection, swap, calibration, decommissioning (access doors, lifting eyes, drain valves, test points, spare-parts kits, labels). |
+
+**Why 9 (not the original 9 listed in Tristan's brief).** The brief proposed `storage / conversion / structure / sensing / control / safety / interface / distribution / serviceability`. Adopted as-is, with the renames above for clarity (e.g. `interface` → `environmental_interface` to avoid collision with the data-interface concept used in Stage 2 PA validation).
+
+**Excluded modules** — every product will mark some as N/A. A flow-through heat exchanger has no `energy_storage_source`. A passive optical sensor has no `power_distribution`. A pure-mechanical hand tool has no `control_compute_communication`. The exclusion is explicit in the `ModuleDecomposition.excluded_modules` field so downstream stages can reason about absence as deliberate, not missing.
+
+---
+
+## §4 Stage 1.5 — Module Decomposition (NEW)
+
+### 4.1 Input/output contract
+
+**Input:**
+- `parsedBrief: StructuredBriefJSON` (current Stage 1 output — unchanged)
+- `classification: string` (current PA Stage 2 output — unchanged)
+- `regulatoryExtraction?: RegulatoryExtraction` (current PA Stage 4 output — unchanged)
+
+**Output:** `StageResult<ModuleDecomposition>` (see types skeleton).
+
+The contract is purely additive — Stage 1.5 lives between current Stages 4 and 5/2 in the PA flow, and between current Stages 1 and 2 in the radical flow. No upstream stage has its signature changed.
+
+### 4.2 LLM prompt strategy
+
+```
+SYSTEM
+You are decomposing a hardware product into a fixed set of 9 universal
+engineering modules. Your output is a JSON object naming which of the 9
+modules apply, with a 2–3 sentence module_brief for each, derived
+parameters, and the subset of the 22 universal radicals that are
+appropriate for this module on this product.
+
+THE 9 UNIVERSAL MODULES
+{{taxonomy_block}}    // §3 above, rendered
+
+ALLOWED RADICALS PER MODULE (default mapping — refine for the product)
+{{allowed_radicals_default}}    // see §5.2
+
+USER
+[Structured brief]
+{{parsedBrief}}
+
+[Classification]
+{{classification}}
+
+[Regulatory context — first 20 entries]
+{{regulatoryExtraction}}
+
+[Output schema]
+{
+  "product_class": "<classification>",
+  "modules": [
+    {
+      "module": "<one of the 9>",
+      "module_brief": "<2-3 sentences specific to THIS product>",
+      "derived_parameters": { "<key>": <number|string> },
+      "allowed_radicals": ["<radical_id>", ...],
+      "applicability_confidence": "high|medium|low"
+    }
+  ],
+  "excluded_modules": ["<module>", ...],
+  "rationale_excluded": { "<module>": "<why N/A>" }
+}
+```
+
+Temperature 0.0. Models: `google/gemini-3.1-pro-preview` primary, `x-ai/grok-4.3` fallback (matches current Stage 2). max_tokens: 4096 (small output — module catalog only, no leaf list).
+
+### 4.3 Council validation step
+
+After the LLM emits the catalog, run a **3-seat council** (sonnet 4.7 + gemini 3.1 pro + grok 4.3) over the catalog only (not the brief). Each seat answers:
+
+1. Does the module list cover the product's functional surface? (yes/no/missing: ...)
+2. Are any modules genuinely N/A but listed? (yes/no/which: ...)
+3. Are derived_parameters numerically plausible? (yes/no/specific challenge: ...)
+
+Verdict aggregator:
+- 3/3 OK → `council_verdict = 'OK'`, proceed.
+- 2/3 OK → `'NEEDS_MINOR'`, log notes, proceed (warn).
+- ≤1/3 OK → `'NEEDS_MAJOR'`, retry Stage 1.5 once with council notes appended; if still ≤1/3, fail the stage.
+
+Council cost: ~£0.10/run (3 short reviews of a small JSON). Cheap relative to the Stage 2 amplification.
+
+### 4.4 Failure modes + fallbacks
+
+| Failure mode | Detection | Fallback |
+|---|---|---|
+| LLM emits invalid module key | JSON validation against `UNIVERSAL_MODULES` enum | Reject + retry with `validation_reminder` appended (one retry, then fail) |
+| LLM names <3 modules | `modules.length >= 3` invariant | Likely a parse error; retry once, then fail |
+| LLM names all 9 modules with `low` confidence | confidence histogram | Council ALWAYS triggers `NEEDS_MAJOR` — retry with stricter prompt |
+| LLM hallucinates a module not in the 9 | Enum check rejects | Same as invalid key |
+| `derived_parameters` numerically nonsensical (e.g. capacity_kwh: -50) | Range check per parameter | Strip the bad parameter, log warning, proceed |
+| Council disagrees on module set | Majority rule | Use majority; record dissent in `council_notes` |
+| Total Stage 1.5 failure | Returns `StageResult.ok = false` | Pipeline falls back to legacy Stage 2 (the current single-shot path) — **dual-write/dual-read for migration; see §6.2** |
+
+---
+
+## §5 Stage 2 — Per-Module Radical Translation (MODIFIED)
+
+### 5.1 Loop structure
+
+Current `runDecomposeRadical()` makes one LLM call. New flow:
+
+```
+for each module in moduleDecomposition.modules:
+    leafList_module = await callLLMPerModule({
+        module_brief,
+        derived_parameters,
+        allowed_radicals: module.allowed_radicals,    // SUBSET — narrow attention
+        allowed_characters: characterLibrary.filter(c => c.radicals ⊆ module.allowed_radicals),
+    })
+    validate, collect
+
+aggregatedLeafList = union(all module leaf lists)
+tree = buildTreeFromLeaves(aggregatedLeafList, ...)    // existing deterministic builder, unchanged
+```
+
+Each per-module call sees ~30–60 candidate characters instead of ~335. The narrowed attention surface is what unlocks deeper decomposition per module (target: 15–30 leaves per module × 5–8 modules = 75–240 leaves total, vs current ceiling of ~40).
+
+### 5.2 Module-specific allowed_radicals subset
+
+Default mapping (Stage 1.5 LLM may refine per product):
+
+| Module | Default allowed radicals |
+|---|---|
+| `energy_storage_source` | electrochemical_energy, lithium_iron_phosphate, hydrogen_storage, fluid_flow_state, pressure_vessel |
+| `energy_conversion_transduction` | silicon_semiconductor, magnetic_coupling, electromechanical_switching, thermal_transfer, mechanical_kinetic, optical_transduction, biochemical_sensing, electrochemical_reaction, refrigerant_fluid |
+| `structure_containment` | steel, aluminium_alloy, carbon_fibre_composite, polymer_thermoplastic, mineral_fibre_material, pressure_vessel |
+| `sensing_instrumentation` | silicon_semiconductor, optical_sensing, chemical_sensing, biochemical_sensing, digital_logic |
+| `control_compute_communication` | silicon_semiconductor, digital_logic, electrical_conducting, copper |
+| `safety_protection` | chemical_suppressant, optical_sensing, chemical_sensing, electromechanical_switching, pressure_vessel |
+| `environmental_interface` | thermal_transfer, refrigerant_fluid, fluid_flow_state, polymer_thermoplastic, mineral_fibre_material |
+| `power_distribution` | copper, electrical_conducting, electromechanical_switching, polymer_thermoplastic, fluid_flow_state |
+| `maintenance_serviceability` | steel, polymer_thermoplastic, electrical_conducting |
+
+Tristan's example holds: a BESS `energy_storage_source` gets `electrochemical_energy + lithium_iron_phosphate`, NOT `photovoltaic` (the BESS is grid-charged, not solar). A solar-charged BESS would have Stage 1.5 add `photovoltaic` to its `energy_storage_source.allowed_radicals` because the brief says so.
+
+### 5.3 Per-module LLM prompt strategy
+
+```
+SYSTEM
+You are decomposing the {{module}} of a {{product_class}} into LEAVES
+(individual procurable parts). Output a flat JSON array of LeafRecord.
+
+You may ONLY use character_ids from this list:
+{{filtered_character_library}}     // ~30–60 entries, not the full 335
+
+You may ONLY assign radicals from:
+{{module.allowed_radicals}}
+
+CONTEXT FROM STAGE 1.5
+module_brief: {{module.module_brief}}
+derived_parameters: {{module.derived_parameters}}
+
+USER
+Produce the full leaf list for THIS module only. Other modules are
+handled separately — do NOT include them. Aim for 15–30 leaves with
+realistic multiplicities.
+```
+
+Temperature 0.0. Models: `google/gemini-3.1-pro-preview` primary, `x-ai/grok-4.3` fallback. max_tokens 4096 per call (single-module output, smaller than the current 8192 single-shot).
+
+### 5.4 Aggregation back to product-level paragraph
+
+After all per-module calls return, merge into the paragraph → sentence → word → character tree the same way `buildTreeFromLeaves()` already does. The deterministic builder doesn't care WHERE the leaves came from — it only needs character_ids and multiplicities. The mapping `module → sentence` is straightforward because each `UniversalModule` corresponds to a sentence-cluster in `character-hierarchy.ts` (`energy_storage_source` → `battery_rack_assembly` for BESS, → `hydrogen_storage_module` for fuel cell, → `accumulator_assembly` for hydraulic, etc.). The hierarchy file gets a per-class mapping `universalModuleToSentenceIds[productClass][module] = string[]` added in Iter 3 implementation.
+
+---
+
+## §6 Migration plan
+
+### 6.1 Code changes required (file-by-file)
+
+| File | Change |
+|---|---|
+| `src/lib/pdf-engine-v2/types/module-decomposition.ts` | NEW — type contracts (this commit's Artefact 2) |
+| `src/lib/pdf-engine-v2/stages/1.7-module-decomposition.ts` | NEW — `runModuleDecomposition()` entry point |
+| `src/lib/pdf-engine-v2/prompts.ts` | NEW exports: `MODULE_DECOMPOSITION_TAXONOMY_PROMPT`, `MODULE_DECOMPOSITION_COUNCIL_PROMPT`, `PER_MODULE_LEAF_PROMPT` |
+| `src/lib/pdf-engine-v2/stages/2-decompose.ts` | NEW function: `runDecomposeRadicalPerModule(moduleDecomposition)` — parallel to `runDecomposeRadical` |
+| `src/lib/pdf-engine-v2/radical/character-hierarchy.ts` | NEW export: `universalModuleToSentenceIds` (per-class map) |
+| `src/lib/pdf-engine-v2/radical/structural-builder.ts` | NEW export: `filterCharacterLibraryByRadicals(allowedRadicals)` helper for §5.3 |
+| `src/lib/pdf-engine-v2/index.ts` (or wherever the pipeline orchestrator lives) | Insert Stage 1.7 between current Stage 4 (regulatory) and Stage 2 (decompose) when `RADICAL_PHASE_3_PER_MODULE=true` |
+
+No deletions. No edits to existing function bodies — Iter 3 is **strictly additive** to keep V8/V9 batches in flight unaffected.
+
+### 6.2 Backward compatibility
+
+Gate the new path behind `RADICAL_PHASE_3_PER_MODULE` (default `false`). When false: existing pipeline unchanged. When true: Stage 1.7 runs, Stage 2 uses the per-module loop. This mirrors the gating pattern Iter 2 used (`RADICAL_PHASE_1_TREE_OUTPUT`).
+
+**Dual-run window:** during the V10/V11 batch comparison, run BOTH paths on the same brief and compare leaf counts + cell ≥8 distribution. Promote to default-on only when V11 ≥ V10 on cell ≥8 across the 10 baselines AND ≥80% on the 5 unseen-class probes (§7).
+
+### 6.3 Cost impact estimate
+
+**Per-pipeline LLM call delta:**
+
+| Stage | Iter 2 calls | Iter 3 calls | Delta |
+|---|---|---|---|
+| 1.5 module decomposition | 0 | 1 | +1 |
+| 1.5 council validation | 0 | 3 (parallel) | +3 |
+| 2 decompose | 1 | 5–9 (one per applicable module) | +4 to +8 |
+| **Total LLM calls per pipeline run** | **~12** (whole pipeline) | **~20–24** | **+8 to +12 (~70%–100% lift)** |
+
+Token-cost multiplier per pipeline: ~1.7×–2.0× (the per-module calls are smaller individually so it's not a clean 2× on calls).
+
+GBP/run estimate (gemini 3.1 pro at ~£3 per million input + £15 per million output):
+- Iter 2 baseline: ~£0.40 per pipeline run.
+- Iter 3 projected: ~£0.70–£0.85 per pipeline run.
+- 10-baseline batch: ~£8.50 vs ~£4.00 today.
+- Full V10 batch (10 briefs × 3 iters of brief revision × scoring): ~£30 vs ~£15.
+
+This is structurally cheaper than the alternative (continuing to inflate the library while accepting low cell ≥8 scores → rerun more batches to grind out incremental gains).
+
+---
+
+## §7 Universality test plan (Phase D)
+
+Iter 3 cannot ship as default-on until it demonstrates **universality**, not just BESS depth. The 5 unseen-class probes:
+
+| # | Brief | Expected modules to appear | Pass: leaf count + cell ≥8 |
+|---|---|---|---|
+| 1 | Tidal stream generator (1 MW, North Sea) | conversion (turbine, gearbox, generator), structure (nacelle, tower, foundation), environmental_interface (anti-biofouling, anti-corrosion), control, safety, distribution | ≥80% of expected unique line items + ≥6/10 average cell score |
+| 2 | RO desalination skid (1000 m³/day) | conversion (HP pump, RO membrane stack), storage (feed tank, brine tank), distribution (pre-filter, post-filter, valves), sensing (conductivity, pressure, flow), control, safety, structure, serviceability | same |
+| 3 | LEO satellite ground station (Ka-band, 7.3 m dish) | conversion (LNA, downconverter, modem), structure (dish, pedestal, radome), environmental_interface (de-icing, sun shield), control, sensing, distribution, safety | same |
+| 4 | Microbrewery fermentation vessel (20 hL stainless) | structure (vessel, jacket), environmental_interface (cooling jacket, insulation), sensing (pH, DO, temp, level), control, safety (PRV, sample port), distribution (CIP/SIP, racking valve), serviceability | same |
+| 5 | Surgical robot end-effector (laparoscopic, 8 mm) | conversion (μ-motors, force transducers), structure (housing, articulation joints), sensing (force, position, vision), control, safety (emergency-disengage, sterilisation interface), distribution (cable harness through arm) | same |
+
+**Pass criteria (per brief):**
+1. Stage 1.5 produces a module catalog with ≥4 modules and ≥1 explicit exclusion (proves the LLM is engaging the taxonomy, not rubber-stamping all 9).
+2. Stage 2 produces ≥80% of the manually-estimated unique-line-item count for that product (manual estimate done before running, sealed envelope).
+3. The aggregated tree resolves cleanly into a procurable BoM (no >10% UNKNOWN_RADICAL leaves).
+4. Council scorecard ≥6/10 on Design Modules and BoM sections (lower bar than baseline because library coverage is thinner for unseen classes — this is a coverage probe, not a quality probe).
+
+**Failure handling:** if any of the 5 fails, Iter 3 ships in **opt-in mode only** (env-flag remains off by default) and the universality bug is logged for Iter 4. Do NOT ship default-on with <5/5 pass.
+
+---
+
+## §8 Risks
+
+### 8.1 LLM hallucination in module catalog
+
+**Risk:** the LLM lists `energy_storage_source` for a flow-through device, or omits `safety_protection` from a high-voltage product. The council guard catches gross errors but not subtle ones.
+
+**Mitigation:** maintain a `class_module_priors` table in code (NOT LLM-generated). For the 10 baselines we know which modules MUST appear (e.g. BESS MUST have all 9 except possibly `maintenance_serviceability` if the brief is silent). Stage 1.5 cross-checks the LLM output against the priors and flags discrepancies. For unseen classes there's no prior — accept LLM judgement + council.
+
+### 8.2 Cost amplification (3–5× LLM calls)
+
+Quantified in §6.3 — projected ~1.7×–2× cost lift per pipeline. Acceptable if cell ≥8 lifts +30 (per Tristan's diagnosis estimate). NOT acceptable if cell ≥8 lifts <+10 — kill criterion for Iter 3.
+
+**Mitigation 1:** parallel module calls (`Promise.all`) — the wall-clock latency hit is ~1.3× even though token spend is 2×.
+**Mitigation 2:** route per-module calls to cheaper models (`x-ai/grok-4.3` or `xiaomi/mimo-v2.5-pro`) if quality holds. Stage 1.5 stays on gemini-3.1-pro because it's the integration step.
+
+### 8.3 Module overlap (e.g. structure vs interface on a pressure vessel)
+
+A BESS container shell is `structure_containment` (it carries load, contains the rack) AND `environmental_interface` (it's IP55, weatherproof, fire-rated). A pressure vessel on a bioreactor is `structure_containment` AND `safety_protection` (the burst rating is a safety boundary).
+
+**Mitigation:** Stage 1.5 prompt explicitly allows multi-classification via a future `secondary_modules: UniversalModule[]` field on `ModuleSpec`. Defer to Iter 3.5 — for v1 we live with the LLM picking one. Council notes will flag the cases where a leaf "wants" to be in two modules.
+
+### 8.4 Determinism regression
+
+The current single-shot path is reproducible at temperature=0.0. The per-module loop introduces N independent LLM calls — variance compounds. Same brief might produce a different module catalog → different per-module calls → different leaf set.
+
+**Mitigation:** seed the council with a fixed verdict-aggregation rule (majority + alphabetical tiebreak); pin model versions in the env; canonicalise the leaf list (sort by character_id) before the deterministic builder runs. Accept that bit-identical reproducibility across runs is no longer guaranteed, but test that the leaf-list HASH stabilises within ±5% across 3 reruns of the same brief.
+
+### 8.5 The mapping `universalModuleToSentenceIds[productClass][module]` becomes a maintenance burden
+
+Per-class tables are exactly what Tristan wants to AVOID (the universality goal). For the 10 baselines the table is ~9 entries × 10 classes = 90 mappings. For unseen classes it's empty — the builder falls back to a "best-fit" sentence resolver based on character ↔ sentence matches.
+
+**Mitigation:** for unseen classes, `buildTreeFromLeaves` already routes via `character-hierarchy`. The new mapping is only needed for the OPTIONAL hint that Stage 2 can use when constraining the per-module character library. If absent, Stage 2 falls back to "use all characters whose radicals are in `module.allowed_radicals`" — radical-based filtering, fully universal.
+
+---
+
+## Iteration kill criteria
+
+Iter 3 implementation is dropped if, after one full implementation pass + V10 batch:
+- Cell ≥8 lift < +10 vs Iter 2 baseline (currently 33/120). Target: 60+/120.
+- Cost per run > 2.5× Iter 2 baseline.
+- <3/5 unseen-class probes pass §7 criteria.
+- Determinism HASH variance > ±10% across 3 reruns of the same brief.
+
+Any one of those = revert to Iter 2 default and re-plan.
