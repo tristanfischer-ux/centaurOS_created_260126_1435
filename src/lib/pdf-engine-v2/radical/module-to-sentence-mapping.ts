@@ -83,6 +83,7 @@ export const MODULE_TO_SENTENCES: Record<UniversalModule, string[]> = {
     'biosensor_system',                       // CGM electrochemistry → electrical signal
     'solar_electric_airframe',                // HAPS PV array (also under structure_containment)
     'propulsion_system',                      // Drone/AUV/HAPS motors convert electrical → mechanical
+    'lighting_system',                        // Vfarm LEDs convert electrical → photons
   ],
 
   // 3. Structure / containment — passive load + form.
