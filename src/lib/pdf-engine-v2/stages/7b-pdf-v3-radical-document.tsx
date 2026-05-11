@@ -211,30 +211,37 @@ function buildFeasibilityFields(state: PipelineState): {
   manufacturingFlags: string[]
 } {
   const cs = state.radicalCostSummary ?? state.costSummary
+  // P0 null-guard: both cost summaries absent → return safe placeholder (council be8de574)
+  if (!cs) {
+    return {
+      costVerdict: '—',
+      topRisks: ['Cost data unavailable — run pipeline stage 4 to generate cost summary.'],
+      regulatoryFlags: ['No regulatory data available — verify jurisdiction-specific requirements before manufacture.'],
+      manufacturingFlags: ['Cost summary absent — lead time and minimum order quantity verification required before design lock.'],
+    }
+  }
   const grammarVerdicts = state.grammarVerdicts
   const brief = state.research?.designBrief
 
-  // Field 1 — Cost verdict + reduction path
+  // Field 1 — Cost verdict + reduction path (cs is non-null after early return above)
   let costVerdict = '—'
-  if (cs) {
-    const unitCost = cs.finalUnitCost
-    const ceiling = cs.ceilingCost ?? brief?.constraints?.unitCostCeilingGbp
-    if (ceiling && unitCost > ceiling) {
-      const pct = ((unitCost - ceiling) / ceiling * 100).toFixed(0)
-      // Suggest reduction paths from topDrivers
-      const top2Drivers = cs.topDrivers?.slice(0, 2).map(d => d.partName) ?? []
-      const reductionSuggestions: string[] = []
-      if (top2Drivers[0]) reductionSuggestions.push(`substitute or batch-source ${top2Drivers[0]}`)
-      if (top2Drivers[1]) reductionSuggestions.push(`re-evaluate specification on ${top2Drivers[1]}`)
-      reductionSuggestions.push(`increase production volume from batch to series run`)
-      costVerdict =
-        `Over budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)} (+${pct}%). ` +
-        `Reduction paths: ${reductionSuggestions.slice(0, 2).join('; ')}.`
-    } else if (ceiling) {
-      costVerdict = `Within budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)}.`
-    } else {
-      costVerdict = `Estimated unit cost: ${fmtGbp(unitCost)}. No cost ceiling specified in brief.`
-    }
+  const unitCost = cs.finalUnitCost
+  const ceiling = cs.ceilingCost ?? brief?.constraints?.unitCostCeilingGbp
+  if (ceiling && unitCost > ceiling) {
+    const pct = ((unitCost - ceiling) / ceiling * 100).toFixed(0)
+    // Suggest reduction paths from topDrivers
+    const top2Drivers = cs.topDrivers?.slice(0, 2).map(d => d.partName) ?? []
+    const reductionSuggestions: string[] = []
+    if (top2Drivers[0]) reductionSuggestions.push(`substitute or batch-source ${top2Drivers[0]}`)
+    if (top2Drivers[1]) reductionSuggestions.push(`re-evaluate specification on ${top2Drivers[1]}`)
+    reductionSuggestions.push(`increase production volume from batch to series run`)
+    costVerdict =
+      `Over budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)} (+${pct}%). ` +
+      `Reduction paths: ${reductionSuggestions.slice(0, 2).join('; ')}.`
+  } else if (ceiling) {
+    costVerdict = `Within budget: ${fmtGbp(unitCost)} vs target ${fmtGbp(ceiling)}.`
+  } else {
+    costVerdict = `Estimated unit cost: ${fmtGbp(unitCost)}. No cost ceiling specified in brief.`
   }
 
   // Field 2 — Top 3 risks (from grammar WARN + BLOCK verdicts)
@@ -269,19 +276,15 @@ function buildFeasibilityFields(state: PipelineState): {
   }
 
   // Field 4 — Manufacturing flags (from grammar verdicts + cost structure)
+  // cs is non-null after early return above
   const manufacturingFlags: string[] = []
-  if (cs) {
-    const quotedPct = ((cs.quotedCostFraction ?? 0) * 100).toFixed(0)
-    manufacturingFlags.push(`Price confidence: ${quotedPct}% of BOM backed by distributor quotes; remainder is Grade-D or LLM estimate.`)
-    if (cs.topDrivers && cs.topDrivers.length > 0) {
-      const driver = cs.topDrivers[0]
-      manufacturingFlags.push(`Top cost driver: ${driver.partName} — ${driver.pct.toFixed(0)}% of BOM total (${fmtGbp(driver.totalGbp)}).`)
-    }
+  const quotedPct = ((cs.quotedCostFraction ?? 0) * 100).toFixed(0)
+  manufacturingFlags.push(`Price confidence: ${quotedPct}% of BOM backed by distributor quotes; remainder is Grade-D or LLM estimate.`)
+  if (cs.topDrivers && cs.topDrivers.length > 0) {
+    const driver = cs.topDrivers[0]
+    manufacturingFlags.push(`Top cost driver: ${driver.partName} — ${driver.pct.toFixed(0)}% of BOM total (${fmtGbp(driver.totalGbp)}).`)
   }
-  const customCotsSplit = cs
-    ? `OEM/custom parts constitute the majority of cost — verify minimum order quantities and lead times before design lock.`
-    : `Lead time and minimum order quantity verification required before design lock.`
-  manufacturingFlags.push(customCotsSplit)
+  manufacturingFlags.push(`OEM/custom parts constitute the majority of cost — verify minimum order quantities and lead times before design lock.`)
 
   return { costVerdict, topRisks, regulatoryFlags, manufacturingFlags }
 }
