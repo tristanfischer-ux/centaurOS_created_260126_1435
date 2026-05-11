@@ -367,6 +367,248 @@ const FeasibilityAssessmentPage = ({ state }: { state: PipelineState }) => {
   )
 }
 
+// ---------------------------------------------------------------------------
+// §C — Brief Requirements Page (structured 2-column key/value with class-aware
+// regulatory flags). Renders always — shows placeholder when parsedBrief absent.
+// No new LLM call — synthesises from parsedBrief + regulatoryExtraction + grammarVerdicts.
+// ---------------------------------------------------------------------------
+
+// Per-class regulatory standards map — class-specific compliance requirements surfaced here
+// so scorers see class-appropriate standards without needing LLM inference.
+const CLASS_REGULATORY_FLAGS: Record<string, string[]> = {
+  bess:        ['G99 (Distribution Network Operator connection)', 'IEC 62619 (Li-ion safety)', 'BS EN 62040-3 (UPS performance)', 'DNO pre-application consultation required'],
+  heat_pump:   ['F-Gas Regulation (EC 842/2006 successor)', 'ErP Directive (2009/125/EC)', 'MCS Certificate required for grant eligibility', 'REFCOM certification for refrigerant handling'],
+  cgm:         ['ISO 13485 (Medical QMS)', 'IEC 60601-1 (Electrical safety for medical)', 'IVDD / IVDR (EU In Vitro Diagnostic Regulation)', 'MHRA Registration (UK market)'],
+  drone:       ['UK Air Navigation Order (Civil Aviation Authority)', 'CAA Operational Authorisation (>250 g)', 'EU EASA Category A1/A3 Drone Regulation', 'RED Directive (2014/53/EU) for radio module'],
+  auv:         ['IMO SOLAS collision regulations (COLREGS)', 'IEC 60529 IP68 for underwater enclosures', 'ATEX/IECEx if battery in explosive atmosphere', 'ITAR/EAR export controls (navigation hardware)'],
+  bioreactor:  ['ISO 10993 (biocompatibility if human-contact)', 'ASME BPE (bioprocess equipment)', 'GMP Annex 1 (sterile manufacturing environment)', 'CE Marking / Machinery Directive (2006/42/EC)'],
+  farm:        ['Water Framework Directive (irrigation systems)', 'CE Marking / Machinery Directive (2006/42/EC)', 'Health & Safety at Work Act 1974 (UK)', 'Food Safety Act 1990 (produce contact surfaces)'],
+  ev_charger:  ['IEC 61851 (EV conductive charging)', 'BS 7671 / 18th Edition Wiring Regulations', 'OLEV/OZEV compliance for grant-eligible units', 'Smart Charging (UK SI 2021/1467)'],
+  edge_ai:     ['RED Directive (2014/53/EU) for wireless', 'CE / UKCA Marking (EMC Directive 2014/30/EU)', 'GDPR / UK Data Protection Act (if data-processing)', 'RoHS 3 (2015/863/EU) for electronic components'],
+}
+
+function getClassRegulatoryFlags(productClass: string | undefined | null): string[] {
+  if (!productClass) return []
+  const cls = productClass.toLowerCase().replace(/[-\s]/g, '_')
+  // Try exact match first, then substring match for flexibility
+  if (CLASS_REGULATORY_FLAGS[cls]) return CLASS_REGULATORY_FLAGS[cls]
+  for (const [key, flags] of Object.entries(CLASS_REGULATORY_FLAGS)) {
+    if (cls.includes(key) || key.includes(cls)) return flags
+  }
+  return []
+}
+
+const BriefRequirementsPage = ({ state }: { state: PipelineState }) => {
+  const projectId = dash(state.projectId)
+  const parsedBrief = state.parsedBrief
+  const brief = state.research?.designBrief
+  const cs = state.radicalCostSummary ?? state.costSummary
+  const regs = state.regulatoryExtraction?.regulatory_entries ?? []
+  const classFlags = getClassRegulatoryFlags(state.productClass)
+
+  // Build KV rows from parsedBrief.constraints if available, else fallback to DesignBrief
+  const kvRows: Array<{ label: string; value: string; highlight?: boolean }> = []
+
+  if (parsedBrief) {
+    const c = parsedBrief.constraints
+    kvRows.push({ label: 'Product Description', value: dash(parsedBrief.product_description) })
+    kvRows.push({ label: 'Mission', value: dash(parsedBrief.mission_statement) })
+    kvRows.push({
+      label: 'Unit Cost Ceiling',
+      value: c.unit_cost_ceiling.value != null
+        ? `${c.unit_cost_ceiling.currency} ${c.unit_cost_ceiling.value.toLocaleString('en-GB')} (${c.unit_cost_ceiling.source})`
+        : 'Not specified',
+      highlight: c.unit_cost_ceiling.value != null && cs?.isOverBudget,
+    })
+    kvRows.push({
+      label: 'Mass Budget',
+      value: c.max_mass_kg.value != null
+        ? `${c.max_mass_kg.value} kg (${c.max_mass_kg.source})`
+        : 'Not specified',
+    })
+    if (c.max_dimensions_mm.w != null || c.max_dimensions_mm.d != null || c.max_dimensions_mm.h != null) {
+      kvRows.push({
+        label: 'Envelope (W × D × H)',
+        value: `${c.max_dimensions_mm.w ?? '—'} × ${c.max_dimensions_mm.d ?? '—'} × ${c.max_dimensions_mm.h ?? '—'} mm (${c.max_dimensions_mm.source})`,
+      })
+    }
+    if (c.target_performance.key_metric) {
+      kvRows.push({
+        label: `Performance: ${c.target_performance.key_metric}`,
+        value: `${c.target_performance.value ?? '—'} ${c.target_performance.unit ?? ''} (${c.target_performance.source})`,
+      })
+    }
+    if (c.batch_size.value != null) {
+      kvRows.push({ label: 'Batch Size', value: `${c.batch_size.value} units (${c.batch_size.source})` })
+    }
+    if (c.operating_environment.temp_min_c != null || c.operating_environment.temp_max_c != null) {
+      kvRows.push({
+        label: 'Operating Temperature',
+        value: `${c.operating_environment.temp_min_c ?? '—'} °C to ${c.operating_environment.temp_max_c ?? '—'} °C`,
+      })
+    }
+    if (c.target_process.value) {
+      kvRows.push({ label: 'Target Process', value: dash(c.target_process.value) })
+    }
+    if (c.target_material.value) {
+      kvRows.push({ label: 'Target Material', value: dash(c.target_material.value) })
+    }
+    if (c.design_life.value) {
+      kvRows.push({ label: 'Design Life', value: dash(c.design_life.value) })
+    }
+    if (c.additional_constraints.length > 0) {
+      kvRows.push({
+        label: 'Additional Constraints',
+        value: c.additional_constraints.map(ac => ac.description).join('; '),
+      })
+    }
+    if (parsedBrief.missing_mandatory_fields.length > 0) {
+      kvRows.push({
+        label: 'Missing Fields',
+        value: parsedBrief.missing_mandatory_fields.join(', '),
+        highlight: true,
+      })
+    }
+  } else if (brief) {
+    // Fallback to legacy DesignBrief structure
+    kvRows.push({ label: 'Use Case', value: dash(brief.useCase) })
+    if (brief.constraints?.unitCostCeilingGbp) {
+      kvRows.push({ label: 'Unit Cost Ceiling', value: `£${brief.constraints.unitCostCeilingGbp.toLocaleString('en-GB')}`, highlight: cs?.isOverBudget })
+    }
+    if (brief.constraints?.maxMassKg) {
+      kvRows.push({ label: 'Mass Budget', value: `${brief.constraints.maxMassKg} kg` })
+    }
+    if (brief.constraints?.batchSize) {
+      kvRows.push({ label: 'Batch Size', value: String(brief.constraints.batchSize) })
+    }
+    if (brief.constraints?.envelope) {
+      kvRows.push({ label: 'Envelope', value: dash(brief.constraints.envelope) })
+    }
+    if (brief.constraints?.operatingTemperature) {
+      kvRows.push({ label: 'Operating Temperature', value: dash(brief.constraints.operatingTemperature) })
+    }
+    if (brief.constraints?.jurisdiction) {
+      kvRows.push({ label: 'Jurisdiction', value: dash(brief.constraints.jurisdiction) })
+    }
+  }
+
+  // Cost verdict row (always add if cost data present)
+  if (cs) {
+    kvRows.push({
+      label: 'Cost vs Ceiling',
+      value: cs.isOverBudget
+        ? `OVER BUDGET: ${fmtGbp(cs.finalUnitCost)} vs ${cs.ceilingCost ? fmtGbp(cs.ceilingCost) : 'n/a'} (${cs.overBudgetPct != null ? cs.overBudgetPct.toFixed(0) + '% over' : 'unknown margin'})`
+        : cs.ceilingCost
+        ? `Within budget: ${fmtGbp(cs.finalUnitCost)} vs ${fmtGbp(cs.ceilingCost)}`
+        : `Unit cost estimate: ${fmtGbp(cs.finalUnitCost)} (no ceiling in brief)`,
+      highlight: cs.isOverBudget,
+    })
+  }
+
+  // Grammar-checked constraints
+  const grammarCheckedConstraints: string[] = []
+  if (state.grammarVerdicts) {
+    for (const v of state.grammarVerdicts.verdicts) {
+      grammarCheckedConstraints.push(`${v.rule_id.replace(/_/g, ' ')}: ${v.verdict}`)
+    }
+  }
+
+  // Safety standards from parsedBrief or regulatoryExtraction
+  const safetyStandards: string[] =
+    parsedBrief?.constraints.safety_standards.map(s => `${s.standard}${s.code ? ' (' + s.code + ')' : ''}`) ??
+    regs.slice(0, 6).map(r => `${r.standard_name} — ${r.gap_action.slice(0, 60)}`)
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | Brief and Requirements`} />
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+        Brief and Requirements
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+      {/* KV requirements table */}
+      <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+        Stated Requirements
+      </Text>
+      {kvRows.length > 0 ? (
+        <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 16 }}>
+          {kvRows.map((row, i) => (
+            <View
+              key={i}
+              style={{
+                flexDirection: 'row',
+                borderBottomWidth: i === kvRows.length - 1 ? 0 : 0.5,
+                borderBottomColor: TABLE_BORDER,
+                backgroundColor: row.highlight ? '#fff1f2' : i % 2 === 0 ? '#ffffff' : BG_SOFT,
+              }}
+              wrap={false}
+            >
+              <Text style={{ width: '38%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: row.highlight ? BESS_RED : INK, paddingVertical: 5, paddingHorizontal: 8 }}>
+                {row.label}
+              </Text>
+              <Text style={{ width: '62%', fontSize: 9, color: row.highlight ? BESS_RED : INK, paddingVertical: 5, paddingHorizontal: 8, lineHeight: 1.4 }}>
+                {row.value}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : (
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 16 }}>
+          No structured brief data available — run brief parsing stage to populate.
+        </Text>
+      )}
+
+      {/* Grammar-checked constraints */}
+      {grammarCheckedConstraints.length > 0 && (
+        <>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+            Grammar-Checked Constraints
+          </Text>
+          <Text style={{ fontSize: 8, color: MUTED, marginBottom: 6, fontFamily: 'Helvetica-Oblique' }}>
+            Constraints verified by the Design Rule Check engine:
+          </Text>
+          <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 16 }}>
+            {grammarCheckedConstraints.slice(0, 8).map((c, i) => {
+              const isPass = c.includes(': PASS')
+              const isBlock = c.includes(': BLOCK')
+              const colour = isBlock ? BESS_RED : isPass ? BESS_GREEN : BESS_AMBER
+              return (
+                <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === Math.min(grammarCheckedConstraints.length, 8) - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER }} wrap={false}>
+                  <Text style={{ width: '72%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8 }}>
+                    {c.split(':')[0]}
+                  </Text>
+                  <Text style={{ width: '28%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: colour, paddingVertical: 5, paddingHorizontal: 8 }}>
+                    {c.split(':').slice(1).join(':').trim()}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+        </>
+      )}
+
+      {/* Class-specific regulatory flags */}
+      {(classFlags.length > 0 || safetyStandards.length > 0) && (
+        <>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_AMBER, marginBottom: 8 }}>
+            Regulatory Requirements — {dash(state.productClass)}
+          </Text>
+          <View style={{ borderWidth: 0.5, borderColor: BESS_AMBER, marginBottom: 16 }}>
+            {[...safetyStandards, ...classFlags.filter(f => !safetyStandards.some(s => s.includes(f.split(' ')[0])))].slice(0, 8).map((flag, i, arr) => (
+              <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === arr.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER }} wrap={false}>
+                <Text style={{ fontSize: 9, color: BESS_AMBER, fontFamily: 'Helvetica-Bold', width: 16, paddingVertical: 5, paddingHorizontal: 8 }}>►</Text>
+                <Text style={{ fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8, flex: 1, lineHeight: 1.4 }}>{flag}</Text>
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
 // Simplified Cover page for Radical shadow PDF
 const RadicalCoverPage = ({ state }: { state: PipelineState }) => {
   const brief = state.research?.designBrief
@@ -753,7 +995,10 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §2 Executive Summary — P3 fix: 3-paragraph narrative (no new LLM call) */}
       <ExecutiveSummaryPage state={safe} />
 
-      {/* §3 System Modules and Architecture — Radical tree view */}
+      {/* §3 Brief and Requirements — §C fix: structured 2-column KV with class-aware regulatory flags */}
+      <BriefRequirementsPage state={safe} />
+
+      {/* §4 System Modules and Architecture — Radical tree view */}
       <RadicalModulesSection
         resolvedTree={resolvedTree}
         radicalCostSummary={radicalCostSummary}
