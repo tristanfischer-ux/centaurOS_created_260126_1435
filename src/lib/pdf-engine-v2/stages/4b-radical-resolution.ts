@@ -269,6 +269,77 @@ function isDistributorResultPlausibleForClass(partClass: PartClass): boolean {
 // JSON dependency.
 // ---------------------------------------------------------------------------
 
+/**
+ * Class-aware MPN hint overrides.
+ *
+ * Bug P0-2 fix (2026-05-11): the default pcb_controller MPN list above is
+ * BESS-specific (ISL94212 = Renesas LFP battery management IC). Resolving
+ * EVERY product's pcb_controller to ISL94212 is wrong for heat pumps
+ * (HVAC controller MCU is the right family) and medical CGMs (low-power
+ * BLE SoC).
+ *
+ * For each (productClass, archetype) pair we provide a ranked MPN list.
+ * If we have a class-specific entry it is used in preference to the
+ * default in MPN_HINTS_BY_CHARACTER. Empty array = "refuse to resolve;
+ * tag as needs vendor selection" (handled by the caller).
+ *
+ * Class-key matching is substring-on-lowercase against productClass.
+ */
+const CLASS_AWARE_MPN_HINTS: Record<string, Record<string, string[]>> = {
+  // Heat pump → STM32F407 family (HVAC control MCU; widely used in heat-pump
+  // controller boards by EBM-Papst, Honeywell, Carel).
+  heat_pump: {
+    pcb_controller: ['STM32F407VGT6', 'STM32F407VET6'],
+  },
+  // CGM / wearable medical → Nordic nRF52832 (low-power BLE SoC, the
+  // workhorse for Dexcom-class continuous glucose monitor patches).
+  cgm: {
+    pcb_controller: ['NRF52832-QFAA-R', 'NRF52832-QFAA-T'],
+  },
+  // Drone / UAV → STM32H7 (typical Pixhawk-class flight controller MCU)
+  drone: {
+    pcb_controller: ['STM32H743VIT6', 'STM32H743ZIT6'],
+  },
+  // Bioreactor → STM32F4 (process controller class, similar to heat pump)
+  bioreactor: {
+    pcb_controller: ['STM32F407VGT6'],
+  },
+  // EV charger → BMS+SCC stack class; ISL94212 still wrong but the canonical
+  // CCS PLC chip is QCA7005-AL33; default to Texas TMS320F28069 DSP for
+  // the high-side controller (most CCS chargers use a C2000 DSP family).
+  ev_charger: {
+    pcb_controller: ['TMS320F28069PZT', 'TMS320F28069PZ'],
+  },
+  // Edge AI / server → typically NVIDIA Jetson / Intel; the controller MCU
+  // is BMC-class — pick AST2500 BMC family (commonest server BMC).
+  edge_ai: {
+    pcb_controller: ['STM32F407VGT6'],  // BMC sidekick — generic MCU placeholder
+  },
+}
+
+/**
+ * Resolve the MPN hint list for a (productClass, archetype) pair.
+ *
+ * Priority:
+ *   1. Class-specific override from CLASS_AWARE_MPN_HINTS (substring match
+ *      on lowercase productClass).
+ *   2. Default from MPN_HINTS_BY_CHARACTER below.
+ *   3. Empty list (no hint — distributor lookup is skipped).
+ */
+export function getMpnHintsForArchetype(
+  archetypeId: string,
+  productClass: string,
+): string[] {
+  const cls = (productClass ?? '').toLowerCase()
+  for (const [classKey, hintsByArch] of Object.entries(CLASS_AWARE_MPN_HINTS)) {
+    if (cls.includes(classKey) || cls.includes(classKey.replace('_', ''))) {
+      const classHints = hintsByArch[archetypeId]
+      if (classHints) return classHints
+    }
+  }
+  return MPN_HINTS_BY_CHARACTER[archetypeId] ?? []
+}
+
 const MPN_HINTS_BY_CHARACTER: Record<string, string[]> = {
   // 1500V DC Contactor — TE Kilovac EV200 is canonical
   'dc_contactor': ['EV200HAANA', 'LEV200A4ANA'],
@@ -418,6 +489,7 @@ async function resolveDistributorLeaf(
   estimatedUnitPriceGbp: number | null,
   callsUsed: { count: number },
   maxCalls: number,
+  productClass: string = 'unknown',
 ): Promise<ResolvedLeafAnnotation> {
   if (callsUsed.count >= maxCalls) {
     const gradeD = GRADE_D_BY_CHARACTER[archetypeId]
@@ -438,7 +510,10 @@ async function resolveDistributorLeaf(
     }
   }
 
-  const hints = MPN_HINTS_BY_CHARACTER[archetypeId] ?? []
+  // Bug P0-2 fix (2026-05-11): use class-aware MPN hints so pcb_controller
+  // (and any other context-sensitive archetype) resolves to a part appropriate
+  // for the product class — heat pump → STM32F407, CGM → nRF52832, BESS → ISL94212.
+  const hints = getMpnHintsForArchetype(archetypeId, productClass)
   let result: AggregateResult | null = null
 
   for (const mpn of hints) {
@@ -845,6 +920,7 @@ export async function runRadicalResolution(
         estimatedUnitPriceGbp,
         callsUsed,
         MAX_DISTRIBUTOR_CALLS,
+        productClass,
       )
     } else {
       // Fallback for unknown partClass — should not happen given exhaustive coverage above
