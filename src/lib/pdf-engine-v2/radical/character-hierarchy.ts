@@ -192,6 +192,15 @@ export const SENTENCES: HierarchySentence[] = [
     label: 'Biosensor System',
     words: ['biosensor_hardware'],
   },
+  // Bug P0-5 fix (2026-05-11): a medical wearable (CGM patch) is not a
+  // submarine — it must NOT decompose under hull_and_buoyancy. This sentence
+  // is the wearable-specific enclosure with biocompatibility and disposable-
+  // patch sub-archetypes.
+  {
+    id: 'medical_wearable_enclosure',
+    label: 'Medical Wearable Enclosure',
+    words: ['wearable_housing', 'wearable_skin_interface'],
+  },
   {
     id: 'haps_airframe',
     label: 'HAPS Airframe',
@@ -458,6 +467,21 @@ export const WORDS: HierarchyWord[] = [
     label: 'Biosensor Hardware',
     sentence_id: 'biosensor_system',
     characters: ['pcb_controller', 'copper_wire'],
+  },
+  // ── medical_wearable_enclosure ───────────────────────────────────────────
+  // Bug P0-5 fix: CGM-class enclosure characters must NOT map to
+  // hull_structure (under hull_and_buoyancy / AUV).
+  {
+    id: 'wearable_housing',
+    label: 'Wearable Housing',
+    sentence_id: 'medical_wearable_enclosure',
+    characters: ['polymer_enclosure'],
+  },
+  {
+    id: 'wearable_skin_interface',
+    label: 'Skin Interface and Sealing',
+    sentence_id: 'medical_wearable_enclosure',
+    characters: ['polymer_gasket'],
   },
   // ── haps_airframe ────────────────────────────────────────────────────────
   {

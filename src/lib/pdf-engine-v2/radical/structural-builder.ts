@@ -255,17 +255,21 @@ export function deriveDroneMandatoryCharacters(): string[] {
 
 /**
  * Mandatory character list for CGM (Continuous Glucose Monitor) wearable briefs.
- * Maps only to biosensor_hardware and edge_compute_hardware sentences.
- * No BESS, heat pump, or drone characters.
+ * Maps to biosensor_hardware (front-end) and medical_wearable_enclosure (housing/seal).
+ * Bug P0-5 fix (2026-05-11): NO LONGER routes polymer_enclosure / polymer_gasket
+ * through hull_structure / hull_and_buoyancy — that's the AUV (underwater
+ * vehicle) sentence. New medical_wearable_enclosure sentence in
+ * character-hierarchy.ts owns wearable housing and skin interface.
+ * No BESS, heat pump, drone, or AUV characters.
  */
 export function deriveCgmMandatoryCharacters(): string[] {
   return [
     // Biosensor system
     'pcb_controller',   // biosensor_hardware (analogue front-end + MCU)
     'copper_wire',      // biosensor_hardware (flex harness)
-    // Polymer sealing / biocompat housing
-    'polymer_enclosure',  // hull_structure (outer waterproof shell) — closest hierarchy match
-    'polymer_gasket',     // hull_structure (O-ring/seal for IP67)
+    // Medical wearable enclosure
+    'polymer_enclosure',  // wearable_housing (outer biocompatible shell)
+    'polymer_gasket',     // wearable_skin_interface (skin seal / IP67 boundary)
   ]
 }
 
@@ -442,14 +446,17 @@ export function deriveClassMandatoryCharacters(
   }
 
   // CGM / wearable medical
+  // Bug P0-5 fix (2026-05-11): polymer_enclosure / polymer_gasket now map to
+  // wearable_housing / wearable_skin_interface under the new
+  // medical_wearable_enclosure sentence — NOT hull_and_buoyancy.
   if (cls.includes('cgm') || cls.includes('glucose') || cls.includes('wearable') || cls.includes('biosensor')) {
     return {
       mandatoryCharacters: deriveCgmMandatoryCharacters(),
       preferredWordIds: {
-        'pcb_controller': 'biosensor_hardware',  // CGM analogue front-end (biosensor_system), not bms_master
-        'copper_wire': 'biosensor_hardware',     // flex harness wiring, not refrigerant_distribution
-        'polymer_enclosure': 'hull_structure',   // waterproof medical shell (hull_and_buoyancy)
-        'polymer_gasket': 'hull_structure',      // IP67 O-ring seal (hull_and_buoyancy), NOT bioreactor_vessel_body
+        'pcb_controller': 'biosensor_hardware',       // CGM analogue front-end (biosensor_system)
+        'copper_wire': 'biosensor_hardware',          // flex harness wiring
+        'polymer_enclosure': 'wearable_housing',      // biocompatible outer shell
+        'polymer_gasket': 'wearable_skin_interface',  // skin seal / IP67 boundary
       },
     }
   }
