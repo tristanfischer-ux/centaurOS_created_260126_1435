@@ -1,11 +1,22 @@
 import type { Module, ModulePA, ResearchResult, StageResult, RiskRow, StructuredBriefJSON, RegulatoryExtraction } from '../types'
-import { MODULE_DECOMPOSITION_SYSTEM, MODULE_DECOMPOSITION_SYSTEM_PA, MODULE_DECOMPOSITION_RADICAL_PROMPT, MODULE_DECOMPOSITION_LEAVES_PROMPT } from '../prompts'
+import { MODULE_DECOMPOSITION_SYSTEM, MODULE_DECOMPOSITION_SYSTEM_PA, MODULE_DECOMPOSITION_RADICAL_PROMPT, MODULE_DECOMPOSITION_LEAVES_PROMPT, PER_MODULE_LEAF_PROMPT } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
 import { validateFmea, type FmeaRow } from '../lib/fmea-validator'
 import type { RadicalTree, CompositionNode } from '../radical/schema.js'
 import { CURRENT_RADICAL_SPEC_VERSION } from '../radical/schema.js'
-import { buildTreeFromLeaves, validateLeafList, deriveBessQuantityOverrides, deriveClassMandatoryCharacters } from '../radical/structural-builder.js'
-import { HIERARCHY_STATS } from '../radical/character-hierarchy.js'
+import { buildTreeFromLeaves, validateLeafList, deriveBessQuantityOverrides, deriveClassMandatoryCharacters, type LeafRecord } from '../radical/structural-builder.js'
+import { HIERARCHY_STATS, SENTENCE_BY_ID, WORD_BY_ID, normaliseProductClass, type HierarchyWord } from '../radical/character-hierarchy.js'
+import type {
+  AggregatePerModuleTelemetry,
+  ModuleDecomposition,
+  ModuleRadicalSubTree,
+  ModuleSpec,
+  PerModuleCallTelemetry,
+  PerModuleDecompositionResult,
+  UniversalModule,
+} from '../types/module-decomposition'
+import { MODULE_DEFAULT_ALLOWED_RADICALS } from '../types/module-decomposition'
+import { candidateSentencesForModule } from '../radical/module-to-sentence-mapping.js'
 
 // Stage 2: Module Decomposition — uses MODULE_DECOMPOSITION_SYSTEM from prompts.ts
 // PA path: uses MODULE_DECOMPOSITION_SYSTEM_PA and validateDecomposeResultPA().
@@ -1042,5 +1053,517 @@ export async function runDecompose(
       error: error instanceof Error ? error.message : 'Unknown error during decompose stage',
       durationMs: Date.now() - startTime
     }
+  }
+}
+
+// =============================================================================
+// Iter 3 — Per-module Stage 2 path (RADICAL_PHASE_3_PER_MODULE)
+// =============================================================================
+//
+// Implements §5 of `radical/ITER3-ARCHITECTURE-DESIGN.md`. Loops over each
+// ModuleSpec in the Stage 1.5 ModuleDecomposition and runs a focused LLM
+// call per module against the narrow character library subset for that
+// module's allowed_radicals (unioned with secondary_modules' defaults).
+//
+// The deterministic builder (`buildTreeFromLeaves`) consumes the union of
+// per-module leaves the same way it consumes single-shot leaves — the
+// secondary classification is a HINT for widening the candidate library,
+// not a fork in the decomposition.
+//
+// Backward compatibility: the existing `runDecomposeRadical()` (single-shot)
+// stays untouched; the engine orchestrator only invokes
+// `runDecomposeRadicalPerModule()` when `RADICAL_PHASE_3_PER_MODULE=true`
+// AND a `ModuleDecomposition` from Stage 1.5 is available.
+
+/**
+ * Returns true when the Iter 3 per-module path is enabled.
+ * Mirrors `isPhase3PerModuleEnabled()` in stages/1.7-module-decomposition.ts;
+ * exported here so the engine orchestrator can gate Stage 2 separately.
+ */
+export function isPhase3PerModuleEnabled(): boolean {
+  const raw = (process.env.RADICAL_PHASE_3_PER_MODULE ?? '').toLowerCase().trim()
+  return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
+}
+
+/**
+ * Build the per-module candidate character library subset.
+ *
+ * Algorithm:
+ *   1. Compute the union of MODULE_TO_SENTENCES[primary] and
+ *      MODULE_TO_SENTENCES[secondary[]] (sentences that legitimately
+ *      decompose this module's primary + secondary functions).
+ *   2. If the product class is normalisable, intersect with sentences
+ *      whose `allowed_classes` includes that class. For unseen classes
+ *      (universality probes), skip the intersection.
+ *   3. From the surviving sentence set, walk each sentence's words and
+ *      collect every character_id whose membership word.characters[]
+ *      contains it.
+ *   4. Filter to characters that exist in KNOWN_CHARACTERS (mirrors the
+ *      validation downstream uses).
+ *
+ * Returns the deduped, sorted set of candidate character IDs.
+ */
+function buildPerModuleCharacterLibrary(
+  moduleSpec: ModuleSpec,
+  productClass: string,
+): { characterIds: string[]; sentenceIds: string[]; words: HierarchyWord[] } {
+  const candidateSentences = candidateSentencesForModule(
+    moduleSpec.module,
+    moduleSpec.secondary_modules ?? [],
+  )
+  const normClass = normaliseProductClass(productClass)
+  const filteredSentences = candidateSentences.filter(sid => {
+    const sentence = SENTENCE_BY_ID.get(sid)
+    if (!sentence) return false
+    if (!normClass) return true // unseen class — skip per-class filter
+    return sentence.allowed_classes.includes(normClass)
+  })
+
+  const words: HierarchyWord[] = []
+  const charIds = new Set<string>()
+  for (const sid of filteredSentences) {
+    const sentence = SENTENCE_BY_ID.get(sid)
+    if (!sentence) continue
+    for (const wordId of sentence.words) {
+      const word = WORD_BY_ID.get(wordId)
+      if (!word) continue
+      words.push(word)
+      for (const charId of word.characters) charIds.add(charId)
+    }
+  }
+  const characterIds = [...charIds].sort()
+  return { characterIds, sentenceIds: filteredSentences, words }
+}
+
+/**
+ * Build the per-module allowed_radicals set.
+ *
+ * Union of:
+ *   - moduleSpec.allowed_radicals (LLM-refined or default fallback)
+ *   - MODULE_DEFAULT_ALLOWED_RADICALS[s] for each secondary module s
+ *
+ * This implements the §5.2 paragraph: "a pump as a ModuleSpec with PRIMARY
+ * actuation_kinematics and SECONDARY mass_fluid_transport_process gets the
+ * UNION of both module's allowed_radicals — the per-module Stage 2 call
+ * sees a wider character library so the BoM captures both motor-stator
+ * characters AND fluid-line characters in one cohesive sub-tree."
+ */
+function unionAllowedRadicals(moduleSpec: ModuleSpec): string[] {
+  const set = new Set<string>(moduleSpec.allowed_radicals)
+  for (const sec of moduleSpec.secondary_modules ?? []) {
+    for (const rad of MODULE_DEFAULT_ALLOWED_RADICALS[sec] ?? []) {
+      set.add(rad)
+    }
+  }
+  return [...set].sort()
+}
+
+/**
+ * Per-module LLM call. Uses temp=0, max_tokens=4096 (smaller per-module
+ * output than the 8192 single-shot). Strict JSON-array parser (matches
+ * the existing leaves prompt parser).
+ */
+async function callOpenRouterPerModule(
+  systemPrompt: string,
+  userContent: string,
+): Promise<{ leaves: unknown; inputTokens: number; outputTokens: number; modelUsed: string; durationMs: number }> {
+  const models = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3']
+  const startedAt = Date.now()
+  let lastErr: unknown
+  for (const model of models) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 300_000)
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.0,
+          max_tokens: 4096,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: userContent },
+          ],
+        }),
+        signal: controller.signal,
+      })
+      clearTimeout(timeout)
+      if (!response.ok) {
+        throw new Error(`OpenRouter API status ${response.status} from ${model}`)
+      }
+      const json = await response.json() as {
+        choices?: Array<{ message?: { content?: string; reasoning?: string; reasoning_details?: Array<{ type?: string; text?: string }> } }>
+        usage?: { prompt_tokens?: number; completion_tokens?: number }
+      }
+      const msg = json.choices?.[0]?.message
+      let raw = msg?.content || msg?.reasoning || ''
+      if (!raw && msg?.reasoning_details?.length) {
+        raw = msg.reasoning_details
+          .filter(d => d.type === 'reasoning.text')
+          .map(d => d.text ?? '')
+          .join('\n')
+      }
+      if (!raw) throw new Error(`Empty response from ${model}`)
+
+      const jsonStr = raw
+        .replace(/<think>[\s\S]*?<\/think>/g, '')
+        .replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '')
+        .replace(/```json\s*/g, '')
+        .replace(/```\s*/g, '')
+        .trim()
+      let parsed: unknown = null
+      try { parsed = JSON.parse(jsonStr) } catch { /* fall through */ }
+      if (parsed === null) {
+        const firstBracket = jsonStr.indexOf('[')
+        const lastBracket = jsonStr.lastIndexOf(']')
+        if (firstBracket >= 0 && lastBracket > firstBracket) {
+          try { parsed = JSON.parse(jsonStr.slice(firstBracket, lastBracket + 1)) } catch { /* fall through */ }
+        }
+      }
+      if (parsed === null) {
+        const firstBrace = jsonStr.indexOf('{')
+        const lastBrace = jsonStr.lastIndexOf('}')
+        if (firstBrace >= 0 && lastBrace > firstBrace) {
+          try {
+            const obj = JSON.parse(jsonStr.slice(firstBrace, lastBrace + 1)) as Record<string, unknown>
+            if (Array.isArray(obj.leaves)) parsed = obj.leaves
+            else if (Array.isArray(obj.components)) parsed = obj.components
+            else if (Array.isArray(obj.parts)) parsed = obj.parts
+            else parsed = obj
+          } catch { /* fall through */ }
+        }
+      }
+      if (parsed === null) {
+        throw new Error(`Could not parse JSON from ${model}; first 200 chars: ${raw.slice(0, 200)}`)
+      }
+      return {
+        leaves: parsed,
+        inputTokens: json.usage?.prompt_tokens ?? 0,
+        outputTokens: json.usage?.completion_tokens ?? 0,
+        modelUsed: model,
+        durationMs: Date.now() - startedAt,
+      }
+    } catch (err) {
+      clearTimeout(timeout)
+      lastErr = err
+      console.warn(`[decompose-per-module] ${model} failed: ${(err as Error).message}; trying next...`)
+      continue
+    }
+  }
+  throw new Error(
+    `All models failed for per-module Stage 2 call. Last error: ${(lastErr as Error)?.message ?? 'unknown'}`,
+  )
+}
+
+/**
+ * Run a single per-module Stage 2 LLM call and validate the leaves.
+ * Returns the per-module sub-tree with telemetry. Validation rules:
+ *   - leaf must pass the existing validateLeafList shape check
+ *   - leaf.character_id must be either '<UNKNOWN>' or in the per-module
+ *     candidate character library (otherwise dropped + logged as
+ *     out-of-scope)
+ */
+async function runOneModuleDecomposition(
+  moduleSpec: ModuleSpec,
+  productClass: string,
+): Promise<ModuleRadicalSubTree> {
+  const startedAt = Date.now()
+  const lib = buildPerModuleCharacterLibrary(moduleSpec, productClass)
+  const allowedRadicals = unionAllowedRadicals(moduleSpec)
+
+  const userContent = [
+    `[Module brief]`,
+    moduleSpec.module_brief,
+    ``,
+    `[Module] ${moduleSpec.module}` + (moduleSpec.secondary_modules?.length ? ` (also serves: ${moduleSpec.secondary_modules.join(', ')})` : ''),
+    `[Product class] ${productClass}`,
+    ``,
+    `[Derived parameters]`,
+    JSON.stringify(moduleSpec.derived_parameters, null, 2),
+    ``,
+    `[Allowed character_ids — you may ONLY use these IDs or "<UNKNOWN>"]`,
+    lib.characterIds.length > 0
+      ? lib.characterIds.join(', ')
+      : '(no candidate characters mapped — emit "<UNKNOWN>" leaves with descriptions for any parts you would identify)',
+    ``,
+    `[Allowed radicals]`,
+    allowedRadicals.join(', '),
+    ``,
+    `[Candidate sentence groups]`,
+    lib.sentenceIds.length > 0 ? lib.sentenceIds.join(', ') : '(none — module is sparse for this class)',
+  ].join('\n')
+
+  let callResult: Awaited<ReturnType<typeof callOpenRouterPerModule>>
+  let retried = false
+  try {
+    callResult = await callOpenRouterPerModule(PER_MODULE_LEAF_PROMPT, userContent)
+  } catch (err) {
+    console.warn(
+      `[decompose-per-module] module="${moduleSpec.module}" call failed: ${(err as Error).message}; emitting empty sub-tree`,
+    )
+    const telemetry: PerModuleCallTelemetry = {
+      llm_call_ms: Date.now() - startedAt,
+      input_tokens: 0,
+      output_tokens: 0,
+      estimated_cost_gbp: 0,
+      model_used: 'none',
+      retried,
+    }
+    return {
+      module: moduleSpec.module,
+      leaves: [],
+      characters_count: 0,
+      unknown_count: 0,
+      telemetry,
+    }
+  }
+
+  let leaves: LeafRecord[] = []
+  try {
+    leaves = validateLeafList(callResult.leaves)
+  } catch (err) {
+    console.warn(`[decompose-per-module] module="${moduleSpec.module}" leaf validation failed: ${(err as Error).message}; retrying once`)
+    retried = true
+    try {
+      const reminderUserContent = userContent +
+        `\n\nYour previous response failed validation: ${(err as Error).message}\nReturn ONLY a bare JSON array of leaf objects. Use only character_ids from the allowed list above.`
+      callResult = await callOpenRouterPerModule(PER_MODULE_LEAF_PROMPT, reminderUserContent)
+      leaves = validateLeafList(callResult.leaves)
+    } catch (err2) {
+      console.warn(
+        `[decompose-per-module] module="${moduleSpec.module}" retry failed: ${(err2 as Error).message}; emitting empty sub-tree`,
+      )
+      const telemetry: PerModuleCallTelemetry = {
+        llm_call_ms: Date.now() - startedAt,
+        input_tokens: callResult.inputTokens,
+        output_tokens: callResult.outputTokens,
+        estimated_cost_gbp: estimatePerCallCostGbp(callResult.inputTokens, callResult.outputTokens),
+        model_used: callResult.modelUsed,
+        retried,
+      }
+      return {
+        module: moduleSpec.module,
+        leaves: [],
+        characters_count: 0,
+        unknown_count: 0,
+        telemetry,
+      }
+    }
+  }
+
+  // Drop out-of-scope leaves: keep only leaves whose character_id is in the
+  // per-module candidate library OR is '<UNKNOWN>'.
+  const candidateSet = new Set(lib.characterIds)
+  const inScope: LeafRecord[] = []
+  let unknownCount = 0
+  let outOfScopeCount = 0
+  for (const l of leaves) {
+    if (l.character_id === '<UNKNOWN>' || l.character_id.startsWith('<UNKNOWN>')) {
+      unknownCount += 1
+      inScope.push(l)
+      continue
+    }
+    if (candidateSet.has(l.character_id)) {
+      inScope.push(l)
+    } else {
+      outOfScopeCount += 1
+    }
+  }
+  if (outOfScopeCount > 0) {
+    console.warn(
+      `[decompose-per-module] module="${moduleSpec.module}" dropped ${outOfScopeCount} out-of-scope leaves (not in candidate library)`,
+    )
+  }
+
+  const telemetry: PerModuleCallTelemetry = {
+    llm_call_ms: Date.now() - startedAt,
+    input_tokens: callResult.inputTokens,
+    output_tokens: callResult.outputTokens,
+    estimated_cost_gbp: estimatePerCallCostGbp(callResult.inputTokens, callResult.outputTokens),
+    model_used: callResult.modelUsed,
+    retried,
+  }
+
+  return {
+    module: moduleSpec.module,
+    leaves: inScope,
+    characters_count: new Set(inScope.filter(l => l.character_id !== '<UNKNOWN>').map(l => l.character_id)).size,
+    unknown_count: unknownCount,
+    telemetry,
+  }
+}
+
+function estimatePerCallCostGbp(inputTokens: number, outputTokens: number): number {
+  return (inputTokens * 3 + outputTokens * 15) / 1_000_000
+}
+
+/**
+ * Per-module Stage 2 — Iter 3 entry point.
+ *
+ * For each ModuleSpec in `moduleDecomposition.modules`, dispatches a focused
+ * per-module LLM call (in parallel via Promise.all to keep wall-clock low).
+ * Each call sees only the candidate character library + allowed_radicals
+ * for THAT module (union of primary + secondary defaults), so wrong-domain
+ * leakage is structurally impossible at this layer.
+ *
+ * Aggregates all per-module leaves into a single union (deduped by
+ * (character_id, archetype_id)), then calls the existing
+ * `buildTreeFromLeaves()` to produce the final RadicalTree. The
+ * deterministic builder is unchanged; the secondary classification is a
+ * HINT, not a fork.
+ *
+ * Returns BOTH the final RadicalTree AND the PerModuleDecompositionResult
+ * (sub-trees + telemetry) so the engine orchestrator can surface the
+ * per-module breakdown for diagnostics + future PDF rendering.
+ *
+ * Empty modules (those returning 0 leaves after out-of-scope filtering)
+ * are tracked separately in `empty_modules` for data-quality monitoring.
+ */
+export async function runDecomposeRadicalPerModule(
+  moduleDecomposition: ModuleDecomposition,
+  parsedBrief: StructuredBriefJSON,
+  classification: string,
+): Promise<StageResult<{ radicalTree: RadicalTreeResult; perModule: PerModuleDecompositionResult }>> {
+  const startedAt = Date.now()
+  console.log(
+    `[decompose-per-module] Starting per-module Stage 2 for ${moduleDecomposition.modules.length} modules ` +
+    `(class=${classification}, council=${moduleDecomposition.council_verdict})`,
+  )
+
+  if (!process.env.OPENROUTER_API_KEY) {
+    return {
+      ok: false,
+      error: 'OPENROUTER_API_KEY is not set; per-module Stage 2 cannot dispatch LLM calls',
+      durationMs: Date.now() - startedAt,
+    }
+  }
+
+  if (moduleDecomposition.modules.length === 0) {
+    return {
+      ok: false,
+      error: 'ModuleDecomposition.modules is empty — Stage 1.5 produced no actionable modules',
+      durationMs: Date.now() - startedAt,
+    }
+  }
+
+  // ── Step 1: parallel per-module calls ─────────────────────────────────────
+  const wallClockStart = Date.now()
+  const subTreePromises = moduleDecomposition.modules.map(spec =>
+    runOneModuleDecomposition(spec, classification),
+  )
+  const subTrees = await Promise.all(subTreePromises)
+  const wallClockMs = Date.now() - wallClockStart
+
+  const empty_modules: UniversalModule[] = subTrees
+    .filter(st => st.leaves.length === 0)
+    .map(st => st.module)
+  if (empty_modules.length > 0) {
+    console.warn(
+      `[decompose-per-module] ${empty_modules.length} module(s) returned 0 leaves: ${empty_modules.join(', ')}`,
+    )
+  }
+
+  // ── Step 2: union all leaves (dedup by (character_id, archetype_id)) ─────
+  const seen = new Map<string, LeafRecord>()
+  for (const st of subTrees) {
+    for (const leaf of st.leaves) {
+      const key = `${leaf.character_id}|${leaf.archetype_id ?? ''}`
+      const existing = seen.get(key)
+      if (!existing) {
+        seen.set(key, leaf)
+      } else {
+        // Sum multiplicities for duplicate (character_id, archetype_id) pairs
+        // — same logical part appearing under two modules (e.g. multi-classification).
+        existing.multiplicity += leaf.multiplicity
+      }
+    }
+  }
+  const aggregated_leaves: LeafRecord[] = [...seen.values()].sort((a, b) =>
+    a.character_id.localeCompare(b.character_id),
+  )
+
+  console.log(
+    `[decompose-per-module] Per-module decomposition complete: ${subTrees.length} sub-trees, ` +
+    `${aggregated_leaves.length} unique leaves (post-dedup), ${empty_modules.length} empty modules ` +
+    `(wall-clock ${wallClockMs}ms)`,
+  )
+
+  // ── Step 3: deterministic tree build ─────────────────────────────────────
+  const productSlug = parsedBrief.project_id ?? classification.replace(/[^a-z0-9_]/gi, '_')
+  const classResult = deriveClassMandatoryCharacters(classification, parsedBrief.constraints)
+  const mandatoryCharacters: string[] | undefined =
+    classResult.mandatoryCharacters.length > 0 ? classResult.mandatoryCharacters : undefined
+  const quantityOverrides: Record<string, number> | undefined = classResult.quantityOverrides
+  const preferredWordIds: Record<string, string> | undefined = classResult.preferredWordIds
+
+  let buildResult
+  try {
+    buildResult = buildTreeFromLeaves(
+      aggregated_leaves,
+      productSlug,
+      classification,
+      quantityOverrides,
+      mandatoryCharacters,
+      preferredWordIds,
+    )
+  } catch (err) {
+    return {
+      ok: false,
+      error: `Per-module Stage 2 tree build failed: ${(err as Error).message}`,
+      durationMs: Date.now() - startedAt,
+    }
+  }
+
+  const { tree, unmappedCharacters, placedLeafCount, stats } = buildResult
+
+  const aggregate_telemetry: AggregatePerModuleTelemetry = {
+    total_llm_call_ms_serial: subTrees.reduce((acc, st) => acc + st.telemetry.llm_call_ms, 0),
+    wall_clock_ms: wallClockMs,
+    total_input_tokens: subTrees.reduce((acc, st) => acc + st.telemetry.input_tokens, 0),
+    total_output_tokens: subTrees.reduce((acc, st) => acc + st.telemetry.output_tokens, 0),
+    total_estimated_cost_gbp: subTrees.reduce((acc, st) => acc + st.telemetry.estimated_cost_gbp, 0),
+    retry_count: subTrees.filter(st => st.telemetry.retried).length,
+  }
+
+  const perModule: PerModuleDecompositionResult = {
+    sub_trees: subTrees,
+    aggregated_leaves,
+    total_leaf_count: aggregated_leaves.length,
+    empty_modules,
+    aggregate_telemetry,
+  }
+
+  // Surface unknowns the same way the single-shot path does
+  const unknownLeaves = aggregated_leaves.filter(
+    l => l.character_id === '<UNKNOWN>' || l.character_id.startsWith('<UNKNOWN>'),
+  )
+  const allUnknowns = [
+    ...unknownLeaves.map(l => `<UNKNOWN_RADICAL>: ${l.description ?? l.character_id}`),
+    ...unmappedCharacters.filter(c => !c.startsWith('<UNKNOWN>')).map(c => `unmapped:${c}`),
+  ]
+
+  const radicalTree: RadicalTreeResult = {
+    tree,
+    unknowns: allUnknowns,
+    netNewArchetypes: [],
+    netNewCharacters: unknownLeaves.map(l => l.description ?? l.character_id),
+    leafCount: aggregated_leaves.length,
+    unmappedLeafCount: stats.unmapped,
+    twoStageMode: true,
+  }
+
+  console.log(
+    `[decompose-per-module] Tree built: ${stats.sentences} sentences, ${stats.words} words, ` +
+    `${placedLeafCount} leaves placed, ${stats.unmapped} unmapped`,
+  )
+
+  return {
+    ok: true,
+    data: { radicalTree, perModule },
+    durationMs: Date.now() - startedAt,
   }
 }
