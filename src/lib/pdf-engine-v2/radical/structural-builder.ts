@@ -32,8 +32,9 @@ import {
   SENTENCE_BY_ID,
   WORD_BY_ID,
   HIERARCHY_STATS,
+  normaliseProductClass,
   type HierarchyWord,
-  type HierarchySentence,
+  type ProductClass,
 } from './character-hierarchy.js'
 
 // ---------------------------------------------------------------------------
@@ -616,6 +617,22 @@ export function buildTreeFromLeaves(
   const characterToWords = buildCharacterToWords()
   const wordToSentence = buildWordToSentence()
 
+  // ── Phase B Iter 1 (Bug P0-7 / 2026-05-11): allowed_classes filter ──────
+  // Drop word candidates whose target sentence's allowed_classes whitelist
+  // does NOT include the normalised product class. Without this filter the
+  // builder used the first word in characterToWords order, causing wrong-
+  // domain leakage (refrigerant_circuit on AUV/drone/HAPS, fss on bioreactor/
+  // vfarm, heat_pump_enclosure on bioreactor). When the product class is
+  // not recognised by normaliseProductClass(), the filter is a no-op so the
+  // legacy behaviour is preserved for unknown classes.
+  const normalisedClass: ProductClass | null = normaliseProductClass(productClass)
+  const isWordAllowed = (word: HierarchyWord): boolean => {
+    if (!normalisedClass) return true // unknown class — skip filter
+    const sentence = wordToSentence.get(word.id)
+    if (!sentence) return true // word with no sentence — handled separately
+    return sentence.allowed_classes.includes(normalisedClass)
+  }
+
   const unmappedCharacters: string[] = []
   const grouped: GroupedLeaf[] = []
 
@@ -666,23 +683,39 @@ export function buildTreeFromLeaves(
     }
 
     // Find which words contain this character
-    const words = characterToWords.get(leaf.character_id)
-    if (!words || words.length === 0) {
+    const allWords = characterToWords.get(leaf.character_id)
+    if (!allWords || allWords.length === 0) {
       // Character exists in library but not in hierarchy — fall back to UNKNOWN_SUBSYSTEM
       unmappedCharacters.push(leaf.character_id)
       continue
     }
 
-    // Pick the word: check preferredWordIds first (class-specific override to prevent
-    // cross-contamination), then fall back to words[0] (WORDS insertion order).
-    let word = words[0]
+    // Phase B Iter 1: filter to class-allowed words BEFORE picking. This is
+    // the universality guard — wrong-class candidates are stripped, so a
+    // shared character like copper_wire on an AUV brief no longer cascades
+    // to refrigerant_distribution → refrigerant_circuit just because that's
+    // the first word in WORDS-insertion order.
+    const allowedWords = allWords.filter(isWordAllowed)
+    if (allowedWords.length === 0) {
+      // No word for this character is valid for the current class. Surface
+      // as unmapped so the operator notices a library gap rather than
+      // silently misplacing the leaf in a wrong-domain sentence.
+      unmappedCharacters.push(leaf.character_id)
+      continue
+    }
+
+    // Pick the word: check preferredWordIds first (class-specific override
+    // honoured ONLY if the preferred word itself is class-allowed), then
+    // fall back to allowedWords[0] (WORDS insertion order, restricted to
+    // class-allowed candidates).
+    let word = allowedWords[0]
     if (preferredWordIds && leaf.character_id in preferredWordIds) {
       const preferredId = preferredWordIds[leaf.character_id]
-      const preferred = words.find(w => w.id === preferredId)
+      const preferred = allowedWords.find(w => w.id === preferredId)
       if (preferred) {
         word = preferred
       }
-      // If preferred word not found (not in this character's word list), fall back to words[0]
+      // If preferred word not found in allowedWords, fall back to allowedWords[0]
     }
     const sentence = wordToSentence.get(word.id)
     if (!sentence) {

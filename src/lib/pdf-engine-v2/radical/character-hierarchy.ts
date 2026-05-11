@@ -26,6 +26,32 @@
 // Type definitions
 // ---------------------------------------------------------------------------
 
+/**
+ * Canonical product-class keys used for cross-domain leakage prevention.
+ *
+ * These are the SHORT keys used in `HierarchySentence.allowed_classes` and
+ * matched by `normaliseProductClass()`. They are NOT the same as the free-form
+ * classification strings the LLM emits (e.g. "battery_energy_storage",
+ * "30 kW monobloc air-to-water heat pump"). The normaliser collapses all of
+ * those down to the keys below.
+ *
+ * If you add a new product class, you MUST:
+ *   1. Add the key here.
+ *   2. Add a `cls.includes(...)` branch in `normaliseProductClass()`.
+ *   3. Tag every relevant sentence with the new key in `allowed_classes`.
+ */
+export type ProductClass =
+  | 'bess'
+  | 'heat_pump'
+  | 'vfarm'
+  | 'drone'
+  | 'ev_charger'
+  | 'bioreactor'
+  | 'edge_ai'
+  | 'auv'
+  | 'cgm'
+  | 'haps'
+
 /** A "word" is a subsystem group (e.g. "battery_string" within "battery_rack_assembly"). */
 export interface HierarchyWord {
   /** snake_case subsystem group ID */
@@ -46,6 +72,62 @@ export interface HierarchySentence {
   label: string
   /** All word IDs that belong to this sentence */
   words: string[]
+  /**
+   * Whitelist of product classes that may legitimately use this sentence as a
+   * destination. The structural builder filters out wrong-class matches at the
+   * character → word resolution step, preventing wrong-domain leakage
+   * (e.g. `refrigerant_circuit` showing up on an AUV/drone/HAPS BOM because
+   * `copper_wire` happens to live in `refrigerant_distribution` first).
+   *
+   * MUST be set on every sentence. Use ALL_PRODUCT_CLASSES for genuinely
+   * cross-domain sentences. An empty array means "no class can use this"
+   * (treated as a configuration error by the filter).
+   *
+   * Phase B Iter 1 (Bug P0-7 / 2026-05-11): added to plug the universality
+   * leakage detected by the engine-accuracy-scorecard.
+   */
+  allowed_classes: ProductClass[]
+}
+
+/** Convenience constant for sentences that genuinely apply to every class. */
+export const ALL_PRODUCT_CLASSES: ProductClass[] = [
+  'bess',
+  'heat_pump',
+  'vfarm',
+  'drone',
+  'ev_charger',
+  'bioreactor',
+  'edge_ai',
+  'auv',
+  'cgm',
+  'haps',
+]
+
+/**
+ * Normalise the free-form classification string emitted by the LLM (e.g.
+ * "battery_energy_storage", "30 kW air-to-water heat pump", "haps_001",
+ * "Modular Indoor Vertical Farm Unit") to one of the canonical
+ * `ProductClass` keys. Returns null when no rule matches — callers should
+ * skip the allowed_classes filter rather than block the build.
+ *
+ * The matching rules MIRROR `deriveClassMandatoryCharacters()` in
+ * `structural-builder.ts`. Keep them in sync.
+ */
+export function normaliseProductClass(classification: string): ProductClass | null {
+  const cls = classification.toLowerCase()
+
+  if (cls === 'battery_energy_storage' || cls === 'bess' || cls.includes('energy_storage')) return 'bess'
+  if (cls.includes('drone') || cls.includes('uav') || cls.includes('quadcopter') || cls.includes('multirotor')) return 'drone'
+  if (cls.includes('cgm') || cls.includes('glucose') || cls.includes('wearable') || cls.includes('biosensor')) return 'cgm'
+  if (cls.includes('heat_pump') || cls.includes('thermal_system') || cls.includes('heat pump')) return 'heat_pump'
+  if (cls.includes('vertical_farm') || cls.includes('farm') || cls.includes('cea') || cls.includes('greenhouse')) return 'vfarm'
+  if (cls.includes('ev_charger') || cls.includes('charger') || cls.includes('ev charger')) return 'ev_charger'
+  if (cls.includes('bioreactor') || cls.includes('ferment')) return 'bioreactor'
+  if (cls.includes('edge_ai') || cls.includes('edge ai') || cls.includes('server') || cls.includes('compute')) return 'edge_ai'
+  if (cls.includes('auv') || cls.includes('underwater') || cls.includes('subsea') || cls.includes('rov')) return 'auv'
+  if (cls.includes('haps') || cls.includes('stratospheric') || cls.includes('pseudo-satellite')) return 'haps'
+
+  return null
 }
 
 // ---------------------------------------------------------------------------
@@ -60,137 +142,179 @@ export const SENTENCES: HierarchySentence[] = [
     id: 'battery_rack_assembly',
     label: 'Battery Rack Assembly',
     words: ['cell_string', 'rack_structure'],
+    allowed_classes: ['bess'],
   },
   {
     id: 'battery_management_system_bms',
     label: 'Battery Management System (BMS)',
     words: ['bms_master', 'bms_slave'],
+    allowed_classes: ['bess'],
   },
   {
     id: 'power_conversion_system_pcs',
     label: 'Power Conversion System (PCS)',
     words: ['pcs_inverter_group', 'grid_transformer_group'],
+    allowed_classes: ['bess'],
   },
   {
     id: 'dc_distribution_switchgear',
     label: 'DC Distribution and Switchgear',
     words: ['dc_switching', 'dc_protection', 'dc_buswork'],
+    // BESS only — EV chargers have their own AC/DC distribution under charger_pcs.
+    allowed_classes: ['bess'],
   },
   {
     id: 'thermal_management_system',
     label: 'Thermal Management System',
     words: ['active_cooling', 'passive_insulation'],
+    // Active liquid cooling + insulation: BESS, edge AI server racks, EV chargers
+    // (DC fast chargers liquid-cooled), HAPS payload thermal. NOT heat pump (it
+    // has its own refrigerant_circuit / hydronic_circuit).
+    allowed_classes: ['bess', 'edge_ai', 'ev_charger', 'haps'],
   },
   {
     id: 'fire_detection_and_suppression_system_fss',
     label: 'Fire Detection and Suppression System (FSS)',
     words: ['suppression_hardware', 'detection_sensors'],
+    // BESS-style fire suppression (NOVEC, gas detect, arc detect, suppression
+    // pressure vessel). Also legitimate on EV chargers (containerised DC fast
+    // chargers carry similar suppression). NOT bioreactors / vfarm / drones —
+    // those have CO2 sensors / smoke sensors but NOT BESS-grade FSS.
+    allowed_classes: ['bess', 'ev_charger'],
   },
   {
     id: 'energy_management_system_ems_scada',
     label: 'Energy Management System / SCADA',
     words: ['ems_compute', 'ems_network'],
+    allowed_classes: ['bess'],
   },
   {
     id: 'container_enclosure_fit_out',
     label: 'Container Enclosure and Fit-Out',
     words: ['container_access', 'container_services'],
+    // Containerised systems: BESS containers, containerised EV chargers,
+    // bioreactor skids (single-use bioreactor cleanrooms), vertical farm
+    // shipping-container farms. NOT vehicle/airframe classes.
+    allowed_classes: ['bess', 'ev_charger', 'bioreactor', 'vfarm'],
   },
   // ── Heat pump ─────────────────────────────────────────────────────────────
   {
     id: 'refrigerant_circuit',
     label: 'Refrigerant Circuit',
-    words: ['refrigerant_cycle', 'refrigerant_distribution'],
+    words: ['refrigerant_cycle', 'compressor_word', 'heat_exchanger_word', 'expansion_valve_word', 'pressure_monitoring_word', 'fan_word', 'refrigerant_distribution'],
+    allowed_classes: ['heat_pump'],
   },
   {
     id: 'hydronic_circuit',
     label: 'Hydronic Circuit',
     words: ['hydronic_flow', 'hydronic_connections'],
+    allowed_classes: ['heat_pump'],
   },
   {
     id: 'heat_pump_controls',
     label: 'Heat Pump Controls',
     words: ['hp_controls_compute'],
+    allowed_classes: ['heat_pump'],
   },
   {
     id: 'heat_pump_enclosure',
     label: 'Heat Pump Enclosure and Frame',
     words: ['hp_enclosure_structure'],
+    allowed_classes: ['heat_pump'],
   },
   // ── Vertical farm ─────────────────────────────────────────────────────────
   {
     id: 'growing_rack_system',
     label: 'Growing Rack System',
     words: ['rack_structure_vfarm'],
+    allowed_classes: ['vfarm'],
   },
   {
     id: 'lighting_system',
     label: 'Lighting System',
     words: ['lighting_fixtures'],
+    allowed_classes: ['vfarm'],
   },
   {
     id: 'fertigation_loop',
     label: 'Fertigation Loop',
     words: ['fertigation_flow'],
+    allowed_classes: ['vfarm'],
   },
   {
     id: 'hvac_co2_system',
     label: 'HVAC / CO2 Dosing System',
     words: ['hvac_flow', 'co2_dosing'],
+    allowed_classes: ['vfarm'],
   },
   // ── Drone / UAV ───────────────────────────────────────────────────────────
   {
     id: 'airframe_structure',
     label: 'Airframe Structure',
     words: ['airframe_body'],
+    allowed_classes: ['drone'],
   },
   {
     id: 'propulsion_system',
     label: 'Propulsion System',
+    // Electric propulsion (motors + wiring) is shared between drones, AUVs
+    // (thrusters), and HAPS (electric prop motors).
     words: ['propulsion_motors'],
+    allowed_classes: ['drone', 'auv', 'haps'],
   },
   {
     id: 'flight_computer',
     label: 'Flight Computer and Avionics',
+    // Avionics / nav-compute is shared by drones, AUVs (mission computer), HAPS.
     words: ['avionics_compute'],
+    allowed_classes: ['drone', 'auv', 'haps'],
   },
   // ── EV Charger ───────────────────────────────────────────────────────────
   {
     id: 'charger_power_conversion',
     label: 'Charger Power Conversion',
     words: ['charger_pcs'],
+    allowed_classes: ['ev_charger'],
   },
   {
     id: 'charger_enclosure',
     label: 'Charger Enclosure',
     words: ['charger_enclosure_structure'],
+    allowed_classes: ['ev_charger'],
   },
   // ── Bioreactor ────────────────────────────────────────────────────────────
   {
     id: 'bioreactor_vessel',
     label: 'Bioreactor Vessel',
     words: ['bioreactor_vessel_body'],
+    allowed_classes: ['bioreactor'],
   },
   {
     id: 'bioreactor_controls',
     label: 'Bioreactor Controls and Sensing',
     words: ['bioreactor_sensing'],
+    allowed_classes: ['bioreactor'],
   },
   // ── Edge AI / AUV / CGM / HAPS ────────────────────────────────────────────
   {
     id: 'edge_compute_system',
     label: 'Edge Compute System',
     words: ['edge_compute_hardware'],
+    // The on-board compute substrate is shared by edge AI servers, AUVs and
+    // HAPS payloads. CGM has its own biosensor_system.
+    allowed_classes: ['edge_ai', 'auv', 'haps'],
   },
   {
     id: 'hull_and_buoyancy',
     label: 'Hull and Buoyancy System',
     words: ['hull_structure'],
+    allowed_classes: ['auv'],
   },
   {
     id: 'biosensor_system',
     label: 'Biosensor System',
     words: ['biosensor_hardware'],
+    allowed_classes: ['cgm'],
   },
   // Bug P0-5 fix (2026-05-11): a medical wearable (CGM patch) is not a
   // submarine — it must NOT decompose under hull_and_buoyancy. This sentence
@@ -200,11 +324,13 @@ export const SENTENCES: HierarchySentence[] = [
     id: 'medical_wearable_enclosure',
     label: 'Medical Wearable Enclosure',
     words: ['wearable_housing', 'wearable_skin_interface'],
+    allowed_classes: ['cgm'],
   },
   {
     id: 'haps_airframe',
     label: 'HAPS Airframe',
     words: ['haps_structure'],
+    allowed_classes: ['haps'],
   },
 ]
 
