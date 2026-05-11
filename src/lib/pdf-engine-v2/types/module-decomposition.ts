@@ -20,15 +20,25 @@ import type { ProductClass } from '../radical/character-hierarchy.js'
 import type { LeafRecord } from '../radical/structural-builder.js'
 
 // ---------------------------------------------------------------------------
-// 1. Universal functional taxonomy (the 9 modules — see §3 of design doc)
+// 1. Universal functional taxonomy (the 12 modules — see §3 of design doc)
 // ---------------------------------------------------------------------------
 
 /**
- * The 9 universal engineering modules every product is decomposed against.
+ * The 12 universal engineering modules every product is decomposed against.
  * No product class is allowed to invent new modules — the LLM may only
  * (a) instantiate these for the product, or (b) mark them as excluded.
  *
  * Order matches the canonical taxonomy table in the design doc §3.
+ *
+ * History: Originally 9 modules. Council (Grok + Gemini + GLM, 2026-05-11)
+ * unanimously added `actuation_kinematics`, `mass_fluid_transport_process`,
+ * and `hmi_ergonomics` after demonstrating the 9-module set forced
+ * shoehorning on 11/15 test products (drone rotors, bioreactor impellers,
+ * RO desalination flows, surgical robot grip, etc.). See
+ * `../COUNCIL-UNIVERSAL-TAXONOMY-2026-05-11.md` for the reasoning.
+ *
+ * `interface` was renamed to `environmental_interface` to avoid collision
+ * with the data-interface concept used in Stage 2 PA validation.
  */
 export const UNIVERSAL_MODULES = [
   'energy_storage_source',
@@ -40,6 +50,9 @@ export const UNIVERSAL_MODULES = [
   'environmental_interface',
   'power_distribution',
   'maintenance_serviceability',
+  'actuation_kinematics',
+  'mass_fluid_transport_process',
+  'hmi_ergonomics',
 ] as const
 
 export type UniversalModule = typeof UNIVERSAL_MODULES[number]
@@ -83,11 +96,11 @@ export type ApplicabilityConfidence = 'high' | 'medium' | 'low'
 export type DerivedParameters = Record<string, string | number>
 
 /**
- * The output spec for one of the 9 universal modules, instantiated for
- * THIS product. Stage 1.5 emits 5–9 of these (one per applicable module).
+ * The output spec for one of the 12 universal modules, instantiated for
+ * THIS product. Stage 1.5 emits 5–12 of these (one per applicable module).
  */
 export interface ModuleSpec {
-  /** Which of the 9 universal modules this is. */
+  /** Which of the 12 universal modules this is (PRIMARY classification). */
   module: UniversalModule
 
   /**
@@ -133,10 +146,33 @@ export interface ModuleSpec {
   applicability_confidence: ApplicabilityConfidence
 
   /**
-   * Optional secondary classifications (for cases like a BESS container
-   * shell that is BOTH structure AND environmental_interface).
-   * Iter 3 v1: NOT consumed by Stage 2 — flagged for Iter 3.5.
-   * Present in the schema so adding behaviour later is non-breaking.
+   * Optional secondary classifications. A single component or sub-system
+   * can legitimately serve more than one universal function — `secondary_modules`
+   * lets the LLM express dual-classification on a single ModuleSpec without
+   * forcing a single-bucket pick that destroys the secondary signal.
+   *
+   * Canonical examples:
+   *   - A pump's PRIMARY is `actuation_kinematics` (it imparts kinematic intent
+   *     to a fluid via an impeller); SECONDARY is `mass_fluid_transport_process`
+   *     (it moves the working fluid through the system).
+   *   - A BESS container shell is PRIMARY `structure_containment` (load + form);
+   *     SECONDARY `environmental_interface` (IP55, weatherproof, fire-rated).
+   *   - A solar panel is PRIMARY `energy_conversion_transduction` (PV cells);
+   *     SECONDARY `structure_containment` (the rigid module body itself
+   *     is part of the array's mechanical structure).
+   *
+   * Iter 3 v1 BEHAVIOUR (CONSUMED, not deferred):
+   *   - Stage 2 per-module radical translation may use `secondary_modules`
+   *     to broaden `allowed_radicals` for that module (union of primary
+   *     + secondary defaults), preserving multi-domain BoM completeness.
+   *   - The deterministic builder treats the leaf set the same way; the
+   *     secondary classification is a HINT to widen the candidate library,
+   *     not a fork in the decomposition.
+   *
+   * Why baked into v1 (not Iter 3.5): multi-classification matters for
+   * unseen-class universality probes. Without it, products like pumps,
+   * solar arrays, and refrigerated structural enclosures shatter their
+   * BoM cohesion across two adjacent modules.
    */
   secondary_modules?: UniversalModule[]
 }
@@ -146,22 +182,54 @@ export interface ModuleSpec {
 // ---------------------------------------------------------------------------
 
 /**
- * Council verdict on the generated module catalog.
- *   OK            — 3/3 seats approve, proceed to Stage 2.
- *   NEEDS_MINOR   — 2/3 seats approve, log council_notes, proceed (warn).
- *   NEEDS_MAJOR   — ≤1/3 seats approve OR ≥2 modules at 'low' confidence;
- *                   retry Stage 1.5 once with notes appended; if still
- *                   NEEDS_MAJOR, fail the stage.
+ * Per-seat verdict (one of these per CouncilSeatReview).
+ *   OK           — seat approves the catalog as-is.
+ *   NEEDS_MINOR  — seat would polish (notes attached) but does not block.
+ *   NEEDS_MAJOR  — seat blocks: fundamental structural issue.
+ */
+export type SeatVerdict = 'OK' | 'NEEDS_MINOR' | 'NEEDS_MAJOR'
+
+/**
+ * Aggregate council verdict on the generated module catalog.
+ *
+ * SYNTHESIS RULE (4-seat council, 2026-05-11):
+ *   - 2+ NEEDS_MAJOR seats           → 'NEEDS_MAJOR' (BLOCK; retry Stage 1.5
+ *                                       once with notes appended; if still
+ *                                       NEEDS_MAJOR, fail the stage).
+ *                                       50% threshold: ≥2 of 4 = block.
+ *   - 1 NEEDS_MAJOR seat             → take the worst non-block verdict
+ *                                       across the other three seats:
+ *                                       any NEEDS_MINOR → 'NEEDS_MINOR';
+ *                                       all OK          → 'NEEDS_MINOR'
+ *                                       (the lone NEEDS_MAJOR is logged).
+ *   - 0 NEEDS_MAJOR + ≥1 NEEDS_MINOR → 'NEEDS_MINOR' (log council_notes,
+ *                                       proceed with warning).
+ *   - All OK                         → 'OK', proceed.
+ *
+ * Additionally: ≥2 modules at 'low' applicability_confidence force the
+ * verdict to NEEDS_MAJOR regardless of seat agreement (data-quality gate).
  */
 export type CouncilVerdict = 'OK' | 'NEEDS_MINOR' | 'NEEDS_MAJOR'
 
 /**
+ * The 4 council seats (canonical names, in invocation order).
+ * Models pinned in env config; do not change without a re-validation run.
+ */
+export type CouncilSeatId = 'grok' | 'gemini' | 'glm' | 'sonnet'
+
+/**
  * One council seat's structured review of the decomposition.
- * Aggregator computes the overall CouncilVerdict from these.
+ * Aggregator computes the overall CouncilVerdict from these per the
+ * synthesis rule documented on `CouncilVerdict`.
  */
 export interface CouncilSeatReview {
-  /** Stable seat identifier — model id slug (e.g. 'sonnet-4.7'). */
-  seat: string
+  /**
+   * Stable seat identifier. Must be one of the 4 canonical seats so
+   * the aggregator can index reproducibly.
+   */
+  seat: CouncilSeatId
+  /** This seat's overall verdict on the catalog. */
+  verdict: SeatVerdict
   /** Q1: does the module list cover the functional surface? */
   coverage_ok: boolean
   /** Q2: are any listed modules genuinely N/A? */
@@ -192,14 +260,14 @@ export interface ModuleDecomposition {
   /**
    * The applicable modules for this product, in the canonical order
    * defined by UNIVERSAL_MODULES (NOT in confidence order).
-   * Length: 3–9 (a product with <3 modules is structurally suspect
+   * Length: 3–12 (a product with <3 modules is structurally suspect
    * and Stage 1.5 must reject).
    */
   modules: ModuleSpec[]
 
   /**
    * Modules explicitly marked N/A for this product. Sum of
-   * modules.length + excluded_modules.length must equal 9 (every
+   * modules.length + excluded_modules.length must equal 12 (every
    * universal module is accounted for, either applied or excluded).
    */
   excluded_modules: UniversalModule[]
@@ -218,7 +286,8 @@ export interface ModuleDecomposition {
   council_verdict: CouncilVerdict
 
   /**
-   * Per-seat reviews retained for diagnostics. Length: 3.
+   * Per-seat reviews retained for diagnostics. Length: 4.
+   * Order matches `CouncilSeatId` declaration: grok, gemini, glm, sonnet.
    */
   council_seats: CouncilSeatReview[]
 
