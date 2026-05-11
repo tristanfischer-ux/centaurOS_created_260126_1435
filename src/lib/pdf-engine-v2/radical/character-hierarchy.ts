@@ -344,6 +344,19 @@ export const SENTENCES: HierarchySentence[] = [
     words: ['haps_structure'],
     allowed_classes: ['haps'],
   },
+  // Phase B Iter 1 (2026-05-11): HAPS-specific power+thermal sentence. Real
+  // HAPS aircraft (Airbus Zephyr, BAE PHASA-35, ESA-funded designs) are
+  // defined by their wing-integrated photovoltaic array + Li-S/Li-ion night-
+  // storage battery + ultra-light composite spar. The composite spar IS the
+  // primary load path — and the PV array IS the wing skin. This sentence
+  // captures the energy/airframe-coupled subsystem that has no analogue in
+  // any other product class.
+  {
+    id: 'solar_electric_airframe',
+    label: 'Solar-Electric Airframe',
+    words: ['composite_spar_word', 'photovoltaic_array_word', 'night_storage_battery_word'],
+    allowed_classes: ['haps'],
+  },
 ]
 
 // ---------------------------------------------------------------------------
@@ -681,6 +694,36 @@ export const WORDS: HierarchyWord[] = [
     label: 'HAPS Airframe Structure',
     sentence_id: 'haps_airframe',
     characters: ['aluminium_extrusion', 'steel_bolt', 'polymer_enclosure'],
+  },
+  // ── solar_electric_airframe (Phase B Iter 1, 2026-05-11) ─────────────────
+  // Wing-integrated PV + composite spar + Li-S night-storage battery —
+  // tightly coupled airframe-energy subsystem unique to HAPS / stratospheric
+  // pseudo-satellite craft. New function-class IDs:
+  //   - 'composite_spar' (carbon_fibre_composite radical, structural)
+  //   - 'wing_integrated_pv_module' (silicon_semiconductor_function +
+  //     optical_transduction_function radicals — already in library)
+  //   - 'lithium_sulfur_night_battery' (electrochemical_energy_function radical)
+  //   - 'mppt_charge_controller' (silicon_semiconductor_function +
+  //     digital_logic_function radicals)
+  // All characters reuse the 22 existing radicals via the same string-only
+  // hierarchy convention used by the heat-pump and AUV characters.
+  {
+    id: 'composite_spar_word',
+    label: 'Composite Spar and Wing Skin',
+    sentence_id: 'solar_electric_airframe',
+    characters: ['composite_spar', 'aluminium_extrusion', 'polymer_enclosure'],
+  },
+  {
+    id: 'photovoltaic_array_word',
+    label: 'Wing-Integrated Photovoltaic Array',
+    sentence_id: 'solar_electric_airframe',
+    characters: ['wing_integrated_pv_module', 'mppt_charge_controller', 'copper_wire'],
+  },
+  {
+    id: 'night_storage_battery_word',
+    label: 'Night-Storage Battery Pack',
+    sentence_id: 'solar_electric_airframe',
+    characters: ['lithium_sulfur_night_battery', 'pcb_controller'],
   },
   // ── Seed-only characters with no domain-specific parent yet ──────────────
   // These appear in multiple product classes — they route to their nearest sentence

@@ -412,7 +412,13 @@ export function deriveAuvMandatoryCharacters(): string[] {
 
 /**
  * Mandatory character list for HAPS (High Altitude Pseudo-Satellite) briefs.
- * Pins to haps_airframe, propulsion_system, edge_compute_system.
+ * Pins to haps_airframe, solar_electric_airframe, propulsion_system,
+ * edge_compute_system.
+ *
+ * Phase B Iter 1 (2026-05-11): added solar_electric_airframe characters —
+ * the wing-integrated PV array, composite spar and Li-S night-storage
+ * battery are the defining subsystems of any 30-day endurance HAPS.
+ * Without them the BOM is just generic airframe bolts and avionics.
  */
 export function deriveHapsMandatoryCharacters(): string[] {
   return [
@@ -420,6 +426,11 @@ export function deriveHapsMandatoryCharacters(): string[] {
     'aluminium_extrusion', // haps_structure (spar/frame)
     'steel_bolt',          // haps_structure (fasteners)
     'polymer_enclosure',   // haps_structure (nacelle/pod)
+    // Solar-electric airframe (Phase B Iter 1)
+    'composite_spar',                 // composite_spar_word (carbon-fibre primary spar)
+    'wing_integrated_pv_module',      // photovoltaic_array_word (wing-skin PV)
+    'mppt_charge_controller',         // photovoltaic_array_word (MPPT)
+    'lithium_sulfur_night_battery',   // night_storage_battery_word (Li-S 30-day pack)
     // Propulsion
     'power_converter',     // propulsion_motors (motor driver)
     'copper_wire',         // propulsion_motors (wiring)
