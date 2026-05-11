@@ -902,19 +902,62 @@ function resolveOemSubsystemLeaf(
  * Resolve a structural_fabricated leaf.
  * Uses Grade D if available; otherwise stubs out with "needs corpus query".
  * Full Nightshift corpus integration is deferred — see Phase 2 spec.
+ *
+ * Bug P1-9 fix (2026-05-11): if the archetype has a known MPN hint
+ * (MPN_HINTS_BY_CHARACTER), try the distributor BEFORE stamping grade_d.
+ * Some "structural" archetypes (copper_wire, polymer_gasket, copper_busbar,
+ * cable_transit_frame) actually have RS/Farnell SKUs and the price-only
+ * table is a strict downgrade from a real distributor hit.
  */
-function resolveStructuralFabricatedLeaf(
+async function resolveStructuralFabricatedLeaf(
   archetypeId: string,
   qty: number,
   estimatedUnitPriceGbp: number | null,
-): ResolvedLeafAnnotation {
+  productClass: string = 'unknown',
+  callsUsed?: { count: number },
+  maxCalls?: number,
+): Promise<ResolvedLeafAnnotation> {
+  // Bug P1-9: opportunistic distributor lookup when MPN hint exists.
+  const hints = getMpnHintsForArchetype(archetypeId, productClass)
+  if (hints.length > 0 && callsUsed && maxCalls && callsUsed.count < maxCalls) {
+    for (const mpn of hints) {
+      if (callsUsed.count >= maxCalls) break
+      callsUsed.count++
+      try {
+        const candidate = await findSkuForPart(mpn)
+        if (!candidate) continue
+        const guardCheck = isDistributorResultConsistentWithArchetype(archetypeId, candidate)
+        if (!guardCheck.ok) continue
+        if (candidate.qty1GBP === null) continue
+        return {
+          archetype_id: archetypeId,
+          part_class: 'structural_fabricated',
+          qty,
+          mpn: candidate.mpn,
+          manufacturer: candidate.best.manufacturer,
+          unit_price_gbp: candidate.qty1GBP,
+          lead_weeks: candidate.best.leadWeeks ?? null,
+          verification_grade: 'verified',
+          source: candidate.best.source as ResolvedLeafAnnotation['source'],
+          source_url: candidate.best.productUrl,
+          distributor: candidate.best.source as ResolvedLeafAnnotation['distributor'],
+          grade_d_basis: null,
+          notes: `Structural-fabricated upgraded to verified via ${candidate.best.source} ` +
+            `(P1-9 opportunistic lookup): ${candidate.best.description ?? ''}`,
+        }
+      } catch (err) {
+        console.warn(`  [Phase2/warn-P1-9] structural lookup failed for ${mpn}: ${(err as Error).message}`)
+      }
+    }
+  }
+
   const gradeD = GRADE_D_BY_CHARACTER[archetypeId]
   if (gradeD) {
     return {
       archetype_id: archetypeId,
       part_class: 'structural_fabricated',
       qty,
-      mpn: null,
+      mpn: hints[0] ?? null,
       manufacturer: null,
       unit_price_gbp: gradeD.typical,
       lead_weeks: null,
@@ -923,7 +966,9 @@ function resolveStructuralFabricatedLeaf(
       source_url: null,
       distributor: 'estimated',
       grade_d_basis: gradeD.basis,
-      notes: 'Structural fabrication: Nightshift corpus query not yet wired; Grade D fallback',
+      notes: hints.length > 0
+        ? `Structural fabrication: distributor miss on ${hints.join('/')}; Grade D fallback`
+        : 'Structural fabrication: Nightshift corpus query not yet wired; Grade D fallback',
     }
   }
 
@@ -931,7 +976,7 @@ function resolveStructuralFabricatedLeaf(
     archetype_id: archetypeId,
     part_class: 'structural_fabricated',
     qty,
-    mpn: null,
+    mpn: hints[0] ?? null,
     manufacturer: null,
     unit_price_gbp: estimatedUnitPriceGbp,
     lead_weeks: null,
@@ -1080,7 +1125,17 @@ export async function runRadicalResolution(
     if (partClass === 'software_ip') {
       annotation = resolveSoftwareIpLeaf(archetypeId, qty, estimatedUnitPriceGbp)
     } else if (partClass === 'structural_fabricated') {
-      annotation = resolveStructuralFabricatedLeaf(archetypeId, qty, estimatedUnitPriceGbp)
+      // Bug P1-9 fix (2026-05-11): pass distributor budget so structural
+      // leaves with a known MPN hint try a verified lookup before falling
+      // through to grade_d_table.
+      annotation = await resolveStructuralFabricatedLeaf(
+        archetypeId,
+        qty,
+        estimatedUnitPriceGbp,
+        productClass,
+        callsUsed,
+        MAX_DISTRIBUTOR_CALLS,
+      )
     } else if (partClass === 'oem_subsystem') {
       annotation = resolveOemSubsystemLeaf(archetypeId, qty, estimatedUnitPriceGbp, productClass)
     } else if (isDistributorResultPlausibleForClass(partClass)) {
