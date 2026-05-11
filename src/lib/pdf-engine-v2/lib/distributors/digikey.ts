@@ -11,6 +11,7 @@
  */
 
 import type { DistributorResult } from './mouser'
+import { parseLeadTimeWeeks } from './mouser'
 
 const DK_TOKEN_URL = 'https://api.digikey.com/v1/oauth2/token'
 const DK_SEARCH_URL = 'https://api.digikey.com/products/v4/search/keyword'
@@ -99,6 +100,28 @@ export async function lookupSkuDigikey(mpn: string): Promise<DistributorResult |
       }
     }
 
+    // Lead time — Digi-Key v4 exposes the field on the Product or Variation:
+    //   - product.ManufacturerLeadWeeks (numeric weeks, when populated)
+    //   - product.ManufacturerLeadTime (free string, e.g. "12 Weeks")
+    //   - product.LeadStatus (e.g. "In Stock", "Backorder")
+    //   - variation.ManufacturerLeadWeeks
+    // P0-1: the field was previously dropped on the floor.
+    const leadCandidates: unknown[] = [
+      best.ManufacturerLeadWeeks,
+      firstVar.ManufacturerLeadWeeks,
+      best.ManufacturerLeadTime,
+      firstVar.ManufacturerLeadTime,
+      best.LeadStatus,
+    ]
+    let leadWeeks: number | null = null
+    for (const cand of leadCandidates) {
+      const parsed = parseLeadTimeWeeks(cand)
+      if (parsed !== null) {
+        leadWeeks = parsed
+        break
+      }
+    }
+
     return {
       source: 'digikey',
       mpn: best.ManufacturerProductNumber || mpn,
@@ -110,6 +133,7 @@ export async function lookupSkuDigikey(mpn: string): Promise<DistributorResult |
         : null,
       datasheetUrl: best.DatasheetUrl || null,
       productUrl: best.ProductUrl || `https://www.digikey.co.uk/en/products/result?keywords=${encodeURIComponent(mpn)}`,
+      leadWeeks,
       fetchedAt: new Date().toISOString(),
     }
   } catch (err) {

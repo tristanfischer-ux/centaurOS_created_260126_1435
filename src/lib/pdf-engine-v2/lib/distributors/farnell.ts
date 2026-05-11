@@ -16,6 +16,7 @@
  */
 
 import type { DistributorResult } from './mouser'
+import { parseLeadTimeWeeks } from './mouser'
 
 const FARNELL_URL = 'https://api.element14.com/catalog/products'
 const STORE = 'uk.farnell.com'
@@ -98,6 +99,20 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
     const dsMatch = block.match(/<ns1:datasheets>[\s\S]*?<ns1:url>([^<]+)<\/ns1:url>[\s\S]*?<\/ns1:datasheets>/)
     const datasheetUrl = dsMatch ? dsMatch[1] : null
 
+    // Lead time — Farnell exposes <ns1:leadTime> as a numeric string (days),
+    // and sometimes <ns1:replenishmentLeadTime> on backorder items.
+    // P0-1: previously dropped on the floor.
+    const leadStr = extract('leadTime') ?? extract('replenishmentLeadTime')
+    let leadWeeks: number | null = null
+    if (leadStr !== null) {
+      const days = parseFloat(leadStr)
+      if (Number.isFinite(days) && days >= 0) {
+        leadWeeks = Math.max(0, Math.round(days / 7))
+      } else {
+        leadWeeks = parseLeadTimeWeeks(leadStr)
+      }
+    }
+
     return {
       source: 'farnell',
       mpn: returnedMpn,
@@ -107,6 +122,7 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
       stockUK,
       datasheetUrl,
       productUrl: productURL,
+      leadWeeks,
       fetchedAt: new Date().toISOString(),
     }
   } catch (err) {

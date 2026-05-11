@@ -32,6 +32,7 @@ const SAMPLE_AGGREGATE_RESULT = {
     stockUK: 340,
     datasheetUrl: 'https://www.mouser.com/datasheet/2/stm32h743zi-2954673.pdf',
     productUrl: 'https://www.mouser.com/ProductDetail/STMicroelectronics/STM32H743ZIT6',
+    leadWeeks: 12,
     fetchedAt: '2026-05-06T10:00:00Z',
   },
   alternates: [],

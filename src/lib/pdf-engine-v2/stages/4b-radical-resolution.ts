@@ -461,7 +461,10 @@ async function resolveDistributorLeaf(
       mpn: result.mpn,
       manufacturer: result.best.manufacturer,
       unit_price_gbp: result.qty1GBP,
-      lead_weeks: null, // distributors don't return lead time via API
+      // Bug P0-1 fix (2026-05-11): distributors DO return lead-time on the
+      // verified result (Mouser LeadTime, Digi-Key ManufacturerLeadWeeks,
+      // Farnell leadTime). Propagate the value instead of dropping it.
+      lead_weeks: result.best.leadWeeks ?? null,
       verification_grade: 'verified',
       source: result.best.source as ResolvedLeafAnnotation['source'],
       source_url: result.best.productUrl,
