@@ -468,13 +468,19 @@ export const WORDS: HierarchyWord[] = [
     id: 'grid_transformer_group',
     label: 'Grid Step-up Transformer',
     sentence_id: 'power_conversion_system_pcs',
-    characters: ['transformer', 'transformer_bushing', 'tap_changer_assembly'],
+    // Iter 2 council fix (GLM): add ac_circuit_breaker (Siemens 3AH5 /
+    // ABB VD4 class) for grid-side fault isolation. circuit_breaker in
+    // dc_protection is DC-rated; grid side needs a separate AC unit.
+    characters: ['transformer', 'transformer_bushing', 'tap_changer_assembly', 'ac_circuit_breaker'],
   },
   {
     id: 'pcs_power_stage',
     label: 'PCS Power Stage',
     sentence_id: 'power_conversion_system_pcs',
-    characters: ['igbt_power_module', 'gate_driver_board', 'dc_link_capacitor', 'snubber_capacitor'],
+    // Iter 2 council fix (Gemini): gate_drive_isolated_dcdc added — IGBT
+    // gate drivers need an isolated +15V/-8V supply (Murata MGJ2 / Recom
+    // RxxP21503D class). Without it the gate driver board can't fire.
+    characters: ['igbt_power_module', 'gate_driver_board', 'gate_drive_isolated_dcdc', 'dc_link_capacitor', 'snubber_capacitor'],
   },
   {
     id: 'pcs_ac_filter',
@@ -506,7 +512,14 @@ export const WORDS: HierarchyWord[] = [
     id: 'dc_earthing',
     label: 'DC Earthing and Surge Protection',
     sentence_id: 'dc_distribution_switchgear',
-    characters: ['surge_arrester_dc', 'earthing_busbar', 'earth_fault_relay', 'earthing_lug'],
+    // Iter 2 council fix (Gemini): rename earth_fault_relay to
+    // insulation_monitoring_device — Bender ISOMETER on a floating-IT BESS
+    // DC bus is an IMD, not a passive EFR. The MPN hint and Grade-D entry
+    // already named the Bender unit; the ID now matches the function.
+    // Iter 2 council fix (Grok+Gemini+GLM): earthing_electrode_rod moved
+    // here from container_security — earth rods are part of the bonding
+    // and earthing system, not the security subsystem.
+    characters: ['surge_arrester_dc', 'earthing_busbar', 'insulation_monitoring_device', 'earthing_lug', 'earthing_electrode_rod'],
   },
   // ── thermal_management_system ────────────────────────────────────────────
   // Iter 2: split out hydraulics (pump + reservoir + sensor) and cold plate.
@@ -594,7 +607,11 @@ export const WORDS: HierarchyWord[] = [
     id: 'container_services',
     label: 'Container Services',
     sentence_id: 'container_enclosure_fit_out',
-    characters: ['cable_transit_frame', 'switchboard_enclosure', 'thermal_insulation_panel', 'cable_tray', 'cable_gland'],
+    // Iter 2 council fix (GLM): container_iso_shell added — the literal
+    // ISO 20'/40' steel container the BoM is named after. Was implicit
+    // before via switchboard_enclosure but a real BESS BoM lists it as a
+    // distinct line item (~£8-12k for a custom-fit-out 40' container).
+    characters: ['cable_transit_frame', 'switchboard_enclosure', 'thermal_insulation_panel', 'cable_tray', 'cable_gland', 'container_iso_shell'],
   },
   {
     id: 'container_hvac',
@@ -610,9 +627,12 @@ export const WORDS: HierarchyWord[] = [
   },
   {
     id: 'container_security',
-    label: 'Container Security and Earthing',
+    label: 'Container Security',
     sentence_id: 'container_enclosure_fit_out',
-    characters: ['cctv_camera', 'earthing_electrode_rod'],
+    // Iter 2 council fix (Grok+Gemini+GLM): earthing_electrode_rod moved
+    // to dc_earthing — it's site bonding/earthing, not security. Replaced
+    // with PIR intrusion detector to give the security word real depth.
+    characters: ['cctv_camera', 'intrusion_detector_pir'],
   },
   // ── refrigerant_circuit ──────────────────────────────────────────────────
   // Bug P0-6 fix (2026-05-11): a real 30 kW R290 heat pump's refrigerant

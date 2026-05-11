@@ -212,8 +212,10 @@ export function deriveBessQuantityOverrides(params: {
     'power_converter',
     'transformer_bushing',
     'tap_changer_assembly',
+    'ac_circuit_breaker', // council fix (GLM): grid-side AC breaker, distinct from DC circuit_breaker
     'igbt_power_module',
     'gate_driver_board',
+    'gate_drive_isolated_dcdc', // council fix (Gemini): IGBT gate driver power supply
     'dc_link_capacitor',
     'snubber_capacitor',
     'ac_filter_inductor',
@@ -228,8 +230,9 @@ export function deriveBessQuantityOverrides(params: {
     'busbar_heat_shrink',
     'surge_arrester_dc',
     'earthing_busbar',
-    'earth_fault_relay',
+    'insulation_monitoring_device',  // renamed from earth_fault_relay (council fix: Bender ISOMETER is an IMD on floating-IT DC)
     'earthing_lug',
+    'earthing_electrode_rod', // moved here from container_security (council fix)
     // Thermal management
     'liquid_cooling_system',
     'cold_plate',
@@ -275,6 +278,7 @@ export function deriveBessQuantityOverrides(params: {
     'switchboard_enclosure',
     'cable_tray',
     'cable_gland',
+    'container_iso_shell', // council fix (GLM): the literal 40' ISO container shell
     'hvac_split_unit',
     'hvac_condensate_pump',
     'hvac_thermostat',
@@ -283,7 +287,7 @@ export function deriveBessQuantityOverrides(params: {
     'convenience_outlet',
     'distribution_board_aux',
     'cctv_camera',
-    'earthing_electrode_rod',
+    'intrusion_detector_pir',  // replaces earthing_electrode_rod (council fix: rod moved to dc_earthing)
   ]
 
   const quantities: QuantityOverrideMap = {

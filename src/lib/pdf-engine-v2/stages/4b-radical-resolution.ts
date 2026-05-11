@@ -186,6 +186,10 @@ const ELECTRONIC_COTS_CHARACTERS = new Set<string>([
   'ems_hmi_panel', 'ems_gateway_modem', 'revenue_meter', 'metering_ct',
   'monitoring_relay', 'mcb_low_voltage', 'safety_relay_compressor',
   'hp_relay_board', 'hp_hmi_display', 'hp_user_interface_pcb',
+  // Council fix Iter 2: insulation_monitoring_device (Bender ISOMETER)
+  'insulation_monitoring_device',
+  // Council fix Iter 2: PIR intrusion detector (replaces earth rod)
+  'intrusion_detector_pir',
   // Drone / avionics electronics
   'imu_6dof_module', 'magnetometer_3axis', 'barometer_pressure_sensor',
   'gnss_receiver_module', 'telemetry_radio_modem', 'rc_receiver_module',
@@ -235,7 +239,11 @@ const MECHANICAL_COTS_CHARACTERS = new Set<string>([
   // Switchgear mechanicals
   'dc_isolator_switch', 'dc_fuse_holder', 'dc_fuse_link', 'pre_charge_contactor',
   'busbar_support_insulator', 'busbar_heat_shrink',
-  'surge_arrester_dc', 'earthing_busbar', 'earth_fault_relay', 'earthing_lug',
+  'surge_arrester_dc', 'earthing_busbar', 'earthing_lug',
+  // Council fix Iter 2: AC-side breaker + container shell + earth electrode
+  'ac_circuit_breaker', 'container_iso_shell', 'earthing_electrode_rod',
+  // Council fix Iter 2: gate-drive isolated DC-DC for IGBT modules
+  'gate_drive_isolated_dcdc',
   // Thermal mechanicals
   'cold_plate', 'coolant_distribution_manifold', 'thermal_interface_material',
   'coolant_pump', 'coolant_reservoir_tank',
@@ -245,7 +253,9 @@ const MECHANICAL_COTS_CHARACTERS = new Set<string>([
   'fss_control_panel',
   // Container fit-out mechanicals
   'cable_tray', 'cable_gland', 'interior_led_luminaire', 'emergency_light',
-  'convenience_outlet', 'distribution_board_aux', 'earthing_electrode_rod',
+  'convenience_outlet', 'distribution_board_aux',
+  // earthing_electrode_rod was previously listed here; council fix moved
+  // it to dc_earthing — declared once above to avoid duplicate set entries.
   'hvac_split_unit', 'hvac_condensate_pump', 'hvac_thermostat',
   'ems_fibre_patch_panel',
   // Heat pump mechanicals
@@ -633,8 +643,11 @@ const MPN_HINTS_BY_CHARACTER: Record<string, string[]> = {
   // ── Phase B Iter 2 (2026-05-11) MPN hints for known parts ────────────────
   // BMS isolation IC — Analog Devices ADuM family
   'bms_isolation_ic': ['ADUM1411ARWZ', 'ISO7741DWR'],
-  // BMS slave cell-monitor IC — Analog Devices LTC6804 / Maxim MAX17841
-  'bms_slave_monitor_ic': ['LTC6804-1', 'MAX17841BGTL+T'],
+  // BMS slave cell-monitor IC — Analog Devices LTC6804 / Maxim MAX17841.
+  // Council fix Iter 2 (GLM): -1 = forward daisy chain (typical), -2 =
+  // reverse daisy chain. List both so the BoM tool offers the right
+  // variant for the topology.
+  'bms_slave_monitor_ic': ['LTC6804-1', 'LTC6804-2', 'MAX17841BGTL+T'],
   // CAN transceiver — TI / NXP staples
   'can_transceiver_ic': ['TCAN1042HDR', 'TJA1051T'],
   // Isolated CAN/485 transceiver — TI ISO1042
@@ -681,6 +694,15 @@ const MPN_HINTS_BY_CHARACTER: Record<string, string[]> = {
   'electronic_speed_controller': ['TEKKO32-F4-65A', 'XROTOR-PRO-80A'],
   // Carbon prop — T-Motor / Master Airscrew
   'propeller_carbon_blade': ['T-MOTOR-G29x9.5-CF', 'MA-19x10-CF'],
+  // Council fix Iter 2: AC switchgear, gate-drive supply, container shell, PIR.
+  // AC vacuum circuit breaker — Siemens 3AH5 / ABB VD4 class
+  'ac_circuit_breaker': ['3AH5103-2', 'VD4-12-1250-25'],
+  // Isolated DC-DC for IGBT gate drive — Murata MGJ2 / Recom RxxP21503D
+  'gate_drive_isolated_dcdc': ['MGJ2D241505SC', 'RP-1515D'],
+  // Bender insulation monitoring device — iso685 family
+  'insulation_monitoring_device': ['ISO685-D-P', 'ISO685W-D-B'],
+  // PIR intrusion detector — Bosch / Honeywell commercial
+  'intrusion_detector_pir': ['BOSCH-ISC-PDL1-W18G', 'HONEYWELL-IS-310'],
 }
 
 // ---------------------------------------------------------------------------
@@ -797,7 +819,11 @@ const GRADE_D_BY_CHARACTER: Record<string, GradeD> = {
   'ac_filter_inductor': { typical: 280, basis: 'Three-phase line filter inductor 100 A (Hammond / SBE)' },
   'ac_filter_capacitor': { typical: 95, basis: 'Three-phase film capacitor for output filter' },
   'ac_emi_filter': { typical: 240, basis: 'Three-phase EMI filter 100 A (Schaffner / Schurter)' },
-  // BESS — DC switchgear
+  // BESS — DC switchgear (Iter 2 council fixes)
+  'ac_circuit_breaker': { typical: 4800, basis: 'Grid-side AC vacuum circuit breaker 12 kV 1250 A (Siemens 3AH5 / ABB VD4)' },
+  'gate_drive_isolated_dcdc': { typical: 18, basis: 'Isolated +15V/-8V DC-DC for IGBT gate drive (Murata MGJ2 / Recom RxxP21503D)' },
+  'container_iso_shell': { typical: 9500, basis: 'Custom-fit 40-foot ISO container shell with internal fit-out support frame (per container)' },
+  'intrusion_detector_pir': { typical: 145, basis: 'Commercial PIR intrusion detector with anti-mask (Bosch ISC-PDL1 / Honeywell IS-310)' },
   'dc_isolator_switch': { typical: 420, basis: 'DC load break isolator 1500 V 400 A (ABB / Socomec)' },
   'dc_fuse_holder': { typical: 65, basis: 'NH fuse holder for DC service (Mersen / Bussmann)' },
   'dc_fuse_link': { typical: 110, basis: 'NH gPV fuse 1500 V DC, 250 A (Mersen / Bussmann)' },
@@ -806,7 +832,7 @@ const GRADE_D_BY_CHARACTER: Record<string, GradeD> = {
   'busbar_heat_shrink': { typical: 6, basis: '1500 V busbar heat-shrink, per metre' },
   'surge_arrester_dc': { typical: 320, basis: 'DC surge arrester Type 2, 1500 V (Phoenix Contact / Mersen)' },
   'earthing_busbar': { typical: 95, basis: 'Tinned copper earthing busbar 30×5 mm × 1 m' },
-  'earth_fault_relay': { typical: 580, basis: 'DC residual current monitor (Bender ISOMETER class)' },
+  'insulation_monitoring_device': { typical: 580, basis: 'DC insulation monitoring device for floating-IT BESS bus (Bender ISOMETER iso685 class)' },
   'earthing_lug': { typical: 4, basis: 'Tinned copper earthing lug, M10 stud (per lug)' },
   // BESS — thermal management
   'cold_plate': { typical: 320, basis: 'Aluminium cold plate, 12-cell, brazed' },
@@ -981,6 +1007,23 @@ const GRADE_D_BY_CHARACTER: Record<string, GradeD> = {
   'ccs_connector_assembly': { typical: 480, basis: 'CCS Type-2 connector head with sensors' },
   'cable_management_arm': { typical: 380, basis: 'Cable retraction / spring-balanced arm assembly' },
   // rack_caster_wheel already declared in the BESS section above.
+  // ── Iter 1 chars previously missing Grade-D (council fix Iter 2) ─────────
+  // Bioprocess vessel (Iter 1)
+  'sterile_agitator_drive': { typical: 1100, basis: 'Sterile magnetic-coupled agitator drive (Sartorius Biostat / Eppendorf class), per drive' },
+  'gas_sparger_assembly': { typical: 220, basis: 'Sterilisable gas sparger with sintered tip (per assembly)' },
+  'sterile_filter_membrane': { typical: 95, basis: '0.2 µm sterile gas filter cartridge (Sartorius Sartopore / Pall)' },
+  'thermal_jacket': { typical: 850, basis: 'Integrated stainless thermal jacket for 200 L vessel (per vessel)' },
+  'single_use_biocompatible_bag': { typical: 280, basis: 'Single-use biocompatible bag for 200 L bioreactor (Sartorius Flexsafe / Cytiva ReadyToProcess)' },
+  // Subsea pressure vessel (Iter 1)
+  'pressure_rated_endcap': { typical: 480, basis: 'Depth-rated AUV end-cap with O-ring grooves, machined aluminium 6082-T6 (per cap)' },
+  'dive_oring_seal': { typical: 22, basis: 'High-pressure dive-rated O-ring 70 Shore EPDM (per ring; 2-3 per end-cap)' },
+  'syntactic_foam_block': { typical: 320, basis: 'Syntactic foam buoyancy block (Trelleborg Eccospheres class), per kg-equivalent block' },
+  'ballast_trim_weight': { typical: 28, basis: 'Lead ballast trim weight (per kg block)' },
+  // Solar-electric airframe (Iter 1)
+  'composite_spar': { typical: 2200, basis: 'CNC-routed CFRP wing spar (per spar; 1-2 per HAPS)' },
+  'wing_integrated_pv_module': { typical: 480, basis: 'Wing-integrated thin-film PV laminate per panel (Ascent Solar / SunPower IBC class)' },
+  'lithium_sulfur_night_battery': { typical: 3800, basis: 'Lithium-sulfur battery pack 5 kWh for HAPS night-storage (Oxis Energy / Li-S Li-S+ class)' },
+  'mppt_charge_controller': { typical: 380, basis: 'High-efficiency MPPT charge controller for HAPS PV array (Genasun / Victron class)' },
 }
 
 // ---------------------------------------------------------------------------
