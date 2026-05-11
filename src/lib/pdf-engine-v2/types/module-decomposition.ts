@@ -59,16 +59,171 @@ export type UniversalModule = typeof UNIVERSAL_MODULES[number]
 
 /**
  * Human-readable label for each module, for prompt rendering and PDF output.
- * Implementation must export a `MODULE_LABELS: Record<UniversalModule, string>`.
  */
 export type UniversalModuleLabels = Record<UniversalModule, string>
 
 /**
  * One-sentence definition for each module, embedded in the Stage 1.5 prompt
  * so the LLM has a stable definition to anchor its decisions.
- * Implementation must export a `MODULE_DEFINITIONS: Record<UniversalModule, string>`.
  */
 export type UniversalModuleDefinitions = Record<UniversalModule, string>
+
+/**
+ * Human-readable labels for the 12 modules. Used in the PDF design-modules
+ * section, in council-validation reports, and (optionally) in prompts.
+ */
+export const MODULE_LABELS: UniversalModuleLabels = {
+  energy_storage_source: 'Energy Storage / Source / Dissipation',
+  energy_conversion_transduction: 'Energy Conversion / Transduction',
+  structure_containment: 'Structure / Containment',
+  sensing_instrumentation: 'Sensing / Instrumentation',
+  control_compute_communication: 'Control / Compute / Communication',
+  safety_protection: 'Safety / Protection',
+  environmental_interface: 'Environmental Interface',
+  power_distribution: 'Power Distribution',
+  maintenance_serviceability: 'Maintenance / Serviceability',
+  actuation_kinematics: 'Actuation / Kinematics / Mechanisms',
+  mass_fluid_transport_process: 'Mass / Fluid Transport & Process',
+  hmi_ergonomics: 'Human-Machine Interface & Ergonomics',
+}
+
+/**
+ * Canonical one-sentence definitions for the 12 modules.
+ * Mirrors §3 of `radical/ITER3-ARCHITECTURE-DESIGN.md` and is rendered into
+ * Stage 1.5 prompts and council-review reports.
+ */
+export const MODULE_DEFINITIONS: UniversalModuleDefinitions = {
+  energy_storage_source:
+    'Stores or sources the primary working energy/material the product uses (battery, fuel tank, capacitor bank, accumulator, biomass feedstock, water reservoir).',
+  energy_conversion_transduction:
+    'Converts energy or material between forms (inverter, motor, heat exchanger, fermenter, RO membrane, solar cell, turbine generator).',
+  structure_containment:
+    'Carries load, contains pressure/fluid, and provides geometric form (pressure vessel, frame, enclosure, container shell, hull, chassis). Passive integrity only.',
+  sensing_instrumentation:
+    'Measures physical state — temperature, pressure, flow, voltage, biochemistry, position, gas concentration.',
+  control_compute_communication:
+    'Closed-loop control, supervisory compute, and on/off-board comms (PLC, MCU, EMS, SCADA, radio, CAN bus, edge inference).',
+  safety_protection:
+    'Detects and mitigates hazards via ACTIVE mitigation devices (fire suppression, surge protection, pressure relief valves, e-stops, interlocks, BMS protection circuits). Operation-time hazards only.',
+  environmental_interface:
+    'Handles the physical boundary with the operating environment (thermal management, ingress protection, EMC shielding, lightning, anti-icing, biofouling protection).',
+  power_distribution:
+    'Distributes electrical or fluid power within the product via UNINTERRUPTED routing only (busbars, switchgear cabling, harnesses, manifolds, conduit). Interrupting devices live in safety_protection.',
+  maintenance_serviceability:
+    'Affords OFFLINE inspection, swap, calibration, decommissioning (access doors, lifting eyes, drain valves, test points, spare-parts kits, labels). Operation-time protection lives in safety_protection.',
+  actuation_kinematics:
+    'Applies converted energy to KINEMATIC INTENT: joints, gears, linkages, propellers, rotors, control surfaces, end-effector jaws, dish actuators, turbine blades, impellers, agitators. Distinct from energy_conversion_transduction (which only changes energy domain).',
+  mass_fluid_transport_process:
+    "Internal pumping, valving, mixing, filtration, separation, phase change, biological/chemical processing. The product's INTERNAL matter flow lives here — distinct from passive containment in structure_containment and from environmental heat/mass exchange in environmental_interface.",
+  hmi_ergonomics:
+    'Operator-facing touchpoints and ergonomic surfaces: touchscreens, haptics, displays, manual controls, sight glasses, ergonomic grips, biocompatible/wearable interfaces. Operator-facing only; external connectors stay in power_distribution (electrical) or mass_fluid_transport_process (fluid).',
+}
+
+/**
+ * Default allowed_radicals subset per module. Mirrors §5.2 of
+ * `radical/ITER3-ARCHITECTURE-DESIGN.md`. Stage 1.5 may refine the per-module
+ * `allowed_radicals` array based on the brief specifics, but defaults here
+ * are used (a) when the LLM omits the field, (b) for the per-module Stage 2
+ * call when the secondary_modules union needs a base set, (c) when the
+ * fallback ClassModulePriors path constructs synthetic ModuleSpec objects.
+ *
+ * IMPORTANT: every ID in these lists MUST appear in `KNOWN_RADICALS` in
+ * `stages/2-decompose.ts`. Validator must reject any radical not in the
+ * known set.
+ */
+export const MODULE_DEFAULT_ALLOWED_RADICALS: Record<UniversalModule, string[]> = {
+  energy_storage_source: [
+    'electrochemical_energy_function',
+    'lithium_iron_phosphate_chemistry',
+    'fluid_flow_state',
+    'pressure_vessel_function',
+  ],
+  energy_conversion_transduction: [
+    'silicon_semiconductor_function',
+    'magnetic_coupling_function',
+    'electromechanical_switching_function',
+    'thermal_transfer_function',
+    'mechanical_kinetic_function',
+    'optical_transduction_function',
+    'biochemical_sensing_function',
+    'electrochemical_reaction_function',
+    'refrigerant_fluid',
+  ],
+  structure_containment: [
+    'steel',
+    'aluminium_alloy',
+    'carbon_fibre_composite',
+    'polymer_thermoplastic',
+    'mineral_fibre_material',
+    'pressure_vessel_function',
+  ],
+  sensing_instrumentation: [
+    'silicon_semiconductor_function',
+    'optical_sensing_function',
+    'chemical_sensing_function',
+    'biochemical_sensing_function',
+    'digital_logic_function',
+  ],
+  control_compute_communication: [
+    'silicon_semiconductor_function',
+    'digital_logic_function',
+    'electrical_conducting_function',
+    'copper',
+  ],
+  safety_protection: [
+    'chemical_suppressant_material',
+    'optical_sensing_function',
+    'chemical_sensing_function',
+    'electromechanical_switching_function',
+    'pressure_vessel_function',
+  ],
+  environmental_interface: [
+    'thermal_transfer_function',
+    'refrigerant_fluid',
+    'fluid_flow_state',
+    'polymer_thermoplastic',
+    'mineral_fibre_material',
+  ],
+  power_distribution: [
+    'copper',
+    'electrical_conducting_function',
+    'electromechanical_switching_function',
+    'polymer_thermoplastic',
+    'fluid_flow_state',
+  ],
+  maintenance_serviceability: [
+    'steel',
+    'polymer_thermoplastic',
+    'electrical_conducting_function',
+  ],
+  actuation_kinematics: [
+    'silicon_semiconductor_function',
+    'copper',
+    'magnetic_coupling_function',
+    'electromechanical_switching_function',
+    'polymer_thermoplastic',
+    'mineral_fibre_material',
+    'mechanical_kinetic_function',
+  ],
+  mass_fluid_transport_process: [
+    'pressure_vessel_function',
+    'fluid_flow_state',
+    'copper',
+    'steel',
+    'polymer_thermoplastic',
+    'chemical_sensing_function',
+    'refrigerant_fluid',
+    'electrochemical_reaction_function',
+  ],
+  hmi_ergonomics: [
+    'silicon_semiconductor_function',
+    'polymer_thermoplastic',
+    'optical_sensing_function',
+    'mechanical_kinetic_function',
+    'digital_logic_function',
+    'thermal_transfer_function',
+  ],
+}
 
 // ---------------------------------------------------------------------------
 // 2. ModuleSpec — per-module decomposition output
