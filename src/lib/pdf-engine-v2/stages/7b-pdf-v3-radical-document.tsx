@@ -512,8 +512,8 @@ const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
     const total = rMeta.total_leaves || 1
     distributorSources.push({ label: 'Verified by Distributor (MPN)', count: rMeta.verified_by_distributor, pct: ((rMeta.verified_by_distributor / total) * 100).toFixed(0) })
     distributorSources.push({ label: 'Vendor Catalog Reference', count: rMeta.from_vendor_catalog, pct: ((rMeta.from_vendor_catalog / total) * 100).toFixed(0) })
-    distributorSources.push({ label: 'LLM Estimate (Grade D)', count: rMeta.from_llm_estimate + (rMeta.grade_d ?? 0), pct: (((rMeta.from_llm_estimate + (rMeta.grade_d ?? 0)) / total) * 100).toFixed(0) })
-    distributorSources.push({ label: 'Stub / Data Gap', count: rMeta.stub + (rMeta.data_gap ?? 0), pct: (((rMeta.stub + (rMeta.data_gap ?? 0)) / total) * 100).toFixed(0) })
+    distributorSources.push({ label: 'LLM Estimate (Grade D)', count: (rMeta.from_llm_estimate ?? 0) + (rMeta.grade_d ?? 0), pct: ((((rMeta.from_llm_estimate ?? 0) + (rMeta.grade_d ?? 0)) / total) * 100).toFixed(0) })
+    distributorSources.push({ label: 'Stub / Data Gap', count: (rMeta.stub ?? 0) + (rMeta.data_gap ?? 0), pct: ((((rMeta.stub ?? 0) + (rMeta.data_gap ?? 0)) / total) * 100).toFixed(0) })
   }
 
   // --- Research summary claims requiring verification ---
