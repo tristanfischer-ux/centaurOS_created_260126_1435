@@ -662,10 +662,20 @@ export function buildTreeFromLeaves(
   // domain leakage (refrigerant_circuit on AUV/drone/HAPS, fss on bioreactor/
   // vfarm, heat_pump_enclosure on bioreactor). When the product class is
   // not recognised by normaliseProductClass(), the filter is a no-op so the
-  // legacy behaviour is preserved for unknown classes.
+  // legacy behaviour is preserved for unknown classes — BUT we emit a
+  // warning so silent regressions (e.g. a typo "heat_pup") are visible in
+  // logs. This was flagged by all three council seats (Grok, Gemini, GLM)
+  // as the primary residual risk of the no-op fallback.
   const normalisedClass: ProductClass | null = normaliseProductClass(productClass)
+  if (!normalisedClass) {
+    console.warn(
+      `[structural-builder] Unrecognised product class "${productClass}" — ` +
+      `allowed_classes filter disabled, wrong-domain leakage protection inactive. ` +
+      `Add a normalisation rule in character-hierarchy.ts:normaliseProductClass().`,
+    )
+  }
   const isWordAllowed = (word: HierarchyWord): boolean => {
-    if (!normalisedClass) return true // unknown class — skip filter
+    if (!normalisedClass) return true // unknown class — skip filter (warned above)
     const sentence = wordToSentence.get(word.id)
     if (!sentence) return true // word with no sentence — handled separately
     return sentence.allowed_classes.includes(normalisedClass)
