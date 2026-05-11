@@ -101,15 +101,20 @@ export async function lookupSkuFarnell(mpn: string): Promise<DistributorResult |
 
     // Lead time — Farnell exposes <ns1:leadTime> as a numeric string (days),
     // and sometimes <ns1:replenishmentLeadTime> on backorder items.
-    // P0-1: previously dropped on the floor.
+    // Strictly-numeric → days. Unit-suffixed ("2 Weeks") → parseLeadTimeWeeks.
+    // Without the strict numeric guard, parseFloat("2 Weeks") returned 2 and
+    // got divided by 7 → 0 weeks (silent truncation).
     const leadStr = extract('leadTime') ?? extract('replenishmentLeadTime')
     let leadWeeks: number | null = null
     if (leadStr !== null) {
-      const days = parseFloat(leadStr)
-      if (Number.isFinite(days) && days >= 0) {
-        leadWeeks = Math.max(0, Math.round(days / 7))
+      const trimmed = leadStr.trim()
+      if (/^\d+(?:\.\d+)?$/.test(trimmed)) {
+        const days = parseFloat(trimmed)
+        if (Number.isFinite(days) && days >= 0) {
+          leadWeeks = Math.max(0, Math.round(days / 7))
+        }
       } else {
-        leadWeeks = parseLeadTimeWeeks(leadStr)
+        leadWeeks = parseLeadTimeWeeks(trimmed)
       }
     }
 
