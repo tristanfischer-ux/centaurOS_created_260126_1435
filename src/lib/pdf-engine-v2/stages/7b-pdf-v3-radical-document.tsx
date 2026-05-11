@@ -720,13 +720,15 @@ function buildFeasibilityData(state: PipelineState): FeasibilityData {
   const envelopeStr = env && (env.w != null || env.d != null || env.h != null)
     ? `${env.w ?? '—'} × ${env.d ?? '—'} × ${env.h ?? '—'} mm`
     : (brief?.constraints?.envelope ?? null)
-  // Detect structural / chassis presence in the resolved tree
-  const structuralLeaves = allLeaves.filter(l => {
-    const aId = l.archetypeId.toLowerCase()
-    return aId.includes('frame') || aId.includes('enclosure') || aId.includes('chassis')
-      || aId.includes('housing') || aId.includes('bracket') || aId.includes('panel')
-      || aId.includes('door') || aId.includes('rack') || aId.includes('vessel')
-  })
+  // Detect structural / chassis presence in the resolved tree.
+  // Council fix 2026-05-11 (3/3 NEEDS_MAJOR + NEEDS_MINOR convergence): use
+  // word-boundary regex to avoid false positives like "control_panel",
+  // "door_switch", "rack_mount_pdu". archetypeIds are snake_case so token
+  // boundaries are underscore + start/end.
+  const STRUCTURAL_TOKENS = ['frame', 'enclosure', 'chassis', 'housing', 'bracket', 'panel', 'door', 'rack', 'vessel']
+  const STRUCTURAL_REGEX = new RegExp(`(?:^|_)(?:${STRUCTURAL_TOKENS.join('|')})(?:$|_)`)
+  const structuralLeaves = allLeaves.filter(l =>
+    STRUCTURAL_REGEX.test(l.archetypeId.toLowerCase()))
   const massVerdict = grammarVerdicts?.verdicts.find(v =>
     v.rule_id === 'mass_balance_closed_loop' || v.rule_id.includes('mass'))
   const mechVerdict: 'PASS' | 'WARN' | 'BLOCK' | 'PENDING' = massVerdict
@@ -1584,7 +1586,10 @@ const RadicalCoverPage = ({ state }: { state: PipelineState }) => {
       )}
 
       {/* Economics */}
-      {unitCost && (
+      {/* Council fix 2026-05-11: was `{unitCost && (...)}` — if unitCost is 0
+          (legitimately) React-PDF renders the literal '0' outside <Text>, which
+          throws "Invalid '0' string child outside <Text> component" at render. */}
+      {unitCost != null && (
         <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 14 }}>
           {[
             { label: 'Radical Unit Cost', value: fmtGbp(unitCost) },
@@ -1911,7 +1916,12 @@ const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
       <DocPageFooter />
     </Page>
 
-    {/* Page 2 — bucketed citations (Distributor URLs + Manufacturer + Standards) */}
+    {/* Page 2 — bucketed citations (Distributor URLs + Manufacturer + Standards).
+        Council fix 2026-05-11 (3/3 NEEDS_MAJOR convergence): only emit page 2
+        when at least one bucket has non-trivial content. Empty page 2 wastes
+        2 of the 12 page budget that the multimodal scorer reads. */}
+    {(distributorBucket.length > 0 || manufacturerRows.length > 0
+      || standardRows.length > 0 || datasheetBucket.length > 0) && (
     <Page size="A4" style={pageStyle}>
       <DocPageHeader title={`${projectId} | Forge Engineering Report | Sources and References (cont.)`} />
       <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
@@ -2043,6 +2053,7 @@ const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
 
       <DocPageFooter />
     </Page>
+    )}
     </>
   )
 }
@@ -2278,14 +2289,13 @@ const EngineeringCalculationsPage = ({ state }: { state: PipelineState }) => {
   // a mechanical engineer can verify mass against budget. Surfaces the gap
   // honestly rather than fabricating a number.
   const massBudgetKg = parsedBrief?.constraints?.max_mass_kg?.value ?? null
-  const structuralLeaves = leaves.filter(l => {
-    const a = l.archetypeId.toLowerCase()
-    return a.includes('frame') || a.includes('enclosure') || a.includes('chassis')
-      || a.includes('housing') || a.includes('bracket') || a.includes('panel')
-      || a.includes('door') || a.includes('rack') || a.includes('vessel')
-      || a.includes('battery') || a.includes('cell') || a.includes('motor')
-      || a.includes('compressor') || a.includes('transformer') || a.includes('inverter')
-  })
+  // Council fix 2026-05-11: word-boundary token match to avoid false positives
+  // (control_panel, door_switch, rack_mount_pdu, motor_controller, etc.).
+  const STRUCTURAL_TOKENS_E = ['frame', 'enclosure', 'chassis', 'housing', 'bracket', 'panel', 'door', 'rack', 'vessel',
+    'battery', 'cell', 'motor', 'compressor', 'transformer', 'inverter']
+  const STRUCTURAL_REGEX_E = new RegExp(`(?:^|_)(?:${STRUCTURAL_TOKENS_E.join('|')})(?:$|_)`)
+  const structuralLeaves = leaves.filter(l =>
+    STRUCTURAL_REGEX_E.test(l.archetypeId.toLowerCase()))
 
   // ── Calc 3: Power budget proxy from electrical grammar verdicts ──────────
   const kclVerdict = grammarVerdicts?.verdicts.find(v => v.rule_id.includes('KCL'))
