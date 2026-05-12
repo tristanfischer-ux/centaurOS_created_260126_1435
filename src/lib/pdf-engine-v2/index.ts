@@ -1107,6 +1107,24 @@ export async function runPipeline(
             `cost≈£${moduleDecomposition.telemetry.estimated_cost_gbp.toFixed(3)}`
           )
 
+          // Piece 1E (2026-05-12) — natural-language layer: deterministic per-
+          // module paragraphs + sub-module sentence pairs (EN + RAD interlinear)
+          // + grammar trace. NO LLM calls. Drives the §4.5 PDF renderer.
+          try {
+            const { buildNaturalLanguageLayer } = await import('./radical/sentence-generator')
+            const naturalLanguageLayer = buildNaturalLanguageLayer(moduleDecomposition.modules)
+            state.naturalLanguageLayer = naturalLanguageLayer
+            console.log(
+              `[pipeline] Stage 1.5+E: natural-language layer built for ` +
+              `${naturalLanguageLayer.module_count} modules`
+            )
+          } catch (nlErr) {
+            console.warn(
+              `[pipeline] Piece 1E natural-language layer build failed (non-fatal): ` +
+              `${(nlErr as Error).message}`
+            )
+          }
+
           // Per-module Stage 2
           const perModuleResult = await runDecomposeRadicalPerModule(
             moduleDecomposition,
@@ -1915,6 +1933,10 @@ export async function runPipeline(
           radicalCostSummary: state.radicalCostSummary ?? null,
           grammarVerdicts: state.grammarVerdicts ?? null,
           moduleDecomposition: state.moduleDecomposition ?? null,
+          // Piece 1E 2026-05-12: persist the natural-language layer so the
+          // §4.5 Sentence + Paragraph view renderer can read it without
+          // re-running the deterministic generator at render time.
+          naturalLanguageLayer: state.naturalLanguageLayer ?? null,
           // Fix 4 (task #91-phase4): legacy costSummary.bomTotal paired field so the
           // aggregator can compute cost delta = (radical - legacy) / legacy.
           // v2-integrated path sets state.costSummary; v1 legacy path sets only

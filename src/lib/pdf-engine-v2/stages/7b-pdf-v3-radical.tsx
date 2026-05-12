@@ -143,6 +143,21 @@ const rs = StyleSheet.create({
     borderBottomColor: TABLE_BORDER,
   },
   wordLabel: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL },
+  // Sub-module divider row within a sentence box (Piece 2E)
+  subModDivider: {
+    flexDirection: 'row',
+    backgroundColor: BESS_TEAL,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    borderBottomWidth: 0.5,
+    borderBottomColor: TABLE_BORDER,
+  },
+  subModDividerText: {
+    fontSize: 8,
+    fontFamily: 'Helvetica-Bold',
+    color: HEADER_TEXT,
+    flex: 1,
+  },
   // Character row styles — normal, WARN-bordered, BLOCK-fracture
   charRowNormal: {
     flexDirection: 'row',
@@ -226,6 +241,26 @@ const rs = StyleSheet.create({
     borderTopColor: BESS_TEAL,
   },
   sentenceTotalText: { fontSize: 9, fontFamily: 'Helvetica-Bold', color: BESS_TEAL },
+  // Sub-module sub-totals table (Piece 2E)
+  subTotalsTable: { borderWidth: 0.5, borderColor: TABLE_BORDER, marginTop: 10, marginBottom: 6 },
+  subTotalsHeader: { flexDirection: 'row', backgroundColor: '#e8f0fe' },
+  subTotalsHC: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, paddingVertical: 5, paddingHorizontal: 7 },
+  subTotalsRow: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: TABLE_BORDER },
+  subTotalsRowAlt: { flexDirection: 'row', borderBottomWidth: 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: BG_SOFT },
+  subTotalsRowTotal: { flexDirection: 'row', backgroundColor: '#f0f4ff', borderTopWidth: 1, borderTopColor: BESS_TEAL },
+  subTotalsCell: { fontSize: 8, color: INK, paddingVertical: 4, paddingHorizontal: 7, lineHeight: 1.3 },
+  // Pricing context note (Piece 2E)
+  pricingNote: {
+    borderLeftWidth: 3,
+    borderLeftColor: BESS_AMBER,
+    backgroundColor: '#fffbe8',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginTop: 10,
+    marginBottom: 14,
+  },
+  pricingNoteLabel: { fontSize: 8, fontFamily: 'Helvetica-Bold', color: '#7a5500', marginBottom: 3 },
+  pricingNoteText: { fontSize: 8, color: '#555555', lineHeight: 1.4 },
   // Grammar verdict summary banner
   grammarBanner: {
     borderWidth: 1,
@@ -375,6 +410,8 @@ interface CharRowProps {
   verificationGrade: string
   source: string
   mpn?: string | null
+  manufacturer?: string | null
+  leadWeeks?: number | null
   rowIndex: number
   verdicts: GrammarVerdict[]  // verdicts affecting this node (filtered before passing)
 }
@@ -388,6 +425,8 @@ const CharacterRow = ({
   verificationGrade,
   source,
   mpn,
+  manufacturer,
+  leadWeeks,
   rowIndex,
   verdicts,
 }: CharRowProps) => {
@@ -403,6 +442,21 @@ const CharacterRow = ({
   const blockVerdicts = verdicts.filter(v => v.verdict === 'BLOCK')
   const warnVerdicts = verdicts.filter(v => v.verdict === 'WARN')
 
+  // Lead time display: prefer integer weeks, fall back to dash
+  const leadStr = leadWeeks != null ? `${leadWeeks} wk` : '—'
+
+  // Grade display: use the raw verification_grade as a compact label
+  function gradeLabel(g: string): string {
+    switch (g) {
+      case 'verified':  return 'Verified'
+      case 'estimated': return 'Est.'
+      case 'grade_d':   return 'Grade D'
+      case 'stub':      return 'Stub'
+      case 'data_gap':  return 'Gap'
+      default:          return g || '—'
+    }
+  }
+
   return (
     <View wrap={false}>
       {/* BLOCK fracture line above the row */}
@@ -417,14 +471,19 @@ const CharacterRow = ({
         </View>
       )}
 
-      {/* Main row */}
+      {/* Main row — 10 columns on A4 portrait with tight widths */}
+      {/*
+        Column widths (total = 100%):
+        Status  8% | Part 20% | MPN 12% | Manufacturer 14% | Qty 5%
+        Unit£  9%  | Line£ 9% | Source 11% | Lead 7% | Grade 5%
+      */}
       <View style={rowStyle}>
         {/* Status badge */}
-        <Text style={[rs.tC, { width: '14%' }]}>
-          <Text style={[rs.statusBadge, { color: status.colour }]}>{status.text}</Text>
+        <Text style={[rs.tC, { width: '8%', fontSize: 7 }]}>
+          <Text style={[rs.statusBadge, { color: status.colour, fontSize: 7 }]}>{status.text}</Text>
         </Text>
         {/* Part name */}
-        <Text style={[rs.tC, { width: '26%', fontFamily: 'Helvetica-Bold' }]}>
+        <Text style={[rs.tC, { width: '20%', fontFamily: 'Helvetica-Bold', fontSize: 8 }]}>
           {labelFromId(label)}
           {hasWarn && !hasBlock && (
             <Text style={{ color: BESS_AMBER }}> ⚠</Text>
@@ -434,20 +493,28 @@ const CharacterRow = ({
           )}
         </Text>
         {/* MPN */}
-        <Text style={[rs.tC, { width: '14%' }]}>{dash(mpn)}</Text>
+        <Text style={[rs.tC, { width: '12%', fontSize: 8 }]}>{dash(mpn)}</Text>
+        {/* Manufacturer */}
+        <Text style={[rs.tC, { width: '14%', fontSize: 7.5, color: MUTED }]}>{dash(manufacturer)}</Text>
         {/* Qty */}
-        <Text style={[rs.tC, { width: '6%', textAlign: 'right' }]}>{qty}</Text>
+        <Text style={[rs.tC, { width: '5%', textAlign: 'right', fontSize: 8 }]}>{qty}</Text>
         {/* Unit £ */}
-        <Text style={[rs.tC, { width: '10%', textAlign: 'right' }]}>
+        <Text style={[rs.tC, { width: '9%', textAlign: 'right', fontSize: 8 }]}>
           {unitPriceGbp !== null ? fmtGbpDetailed(unitPriceGbp) : 'TBD'}
         </Text>
-        {/* Total £ */}
-        <Text style={[rs.tC, { width: '10%', textAlign: 'right', fontFamily: 'Helvetica-Bold' }]}>
+        {/* Line £ */}
+        <Text style={[rs.tC, { width: '9%', textAlign: 'right', fontFamily: 'Helvetica-Bold', fontSize: 8 }]}>
           {lineTotal > 0 ? fmtGbp(lineTotal) : 'TBD'}
         </Text>
         {/* Source */}
-        <Text style={[rs.tC, { width: '20%', color: status.colour }]}>
+        <Text style={[rs.tC, { width: '11%', color: status.colour, fontSize: 7.5 }]}>
           {sourceLabel(source)}
+        </Text>
+        {/* Lead time */}
+        <Text style={[rs.tC, { width: '7%', fontSize: 7.5, color: MUTED }]}>{leadStr}</Text>
+        {/* Grade */}
+        <Text style={[rs.tC, { width: '5%', fontSize: 7, color: status.colour }]}>
+          {gradeLabel(verificationGrade)}
         </Text>
       </View>
 
@@ -469,24 +536,135 @@ const CharacterRow = ({
 // Sentence sub-table — one box per sentence/subsystem
 // ---------------------------------------------------------------------------
 
+interface LeafEntry {
+  archetypeId: string
+  label: string
+  qty: number
+  unitPriceGbp: number | null
+  lineTotal: number
+  verificationGrade: string
+  source: string
+  mpn?: string | null
+  manufacturer?: string | null
+  leadWeeks?: number | null
+  sub_module_id?: string | null
+}
+
 interface SentenceBoxProps {
   sentenceId: string
   label: string
-  leaves: Array<{
-    archetypeId: string
-    label: string
-    qty: number
-    unitPriceGbp: number | null
-    lineTotal: number
-    verificationGrade: string
-    source: string
-    mpn?: string | null
-  }>
+  leaves: LeafEntry[]
   sentenceTotal: number
   wordSubtotal: number
   sentenceMarkupGbp: number
   verdictMap: Map<string, GrammarVerdict[]>
   wordLabel?: string
+}
+
+/** Render a sub-module divider row spanning all 10 columns */
+const SubModuleDividerRow = ({ subModuleId, leaves }: { subModuleId: string; leaves: LeafEntry[] }) => {
+  const subTotal = leaves.reduce((s, l) => s + l.lineTotal, 0)
+  const label = subModuleId === '<UNCATEGORISED>' || subModuleId === 'uncategorised' || subModuleId === '__none__'
+    ? 'Uncategorised'
+    : labelFromId(subModuleId)
+  const description = `${label} — ${leaves.length} part${leaves.length !== 1 ? 's' : ''}${subTotal > 0 ? ' / ' + fmtGbp(subTotal) : ''}`
+
+  return (
+    <View style={rs.subModDivider} wrap={false}>
+      <Text style={rs.subModDividerText}>{description}</Text>
+    </View>
+  )
+}
+
+/** Sub-module sub-totals compact table (Piece 2E) */
+const SubModuleSubTotalsTable = ({ groups, sentenceTotal }: {
+  groups: Array<{ subModuleId: string; leaves: LeafEntry[] }>
+  sentenceTotal: number
+}) => {
+  const totalLines = groups.reduce((s, g) => s + g.leaves.length, 0)
+
+  return (
+    <View style={rs.subTotalsTable} wrap={false}>
+      {/* Header */}
+      <View style={rs.subTotalsHeader}>
+        <Text style={[rs.subTotalsHC, { width: '46%' }]}>Sub-module</Text>
+        <Text style={[rs.subTotalsHC, { width: '14%', textAlign: 'right' }]}>Lines</Text>
+        <Text style={[rs.subTotalsHC, { width: '24%', textAlign: 'right' }]}>Sub-total £</Text>
+        <Text style={[rs.subTotalsHC, { width: '16%', textAlign: 'right' }]}>% of module</Text>
+      </View>
+      {/* Data rows */}
+      {groups.map((g, gi) => {
+        const subTotal = g.leaves.reduce((s, l) => s + l.lineTotal, 0)
+        const pct = sentenceTotal > 0 ? (subTotal / sentenceTotal) * 100 : 0
+        const displayId = g.subModuleId === '<UNCATEGORISED>' || g.subModuleId === 'uncategorised' || g.subModuleId === '__none__'
+          ? 'uncategorised'
+          : g.subModuleId
+        return (
+          <View key={gi} style={gi % 2 === 0 ? rs.subTotalsRow : rs.subTotalsRowAlt}>
+            <Text style={[rs.subTotalsCell, { width: '46%' }]}>{displayId}</Text>
+            <Text style={[rs.subTotalsCell, { width: '14%', textAlign: 'right' }]}>{g.leaves.length}</Text>
+            <Text style={[rs.subTotalsCell, { width: '24%', textAlign: 'right' }]}>{fmtGbp(subTotal)}</Text>
+            <Text style={[rs.subTotalsCell, { width: '16%', textAlign: 'right' }]}>{pct.toFixed(2)} %</Text>
+          </View>
+        )
+      })}
+      {/* Total row */}
+      <View style={rs.subTotalsRowTotal}>
+        <Text style={[rs.subTotalsCell, { width: '46%', fontFamily: 'Helvetica-Bold' }]}>Module total</Text>
+        <Text style={[rs.subTotalsCell, { width: '14%', textAlign: 'right', fontFamily: 'Helvetica-Bold' }]}>{totalLines}</Text>
+        <Text style={[rs.subTotalsCell, { width: '24%', textAlign: 'right', fontFamily: 'Helvetica-Bold' }]}>{fmtGbp(sentenceTotal)}</Text>
+        <Text style={[rs.subTotalsCell, { width: '16%', textAlign: 'right', fontFamily: 'Helvetica-Bold' }]}>100.00 %</Text>
+      </View>
+    </View>
+  )
+}
+
+/** Pricing context note (Piece 2E) — hardcoded 25-unit batch context */
+const PricingContextNote = () => (
+  // Coding-council 2026-05-12 fix: pricing note de-hardcoded from BESS specifics
+  // (was citing "£2,800 bms_master_pcb" verbatim — misleading on non-BESS products).
+  // Now generic prose about batch-volume vs high-volume pricing applicable to any
+  // product class. Per-product specific commentary deferred to a future piece that
+  // reads brief batch size + product class and generates a per-class note.
+  <View style={rs.pricingNote} wrap={false}>
+    <Text style={rs.pricingNoteLabel}>Pricing note (batch-volume context):</Text>
+    <Text style={rs.pricingNoteText}>
+      Pricing reflects the annual batch volumes declared in the brief. High-volume equivalents
+      (10,000+ units/year) typically land 30–40% lower for commodity components and 60–70% lower
+      for custom-engineered subassemblies once non-recurring engineering (NRE) is amortised. Where
+      a line item shows a high unit cost relative to comparable industrial parts, that gap usually
+      reflects the small-batch order quantity rather than a fundamental cost-of-goods issue.
+    </Text>
+  </View>
+)
+
+/** Group leaves by sub_module_id — preserves insertion order of first occurrence */
+function groupLeavesBySubModule(leaves: LeafEntry[]): Array<{ subModuleId: string; leaves: LeafEntry[] }> {
+  const order: string[] = []
+  const map = new Map<string, LeafEntry[]>()
+
+  for (const leaf of leaves) {
+    const key = leaf.sub_module_id ?? '__none__'
+    if (!map.has(key)) {
+      map.set(key, [])
+      order.push(key)
+    }
+    map.get(key)!.push(leaf)
+  }
+
+  return order.map(k => ({ subModuleId: k, leaves: map.get(k)! }))
+}
+
+/**
+ * Determine whether sub-module grouping is meaningful:
+ * returns true only if there is at least one non-null, non-sentinel sub_module_id
+ * that is not '__none__' and is not the single "all uncategorised" case.
+ */
+function hasRealSubModules(leaves: LeafEntry[]): boolean {
+  const ids = new Set(leaves.map(l => l.sub_module_id ?? '__none__'))
+  // Filter out the sentinel/null group — if more than one real sub-module ID exists, it's meaningful
+  const real = [...ids].filter(id => id !== '__none__' && id !== '<UNCATEGORISED>' && id !== 'uncategorised')
+  return real.length > 1
 }
 
 const SentenceBox = ({
@@ -499,26 +677,37 @@ const SentenceBox = ({
   verdictMap,
   wordLabel,
 }: SentenceBoxProps) => {
+  // 10-column header — tight widths for A4 portrait
   const bomCols = [
-    { label: 'Status', width: '14%' },
-    { label: 'Part', width: '26%' },
-    { label: 'MPN', width: '14%' },
-    { label: 'Qty', width: '6%', align: 'right' as const },
-    { label: 'Unit £', width: '10%', align: 'right' as const },
-    { label: 'Total £', width: '10%', align: 'right' as const },
-    { label: 'Source', width: '20%' },
+    { label: 'Status',   width: '8%' },
+    { label: 'Part',     width: '20%' },
+    { label: 'MPN',      width: '12%' },
+    { label: 'Manufacturer', width: '14%' },
+    { label: 'Qty',      width: '5%',  align: 'right' as const },
+    { label: 'Unit £',   width: '9%',  align: 'right' as const },
+    { label: 'Line £',   width: '9%',  align: 'right' as const },
+    { label: 'Source',   width: '11%' },
+    { label: 'Lead',     width: '7%' },
+    { label: 'Grade',    width: '5%' },
   ]
 
+  // Decide grouping mode
+  const useSubModuleGrouping = hasRealSubModules(leaves)
+  const groups = useSubModuleGrouping ? groupLeavesBySubModule(leaves) : null
+
+  // Global row index counter for alternating row colours across groups
+  let globalRowIndex = 0
+
   return (
-    <View style={rs.sentenceBox} wrap={false}>
+    <View style={rs.sentenceBox}>
       {/* Sentence header — dark navy, full-width */}
       <View style={rs.sentenceHeader}>
         <Text style={rs.sentenceTitle}>{labelFromId(label)}</Text>
         <Text style={rs.sentenceSubtotal}>{fmtGbp(sentenceTotal)} total</Text>
       </View>
 
-      {/* Optional word sub-heading */}
-      {wordLabel && wordLabel !== label && (
+      {/* Optional word sub-heading (legacy path when no sub-module grouping) */}
+      {!useSubModuleGrouping && wordLabel && wordLabel !== label && (
         <View style={rs.wordHeader}>
           <Text style={rs.wordLabel}>{labelFromId(wordLabel)}</Text>
         </View>
@@ -529,21 +718,50 @@ const SentenceBox = ({
         {bomCols.map((col, ci) => (
           <Text
             key={ci}
-            style={[rs.darkTHC, { width: col.width, textAlign: col.align || 'left' }]}
+            style={[rs.darkTHC, { width: col.width, textAlign: col.align || 'left', fontSize: 7.5, paddingHorizontal: 5 }]}
           >
             {col.label}
           </Text>
         ))}
       </View>
 
-      {/* Part rows */}
+      {/* Part rows — with optional sub-module dividers */}
       {leaves.length === 0 ? (
         <View style={rs.tRow}>
           <Text style={[rs.tC, { width: '100%', color: MUTED, fontFamily: 'Helvetica-Oblique' }]}>
             No parts for this subsystem.
           </Text>
         </View>
+      ) : useSubModuleGrouping && groups ? (
+        // Sub-module grouped rendering
+        groups.map((group, gi) => (
+          <View key={gi}>
+            <SubModuleDividerRow subModuleId={group.subModuleId} leaves={group.leaves} />
+            {group.leaves.map((leaf, ri) => {
+              const verdicts = verdictMap.get(leaf.archetypeId) ?? []
+              const rowIdx = globalRowIndex++
+              return (
+                <CharacterRow
+                  key={ri}
+                  archetypeId={leaf.archetypeId}
+                  label={leaf.label || leaf.archetypeId}
+                  qty={leaf.qty}
+                  unitPriceGbp={leaf.unitPriceGbp}
+                  lineTotal={leaf.lineTotal}
+                  verificationGrade={leaf.verificationGrade}
+                  source={leaf.source}
+                  mpn={leaf.mpn}
+                  manufacturer={leaf.manufacturer}
+                  leadWeeks={leaf.leadWeeks}
+                  rowIndex={rowIdx}
+                  verdicts={verdicts}
+                />
+              )
+            })}
+          </View>
+        ))
       ) : (
+        // Flat rendering (legacy / all-uncategorised)
         leaves.map((leaf, ri) => {
           const verdicts = verdictMap.get(leaf.archetypeId) ?? []
           return (
@@ -557,6 +775,8 @@ const SentenceBox = ({
               verificationGrade={leaf.verificationGrade}
               source={leaf.source}
               mpn={leaf.mpn}
+              manufacturer={leaf.manufacturer}
+              leadWeeks={leaf.leadWeeks}
               rowIndex={ri}
               verdicts={verdicts}
             />
@@ -573,6 +793,16 @@ const SentenceBox = ({
           Subsystem Total: {fmtGbp(sentenceTotal)}
         </Text>
       </View>
+
+      {/* Sub-module sub-totals table — only when we have real sub-module grouping */}
+      {useSubModuleGrouping && groups && (
+        <View style={{ paddingHorizontal: 10, paddingBottom: 8 }}>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginTop: 8, marginBottom: 2 }}>
+            Sub-module sub-totals (per unit)
+          </Text>
+          <SubModuleSubTotalsTable groups={groups} sentenceTotal={wordSubtotal} />
+        </View>
+      )}
     </View>
   )
 }
@@ -584,20 +814,12 @@ const SentenceBox = ({
 /**
  * Collect all leaf nodes from a resolved tree node recursively.
  * Returns flat array of leaf data for rendering.
+ * Piece 2E: extended with manufacturer, lead_weeks, sub_module_id.
  */
 function collectLeavesFromNode(
   node: ResolvedCompositionNode,
-): Array<{
-  archetypeId: string
-  label: string
-  qty: number
-  unitPriceGbp: number | null
-  lineTotal: number
-  verificationGrade: string
-  source: string
-  mpn: string | null
-}> {
-  const results: ReturnType<typeof collectLeavesFromNode> = []
+): LeafEntry[] {
+  const results: LeafEntry[] = []
 
   function walk(n: ResolvedCompositionNode): void {
     const isLeaf = !n.children || n.children.length === 0
@@ -615,6 +837,9 @@ function collectLeavesFromNode(
         verificationGrade: res?.verification_grade ?? 'data_gap',
         source: res?.source ?? 'stub',
         mpn: res?.mpn ?? null,
+        manufacturer: res?.manufacturer ?? null,
+        leadWeeks: res?.lead_weeks ?? null,
+        sub_module_id: n.sub_module_id ?? null,
       })
     } else {
       for (const child of n.children) {
@@ -743,6 +968,9 @@ export const RadicalBomSection = ({
           </Text>
         </View>
       )}
+
+      {/* Pricing context note — Piece 2E */}
+      <PricingContextNote />
 
       <PageFooter />
     </Page>

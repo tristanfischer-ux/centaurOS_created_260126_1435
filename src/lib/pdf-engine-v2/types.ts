@@ -790,6 +790,14 @@ export interface PipelineState {
    */
   moduleDecomposition?: import('./types/module-decomposition.js').ModuleDecomposition
   /**
+   * Piece 1E (2026-05-12) — Natural-language layer derived deterministically
+   * from moduleDecomposition. Per-module paragraph (EN + RAD), grammar trace,
+   * per-sub-module sentence pairs (EN + RAD interlinear). Drives the §4.5 PDF
+   * Sentence + Paragraph view renderer page. NO LLM calls — pure transformation
+   * from Stage 1.5's structured output via radical/sentence-generator.ts.
+   */
+  naturalLanguageLayer?: import('./radical/sentence-generator.js').NaturalLanguageLayer
+  /**
    * Phase 4 — Grammar Verdicts.
    * Populated when RADICAL_PHASE_4_GRAMMAR=true AND resolvedRadicalTree exists.
    * Contains one GrammarVerdict per rule fired, plus overall_verdict and

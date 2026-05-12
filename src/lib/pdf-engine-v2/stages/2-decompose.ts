@@ -1159,15 +1159,19 @@ function unionAllowedRadicals(moduleSpec: ModuleSpec): string[] {
 }
 
 /**
- * Per-module LLM call. Uses temp=0, max_tokens=4096 (smaller per-module
- * output than the 8192 single-shot). Strict JSON-array parser (matches
- * the existing leaves prompt parser).
+ * Per-module LLM call. Uses temp=0, max_tokens=8192 (raised from 4096 in
+ * Piece 1D fix 2026-05-12: the new schema added sub_module_id + word_id to
+ * every leaf — for a 20-leaf module that's ~600 extra output tokens, enough
+ * to truncate Gemini's response mid-leaf and crash JSON parsing). Strict
+ * JSON-array parser. Model order: Grok primary, Gemini fallback — same
+ * preamble + truncation pattern as Stage 1.5 (drawer
+ * `forgeos_decisions_905cc6faa0f9ee4f`).
  */
 async function callOpenRouterPerModule(
   systemPrompt: string,
   userContent: string,
 ): Promise<{ leaves: unknown; inputTokens: number; outputTokens: number; modelUsed: string; durationMs: number }> {
-  const models = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3']
+  const models = ['x-ai/grok-4.3', 'google/gemini-3.1-pro-preview']
   const startedAt = Date.now()
   let lastErr: unknown
   for (const model of models) {
@@ -1183,7 +1187,7 @@ async function callOpenRouterPerModule(
         body: JSON.stringify({
           model,
           temperature: 0.0,
-          max_tokens: 4096,
+          max_tokens: 8192,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
@@ -1394,6 +1398,72 @@ async function runOneModuleDecomposition(
   if (outOfScopeCount > 0) {
     console.warn(
       `[decompose-per-module] module="${moduleSpec.module}" dropped ${outOfScopeCount} out-of-scope leaves (not in candidate library)`,
+    )
+  }
+
+  // Piece 1D.2 2026-05-12: topology multiplier propagation. Stage 1.5's
+  // SubModuleSpec → WordSpec → ContentCharacter carries the quantity modifier
+  // (e.g. ×3920 cells, ×112 frames, ×896 thermistors) on the modifier_characters
+  // array. Stage 2's per-module LLM emits leaves with multiplicity=1 by default.
+  // Override here: when a leaf's character_id matches a word's content_character
+  // .character_id within this module's sub_modules, read the word's modifier_
+  // characters for kind='quantity' and parse the value (e.g. "×3920" → 3920).
+  // Apply as multiplicity so downstream BoM rendering reflects the real
+  // production quantity rather than qty=1.
+  //
+  // Worked-example reference: §6 BoM shows lfp_prismatic_cell qty 3920,
+  // cell_to_cell_busbar qty 3808, module_steel_frame qty 112, ntc_thermistor
+  // qty 896. Without this override the BoM shows qty=1 for all of these.
+  let multiplicityOverrideCount = 0
+  if (moduleSpec.sub_modules && moduleSpec.sub_modules.length > 0) {
+    const charToQty = new Map<string, number>()
+    for (const sm of moduleSpec.sub_modules) {
+      for (const w of sm.words ?? []) {
+        const cid = w.content_character?.character_id
+        if (!cid) continue
+        const qtyMod = (w.modifier_characters ?? []).find(m => m.kind === 'quantity')
+        if (!qtyMod) continue
+        // Parse multiplicity from the quantity modifier value. Common shapes:
+        //   "×3920", "x3920", "3920", "×112" — strip leading × / x and parse.
+        const raw = String(qtyMod.value ?? '').trim()
+        const stripped = raw.replace(/^[×x]\s*/i, '').replace(/[\s,]/g, '')
+        const parsed = parseInt(stripped, 10)
+        if (Number.isFinite(parsed) && parsed >= 1) {
+          // If the same character_id appears in multiple words within this
+          // ModuleSpec, take the max — preserves the largest declared qty.
+          const existing = charToQty.get(cid)
+          if (existing === undefined || parsed > existing) {
+            charToQty.set(cid, parsed)
+          }
+        } else {
+          // Coding-council 2026-05-12 fix: surface hedged-quantity parse
+          // failures (e.g. "approximately 3920", "many", "few hundred")
+          // instead of silently dropping the multiplicity. The Stage 1.5
+          // LLM occasionally writes natural-language qualifiers when its
+          // confidence is low; without this warning the topology multiplier
+          // override silently no-ops and the BoM shows qty=1.
+          console.warn(
+            `[decompose-per-module] module="${moduleSpec.module}" sub="${sm.id}" ` +
+            `word="${w.id}" character="${cid}": could not parse quantity ` +
+            `modifier value "${raw}" as integer — multiplicity override skipped. ` +
+            `(Stage 1.5 LLM emitted a hedged or non-numeric quantity.)`
+          )
+        }
+      }
+    }
+    if (charToQty.size > 0) {
+      for (const leaf of inScope) {
+        const declaredQty = charToQty.get(leaf.character_id)
+        if (declaredQty !== undefined && declaredQty > leaf.multiplicity) {
+          leaf.multiplicity = declaredQty
+          multiplicityOverrideCount += 1
+        }
+      }
+    }
+  }
+  if (multiplicityOverrideCount > 0) {
+    console.log(
+      `[decompose-per-module] module="${moduleSpec.module}" applied topology multiplier override on ${multiplicityOverrideCount} leaf${multiplicityOverrideCount === 1 ? '' : 's'} from Stage 1.5 quantity modifiers`,
     )
   }
 

@@ -10,24 +10,37 @@
  * Writes the PDF to stdout (base64) and progress to stderr.
  */
 
-// Load env vars from .env.local if not already set
+// Load env vars from .env.local + ~/.claude/secrets/distributor-apis.env if not already set.
+// Piece 1D.1 2026-05-12: distributor API credentials (MOUSER_API_KEY, DIGIKEY_CLIENT_ID,
+// DIGIKEY_CLIENT_SECRET, FARNELL_API_KEY) live OUTSIDE the repo at
+// ~/.claude/secrets/distributor-apis.env. Without loading them, Stage 4b resolution
+// falls back to grade_d_table — V10-legacy stats showed 93/101 leaves as grade_d,
+// 0 verified_by_distributor — directly impacting §6 BoM scores.
 import { readFileSync } from 'fs'
 import { resolve } from 'path'
-try {
-  const envPath = resolve(process.cwd(), '.env.local')
-  const envContent = readFileSync(envPath, 'utf-8')
-  for (const line of envContent.split('\n')) {
-    const trimmed = line.trim()
-    if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
-      const [key, ...valueParts] = trimmed.split('=')
-      const value = valueParts.join('=').replace(/^["']|["']$/g, '')
-      if (!process.env[key]) {
-        process.env[key] = value
+import { homedir } from 'os'
+
+const envFilesToLoad = [
+  resolve(process.cwd(), '.env.local'),
+  resolve(homedir(), '.claude/secrets/distributor-apis.env'),
+]
+
+for (const envPath of envFilesToLoad) {
+  try {
+    const envContent = readFileSync(envPath, 'utf-8')
+    for (const line of envContent.split('\n')) {
+      const trimmed = line.trim()
+      if (trimmed && !trimmed.startsWith('#') && trimmed.includes('=')) {
+        const [key, ...valueParts] = trimmed.split('=')
+        const value = valueParts.join('=').replace(/^["']|["']$/g, '')
+        if (!process.env[key]) {
+          process.env[key] = value
+        }
       }
     }
+  } catch {
+    // env file not found — continue with existing env
   }
-} catch (e) {
-  // .env.local not found — continue with existing env
 }
 
 import { runPipeline } from './index'

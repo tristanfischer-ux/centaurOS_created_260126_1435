@@ -24,7 +24,7 @@
  * to keep this file self-contained and avoid import coupling.
  */
 import React from 'react'
-import { Document, Page, Text, View } from '@react-pdf/renderer'
+import { Document, Page, Text, View, Svg, Rect, Line, Path, G } from '@react-pdf/renderer'
 import { normaliseState, safeNumber } from '../lib/safe-state'
 import type { PipelineState } from '../types'
 import type { GrammarVerdict } from './4d-radical-grammar'
@@ -33,6 +33,10 @@ import {
   RadicalCostSection,
   RadicalModulesSection,
 } from './7b-pdf-v3-radical'
+import { humaniseId } from '../radical/sentence-generator'
+import type { ModuleNaturalLanguage, SubModuleSentencePair } from '../radical/sentence-generator'
+import type { CrossModuleGrammarLink, GrammarLink, ModuleSpec, SubModuleSpec } from '../types/module-decomposition'
+import { MODULE_LABELS, UNIVERSAL_MODULES } from '../types/module-decomposition'
 
 // Design tokens — identical to 7-pdf-v3.tsx
 const BESS_TEAL   = '#2563ae'
@@ -1313,6 +1317,1530 @@ function collectAllSourcingLeaves(state: PipelineState): SourcingLeaf[] {
 
   walk(resolvedTree.composition.root)
   return leaves
+}
+
+// ---------------------------------------------------------------------------
+// §2.5 — Module Connection Map Page
+// Renders the cross-module grammar link graph + matrix table from
+// state.moduleDecomposition. Falls back gracefully when Stage 1.5 did not run.
+// ---------------------------------------------------------------------------
+
+/** Short label for a module: truncate to ~22 chars to fit PDF boxes */
+function shortModuleLabel(module: string): string {
+  const full = MODULE_LABELS[module as keyof typeof MODULE_LABELS] ?? humaniseId(module)
+  // Abbreviate a few long names for the SVG boxes
+  const abbrevs: Record<string, string> = {
+    'Energy Storage / Source / Dissipation': 'Energy Storage',
+    'Energy Conversion / Transduction': 'Energy Conversion',
+    'Control / Compute / Communication': 'Control / Compute',
+    'Sensing / Instrumentation': 'Sensing',
+    'Safety / Protection': 'Safety / Protection',
+    'Environmental Interface': 'Environmental I/F',
+    'Power Distribution': 'Power Distribution',
+    'Maintenance / Serviceability': 'Maintenance',
+    'Structure / Containment': 'Structure',
+    'Actuation / Kinematics / Mechanisms': 'Actuation',
+    'Mass / Fluid Transport & Process': 'Fluid Transport',
+    'Human-Machine Interface & Ergonomics': 'HMI',
+  }
+  return abbrevs[full] ?? full
+}
+
+/** First sentence of module_brief — for box subtitle */
+function firstSentence(text: string): string {
+  const m = text.match(/^[^.!?]+[.!?]/)
+  return m ? m[0].trim() : text.slice(0, 60).trim()
+}
+
+/**
+ * SVG graph component: module boxes in a 4-wide grid with labelled connection lines.
+ * Renders inside a @react-pdf/renderer Page's Svg element.
+ *
+ * Layout: A4 content width ~507pt after 44pt margins.
+ * We use a viewBox that maps onto the available width.
+ */
+function ModuleConnectionGraph({
+  modules,
+  links,
+}: {
+  modules: ModuleSpec[]
+  links: CrossModuleGrammarLink[]
+}): React.ReactElement {
+  const COLS = 4
+  const BOX_W = 110
+  const BOX_H = 42
+  const COL_GAP = 14
+  const ROW_GAP = 48
+  const PAD_X = 6
+  const PAD_TOP = 8
+
+  const n = modules.length
+  const rows = Math.ceil(n / COLS)
+
+  // Position each module box
+  const positions: Record<string, { cx: number; cy: number; x: number; y: number }> = {}
+  modules.forEach((mod, idx) => {
+    const col = idx % COLS
+    const row = Math.floor(idx / COLS)
+    const x = PAD_X + col * (BOX_W + COL_GAP)
+    const y = PAD_TOP + row * (BOX_H + ROW_GAP)
+    positions[mod.module] = { x, y, cx: x + BOX_W / 2, cy: y + BOX_H / 2 }
+  })
+
+  const TOTAL_W = PAD_X * 2 + COLS * BOX_W + (COLS - 1) * COL_GAP
+  const TOTAL_H = PAD_TOP + rows * BOX_H + (rows - 1) * ROW_GAP + 16
+
+  // Arrow path between two module boxes
+  function arrowPoints(from: string, to: string): { x1: number; y1: number; x2: number; y2: number } | null {
+    const fp = positions[from]
+    const tp = positions[to]
+    if (!fp || !tp) return null
+    // Connect bottom of upper box to top of lower box, or right/left of same-row boxes
+    const sameRow = Math.floor(modules.findIndex(m => m.module === from) / COLS) ===
+                    Math.floor(modules.findIndex(m => m.module === to) / COLS)
+    if (sameRow) {
+      // horizontal: connect right edge of left box to left edge of right box
+      const goRight = fp.cx < tp.cx
+      return goRight
+        ? { x1: fp.x + BOX_W, y1: fp.cy, x2: tp.x, y2: tp.cy }
+        : { x1: fp.x, y1: fp.cy, x2: tp.x + BOX_W, y2: tp.cy }
+    } else {
+      // vertical / diagonal: bottom of upper to top of lower
+      const fromAbove = fp.cy < tp.cy
+      return fromAbove
+        ? { x1: fp.cx, y1: fp.y + BOX_H, x2: tp.cx, y2: tp.y }
+        : { x1: fp.cx, y1: fp.y, x2: tp.cx, y2: tp.y + BOX_H }
+    }
+  }
+
+  return (
+    <Svg viewBox={`0 0 ${TOTAL_W} ${TOTAL_H}`} width={TOTAL_W} height={TOTAL_H}>
+      {/* Connection lines — drawn before boxes so boxes sit on top */}
+      {links.map((link, i) => {
+        const pts = arrowPoints(link.from_module, link.to_module)
+        if (!pts) return null
+        const isMutual = link.type === 'mutual'
+        const label = humaniseId(link.mechanism)
+        const mx = (pts.x1 + pts.x2) / 2
+        const my = (pts.y1 + pts.y2) / 2
+        return (
+          <G key={i}>
+            <Line
+              x1={pts.x1} y1={pts.y1} x2={pts.x2} y2={pts.y2}
+              stroke={BESS_NAVY}
+              strokeWidth={1}
+              strokeDasharray={isMutual ? undefined : '3,2'}
+            />
+            {/* Small label pill at midpoint */}
+            <Rect
+              x={mx - 22} y={my - 5} width={44} height={10}
+              fill="#ffffff" stroke="#e0e0e0" strokeWidth={0.5}
+            />
+            <Text
+              x={mx} y={my + 3}
+              style={{ fontSize: 5, fill: BESS_TEAL, textAnchor: 'middle', fontFamily: 'Helvetica-Bold' }}
+            >
+              {label.length > 14 ? label.slice(0, 13) + '…' : label}
+            </Text>
+          </G>
+        )
+      })}
+
+      {/* Module boxes */}
+      {modules.map((mod) => {
+        const pos = positions[mod.module]
+        if (!pos) return null
+        const label = shortModuleLabel(mod.module)
+        const sub = firstSentence(mod.module_brief ?? '')
+        return (
+          <G key={mod.module}>
+            <Rect
+              x={pos.x} y={pos.y} width={BOX_W} height={BOX_H}
+              rx={4} ry={4}
+              fill="#ffffff" stroke={BESS_NAVY} strokeWidth={1.2}
+            />
+            <Text
+              x={pos.cx} y={pos.y + 13}
+              style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', fill: INK_DARK, textAnchor: 'middle' }}
+            >
+              {label}
+            </Text>
+            <Text
+              x={pos.cx} y={pos.y + 23}
+              style={{ fontSize: 5, fill: MUTED, textAnchor: 'middle', fontFamily: 'Helvetica' }}
+            >
+              {sub.length > 28 ? sub.slice(0, 27) + '…' : sub}
+            </Text>
+          </G>
+        )
+      })}
+    </Svg>
+  )
+}
+
+/**
+ * §2.5 Module Connection Map Page
+ *
+ * Visual: SVG graph of module boxes + connection lines, followed by a
+ * matrix table (from × to). Falls back to a placeholder if moduleDecomposition
+ * is absent (legacy state paths).
+ */
+export function ModuleConnectionMapPage({ state }: { state: PipelineState }): React.ReactElement {
+  const projectId = dash(state.projectId)
+  const md = state.moduleDecomposition
+
+  if (!md) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §2.5 Module Connection Map`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Module Connection Map
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Module connection map unavailable — Stage 1.5 did not run for this product.
+          Enable RADICAL_PHASE_3_PER_MODULE=true and re-run the pipeline to populate.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const modules = md.modules ?? []
+  const links = md.cross_module_grammar_links ?? []
+  const excludedModules = md.excluded_modules ?? []
+  const rationaleExcluded = md.rationale_excluded ?? {}
+  const n = modules.length
+
+  // Build index for quick lookup
+  const moduleIndex = new Map<string, ModuleSpec>()
+  for (const m of modules) moduleIndex.set(m.module, m)
+
+  // Matrix: [from][to] = description string
+  // For directional links: from → to
+  // For mutual links: both directions populated
+  const matrix: Record<string, Record<string, string>> = {}
+  for (const m of modules) matrix[m.module] = {}
+
+  for (const link of links) {
+    const fromMod = link.from_module
+    const toMod = link.to_module
+    const mechLabel = humaniseId(link.mechanism)
+    const detail = link.detail ? ` (${link.detail})` : ''
+    const cellText = `${mechLabel}${detail}`
+
+    if (!matrix[fromMod]) matrix[fromMod] = {}
+    if (!matrix[toMod]) matrix[toMod] = {}
+
+    if (link.type === 'mutual') {
+      // Both directions
+      const existFwd = matrix[fromMod][toMod]
+      matrix[fromMod][toMod] = existFwd ? `${existFwd}; ${cellText}` : cellText
+      const existRev = matrix[toMod][fromMod]
+      matrix[toMod][fromMod] = existRev ? `${existRev}; ${cellText}` : cellText
+    } else {
+      const exist = matrix[fromMod][toMod]
+      matrix[fromMod][toMod] = exist ? `${exist}; ${cellText}` : cellText
+    }
+  }
+
+  // Column header width — compress for >4 modules
+  const colPct = n <= 4 ? `${Math.floor(80 / n)}%` : n <= 6 ? '13%' : '10%'
+  const rowHeaderPct = n <= 4 ? '20%' : n <= 6 ? '22%' : '20%'
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | §2.5 Module Connection Map`} />
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+        Module Connection Map
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 10 }} />
+
+      {/* Subtitle paragraph */}
+      <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 14, lineHeight: 1.5 }}>
+        {`How the ${n} active module${n !== 1 ? 's' : ''} of this product interconnect at the system-architecture level. Each connection is annotated with its physical mechanism (electrical bus, comms link, cooling loop, etc.). Modules marked N/A for this product class are listed below the matrix.`}
+      </Text>
+
+      {/* SVG graph — module boxes in 4-wide grid with labelled connection lines */}
+      {modules.length > 0 ? (
+        <>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+            System Architecture Graph
+          </Text>
+          <View style={{ marginBottom: 16, alignItems: 'center' }}>
+            <ModuleConnectionGraph modules={modules} links={links} />
+          </View>
+
+          {/* Legend: mutual (solid) vs directional (dashed) */}
+          <View style={{ flexDirection: 'row', marginBottom: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
+              <View style={{ width: 20, height: 1, backgroundColor: BESS_NAVY, marginRight: 4 }} />
+              <Text style={{ fontSize: 7, color: MUTED }}>Mutual (bidirectional)</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: 20, height: 1, backgroundColor: BESS_NAVY, marginRight: 4, borderStyle: 'dashed', borderWidth: 0.5 }} />
+              <Text style={{ fontSize: 7, color: MUTED }}>Directional (one-way)</Text>
+            </View>
+          </View>
+        </>
+      ) : null}
+
+      {/* Connection list — numbered for clarity */}
+      {links.length > 0 ? (
+        <>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6 }}>
+            Connection Index
+          </Text>
+          {links.map((link, i) => {
+            const fromLabel = shortModuleLabel(link.from_module)
+            const toLabel = shortModuleLabel(link.to_module)
+            const mechLabel = humaniseId(link.mechanism)
+            const detail = link.detail ? ` — ${link.detail}` : ''
+            const arrow = link.type === 'mutual' ? '↔' : '→'
+            return (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }} wrap={false}>
+                <Text style={{ fontSize: 8, color: MUTED, width: 16 }}>{i + 1}.</Text>
+                <Text style={{ fontSize: 8, color: INK, flex: 1 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>{fromLabel}</Text>
+                  {` ${arrow} `}
+                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>{toLabel}</Text>
+                  {`  `}
+                  <Text style={{ color: BESS_TEAL }}>[{mechLabel}{detail}]</Text>
+                </Text>
+              </View>
+            )
+          })}
+          <View style={{ marginBottom: 14 }} />
+        </>
+      ) : (
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 14 }}>
+          No cross-module grammar links declared.
+        </Text>
+      )}
+
+      {/* Connection matrix table — rows: from module, cols: to module */}
+      {modules.length > 1 ? (
+        <>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6 }}>
+            Connection Matrix
+          </Text>
+          <Text style={{ fontSize: 7, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 6 }}>
+            Read row → column as "what the row module provides to the column module."
+          </Text>
+          <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 16 }}>
+            {/* Header row */}
+            <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+              <View style={{ width: rowHeaderPct, borderRightWidth: 0.5, borderRightColor: '#4a6a9f', paddingVertical: 4, paddingHorizontal: 4 }}>
+                <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#aac0e0' }}>from ↓  to →</Text>
+              </View>
+              {modules.map((m, i) => (
+                <View key={i} style={{ width: colPct, borderRightWidth: i < modules.length - 1 ? 0.5 : 0, borderRightColor: '#4a6a9f', paddingVertical: 4, paddingHorizontal: 3 }}>
+                  <Text style={{ fontSize: 5.5, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT }}>
+                    {shortModuleLabel(m.module)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {/* Data rows */}
+            {modules.map((fromMod, rowIdx) => (
+              <View key={rowIdx} style={{ flexDirection: 'row', borderBottomWidth: rowIdx < modules.length - 1 ? 0.5 : 0, borderBottomColor: TABLE_BORDER, backgroundColor: rowIdx % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
+                <View style={{ width: rowHeaderPct, borderRightWidth: 0.5, borderRightColor: TABLE_BORDER, paddingVertical: 4, paddingHorizontal: 4 }}>
+                  <Text style={{ fontSize: 5.5, fontFamily: 'Helvetica-Bold', color: BESS_NAVY }}>
+                    {shortModuleLabel(fromMod.module)}
+                  </Text>
+                </View>
+                {modules.map((toMod, colIdx) => {
+                  const isSelf = fromMod.module === toMod.module
+                  const cellText = matrix[fromMod.module]?.[toMod.module] ?? ''
+                  return (
+                    <View
+                      key={colIdx}
+                      style={{
+                        width: colPct,
+                        borderRightWidth: colIdx < modules.length - 1 ? 0.5 : 0,
+                        borderRightColor: TABLE_BORDER,
+                        paddingVertical: 3,
+                        paddingHorizontal: 3,
+                        backgroundColor: isSelf ? BESS_NAVY : undefined,
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isSelf ? (
+                        <Text style={{ fontSize: 6, color: '#4a6a9f', textAlign: 'center' }}>■</Text>
+                      ) : cellText ? (
+                        <Text style={{ fontSize: 5.5, color: INK, lineHeight: 1.4 }}>{cellText}</Text>
+                      ) : (
+                        <Text style={{ fontSize: 6, color: MUTED, textAlign: 'center' }}>—</Text>
+                      )}
+                    </View>
+                  )
+                })}
+              </View>
+            ))}
+          </View>
+        </>
+      ) : null}
+
+      {/* Excluded modules note */}
+      {excludedModules.length > 0 ? (
+        <View style={{ backgroundColor: BG_SOFT, borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 8, marginBottom: 8 }}>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: MUTED, marginBottom: 4 }}>
+            Modules excluded for this product class ({excludedModules.length}):
+          </Text>
+          {excludedModules.map((excl, i) => {
+            const label = MODULE_LABELS[excl as keyof typeof MODULE_LABELS] ?? humaniseId(excl)
+            const rationale = rationaleExcluded[excl as keyof typeof rationaleExcluded] ?? 'Not applicable to this product class.'
+            return (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 2 }}>
+                <Text style={{ fontSize: 7, color: MUTED, width: 130, fontFamily: 'Helvetica-Bold' }}>{label}</Text>
+                <Text style={{ fontSize: 7, color: MUTED, flex: 1, fontFamily: 'Helvetica-Oblique' }}>{rationale}</Text>
+              </View>
+            )
+          })}
+        </View>
+      ) : null}
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
+// ── shared picker — used by 2B (OneModuleWrittenOut), 2C (cards + map), 2D (sentence+paragraph) ──
+
+/**
+ * Pick the primary module for detail pages (§3 / §6 / §7 / §8).
+ *
+ * Selects the most-decomposed module (highest sub_module count) so that all
+ * four detail pages show the same module and maintain narrative continuity.
+ * Tiebreak: canonical UNIVERSAL_MODULES order. Falls back to the first
+ * applicable module when all modules have ≤1 sub_module.
+ *
+ * Previously named `pickMostDecomposedModule` — renamed and moved here so that
+ * Piece 2D (SentenceParagraphViewPage) can call the same function.
+ */
+function pickPrimaryModuleForDetail(modules: ModuleSpec[]): ModuleSpec | null {
+  if (modules.length === 0) return null
+
+  // Sort: most sub_modules first, tiebreak by UNIVERSAL_MODULES order index
+  const ranked = [...modules].sort((a, b) => {
+    const diff = (b.sub_modules?.length ?? 0) - (a.sub_modules?.length ?? 0)
+    if (diff !== 0) return diff
+    const ai = UNIVERSAL_MODULES.indexOf(a.module as (typeof UNIVERSAL_MODULES)[number])
+    const bi = UNIVERSAL_MODULES.indexOf(b.module as (typeof UNIVERSAL_MODULES)[number])
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi)
+  })
+  return ranked[0]
+}
+
+/**
+ * Build a compact modifier summary string from the first word's modifiers.
+ * e.g. "qty ×3920, cap 280 Ah, form prismatic"
+ */
+function summariseModifiers(sm: SubModuleSpec, maxCount = 3): string {
+  const word = sm.words?.[0]
+  if (!word) return ''
+  const mods = (word.modifier_characters ?? []).slice(0, maxCount)
+  return mods
+    .map(m => {
+      const label = m.kind === 'quantity' ? 'qty' : m.kind
+      const val = m.unit ? `${m.value} ${m.unit}` : m.value
+      return `${label} ${val}`
+    })
+    .join(', ')
+}
+
+/**
+ * §3 One Module Written Out Page
+ *
+ * Zooms into the most-decomposed module (by sub_module count) and lists all
+ * its sub-modules in a bento-style grid: monospace ID + name, role verb,
+ * primary content character, and first 2-3 modifiers.
+ *
+ * Falls back gracefully when moduleDecomposition is absent or the chosen
+ * module has no sub_modules.
+ */
+export function OneModuleWrittenOutPage({ state }: { state: PipelineState }): React.ReactElement {
+  const projectId = dash(state.projectId)
+  const md = state.moduleDecomposition
+
+  // ── Edge case 1: Stage 1.5 did not run ──────────────────────────────────
+  if (!md) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §3 Module Detail`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Module Detail
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Module detail unavailable — Stage 1.5 did not run.
+          Enable RADICAL_PHASE_3_PER_MODULE=true and re-run the pipeline to populate.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const modules = md.modules ?? []
+  const chosen = pickPrimaryModuleForDetail(modules)
+
+  // ── Edge case 2: no modules at all ──────────────────────────────────────
+  if (!chosen) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §3 Module Detail`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Module Detail
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Module detail unavailable — no modules in moduleDecomposition.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const subModules = chosen.sub_modules ?? []
+  const moduleLabel = MODULE_LABELS[chosen.module as keyof typeof MODULE_LABELS] ?? humaniseId(chosen.module)
+  const grammarLinks = chosen.grammar_links ?? []
+
+  // Determine phrasing for cross-ref note based on why we picked this module
+  const maxSubCount = Math.max(...modules.map(m => (m.sub_modules ?? []).length))
+  const isMostDecomposed = subModules.length >= maxSubCount && maxSubCount > 1
+  const pickReason = isMostDecomposed ? 'most-decomposed' : 'primary'
+  const crossRefAdj = isMostDecomposed
+    ? 'most-decomposed'
+    : 'primary cost-anchor'
+
+  // ── Edge case 3: chosen module has 0 sub_modules ─────────────────────────
+  if (subModules.length === 0) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §3 Module Detail: ${chosen.module}`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+          {`Module Detail: ${moduleLabel}`}
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 10 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 14, lineHeight: 1.5 }}>
+          {`Zooming into one module from the §2.5 connection map. The \`${chosen.module}\` module is the ${crossRefAdj} subsystem of this product.`}
+        </Text>
+        {chosen.module_brief ? (
+          <View style={{ borderLeftWidth: 3, borderLeftColor: BESS_TEAL, paddingLeft: 10, marginBottom: 16, backgroundColor: BG_SOFT, padding: 10 }}>
+            <Text style={{ fontSize: 9, color: INK, lineHeight: 1.6 }}>{chosen.module_brief}</Text>
+          </View>
+        ) : null}
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Sub-module decomposition not populated — Stage 1.5 produced only the module-level catalogue.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  // ── Topology notes — sub-modules with a topology_clause ─────────────────
+  const topologyItems = subModules.filter(sm => sm.topology_clause && sm.topology_clause.trim())
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | §3 Module Detail: ${chosen.module}`} />
+
+      {/* Title */}
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+        {`Module Detail: ${moduleLabel}`}
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 10 }} />
+
+      {/* Cross-reference note */}
+      <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 14, lineHeight: 1.5 }}>
+        {`Zooming into one module from the §2.5 connection map. The \`${chosen.module}\` module is the ${crossRefAdj} subsystem of this product (${subModules.length} sub-module${subModules.length !== 1 ? 's' : ''}, ${pickReason} pick).`}
+      </Text>
+
+      {/* Module brief — quote-style block with BESS_TEAL left border */}
+      {chosen.module_brief ? (
+        <View style={{ borderLeftWidth: 3, borderLeftColor: BESS_TEAL, paddingLeft: 10, marginBottom: 16, backgroundColor: BG_SOFT, padding: 10 }}>
+          <Text style={{ fontSize: 9, color: INK, lineHeight: 1.6 }}>{chosen.module_brief}</Text>
+        </View>
+      ) : null}
+
+      {/* Sub-modules heading */}
+      <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+        {`This module contains the following sub-modules:`}
+      </Text>
+
+      {/* Bento-style sub-module boxes */}
+      {subModules.map((sm, i) => {
+        const firstWord = sm.words?.[0]
+        const contentChar = firstWord?.content_character
+        const primaryRadical = contentChar?.function_radical_primary
+          ?? contentChar?.material_radical_primary
+          ?? null
+        const modSummary = summariseModifiers(sm, 3)
+        const roleVerb = sm.role_verb ?? 'comprises'
+        const hasNoWords = !sm.words || sm.words.length === 0
+
+        return (
+          <View
+            key={sm.id}
+            wrap={false}
+            style={{
+              borderWidth: 1,
+              borderColor: TABLE_BORDER,
+              borderRadius: 4,
+              padding: 8,
+              marginBottom: i < subModules.length - 1 ? 6 : 0,
+              backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT,
+            }}
+          >
+            <View style={{ flexDirection: 'row', marginBottom: 3 }}>
+              {/* Left column: ID + human name */}
+              <View style={{ flex: 1.2 }}>
+                <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: BESS_NAVY }}>
+                  {sm.id}
+                </Text>
+                <Text style={{ fontSize: 7.5, color: INK, marginTop: 1 }}>{sm.name_human}</Text>
+              </View>
+              {/* Right column: role verb + character + modifiers */}
+              <View style={{ flex: 2.8, paddingLeft: 10 }}>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap' }}>
+                  <Text style={{ fontSize: 7.5, fontFamily: 'Helvetica-Oblique', color: BESS_TEAL }}>
+                    {roleVerb}
+                  </Text>
+                  {primaryRadical ? (
+                    <Text style={{ fontSize: 7.5, color: INK, marginLeft: 4 }}>
+                      {`[${humaniseId(primaryRadical)}]`}
+                    </Text>
+                  ) : null}
+                </View>
+                {hasNoWords ? (
+                  <Text style={{ fontSize: 7, color: MUTED, fontFamily: 'Helvetica-Oblique', marginTop: 2 }}>
+                    (no words declared)
+                  </Text>
+                ) : modSummary ? (
+                  <Text style={{ fontSize: 7, color: MUTED, marginTop: 2 }}>
+                    {modSummary}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+          </View>
+        )
+      })}
+
+      {/* Topology notes */}
+      {topologyItems.length > 0 ? (
+        <View style={{ marginTop: 12 }}>
+          <Text style={{ fontSize: 8, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+            Topology notes:
+          </Text>
+          {topologyItems.map((sm, i) => (
+            <View key={i} style={{ flexDirection: 'row', marginBottom: 3 }} wrap={false}>
+              <Text style={{ fontSize: 7.5, color: MUTED, width: 14 }}>•</Text>
+              <Text style={{ fontSize: 7.5, color: INK, fontFamily: 'Helvetica-Oblique', flex: 1 }}>
+                {`${sm.id}: ${sm.topology_clause}`}
+              </Text>
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {/* Connection summary */}
+      <Text style={{ fontSize: 7.5, color: MUTED, fontFamily: 'Helvetica-Oblique', marginTop: 12, lineHeight: 1.5 }}>
+        {grammarLinks.length > 0
+          ? `This module declares ${grammarLinks.length} internal grammar link${grammarLinks.length !== 1 ? 's' : ''} — see the sub-module Connection Map in §4 for the topology.`
+          : `This module declares no internal grammar links.`
+        }
+      </Text>
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Piece 2C helpers — character square rendering
+// ---------------------------------------------------------------------------
+
+const SLATE = '#6b8e9c'
+const SLATE_BG = '#f6fafc'
+const SLATE_LIGHT = '#eef5f8'
+const QUAD_BORDER = '#dddddd'
+
+/**
+ * A single 2×2 quadrant character square.
+ * isContent=true → BLACK border (content character)
+ * isContent=false → SLATE border (modifier character)
+ */
+function CharacterSquare({
+  isContent,
+  tl, tr, bl, br,
+  label,
+  size = 48,
+}: {
+  isContent: boolean
+  tl: string; tr: string; bl: string; br: string
+  label: string
+  size?: number
+}): React.ReactElement {
+  const half = size / 2
+  const borderColour = isContent ? INK_DARK : SLATE
+  const bgFill = isContent ? '#ffffff' : SLATE_BG
+
+  // Quadrant cell helper — avoids repeating the border/padding spec
+  type QCell = { text: string; bold?: boolean; large?: boolean; muted?: boolean; tinted?: boolean }
+  const qCell = (cell: QCell) => {
+    const isEmpty = !cell.text || cell.text === '—'
+    return (
+      <View style={{
+        width: half, height: half,
+        borderWidth: 0.5, borderColor: QUAD_BORDER,
+        alignItems: 'center', justifyContent: 'center',
+        backgroundColor: isEmpty ? (isContent ? '#fafafa' : '#f4f7f9') : (cell.tinted ? (isContent ? '#f0fff4' : SLATE_LIGHT) : bgFill),
+        overflow: 'hidden',
+      }}>
+        <Text style={{
+          fontSize: cell.large ? 8 : 5.5,
+          fontFamily: cell.bold ? 'Helvetica-Bold' : 'Helvetica',
+          color: isEmpty ? '#cccccc' : (isContent ? INK_DARK : BESS_NAVY),
+          textAlign: 'center',
+        }}>
+          {isEmpty ? '—' : cell.text}
+        </Text>
+      </View>
+    )
+  }
+
+  return (
+    <View style={{ alignItems: 'center', marginRight: 4, marginBottom: 4 }}>
+      {/* 2×2 grid */}
+      <View style={{
+        width: size, height: size,
+        borderWidth: 2, borderColor: borderColour, borderRadius: 2,
+        backgroundColor: bgFill,
+        overflow: 'hidden',
+        flexDirection: 'column',
+      }}>
+        <View style={{ flexDirection: 'row' }}>
+          {qCell({ text: tl, tinted: true, bold: !isContent })}
+          {qCell({ text: tr, bold: !isContent && tr !== '—' && tr !== '', large: !isContent })}
+        </View>
+        <View style={{ flexDirection: 'row' }}>
+          {qCell({ text: bl, bold: !isContent && bl !== '—' && bl !== '' })}
+          {qCell({ text: br, muted: true })}
+        </View>
+      </View>
+      {/* Label below */}
+      <Text style={{
+        fontSize: 4.5,
+        fontFamily: 'Helvetica',
+        color: isContent ? BESS_NAVY : SLATE,
+        textAlign: 'center',
+        marginTop: 2,
+        maxWidth: size + 4,
+      }}>
+        {label.length > 16 ? label.slice(0, 15) + '…' : label}
+      </Text>
+    </View>
+  )
+}
+
+/**
+ * Render a content character as a 2×2 square.
+ * TL=function_radical_primary, TR=function_radical_secondary,
+ * BL=material_radical_primary, BR=material_radical_secondary.
+ */
+function renderContentCharSquare(cc: import('../types/module-decomposition').ContentCharacter, size = 48): React.ReactElement {
+  // Strip long prefixes for display readability
+  const abbrev = (s: string | null): string => {
+    if (!s) return '—'
+    // Strip _function, _chemistry suffixes for brevity in small squares
+    return s.replace(/_function$/, '').replace(/_chemistry$/, '').replace(/_/g, ' ')
+  }
+  return (
+    <CharacterSquare
+      isContent={true}
+      tl={abbrev(cc.function_radical_primary)}
+      tr={abbrev(cc.function_radical_secondary)}
+      bl={abbrev(cc.material_radical_primary)}
+      br={abbrev(cc.material_radical_secondary)}
+      label={cc.character_id}
+      size={size}
+    />
+  )
+}
+
+/**
+ * Render a modifier character as a 2×2 square.
+ * TL=kind, TR=value, BL=unit, BR=scope (not in type — often empty).
+ */
+function renderModifierCharSquare(mc: import('../types/module-decomposition').ModifyingCharacter, size = 48): React.ReactElement {
+  // Compact kind label
+  const kindLabel: Record<string, string> = {
+    quantity: 'qty', capacity: 'cap', form: 'form', topology: 'top',
+    dimension: 'dim', lifecycle: 'life', regulatory: 'reg', performance: 'perf',
+    tolerance: 'tol', envelope: 'env',
+  }
+  const tl = kindLabel[mc.kind] ?? mc.kind.slice(0, 4)
+  const tr = mc.value ?? '—'
+  const bl = mc.unit ?? '—'
+  const charLabel = mc.unit ? `${tl} ${mc.value} ${mc.unit}` : `${tl} ${mc.value}`
+  return (
+    <CharacterSquare
+      isContent={false}
+      tl={tl} tr={tr.length > 8 ? tr.slice(0, 7) + '…' : tr}
+      bl={bl} br="—"
+      label={charLabel}
+      size={size}
+    />
+  )
+}
+
+// ── §4 sub-module connection map (SVG graph + matrix) at sub-module level ───
+
+function SubModuleConnectionGraph({
+  subModules,
+  links,
+}: {
+  subModules: import('../types/module-decomposition').SubModuleSpec[]
+  links: import('../types/module-decomposition').GrammarLink[]
+}): React.ReactElement {
+  const n = subModules.length
+  // Layout: up to 3 boxes per row, ~3 rows max
+  const COLS = Math.min(3, n)
+  const BOX_W = 130
+  const BOX_H = 44
+  const COL_GAP = 30
+  const ROW_GAP = 38
+  const PAD = 8
+
+  const positions: Record<string, { x: number; y: number; cx: number; cy: number }> = {}
+  subModules.forEach((sm, i) => {
+    const col = i % COLS
+    const row = Math.floor(i / COLS)
+    const x = PAD + col * (BOX_W + COL_GAP)
+    const y = PAD + row * (BOX_H + ROW_GAP)
+    positions[sm.id] = { x, y, cx: x + BOX_W / 2, cy: y + BOX_H / 2 }
+  })
+
+  const rows = Math.ceil(n / COLS)
+  const TOTAL_W = PAD * 2 + COLS * BOX_W + (COLS - 1) * COL_GAP
+  const TOTAL_H = PAD * 2 + rows * BOX_H + (rows - 1) * ROW_GAP
+
+  function arrowPts(fromId: string, toId: string): { x1: number; y1: number; x2: number; y2: number } | null {
+    const fp = positions[fromId]; const tp = positions[toId]
+    if (!fp || !tp) return null
+    const sameRow = Math.abs(fp.cy - tp.cy) < 4
+    if (sameRow) {
+      return fp.cx < tp.cx
+        ? { x1: fp.x + BOX_W, y1: fp.cy, x2: tp.x, y2: tp.cy }
+        : { x1: fp.x, y1: fp.cy, x2: tp.x + BOX_W, y2: tp.cy }
+    }
+    return fp.cy < tp.cy
+      ? { x1: fp.cx, y1: fp.y + BOX_H, x2: tp.cx, y2: tp.y }
+      : { x1: fp.cx, y1: fp.y, x2: tp.cx, y2: tp.y + BOX_H }
+  }
+
+  return (
+    <Svg viewBox={`0 0 ${TOTAL_W} ${TOTAL_H}`} width={TOTAL_W} height={TOTAL_H}>
+      {links.map((link, i) => {
+        const pts = arrowPts(link.from_sub_module, link.to_sub_module)
+        if (!pts) return null
+        const mechLabel = humaniseId(link.mechanism)
+        const mx = (pts.x1 + pts.x2) / 2
+        const my = (pts.y1 + pts.y2) / 2
+        return (
+          <G key={i}>
+            <Line
+              x1={pts.x1} y1={pts.y1} x2={pts.x2} y2={pts.y2}
+              stroke={BESS_NAVY} strokeWidth={0.9}
+              strokeDasharray={link.type === 'mutual' ? undefined : '3,2'}
+            />
+            <Rect x={mx - 22} y={my - 5} width={44} height={10} fill="#ffffff" stroke="#e0e0e0" strokeWidth={0.5} />
+            <Text x={mx} y={my + 3} style={{ fontSize: 4.5, fill: BESS_TEAL, textAnchor: 'middle', fontFamily: 'Helvetica-Bold' }}>
+              {mechLabel.length > 15 ? mechLabel.slice(0, 14) + '…' : mechLabel}
+            </Text>
+          </G>
+        )
+      })}
+      {subModules.map((sm) => {
+        const pos = positions[sm.id]
+        if (!pos) return null
+        const label = sm.id.length > 18 ? sm.id.slice(0, 17) + '…' : sm.id
+        const sub = sm.name_human ?? ''
+        return (
+          <G key={sm.id}>
+            <Rect x={pos.x} y={pos.y} width={BOX_W} height={BOX_H} rx={4} ry={4} fill="#ffffff" stroke={BESS_NAVY} strokeWidth={1.2} />
+            <Text x={pos.cx} y={pos.y + 16} style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', fill: INK_DARK, textAnchor: 'middle' }}>
+              {label}
+            </Text>
+            <Text x={pos.cx} y={pos.y + 28} style={{ fontSize: 5, fill: MUTED, textAnchor: 'middle', fontFamily: 'Helvetica' }}>
+              {sub.length > 22 ? sub.slice(0, 21) + '…' : sub}
+            </Text>
+          </G>
+        )
+      })}
+    </Svg>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// §6 SubModuleRadicalCardsPage
+// One or more PDF pages rendering the §4 sub-module radical cards for the
+// most-decomposed module. Uses the shared pickPrimaryModuleForDetail() helper
+// so all four detail pages (2B, 2C cards, 2C map, 2D) show the same module.
+// ---------------------------------------------------------------------------
+export function SubModuleRadicalCardsPage({ state }: { state: PipelineState }): React.ReactElement {
+  const projectId = dash(state.projectId)
+  const md = state.moduleDecomposition
+
+  if (!md) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §6 Radical Translation Cards`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>Radical Translation Cards</Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Unavailable — Stage 1.5 did not run for this product.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const modules = md.modules ?? []
+  const chosen = pickPrimaryModuleForDetail(modules)
+
+  if (!chosen) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §6 Radical Translation Cards`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>Radical Translation Cards</Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          No modules in moduleDecomposition.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const subModules = (chosen.sub_modules ?? []).filter(sm => sm.words && sm.words.length > 0)
+  const moduleLabel = MODULE_LABELS[chosen.module as keyof typeof MODULE_LABELS] ?? humaniseId(chosen.module)
+
+  if (subModules.length === 0) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §6 Radical Translation Cards`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>Radical Translation Cards</Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Sub-module decomposition not populated for module {chosen.module}.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | §6 Radical Translation Cards — ${chosen.module}`} />
+
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+        Radical Translation Cards
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 6 }} />
+
+      <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 10, lineHeight: 1.5 }}>
+        {`§4 sub-module radical cards for the \`${chosen.module}\` module (${moduleLabel}). Each dashed frame is a word; each square is a character — black border = content (engineering noun/function), slate border = modifier (quantity, capacity, form, etc.). Quadrant layout: TL/BL = function/material radical ID for content characters; TL=kind, TR=value, BL=unit for modifier characters.`}
+      </Text>
+
+      {/* Character anatomy legend — compact two-column */}
+      <View style={{ flexDirection: 'row', marginBottom: 10, borderWidth: 0.5, borderColor: TABLE_BORDER, padding: 6, backgroundColor: BG_SOFT }}>
+        <View style={{ flex: 1, marginRight: 8 }}>
+          <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Content character (black border)</Text>
+          <Text style={{ fontSize: 6, color: INK, lineHeight: 1.5 }}>TL — primary function radical{'\n'}TR — secondary function (often empty){'\n'}BL — primary material radical{'\n'}BR — secondary material (often empty)</Text>
+        </View>
+        <View style={{ flex: 1, borderLeftWidth: 0.5, borderLeftColor: SLATE, paddingLeft: 8 }}>
+          <Text style={{ fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 3, textTransform: 'uppercase', letterSpacing: 0.3 }}>Modifier character (slate border)</Text>
+          <Text style={{ fontSize: 6, color: BESS_NAVY, lineHeight: 1.5 }}>TL — modifier kind (qty, cap, form…){'\n'}TR — primary value (e.g. 280, ×3920){'\n'}BL — unit (Ah, V, kg){'\n'}BR — scope qualifier (often empty)</Text>
+        </View>
+      </View>
+
+      {/* Sub-module cards */}
+      {subModules.map((sm, smIdx) => {
+        const modSummary = summariseModifiers(sm, 3)
+        return (
+          <View
+            key={sm.id}
+            wrap={false}
+            style={{
+              marginBottom: smIdx < subModules.length - 1 ? 8 : 0,
+              borderWidth: 1, borderColor: TABLE_BORDER, borderRadius: 4,
+            }}
+          >
+            {/* Header bar */}
+            <View style={{
+              backgroundColor: BESS_NAVY, paddingHorizontal: 8, paddingVertical: 5,
+              borderTopLeftRadius: 3, borderTopRightRadius: 3,
+            }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <Text style={{ fontSize: 7.5, fontFamily: 'Courier', color: '#ffffff', marginRight: 8 }}>
+                  {sm.id}
+                </Text>
+                <Text style={{ fontSize: 7, color: '#aac0e0', flex: 1 }}>{sm.name_human}</Text>
+                {modSummary ? (
+                  <Text style={{ fontSize: 6, color: '#7a9fc0', fontFamily: 'Helvetica-Oblique', marginLeft: 8 }}>
+                    {modSummary}
+                  </Text>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Word frames */}
+            <View style={{ padding: 6 }}>
+              {sm.words.map((word, wIdx) => (
+                <View
+                  key={word.id}
+                  style={{
+                    borderWidth: 0.5, borderColor: '#aaaaaa', borderStyle: 'dashed',
+                    padding: 5, marginBottom: wIdx < sm.words.length - 1 ? 5 : 0,
+                    borderRadius: 2,
+                  }}
+                  wrap={false}
+                >
+                  {/* Row of character squares */}
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-start' }}>
+                    {/* Content character */}
+                    {renderContentCharSquare(word.content_character, 44)}
+                    {/* Modifier characters */}
+                    {word.modifier_characters.map((mc, mcIdx) => (
+                      <View key={mcIdx}>
+                        {renderModifierCharSquare(mc, 44)}
+                      </View>
+                    ))}
+                  </View>
+                  {/* Word name label */}
+                  <Text style={{ fontSize: 6, color: MUTED, fontFamily: 'Helvetica-Oblique', marginTop: 2 }}>
+                    {word.id}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        )
+      })}
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// §7 SubModuleConnectionMapPage
+// Separate PDF page: SVG graph of sub-modules within the picked module,
+// labelled arrows for each grammar_link, followed by a connection matrix.
+// ---------------------------------------------------------------------------
+export function SubModuleConnectionMapPage({ state }: { state: PipelineState }): React.ReactElement {
+  const projectId = dash(state.projectId)
+  const md = state.moduleDecomposition
+
+  if (!md) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §7 Sub-Module Connection Map`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>Sub-Module Connection Map</Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Unavailable — Stage 1.5 did not run for this product.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const modules = md.modules ?? []
+  const chosen = pickPrimaryModuleForDetail(modules)
+
+  if (!chosen) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §7 Sub-Module Connection Map`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>Sub-Module Connection Map</Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>No modules available.</Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const subModules = chosen.sub_modules ?? []
+  const links = chosen.grammar_links ?? []
+  const moduleLabel = MODULE_LABELS[chosen.module as keyof typeof MODULE_LABELS] ?? humaniseId(chosen.module)
+  const n = subModules.length
+
+  if (n === 0) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §7 Sub-Module Connection Map`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>Sub-Module Connection Map</Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Sub-module decomposition not populated for module {chosen.module}.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  // Build connection matrix [from_sub_module][to_sub_module] = description
+  const matrix: Record<string, Record<string, string>> = {}
+  for (const sm of subModules) matrix[sm.id] = {}
+
+  for (const link of links) {
+    const mechLabel = humaniseId(link.mechanism)
+    const detail = link.detail ? ` (${link.detail})` : ''
+    const cellText = `${mechLabel}${detail}`
+
+    if (!matrix[link.from_sub_module]) matrix[link.from_sub_module] = {}
+    if (!matrix[link.to_sub_module]) matrix[link.to_sub_module] = {}
+
+    if (link.type === 'mutual') {
+      const ef = matrix[link.from_sub_module][link.to_sub_module]
+      matrix[link.from_sub_module][link.to_sub_module] = ef ? `${ef}; ${cellText}` : cellText
+      const er = matrix[link.to_sub_module][link.from_sub_module]
+      matrix[link.to_sub_module][link.from_sub_module] = er ? `${er}; ${cellText}` : cellText
+    } else {
+      const ex = matrix[link.from_sub_module][link.to_sub_module]
+      matrix[link.from_sub_module][link.to_sub_module] = ex ? `${ex}; ${cellText}` : cellText
+    }
+  }
+
+  // Column widths: compress for many sub-modules
+  const colPct = n <= 4 ? `${Math.floor(72 / n)}%` : n <= 6 ? '12%' : '9%'
+  const rowHeaderPct = n <= 4 ? '28%' : n <= 6 ? '28%' : '26%'
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | §7 Sub-Module Connection Map — ${chosen.module}`} />
+
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+        Sub-Module Connection Map
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 8 }} />
+
+      <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 12, lineHeight: 1.5 }}>
+        {`Intra-module connection topology for \`${chosen.module}\` (${moduleLabel}). Shows how the ${n} sub-module${n !== 1 ? 's' : ''} wire together via mechanical mounts, electrical buses, comms links, and control paths. See §6 for the character-level radical cards. Cross-module connections appear in the §4 Module Connection Map.`}
+      </Text>
+
+      {/* SVG graph */}
+      {n > 0 && (
+        <>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
+            Sub-Module Graph
+          </Text>
+          <View style={{ marginBottom: 14, alignItems: 'center' }}>
+            <SubModuleConnectionGraph subModules={subModules} links={links} />
+          </View>
+
+          {/* Legend */}
+          <View style={{ flexDirection: 'row', marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
+              <View style={{ width: 18, height: 1, backgroundColor: BESS_NAVY, marginRight: 4 }} />
+              <Text style={{ fontSize: 7, color: MUTED }}>Mutual (bidirectional)</Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ width: 18, height: 1, backgroundColor: BESS_NAVY, marginRight: 4, borderStyle: 'dashed', borderWidth: 0.5 }} />
+              <Text style={{ fontSize: 7, color: MUTED }}>Directional (one-way)</Text>
+            </View>
+          </View>
+        </>
+      )}
+
+      {/* Connection index */}
+      {links.length > 0 ? (
+        <>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 6 }}>
+            Connection Index ({links.length})
+          </Text>
+          {links.map((link, i) => {
+            const mechLabel = humaniseId(link.mechanism)
+            const detail = link.detail ? ` — ${link.detail}` : ''
+            const arrow = link.type === 'mutual' ? '↔' : '→'
+            return (
+              <View key={i} style={{ flexDirection: 'row', marginBottom: 4 }} wrap={false}>
+                <Text style={{ fontSize: 8, color: MUTED, width: 16 }}>{i + 1}.</Text>
+                <Text style={{ fontSize: 8, color: INK, flex: 1 }}>
+                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>{link.from_sub_module}</Text>
+                  {` ${arrow} `}
+                  <Text style={{ fontFamily: 'Helvetica-Bold' }}>{link.to_sub_module}</Text>
+                  {`  `}
+                  <Text style={{ color: BESS_TEAL }}>[{mechLabel}{detail}]</Text>
+                </Text>
+              </View>
+            )
+          })}
+          <View style={{ marginBottom: 12 }} />
+        </>
+      ) : (
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 12 }}>
+          No intra-module grammar links declared for this module.
+        </Text>
+      )}
+
+      {/* Connection matrix */}
+      {n > 1 && (
+        <>
+          <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 4 }}>
+            Connection Matrix
+          </Text>
+          <Text style={{ fontSize: 7, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 6 }}>
+            Read row → column as "what the row sub-module provides to the column sub-module."
+          </Text>
+          <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER }}>
+            {/* Header */}
+            <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
+              <View style={{ width: rowHeaderPct, borderRightWidth: 0.5, borderRightColor: '#4a6a9f', paddingVertical: 4, paddingHorizontal: 4 }}>
+                <Text style={{ fontSize: 5.5, fontFamily: 'Helvetica-Bold', color: '#aac0e0' }}>from ↓  to →</Text>
+              </View>
+              {subModules.map((sm, i) => (
+                <View key={i} style={{ width: colPct, borderRightWidth: i < n - 1 ? 0.5 : 0, borderRightColor: '#4a6a9f', paddingVertical: 4, paddingHorizontal: 3 }}>
+                  <Text style={{ fontSize: 5, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT }}>
+                    {sm.id.length > 14 ? sm.id.slice(0, 13) + '…' : sm.id}
+                  </Text>
+                </View>
+              ))}
+            </View>
+            {/* Data rows */}
+            {subModules.map((fromSm, rowIdx) => (
+              <View
+                key={rowIdx}
+                style={{
+                  flexDirection: 'row',
+                  borderBottomWidth: rowIdx < n - 1 ? 0.5 : 0, borderBottomColor: TABLE_BORDER,
+                  backgroundColor: rowIdx % 2 === 0 ? '#ffffff' : BG_SOFT,
+                }}
+                wrap={false}
+              >
+                <View style={{ width: rowHeaderPct, borderRightWidth: 0.5, borderRightColor: TABLE_BORDER, paddingVertical: 4, paddingHorizontal: 4 }}>
+                  <Text style={{ fontSize: 5.5, fontFamily: 'Helvetica-Bold', color: BESS_NAVY }}>
+                    {fromSm.id.length > 18 ? fromSm.id.slice(0, 17) + '…' : fromSm.id}
+                  </Text>
+                </View>
+                {subModules.map((toSm, colIdx) => {
+                  const isSelf = fromSm.id === toSm.id
+                  const cellText = matrix[fromSm.id]?.[toSm.id] ?? ''
+                  return (
+                    <View
+                      key={colIdx}
+                      style={{
+                        width: colPct,
+                        borderRightWidth: colIdx < n - 1 ? 0.5 : 0, borderRightColor: TABLE_BORDER,
+                        paddingVertical: 3, paddingHorizontal: 3,
+                        backgroundColor: isSelf ? BESS_NAVY : undefined,
+                        justifyContent: 'center',
+                      }}
+                    >
+                      {isSelf ? (
+                        <Text style={{ fontSize: 6, color: '#4a6a9f', textAlign: 'center' }}>■</Text>
+                      ) : cellText ? (
+                        <Text style={{ fontSize: 5, color: INK, lineHeight: 1.3 }}>{cellText}</Text>
+                      ) : (
+                        <Text style={{ fontSize: 6, color: MUTED, textAlign: 'center' }}>—</Text>
+                      )}
+                    </View>
+                  )
+                })}
+              </View>
+            ))}
+          </View>
+        </>
+      )}
+
+      <DocPageFooter />
+    </Page>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// §8 SentenceParagraphViewPage (Piece 2D 2026-05-12)
+// Interlinear English + RAD syntax view: one sentence card per sub-module of
+// the picked module, followed by the whole-module paragraph rendered in both
+// languages. Data from state.naturalLanguageLayer.by_module[picked_module].
+// ---------------------------------------------------------------------------
+
+const SENT_CARD_BG   = '#f8fafc'
+const SENT_BORDER    = '#c0c8d0'
+const RAD_BOX_BG     = '#f3f4f6'
+const PARA_BORDER    = INK_DARK
+const GRAMMAR_BG     = '#f1f5f9'
+const GRAMMAR_BORDER = '#94a3b8'
+const EN_BADGE_BG    = BESS_TEAL
+const RAD_BADGE_BG   = '#475569'
+
+export function SentenceParagraphViewPage({ state }: { state: PipelineState }): React.ReactElement {
+  const projectId = dash(state.projectId)
+  const md = state.moduleDecomposition
+  const nll = state.naturalLanguageLayer
+
+  // ── Edge case 1: naturalLanguageLayer absent ────────────────────────────
+  if (!nll) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §4.5 Sentence + Paragraph View`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Sentence + Paragraph View
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.6 }}>
+          Sentence + paragraph view unavailable — Piece 1E natural-language layer did not generate.
+          Enable RADICAL_PHASE_3_PER_MODULE=true and re-run.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  // ── Edge case 2: moduleDecomposition absent ─────────────────────────────
+  if (!md) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §4.5 Sentence + Paragraph View`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Sentence + Paragraph View
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          Sentence + paragraph view unavailable — Stage 1.5 did not run.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const modules = md.modules ?? []
+  const chosen = pickPrimaryModuleForDetail(modules)
+
+  // ── Edge case 3: no modules ─────────────────────────────────────────────
+  if (!chosen) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | §4.5 Sentence + Paragraph View`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Sentence + Paragraph View
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
+          No modules available.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const moduleLabel = MODULE_LABELS[chosen.module as keyof typeof MODULE_LABELS] ?? humaniseId(chosen.module)
+  const moduleLabelDisplay = moduleLabel
+
+  // Look up the natural-language data for the picked module
+  const moduleLang: ModuleNaturalLanguage | undefined = nll.by_module[chosen.module]
+  const grammarLinks: GrammarLink[] = chosen.grammar_links ?? []
+
+  // Derive paragraph_en fallback: concatenate sub_module_sentences if needed
+  const subSentences: SubModuleSentencePair[] = moduleLang?.sub_module_sentences ?? []
+  const paragraphEn: string = (moduleLang?.paragraph_en && moduleLang.paragraph_en.trim())
+    ? moduleLang.paragraph_en
+    : subSentences.map(s => s.sentence_en).filter(Boolean).join(' ')
+  const paragraphRad: string = moduleLang?.paragraph_rad ?? ''
+
+  const hasSubSentences = subSentences.length > 0
+  const hasParagraph = paragraphEn.trim().length > 0
+
+  return (
+    <Page size="A4" style={pageStyle}>
+      <DocPageHeader title={`${projectId} | Forge Engineering Report | §4.5 Sentence + Paragraph View`} />
+
+      {/* Title */}
+      <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+        {`Sentence + Paragraph View: ${moduleLabelDisplay}`}
+      </Text>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 8 }} />
+
+      {/* Subtitle */}
+      <Text style={{ fontSize: 8.5, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 14, lineHeight: 1.55 }}>
+        Each sub-module rendered as an English sentence and its radical-syntax equivalent.
+        {' '}The ⊕ operator joins content + modifier characters within a word and joins words within a sentence.
+        {' '}↔ between sub-modules denotes a grammar link. The final block renders the whole module as one paragraph in both languages.
+      </Text>
+
+      {/* ── Sub-module sentence cards ───────────────────────────────────── */}
+      {!hasSubSentences ? (
+        <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique', marginBottom: 12 }}>
+          No sub-module sentence pairs declared for this module.
+        </Text>
+      ) : (
+        subSentences.map((sub, idx) => {
+          // Grammar links involving this sub-module
+          const relatedLinks = grammarLinks.filter(
+            gl => gl.from_sub_module === sub.sub_module_id || gl.to_sub_module === sub.sub_module_id
+          )
+
+          return (
+            <View
+              key={sub.sub_module_id}
+              wrap={false}
+              style={{
+                borderWidth: 1.5,
+                borderColor: SENT_BORDER,
+                borderRadius: 7,
+                backgroundColor: SENT_CARD_BG,
+                padding: 8,
+                marginBottom: idx < subSentences.length - 1 ? 8 : 12,
+              }}
+            >
+              {/* Sub-module badge */}
+              <View style={{ flexDirection: 'row', marginBottom: 6 }}>
+                <View style={{
+                  backgroundColor: BESS_TEAL,
+                  borderRadius: 3,
+                  paddingHorizontal: 5,
+                  paddingVertical: 2,
+                }}>
+                  <Text style={{ fontSize: 7, fontFamily: 'Helvetica-Bold', color: '#ffffff' }}>
+                    {sub.sub_module_id}
+                  </Text>
+                </View>
+              </View>
+
+              {/* English sentence */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 5 }}>
+                <View style={{
+                  backgroundColor: EN_BADGE_BG,
+                  borderRadius: 2,
+                  paddingHorizontal: 4,
+                  paddingVertical: 1.5,
+                  marginRight: 5,
+                  marginTop: 1,
+                }}>
+                  <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#ffffff' }}>EN</Text>
+                </View>
+                <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.55, flex: 1 }}>
+                  {sub.sentence_en}
+                </Text>
+              </View>
+
+              {/* RAD sentence */}
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: relatedLinks.length > 0 ? 5 : 0 }}>
+                <View style={{
+                  backgroundColor: RAD_BADGE_BG,
+                  borderRadius: 2,
+                  paddingHorizontal: 4,
+                  paddingVertical: 1.5,
+                  marginRight: 5,
+                  marginTop: 1,
+                }}>
+                  <Text style={{ fontSize: 6, fontFamily: 'Helvetica-Bold', color: '#ffffff' }}>RAD</Text>
+                </View>
+                <View style={{
+                  flex: 1,
+                  borderWidth: 0.75,
+                  borderColor: SENT_BORDER,
+                  borderStyle: 'dashed',
+                  backgroundColor: RAD_BOX_BG,
+                  borderRadius: 3,
+                  padding: 5,
+                }}>
+                  <Text style={{ fontSize: 8.5, fontFamily: 'Courier', color: INK, lineHeight: 1.5 }}>
+                    {sub.sentence_rad}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Grammar links sub-block */}
+              {relatedLinks.length > 0 && (
+                <View style={{
+                  borderWidth: 0.75,
+                  borderColor: GRAMMAR_BORDER,
+                  borderRadius: 3,
+                  backgroundColor: GRAMMAR_BG,
+                  padding: 5,
+                  marginTop: 2,
+                }}>
+                  {relatedLinks.map((gl, glIdx) => {
+                    const mechLabel = humaniseId(gl.mechanism)
+                    const detail = gl.detail ? ` ${gl.detail}` : ''
+                    const arrow = gl.type === 'mutual' ? '↔' : '→'
+                    return (
+                      <Text
+                        key={glIdx}
+                        style={{ fontSize: 7.5, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.45, marginBottom: glIdx < relatedLinks.length - 1 ? 2 : 0 }}
+                      >
+                        {`${gl.from_sub_module} ${arrow} ${gl.to_sub_module} — ${mechLabel}${detail}`}
+                      </Text>
+                    )
+                  })}
+                </View>
+              )}
+            </View>
+          )
+        })
+      )}
+
+      {/* ── Module paragraph block ──────────────────────────────────────── */}
+      {hasParagraph && (
+        <View
+          wrap={false}
+          style={{
+            borderWidth: 2,
+            borderColor: PARA_BORDER,
+            borderRadius: 7,
+            backgroundColor: '#ffffff',
+            padding: 10,
+            marginTop: 4,
+          }}
+        >
+          {/* Header */}
+          <Text style={{
+            fontSize: 8,
+            fontFamily: 'Helvetica-Bold',
+            color: BESS_NAVY,
+            textTransform: 'uppercase',
+            letterSpacing: 0.5,
+            marginBottom: 6,
+          }}>
+            {`MODULE PARAGRAPH — ${chosen.module}`}
+          </Text>
+
+          {/* English paragraph */}
+          <Text style={{ fontSize: 9.5, color: INK, lineHeight: 1.6, marginBottom: 8 }}>
+            {paragraphEn}
+          </Text>
+
+          {/* RAD paragraph */}
+          {paragraphRad.trim().length > 0 && (
+            <View style={{
+              borderWidth: 0.75,
+              borderColor: SENT_BORDER,
+              borderStyle: 'dashed',
+              backgroundColor: RAD_BOX_BG,
+              borderRadius: 3,
+              padding: 6,
+              marginBottom: 6,
+            }}>
+              <Text style={{ fontSize: 8, fontFamily: 'Courier', color: INK, lineHeight: 1.5 }}>
+                {paragraphRad}
+              </Text>
+            </View>
+          )}
+
+          {/* Footer note */}
+          <Text style={{ fontSize: 7, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.4 }}>
+            Reading order matches the physical signal flow. ⊕ = within-word/sentence combination; ↔ = grammar link between sub-modules.
+          </Text>
+        </View>
+      )}
+
+      <DocPageFooter />
+    </Page>
+  )
 }
 
 function buildSourcingStrategyData(state: PipelineState): {
@@ -2833,7 +4361,22 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §3 Brief and Requirements — §C fix: structured 2-column KV with class-aware regulatory flags */}
       <BriefRequirementsPage state={safe} />
 
-      {/* §4 System Modules and Architecture — Radical tree view */}
+      {/* §4 Module Connection Map — cross-module grammar link graph + matrix (Piece 2A 2026-05-12) */}
+      <ModuleConnectionMapPage state={safe} />
+
+      {/* §5 One Module Written Out — bento sub-module grid for most-decomposed module (Piece 2B 2026-05-12) */}
+      <OneModuleWrittenOutPage state={safe} />
+
+      {/* §6 Sub-Module Radical Cards — 2×2 quadrant character squares per sub-module (Piece 2C 2026-05-12) */}
+      <SubModuleRadicalCardsPage state={safe} />
+
+      {/* §7 Sub-Module Connection Map — SVG graph + matrix scoped to picked module (Piece 2C 2026-05-12) */}
+      <SubModuleConnectionMapPage state={safe} />
+
+      {/* §8 Sentence + Paragraph View — interlinear EN + RAD per sub-module + whole-module paragraph (Piece 2D 2026-05-12) */}
+      <SentenceParagraphViewPage state={safe} />
+
+      {/* §9 System Modules and Architecture — Radical tree view */}
       <RadicalModulesSection
         resolvedTree={resolvedTree}
         radicalCostSummary={radicalCostSummary}
@@ -2848,13 +4391,13 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
        * marked them ❌ or returned null. After: they land on pages 5-9.
        */}
 
-      {/* §5 Feasibility Assessment — 4-discipline engineering analysis (no LLM) */}
+      {/* §9 Feasibility Assessment — 4-discipline engineering analysis (no LLM) */}
       <FeasibilityAssessmentPage state={safe} />
 
-      {/* §6 Sources and References — distributor URLs + manufacturer + standards + datasheets */}
+      {/* §10 Sources and References — distributor URLs + manufacturer + standards + datasheets */}
       <SourcesReferencesPage state={safe} />
 
-      {/* §7 Engineering Calculations (Appendix E early-summary) — Pareto, markup, mass, electrical, thermal, lead-time */}
+      {/* §11 Engineering Calculations (Appendix E early-summary) — Pareto, markup, mass, electrical, thermal, lead-time */}
       <EngineeringCalculationsPage state={safe} />
 
       {/* §8 Bill of Materials — sentence-grouped, grammar verdicts inline (multi-page) */}

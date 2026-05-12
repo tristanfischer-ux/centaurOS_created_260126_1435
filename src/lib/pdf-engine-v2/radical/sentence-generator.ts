@@ -508,6 +508,173 @@ function ensureTerminalPunctuation(s: string): string {
 }
 
 // ---------------------------------------------------------------------------
+// Piece 1E (2026-05-12) — NaturalLanguageLayer: pipeline-time wiring
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-sub-module sentence pair (English + RAD interlinear).
+ * Mirrors the §4.5 worked-example display where each sub-module is rendered
+ * twice — plain English on top, radical syntax just below.
+ */
+export interface SubModuleSentencePair {
+  sub_module_id: string
+  sentence_en: string
+  sentence_rad: string
+}
+
+/**
+ * Per-module natural-language layer output: one paragraph (EN + RAD) for the
+ * whole module, the canonical grammar trace string, and the sentence pairs for
+ * each sub-module within the module. Drives the §4.5 PDF renderer.
+ */
+export interface ModuleNaturalLanguage {
+  module: string
+  paragraph_en: string
+  paragraph_rad: string
+  grammar_trace: string
+  sub_module_sentences: SubModuleSentencePair[]
+}
+
+/**
+ * Top-level natural-language layer output. Keyed by UniversalModule string for
+ * direct lookup. Serialises cleanly to JSON for state.json persistence.
+ */
+export interface NaturalLanguageLayer {
+  /** One ModuleNaturalLanguage entry per module in ModuleDecomposition.modules. */
+  by_module: Record<string, ModuleNaturalLanguage>
+  /**
+   * Wall-clock + content telemetry — useful for cost-monitor + scorecard correlation.
+   * NO LLM calls are made by this layer; it is purely deterministic generation
+   * from Stage 1.5's structured output.
+   */
+  generated_at: string
+  module_count: number
+}
+
+/**
+ * Render the natural-language layer for an entire ModuleDecomposition. Pure
+ * function — no LLM calls, fully deterministic from the ModuleSpec input. Safe
+ * to call from the orchestrator immediately after Stage 1.5 completes.
+ *
+ * For each module:
+ *   - paragraph_en = generateModuleParagraph(module, sub_module_sentences.map(en))
+ *   - paragraph_rad = the RAD-syntax variant (words joined by ⊕, sentences by ↔)
+ *   - grammar_trace = generateGrammarTrace(module) (symbolic compact form)
+ *   - sub_module_sentences[] = one entry per sub_module with EN + RAD pair
+ */
+export function buildNaturalLanguageLayer(
+  modules: ReadonlyArray<ModuleSpec>,
+): NaturalLanguageLayer {
+  const byModule: Record<string, ModuleNaturalLanguage> = {}
+
+  for (const moduleSpec of modules) {
+    // Per-sub-module sentence pairs
+    const subSentences: SubModuleSentencePair[] = []
+    const enSubSentences: string[] = []
+    for (const sub of moduleSpec.sub_modules ?? []) {
+      const en = generateSubmoduleSentence(sub, { style: 'verbose' })
+      const rad = generateSubmoduleRadSentence(sub)
+      subSentences.push({
+        sub_module_id: sub.id,
+        sentence_en: en,
+        sentence_rad: rad,
+      })
+      enSubSentences.push(en)
+    }
+
+    // Module paragraph (EN) — uses the same prose-style generator as before
+    const paragraphEn = generateModuleParagraph(moduleSpec, enSubSentences)
+
+    // Module paragraph (RAD) — concatenate sub-module RAD sentences with ↔
+    // mechanism-tagged operators reflecting the module's grammar_links. Falls
+    // back to ⊕ AND between sub-modules with no declared link.
+    const paragraphRad = generateModuleRadParagraph(moduleSpec, subSentences)
+
+    // Canonical symbolic grammar trace (reusable for parser round-trip in Iter 5)
+    const grammarTrace = generateGrammarTrace(moduleSpec)
+
+    byModule[moduleSpec.module] = {
+      module: moduleSpec.module,
+      paragraph_en: paragraphEn,
+      paragraph_rad: paragraphRad,
+      grammar_trace: grammarTrace,
+      sub_module_sentences: subSentences,
+    }
+  }
+
+  return {
+    by_module: byModule,
+    generated_at: new Date().toISOString(),
+    module_count: modules.length,
+  }
+}
+
+/**
+ * Render one sub-module as its RAD-syntax sentence: each word as
+ * "character_id (modifier1, modifier2)", words joined by " ⊕ ".
+ * For multi-word sub-modules, brackets per-word clauses to disambiguate
+ * within-word ⊕ from between-word ⊕ (council 2026-05-12 P3 fix).
+ */
+function generateSubmoduleRadSentence(sub: SubModuleSpec): string {
+  const words = sub.words ?? []
+  if (words.length === 0) return `<${sub.id}>`
+  const wordClauses = words.map(w => renderWordRadClause(w))
+  if (wordClauses.length === 1) return wordClauses[0]
+  return wordClauses.map(w => `[${w}]`).join(` ${GRAMMAR_OPERATORS.WITHIN_WORD} `)
+}
+
+/**
+ * Render the whole module as a RAD-syntax paragraph: sub-module RAD sentences
+ * joined by the appropriate grammar link operator (↔ mutual / → directional),
+ * tagged with mechanism. Disconnected sub-modules joined by AND.
+ */
+function generateModuleRadParagraph(
+  moduleSpec: ModuleSpec,
+  subSentences: ReadonlyArray<SubModuleSentencePair>,
+): string {
+  const radById = new Map<string, string>()
+  for (const s of subSentences) radById.set(s.sub_module_id, s.sentence_rad)
+
+  const links = moduleSpec.grammar_links ?? []
+  const visited = new Set<string>()
+  const segments: string[] = []
+
+  // Coding-council 2026-05-12 fix: original implementation chained
+  // "OP toRad" after the first segment, dropping the from-side. That broke
+  // fan-out topologies (A→B and A→C — second link rendered without A).
+  // Now every link emits the full "fromRad OP toRad" pair as its own segment;
+  // the reader can deduplicate by sub-module repetition rather than rely on
+  // implicit chaining. Renderer joins segments with comma+space.
+  for (const link of links) {
+    const fromRad = radById.get(link.from_sub_module) ?? `<${link.from_sub_module}>`
+    const toRad = radById.get(link.to_sub_module) ?? `<${link.to_sub_module}>`
+    const op = link.type === 'mutual'
+      ? GRAMMAR_OPERATORS.MUTUAL_LINK
+      : GRAMMAR_OPERATORS.DIRECTIONAL_LINK
+    const detail = link.detail ? ` (${link.detail})` : ''
+    const opTagged = `${op}[${humaniseMechanism(link.mechanism)}${detail}]`
+    segments.push(`${fromRad} ${opTagged} ${toRad}`)
+    visited.add(link.from_sub_module)
+    visited.add(link.to_sub_module)
+  }
+
+  for (const s of subSentences) {
+    if (!visited.has(s.sub_module_id)) {
+      if (segments.length === 0) {
+        segments.push(s.sentence_rad)
+      } else {
+        segments.push(`${GRAMMAR_OPERATORS.AND.trim()} ${s.sentence_rad}`)
+      }
+    }
+  }
+
+  // Coding-council 2026-05-12: join segments with commas now that each
+  // segment is a full "from OP to" pair (was bare spaces when segments
+  // chained as "OP to" — caused fan-out topologies to silently drop the from).
+  return segments.join(', ').replace(/\s+/g, ' ').trim()
+}
+
+// ---------------------------------------------------------------------------
 // Re-exports for ergonomic call sites
 // ---------------------------------------------------------------------------
 

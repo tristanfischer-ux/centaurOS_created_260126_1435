@@ -628,7 +628,30 @@ function validateModuleDecompositionPayload(
     prior_warnings.push(`missing_required modules per ${normClass} prior: ${priorResult.missing_required.join(', ')}`)
   }
   if (priorResult.forbidden_present.length > 0) {
-    errors.push(`forbidden_present modules per ${normClass} prior: ${priorResult.forbidden_present.join(', ')}`)
+    // Piece 1D fix 2026-05-12: auto-strip forbidden modules + move to excluded
+    // with auto-rationale, rather than hard-failing the entire catalogue. Real
+    // production data (BESS v4 run) showed Grok occasionally emits
+    // `mass_fluid_transport_process` for BESS because the cooling loop reads as
+    // "fluid transport" colloquially — even though the BESS prior correctly
+    // forbids it (BESS does thermal management, not internal mass flow).
+    // The LLM is "almost right" — auto-correcting is more useful than blocking.
+    paramWarnings.push(
+      `forbidden_present modules per ${normClass} prior auto-stripped + moved to excluded: ${priorResult.forbidden_present.join(', ')}`,
+    )
+    for (const fm of priorResult.forbidden_present) {
+      // Remove from modules array
+      const idx = modules.findIndex(m => m.module === fm)
+      if (idx >= 0) modules.splice(idx, 1)
+      // Add to excluded list (if not already there)
+      if (!excluded.includes(fm as UniversalModule)) {
+        excluded.push(fm as UniversalModule)
+      }
+      // Synthesise rationale
+      if (!rationale[fm as UniversalModule]) {
+        rationale[fm as UniversalModule] =
+          `Auto-excluded by ${normClass} prior — module is forbidden for this product class (LLM emitted it incorrectly; engine corrected).`
+      }
+    }
   }
 
   // ── cross_module_grammar_links ─────────────────────────────────────────────
@@ -717,13 +740,21 @@ function buildCouncilUserContent(
 }
 
 function parseSeatReview(raw: unknown, seat: CouncilSeatId): CouncilSeatReview {
+  // Piece 1D fix 2026-05-12: when the seat response is null / not an object /
+  // unparseable, treat as TRANSPORT_FAILED (ABSTAIN-equivalent in the
+  // aggregator), NOT as a legitimate NEEDS_MAJOR vote. This catches the case
+  // where the seat call SUCCEEDED at the HTTP layer but the LLM returned
+  // unparseable text ("Let me carefully review...") — different from a real
+  // transport-layer throw which sets transport_failed=true in the catch block,
+  // but functionally the same: the seat didn't actually review.
   const fallback: CouncilSeatReview = {
     seat,
     verdict: 'NEEDS_MAJOR',
     coverage_ok: false,
     no_spurious_modules: false,
     parameters_plausible: false,
-    notes: ['failed to parse seat response — defaulting to NEEDS_MAJOR'],
+    notes: ['failed to parse seat response — treated as ABSTAIN (transport_failed) by aggregator'],
+    transport_failed: true,
   }
   if (!raw || typeof raw !== 'object') return fallback
   const r = raw as Record<string, unknown>
@@ -1013,11 +1044,18 @@ export async function runModuleDecomposition(
   let llmDuration = attempt1.durationMs
   let retried = false
 
-  // Retry once on schema failure with the validation reminder appended
+  // Retry once on schema failure with the validation reminder appended.
+  // Piece 1D fix 2026-05-12: surface the specific schema errors (was logging
+  // only the COUNT, hiding the actual cause). When BESS v2 fell through to
+  // fallback with "1 errors", future diagnosis required reading raw LLM dumps;
+  // the error list itself is small enough to log verbatim.
   if (!v.validation.ok) {
     console.warn(
       `[module-decomposition] Stage 1.5 first attempt failed validation (${v.validation.schema_errors.length} errors). Retrying...`,
     )
+    for (const err of v.validation.schema_errors) {
+      console.warn(`[module-decomposition]   error: ${err}`)
+    }
     const reminder =
       `\n\nCRITICAL VALIDATION REQUIREMENTS (YOUR PREVIOUS RESPONSE FAILED THESE):\n` +
       v.validation.schema_errors.map(e => `- ${e}`).join('\n') +
@@ -1121,14 +1159,20 @@ export async function runModuleDecomposition(
         finalCrossModuleLinks = v2.crossModuleGrammarLinks
         finalCouncil = council2
       } else {
-        // Couldn't even validate the retry; fall back to priors
+        // Couldn't even validate the retry; fall back to priors.
+        // Piece 1D fix 2026-05-12: surface the specific schema errors so future
+        // diagnosis doesn't need raw LLM dumps (was logging only a generic message).
+        console.warn(`[module-decomposition] Council retry validation failed (${v2.validation.schema_errors.length} errors):`)
+        for (const err of v2.validation.schema_errors) {
+          console.warn(`[module-decomposition]   error: ${err}`)
+        }
         const fallback = buildFallbackDecomposition(
           classification,
           parsedBrief,
           `Council retry validation failed: ${v2.validation.schema_errors.join('; ')}`,
         )
         if (fallback) {
-          console.warn('[module-decomposition] Council retry validation failed — falling back to ClassModulePriors')
+          console.warn('[module-decomposition] Falling back to ClassModulePriors')
           return { ok: true, data: fallback, durationMs: Date.now() - startedAt }
         }
         return {
