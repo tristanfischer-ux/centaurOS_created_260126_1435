@@ -983,18 +983,22 @@ export function buildTreeFromLeaves(
         })
       }
     }
-    // Remove LLM-provided leaves that are NOT in the mandatory set.
-    // This is the critical determinism guarantee: only characters in the mandatory
-    // set appear in the tree. The LLM may identify extra characters (or miss some),
-    // but the mandatory set DEFINES the tree structure — it is invariant.
-    // UNKNOWN leaves are always dropped (surfaced separately as unmapped).
-    const mandatorySet = new Set(mandatoryCharacters)
+    // Drop UNKNOWN leaves (surfaced separately as unmapped) but PRESERVE every
+    // recognised LLM character. The mandatory set is now a FLOOR (safety
+    // invariants injected if the LLM omits them) not a CEILING — LLM extras
+    // beyond the mandatory list flow through to the tree.
+    //
+    // Council 4/4 NEEDS_MAJOR_CONCERN, 2026-05-12 (commit 0c9ad53d): the
+    // previous filter to mandatorySet kept the post-Iter-3 architectural fix
+    // from showing any structural difference vs legacy (V10 dual-run cost
+    // £100 to learn this; archetype diff post-build was 100% identical across
+    // all 10 product classes). Pure-union semantics let per-module Stage 2
+    // value reach state.radicalTree without sacrificing the regulatory floor.
     effectiveLeaves = effectiveLeaves.filter(l => {
       if (l.character_id === '<UNKNOWN>' || l.character_id.startsWith('<UNKNOWN>')) {
-        return false // UNKNOWN leaves always dropped from tree
+        return false // UNKNOWN leaves always dropped — surfaced to unmapped
       }
-      // Keep only leaves whose character_id is in the mandatory set
-      return mandatorySet.has(l.character_id)
+      return true // recognised characters all preserved (LLM extras + mandatory)
     })
   }
 
