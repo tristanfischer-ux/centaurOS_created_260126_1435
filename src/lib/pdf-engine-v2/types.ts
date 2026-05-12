@@ -798,6 +798,29 @@ export interface PipelineState {
    */
   naturalLanguageLayer?: import('./radical/sentence-generator.js').NaturalLanguageLayer
   /**
+   * Piece 1G (2026-05-12) — LLM-augmented brief overview prose.
+   * Generated from parsedBrief + researchSynthesis at pipeline-end. Four
+   * blocks: overview_and_context (2 paras), mission_statement, target_customers,
+   * why_now. Drives the prose-rich §3 Brief and Requirements PDF page.
+   */
+  briefOverviewProse?: import('./radical/brief-overview-llm.js').BriefOverviewProse
+  /**
+   * Piece 1H (2026-05-12) — LLM-augmented regulatory standard-by-standard prose.
+   * Generated from regulatoryExtraction at pipeline-end. Four prose blocks per
+   * standard: applicability, engineering_impact, evidence_required, gap_action.
+   * Drives the §Regulatory and Compliance Posture PDF page.
+   * Non-fatal: renderer shows a placeholder when absent.
+   */
+  regulatoryProse?: import('./radical/regulatory-prose-llm.js').RegulatoryProseLayer
+  /**
+   * Piece 1I (2026-05-12) — LLM-augmented FMEA risk-by-risk prose.
+   * Generated from state.fmea (RiskRow[]) at pipeline-end. Four prose blocks per
+   * risk: hazard, root_cause, mitigation, detection. Top 20 risks by S×O descending.
+   * Drives the §Risk Register prose PDF page.
+   * Non-fatal: renderer shows a placeholder when absent.
+   */
+  fmeaRiskProse?: import('./radical/fmea-risk-llm.js').FmeaRiskProseLayer
+  /**
    * Phase 4 — Grammar Verdicts.
    * Populated when RADICAL_PHASE_4_GRAMMAR=true AND resolvedRadicalTree exists.
    * Contains one GrammarVerdict per rule fired, plus overall_verdict and

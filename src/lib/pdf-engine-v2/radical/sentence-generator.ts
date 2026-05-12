@@ -529,7 +529,8 @@ export interface SubModuleSentencePair {
  */
 export interface ModuleNaturalLanguage {
   module: string
-  paragraph_en: string
+  paragraph_en: string         // deterministic, always present
+  paragraph_en_llm?: string    // LLM-augmented, present when Piece 1F succeeded
   paragraph_rad: string
   grammar_trace: string
   sub_module_sentences: SubModuleSentencePair[]

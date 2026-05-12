@@ -1125,6 +1125,95 @@ export async function runPipeline(
             )
           }
 
+          // Piece 1F (2026-05-12) — LLM-augmented module paragraphs. Falls back
+          // to the deterministic paragraph_en when an LLM call throws. ~£0.05 per
+          // module × ~8 modules = ~£0.40 per pipeline run.
+          if (state.naturalLanguageLayer && moduleDecomposition.modules.length > 0) {
+            try {
+              const { generateLlmModuleParagraph } = await import('./radical/module-paragraph-llm')
+              const llmStartedAt = Date.now()
+              let llmSuccessCount = 0
+              let llmFailCount = 0
+              // Run sequentially — Grok rate limit isn't generous enough for parallel.
+              // Each call ~3-5s; 8 modules ≈ 30-40s wall-clock — acceptable.
+              for (const moduleSpec of moduleDecomposition.modules) {
+                const nl = state.naturalLanguageLayer.by_module[moduleSpec.module]
+                if (!nl) continue
+                try {
+                  const llmParagraph = await generateLlmModuleParagraph(moduleSpec, nl.paragraph_en)
+                  nl.paragraph_en_llm = llmParagraph
+                  llmSuccessCount += 1
+                } catch (perModuleErr) {
+                  console.warn(
+                    `[pipeline] Piece 1F: LLM paragraph failed for module="${moduleSpec.module}" (non-fatal, falling back to deterministic): ${(perModuleErr as Error).message}`
+                  )
+                  llmFailCount += 1
+                }
+              }
+              console.log(
+                `[pipeline] Piece 1F: LLM paragraphs ${llmSuccessCount} ok / ${llmFailCount} fallback ` +
+                `(wall-clock ${Date.now() - llmStartedAt}ms)`
+              )
+            } catch (nlfErr) {
+              console.warn(
+                `[pipeline] Piece 1F natural-language LLM augmentation failed (non-fatal): ` +
+                `${(nlfErr as Error).message}`
+              )
+            }
+          }
+
+          // Piece 1G (2026-05-12) — LLM-augmented brief overview prose.
+          // Generates Mission Statement / Target Customers / Why Now / Overview &
+          // Context paragraphs from parsedBrief + researchSynthesis. Non-fatal:
+          // renderer falls back to tabular brief data if this fails.
+          if (state.parsedBrief) {
+            try {
+              const { generateBriefOverviewProse } = await import('./radical/brief-overview-llm')
+              const startedAt = Date.now()
+              const prose = await generateBriefOverviewProse(state.parsedBrief, state.researchSynthesis)
+              state.briefOverviewProse = prose
+              console.log(
+                `[pipeline] Piece 1G: brief overview prose generated (${Date.now() - startedAt}ms, model=${prose.model_used}, used_research=${prose.used_research_synthesis})`
+              )
+            } catch (briefErr) {
+              console.warn(
+                `[pipeline] Piece 1G brief overview prose failed (non-fatal): ${(briefErr as Error).message}`
+              )
+            }
+          }
+
+          // Piece 1H (2026-05-12) — LLM-augmented regulatory standard-by-standard prose.
+          // Generates four prose blocks per standard (applicability, engineering_impact,
+          // evidence_required, gap_action) from regulatoryExtraction. Non-fatal:
+          // renderer falls back to placeholder text if this fails.
+          if (state.regulatoryExtraction && state.parsedBrief) {
+            try {
+              const { generateRegulatoryProseLayer } = await import('./radical/regulatory-prose-llm')
+              const startedAt = Date.now()
+              const prose = await generateRegulatoryProseLayer(state.regulatoryExtraction, productClassForRadical)
+              state.regulatoryProse = prose
+              console.log(`[pipeline] Piece 1H: regulatory prose generated for ${prose.standard_count} standards (${Date.now() - startedAt}ms)`)
+            } catch (regErr) {
+              console.warn(`[pipeline] Piece 1H regulatory prose failed (non-fatal): ${(regErr as Error).message}`)
+            }
+          }
+
+          // Piece 1I (2026-05-12) — LLM-augmented FMEA risk prose.
+          // Generates four prose blocks per risk (hazard, root_cause, mitigation, detection)
+          // from state.fmea (RiskRow[]). Top 20 by S×O descending. Non-fatal:
+          // renderer falls back to placeholder text if this fails.
+          if ((state as any).fmea && ((state as any).fmea as unknown[]).length > 0 && state.parsedBrief) {
+            try {
+              const { generateFmeaRiskProseLayer } = await import('./radical/fmea-risk-llm')
+              const startedAt = Date.now()
+              const prose = await generateFmeaRiskProseLayer((state as any).fmea, productClassForRadical)
+              state.fmeaRiskProse = prose
+              console.log(`[pipeline] Piece 1I: FMEA risk prose generated for ${prose.risk_count} risks (${Date.now() - startedAt}ms)`)
+            } catch (fmeaErr) {
+              console.warn(`[pipeline] Piece 1I FMEA risk prose failed (non-fatal): ${(fmeaErr as Error).message}`)
+            }
+          }
+
           // Per-module Stage 2
           const perModuleResult = await runDecomposeRadicalPerModule(
             moduleDecomposition,
@@ -1937,6 +2026,15 @@ export async function runPipeline(
           // §4.5 Sentence + Paragraph view renderer can read it without
           // re-running the deterministic generator at render time.
           naturalLanguageLayer: state.naturalLanguageLayer ?? null,
+          // Piece 1G 2026-05-12: persist brief overview prose so the
+          // §3 Brief and Requirements renderer can read it without re-calling the LLM.
+          briefOverviewProse: state.briefOverviewProse ?? null,
+          // Piece 1H 2026-05-12: persist regulatory standard-by-standard prose so the
+          // §Regulatory Compliance renderer can read it without re-calling the LLM.
+          regulatoryProse: state.regulatoryProse ?? null,
+          // Piece 1I 2026-05-12: persist FMEA risk prose so the
+          // §Risk Register prose renderer can read it without re-calling the LLM.
+          fmeaRiskProse: state.fmeaRiskProse ?? null,
           // Fix 4 (task #91-phase4): legacy costSummary.bomTotal paired field so the
           // aggregator can compute cost delta = (radical - legacy) / legacy.
           // v2-integrated path sets state.costSummary; v1 legacy path sets only

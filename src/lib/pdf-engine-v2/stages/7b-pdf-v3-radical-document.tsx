@@ -1066,6 +1066,14 @@ const BriefRequirementsPage = ({ state }: { state: PipelineState }) => {
   const regs = state.regulatoryExtraction?.regulatory_entries ?? []
   const classFlags = getClassRegulatoryFlags(state.productClass)
 
+  // Piece 1G (2026-05-12) — LLM-augmented brief overview prose blocks.
+  const briefProse = (state as any).briefOverviewProse as undefined | {
+    overview_and_context: string
+    mission_statement: string
+    target_customers: string
+    why_now: string
+  }
+
   // Build KV rows from parsedBrief.constraints if available, else fallback to DesignBrief
   const kvRows: Array<{ label: string; value: string; highlight?: boolean }> = []
 
@@ -1186,6 +1194,22 @@ const BriefRequirementsPage = ({ state }: { state: PipelineState }) => {
         Brief and Requirements
       </Text>
       <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+      {/* Piece 1G — LLM prose: Overview and Context / Mission / Target Customers / Why Now */}
+      {briefProse && (
+        <View>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginTop: 12, marginBottom: 6 }}>Overview and Context</Text>
+          {briefProse.overview_and_context.split('\n\n').map((para, i) => (
+            <Text key={i} style={{ fontSize: 10, color: INK, lineHeight: 1.55, marginBottom: 8 }}>{para}</Text>
+          ))}
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginTop: 12, marginBottom: 6 }}>Mission Statement</Text>
+          <Text style={{ fontSize: 10, color: INK, lineHeight: 1.55, marginBottom: 8 }}>{briefProse.mission_statement}</Text>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginTop: 12, marginBottom: 6 }}>Target Customers</Text>
+          <Text style={{ fontSize: 10, color: INK, lineHeight: 1.55, marginBottom: 8 }}>{briefProse.target_customers}</Text>
+          <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginTop: 12, marginBottom: 6 }}>Why Now</Text>
+          <Text style={{ fontSize: 10, color: INK, lineHeight: 1.55, marginBottom: 12 }}>{briefProse.why_now}</Text>
+        </View>
+      )}
 
       {/* KV requirements table */}
       <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
@@ -2646,8 +2670,10 @@ export function SentenceParagraphViewPage({ state }: { state: PipelineState }): 
 
   // Derive paragraph_en fallback: concatenate sub_module_sentences if needed
   const subSentences: SubModuleSentencePair[] = moduleLang?.sub_module_sentences ?? []
-  const paragraphEn: string = (moduleLang?.paragraph_en && moduleLang.paragraph_en.trim())
-    ? moduleLang.paragraph_en
+  // Piece 1F 2026-05-12: prefer LLM-augmented paragraph when available.
+  const moduleParagraphEn: string | undefined = moduleLang?.paragraph_en_llm || moduleLang?.paragraph_en
+  const paragraphEn: string = (moduleParagraphEn && moduleParagraphEn.trim())
+    ? moduleParagraphEn
     : subSentences.map(s => s.sentence_en).filter(Boolean).join(' ')
   const paragraphRad: string = moduleLang?.paragraph_rad ?? ''
 
@@ -3586,6 +3612,154 @@ const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
   )
 }
 
+// ─── Piece 1H (2026-05-12) — LLM-augmented Regulatory Compliance prose page ──
+// Renders one sub-section per regulatory standard in state.regulatoryProse.
+// Falls back to a placeholder page when the prose layer is absent (non-fatal).
+const RegulatoryProsePage = ({ state }: { state: PipelineState }) => {
+  const projectId = dash(state.projectId)
+  const proseLayer = (state as any).regulatoryProse as import('../radical/regulatory-prose-llm').RegulatoryProseLayer | undefined | null
+
+  if (!proseLayer || Object.keys(proseLayer.by_standard).length === 0) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | Regulatory and Compliance Posture`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Regulatory and Compliance Posture
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 10, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.5 }}>
+          Regulatory prose unavailable — Piece 1H LLM call did not run.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const entries = Object.values(proseLayer.by_standard)
+
+  const SUB_LABELS: Array<{ key: keyof typeof entries[0]; label: string }> = [
+    { key: 'applicability', label: 'Applicability' },
+    { key: 'engineering_impact', label: 'Engineering Impact' },
+    { key: 'evidence_required', label: 'Evidence Required' },
+    { key: 'gap_action', label: 'Gap Action' },
+  ]
+
+  return (
+    <>
+      {entries.map((entry, pageIdx) => (
+        <Page key={pageIdx} size="A4" style={pageStyle}>
+          <DocPageHeader title={`${projectId} | Forge Engineering Report | Regulatory and Compliance Posture`} />
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+            Regulatory and Compliance Posture
+          </Text>
+          <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+          {/* Standard header */}
+          <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 14 }}>
+            {entry.standard_name}
+          </Text>
+
+          {/* Four sub-sections — Council 2026-05-12 fix: removed wrap={false}
+              from each sub-section View. Long regulatory prose (e.g.
+              IEC 62619 with multi-jurisdiction notes) can exceed a single
+              A4 column block; wrap=false caused mid-paragraph clipping
+              instead of paginating. Each standard still gets its own Page
+              so cross-standard splitting is prevented at the higher level. */}
+          {SUB_LABELS.map(({ key, label }) => {
+            const prose = entry[key as keyof typeof entry] as string
+            return (
+              <View key={key} style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  {label}
+                </Text>
+                <Text style={{ fontSize: 10, color: INK, lineHeight: 1.55 }}>
+                  {dash(prose)}
+                </Text>
+              </View>
+            )
+          })}
+
+          <DocPageFooter />
+        </Page>
+      ))}
+    </>
+  )
+}
+
+// Piece 1I — Renders one A4 page per FMEA risk with four prose sub-sections:
+// Hazard / Root Cause / Mitigation / Detection.
+// Falls back to a placeholder page when the prose layer is absent (non-fatal).
+const FmeaRiskProsePage = ({ state }: { state: PipelineState }) => {
+  const projectId = dash(state.projectId)
+  const proseLayer = (state as any).fmeaRiskProse as import('../radical/fmea-risk-llm').FmeaRiskProseLayer | undefined | null
+
+  if (!proseLayer || Object.keys(proseLayer.by_risk_id).length === 0) {
+    return (
+      <Page size="A4" style={pageStyle}>
+        <DocPageHeader title={`${projectId} | Forge Engineering Report | Risk Register — Prose`} />
+        <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+          Risk Register — Engineering Analysis
+        </Text>
+        <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+        <Text style={{ fontSize: 10, color: MUTED, fontFamily: 'Helvetica-Oblique', lineHeight: 1.5 }}>
+          FMEA risk prose unavailable — Piece 1I LLM call did not run.
+        </Text>
+        <DocPageFooter />
+      </Page>
+    )
+  }
+
+  const entries = Object.values(proseLayer.by_risk_id)
+
+  const SUB_LABELS: Array<{ key: keyof FmeaRiskProseSubKeys; label: string }> = [
+    { key: 'hazard', label: 'Hazard' },
+    { key: 'root_cause', label: 'Root Cause' },
+    { key: 'mitigation', label: 'Mitigation' },
+    { key: 'detection', label: 'Detection' },
+  ]
+
+  return (
+    <>
+      {entries.map((entry, pageIdx) => (
+        <Page key={pageIdx} size="A4" style={pageStyle}>
+          <DocPageHeader title={`${projectId} | Forge Engineering Report | Risk Register — Prose`} />
+          <Text style={{ fontSize: 20, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 8 }}>
+            Risk Register — Engineering Analysis
+          </Text>
+          <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 16 }} />
+
+          {/* Risk identifier header */}
+          <Text style={{ fontSize: 14, fontFamily: 'Helvetica-Bold', color: BESS_NAVY, marginBottom: 14 }}>
+            {entry.risk_id}
+          </Text>
+
+          {/* Four sub-sections — Council 2026-05-12 fix: removed wrap={false}
+              for the same reason as RegulatoryProsePage above (long prose
+              clipping vs pagination). Each risk still gets its own Page. */}
+          {SUB_LABELS.map(({ key, label }) => {
+            const prose = entry[key] as string
+            return (
+              <View key={key} style={{ marginBottom: 14 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                  {label}
+                </Text>
+                <Text style={{ fontSize: 10, color: INK, lineHeight: 1.55 }}>
+                  {dash(prose)}
+                </Text>
+              </View>
+            )
+          })}
+
+          <DocPageFooter />
+        </Page>
+      ))}
+    </>
+  )
+}
+
+// Local helper type to avoid inline keyof expression in the map above.
+type FmeaRiskProseSubKeys = { hazard: string; root_cause: string; mitigation: string; detection: string }
+
 // Grammar Verdicts detail page — all WARN and BLOCK verdicts
 // Always renders: placeholder when grammarVerdicts absent (eliminates §8 silent-drop, council be8de574)
 const GrammarVerdictsPage = ({ state }: { state: PipelineState }) => {
@@ -4397,6 +4571,9 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §10 Sources and References — distributor URLs + manufacturer + standards + datasheets */}
       <SourcesReferencesPage state={safe} />
 
+      {/* §10b Regulatory and Compliance Posture — Piece 1H LLM prose, one page per standard */}
+      <RegulatoryProsePage state={safe} />
+
       {/* §11 Engineering Calculations (Appendix E early-summary) — Pareto, markup, mass, electrical, thermal, lead-time */}
       <EngineeringCalculationsPage state={safe} />
 
@@ -4424,7 +4601,10 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
       {/* §12 Investability — placeholder page (Tristan 2026-05-12). Coming soon. */}
       <InvestabilityPlaceholderPage state={safe} />
 
-      {/* §13 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
+      {/* §13 Risk Register prose — Piece 1I LLM prose, one page per FMEA risk */}
+      <FmeaRiskProsePage state={safe} />
+
+      {/* §14 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
       <GrammarVerdictsPage state={safe} />
 
       {/* §14 Technical Appendix A/B/C/D — full BOM table, tree dump, grammar defs, glossary */}
