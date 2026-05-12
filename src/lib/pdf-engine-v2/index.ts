@@ -1182,37 +1182,9 @@ export async function runPipeline(
             }
           }
 
-          // Piece 1H (2026-05-12) — LLM-augmented regulatory standard-by-standard prose.
-          // Generates four prose blocks per standard (applicability, engineering_impact,
-          // evidence_required, gap_action) from regulatoryExtraction. Non-fatal:
-          // renderer falls back to placeholder text if this fails.
-          if (state.regulatoryExtraction && state.parsedBrief) {
-            try {
-              const { generateRegulatoryProseLayer } = await import('./radical/regulatory-prose-llm')
-              const startedAt = Date.now()
-              const prose = await generateRegulatoryProseLayer(state.regulatoryExtraction, productClassForRadical)
-              state.regulatoryProse = prose
-              console.log(`[pipeline] Piece 1H: regulatory prose generated for ${prose.standard_count} standards (${Date.now() - startedAt}ms)`)
-            } catch (regErr) {
-              console.warn(`[pipeline] Piece 1H regulatory prose failed (non-fatal): ${(regErr as Error).message}`)
-            }
-          }
-
-          // Piece 1I (2026-05-12) — LLM-augmented FMEA risk prose.
-          // Generates four prose blocks per risk (hazard, root_cause, mitigation, detection)
-          // from state.fmea (RiskRow[]). Top 20 by S×O descending. Non-fatal:
-          // renderer falls back to placeholder text if this fails.
-          if ((state as any).fmea && ((state as any).fmea as unknown[]).length > 0 && state.parsedBrief) {
-            try {
-              const { generateFmeaRiskProseLayer } = await import('./radical/fmea-risk-llm')
-              const startedAt = Date.now()
-              const prose = await generateFmeaRiskProseLayer((state as any).fmea, productClassForRadical)
-              state.fmeaRiskProse = prose
-              console.log(`[pipeline] Piece 1I: FMEA risk prose generated for ${prose.risk_count} risks (${Date.now() - startedAt}ms)`)
-            } catch (fmeaErr) {
-              console.warn(`[pipeline] Piece 1I FMEA risk prose failed (non-fatal): ${(fmeaErr as Error).message}`)
-            }
-          }
+          // NOTE: Piece 1H + 1I previously lived here but were no-ops — state.regulatoryExtraction
+          // and state.fmea aren't populated until PA Stage 4 / Stage 6b which run much later.
+          // Moved to fire right after those stages complete (search "Piece 1H" / "Piece 1I").
 
           // Per-module Stage 2
           const perModuleResult = await runDecomposeRadicalPerModule(
@@ -1763,6 +1735,27 @@ export async function runPipeline(
         `[pipeline] PA Regulatory Extraction complete: ${regulatoryResult.data.regulatory_entries.length} entries. ` +
         `All source_grade=C, verification_status=UNVERIFIED. Dual-wrote to state.research.designBrief.regulatory.`
       )
+
+      // Piece 1H (2026-05-12, re-wired 2026-05-13) — LLM-augmented regulatory
+      // standard-by-standard prose. Generates four prose blocks per standard
+      // (applicability, engineering_impact, evidence_required, gap_action).
+      // Must run AFTER state.regulatoryExtraction is populated above; previously
+      // sat in the radical-pipeline block where regulatoryExtraction was always
+      // undefined and the guard silently skipped.
+      if (state.parsedBrief) {
+        try {
+          const { generateRegulatoryProseLayer } = await import('./radical/regulatory-prose-llm')
+          const productClassForProse: string = typeof classification === 'string'
+            ? classification
+            : (classification?.productClass ?? 'unknown')
+          const startedAt = Date.now()
+          const prose = await generateRegulatoryProseLayer(regulatoryResult.data, productClassForProse)
+          state.regulatoryProse = prose
+          console.log(`[pipeline] Piece 1H: regulatory prose generated for ${prose.standard_count} standards (${Date.now() - startedAt}ms)`)
+        } catch (regErr) {
+          console.warn(`[pipeline] Piece 1H regulatory prose failed (non-fatal): ${(regErr as Error).message}`)
+        }
+      }
     } else {
       // Non-fatal: log warning and continue. Review will proceed without regulatory context.
       console.warn(
@@ -1817,6 +1810,26 @@ export async function runPipeline(
         source: 'llm',
         detail: 'Gemini 3.1 Pro — domain-specific FMEA with S/O/D/RPN columns',
       })
+
+      // Piece 1I (2026-05-12, re-wired 2026-05-13) — LLM-augmented FMEA risk
+      // prose. Generates four prose blocks per risk (hazard, root_cause,
+      // mitigation, detection). Must run AFTER state.fmea is populated above;
+      // previously sat in the radical-pipeline block where state.fmea was
+      // always undefined and the guard silently skipped.
+      if (state.parsedBrief) {
+        try {
+          const { generateFmeaRiskProseLayer } = await import('./radical/fmea-risk-llm')
+          const productClassForProse: string = typeof classification === 'string'
+            ? classification
+            : (classification?.productClass ?? 'unknown')
+          const startedAt = Date.now()
+          const prose = await generateFmeaRiskProseLayer(fmeaResult.data, productClassForProse)
+          state.fmeaRiskProse = prose
+          console.log(`[pipeline] Piece 1I: FMEA risk prose generated for ${prose.risk_count} risks (${Date.now() - startedAt}ms)`)
+        } catch (fmeaErr) {
+          console.warn(`[pipeline] Piece 1I FMEA risk prose failed (non-fatal): ${(fmeaErr as Error).message}`)
+        }
+      }
     } else {
       console.warn(`[pipeline] FMEA Generation returned insufficient rows — renderer will fall back to module riskMatrix.`)
     }
