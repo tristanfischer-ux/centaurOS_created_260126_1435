@@ -28,6 +28,7 @@ import type {
   ModifyingCharacter,
   ModuleSpec,
   SubModuleSpec,
+  WordSpec,
 } from '../types/module-decomposition'
 import { MODULE_LABELS } from '../types/module-decomposition'
 
@@ -220,7 +221,7 @@ export function modifierStripInline(modifiers: ReadonlyArray<ModifyingCharacter>
 
 export interface SubmoduleSentenceOptions {
   /**
-   * 'compact'  — "The cell string consists of 3,920 LFP prismatic cells (qty ×3920, cap 280 Ah)."
+   * 'compact'  — "The cell string consists of LFP prismatic cell (qty ×3920, cap 280 Ah) and cell-to-cell busbar (qty ×3808)."
    * 'verbose'  — additionally appends the topology clause if present.
    * Defaults to 'verbose'.
    */
@@ -228,15 +229,42 @@ export interface SubmoduleSentenceOptions {
 }
 
 /**
+ * Render the English clause for a single WordSpec:
+ *   "{content_character.name_human} ({modifier_strip})"
+ *
+ * Returns just the name when there are no modifiers.
+ */
+function renderWordClause(word: WordSpec): string {
+  const charName = word.content_character?.name_human
+    || humaniseId(word.content_character?.character_id ?? word.id)
+  const strip = modifierStripInline(word.modifier_characters ?? [])
+  return strip ? `${charName} (${strip})` : charName
+}
+
+/**
+ * Render the RAD-notation clause for a single WordSpec:
+ *   "{character_id} ⊕ modifier1 ⊕ modifier2 ..."
+ *
+ * Modifiers use the trace-compact form (value+unit, no kind prefix).
+ */
+function renderWordRadClause(word: WordSpec): string {
+  const charId = word.content_character?.character_id || word.id
+  const modTokens = (word.modifier_characters ?? []).map(m =>
+    m.unit ? `${m.value}${m.unit}` : m.value,
+  )
+  return [charId, ...modTokens].join(` ${GRAMMAR_OPERATORS.WITHIN_WORD} `)
+}
+
+/**
  * Generate a single English sentence describing a sub-module.
  *
- * Template:
- *   "The {sub_module_name_human} {role_verb} {primary_character_name_human}
- *    ({modifier_strip}) {topology_clause}."
+ * Iterates over sub_module.words[] and joins them:
+ *   EN  : "The {sub_module_name} {role_verb} {word1_clause}, {word2_clause}, ... {topology_clause}."
+ *   Joins multiple words with ", " (or " and " for the last pair when exactly 2 words).
  *
- * Capitalisation: sentence-initial only. The article "The" is added on
- * unconditionally — sub-module names in this layer are always definite
- * references within the parent ModuleSpec.
+ * Fallbacks:
+ *   - Empty words[] → "The {sub_module_name} {role_verb} (uncategorised)."
+ *   - word.content_character.name_human absent → humaniseId(character_id)
  */
 export function generateSubmoduleSentence(
   subModule: SubModuleSpec,
@@ -245,16 +273,25 @@ export function generateSubmoduleSentence(
   const style = options?.style ?? 'verbose'
   const subject = subModule.name_human || humaniseId(subModule.id)
   const verb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
-  const primary = subModule.primary_character_name_human
-    || humaniseId(subModule.primary_character_id)
-  const strip = modifierStripInline(subModule.modifiers)
-  const stripWrapped = strip ? ` (${strip})` : ''
+  const words = subModule.words ?? []
   const topology = (style === 'verbose' && subModule.topology_clause)
     ? ` ${subModule.topology_clause.trim()}`
     : ''
-  // Pluralisation: rely on the LLM-provided primary_character_name_human to
-  // already be in its natural plural/singular form (qty modifier signals quantity).
-  const sentence = `The ${subject} ${verb} ${primary}${stripWrapped}${topology}`
+
+  let wordPart: string
+  if (words.length === 0) {
+    wordPart = '(uncategorised)'
+  } else if (words.length === 1) {
+    wordPart = renderWordClause(words[0])
+  } else if (words.length === 2) {
+    wordPart = `${renderWordClause(words[0])} and ${renderWordClause(words[1])}`
+  } else {
+    const allButLast = words.slice(0, -1).map(renderWordClause).join(', ')
+    const last = renderWordClause(words[words.length - 1])
+    wordPart = `${allButLast}, and ${last}`
+  }
+
+  const sentence = `The ${subject} ${verb} ${wordPart}${topology}`
   return ensureTerminalPunctuation(sentence)
 }
 
@@ -371,17 +408,19 @@ function renderLinkProse(moduleSpec: ModuleSpec, links: ReadonlyArray<GrammarLin
 /**
  * Render the engineering-grammar trace for a ModuleSpec.
  *
- * Format (per-sub-module clause):
- *   primary_id ⊕ modifier_value ⊕ modifier_value ↔[mechanism] other_id ...
+ * Format (per-sub-module clause): all words within the sub-module joined by ⊕,
+ * sub-module clauses joined with link operators.
+ *
+ *   word1_id ⊕ mod1 ⊕ mod2 ⊕ word2_id ⊕ mod1 ↔[mechanism] other_sub_id ...
  *
  * Modifiers are joined with `⊕` (within-word combine). Sub-module clauses
  * are joined with the link operators (`↔` for mutual, `→` for directional)
  * tagged with the mechanism in square brackets. Disconnected sub-modules
  * are joined with ` + ` (AND).
  *
- * Example (BESS energy_storage):
- *   lfp_prismatic_cell ⊕ ×3920 ⊕ 280Ah ⊕ prismatic ↔[mechanical mount]
- *   rack_structure ↔[PCB mounting] bms_slave →[CAN bus] bms_master
+ * Example (BESS energy_storage, cell_string sub-module):
+ *   lfp_prismatic_cell ⊕ ×3920 ⊕ 280Ah ⊕ prismatic ⊕ 35s×112 ⊕ 3.2V ⊕ 6000cyc ⊕ IEC 62619 ⊕
+ *   cell_to_cell_busbar ⊕ ×3808 ⊕ 350A
  *
  * Returns an empty string when the ModuleSpec has no sub-modules.
  */
@@ -390,12 +429,33 @@ export function generateGrammarTrace(moduleSpec: ModuleSpec): string {
   if (subs.length === 0) return ''
   const links = moduleSpec.grammar_links ?? []
 
-  // Pre-render each sub-module's "primary ⊕ modifiers" clause keyed by id.
+  // Pre-render each sub-module's clause from its words[]. Each word renders as
+  // "char_id ⊕ mod1 ⊕ mod2"; words within a sub-module are joined by ⊕ as well.
+  //
+  // Coding-council 1B 2026-05-12 P3 fix: the ⊕ operator is overloaded — it joins
+  // both (a) content character + modifier characters WITHIN a word AND (b) words
+  // WITHIN a sub-module. Without disambiguation the trace `char_a ⊕ m1 ⊕ m2 ⊕
+  // char_b ⊕ m3` is ambiguous between two-word sub-module {a:(m1,m2), b:(m3)}
+  // and one-word sub-module {a:(m1,m2,b,m3)}. Brackets per-word clauses for
+  // multi-word sub-modules so the Iter-5 parser (and human readers) can recover
+  // the structure unambiguously. Single-word sub-modules render without brackets
+  // since there is no ambiguity.
   const subClauseById = new Map<string, string>()
   for (const sub of subs) {
-    const primary = sub.primary_character_id || humaniseId(sub.id)
-    const modifierTokens = sub.modifiers.map(m => modifierTokenForTrace(m))
-    const clause = [primary, ...modifierTokens].join(` ${GRAMMAR_OPERATORS.WITHIN_WORD} `)
+    const words = sub.words ?? []
+    if (words.length === 0) {
+      subClauseById.set(sub.id, humaniseId(sub.id))
+      continue
+    }
+    const wordClauses = words.map(w => renderWordRadClause(w))
+    let clause: string
+    if (wordClauses.length === 1) {
+      clause = wordClauses[0]
+    } else {
+      // Multi-word: bracket each word so within-word ⊕ stays distinguishable from
+      // between-word ⊕. Format: `[char ⊕ m1 ⊕ m2] ⊕ [char_b ⊕ m3]`.
+      clause = wordClauses.map(w => `[${w}]`).join(` ${GRAMMAR_OPERATORS.WITHIN_WORD} `)
+    }
     subClauseById.set(sub.id, clause)
   }
 
@@ -433,18 +493,7 @@ export function generateGrammarTrace(moduleSpec: ModuleSpec): string {
   return segments.join(' ').replace(/\s+/g, ' ').trim()
 }
 
-/**
- * Trace-format render of a single modifier (no kind prefix — the operator
- * `⊕` already signals the relationship).
- *
- *   { kind:'quantity', value:'×3920' }              → '×3920'
- *   { kind:'capacity', value:'280', unit:'Ah' }     → '280Ah'
- *   { kind:'form',     value:'prismatic' }          → 'prismatic'
- */
-function modifierTokenForTrace(modifier: ModifyingCharacter): string {
-  if (modifier.unit) return `${modifier.value}${modifier.unit}`
-  return modifier.value
-}
+// (modifierTokenForTrace removed in Piece 1B.1 — logic inlined into renderWordRadClause)
 
 // ---------------------------------------------------------------------------
 // Internal helpers
@@ -462,4 +511,4 @@ function ensureTerminalPunctuation(s: string): string {
 // Re-exports for ergonomic call sites
 // ---------------------------------------------------------------------------
 
-export type { GrammarLink, GrammarMechanism, ModifyingCharacter, ModuleSpec, SubModuleSpec }
+export type { GrammarLink, GrammarMechanism, ModifyingCharacter, ModuleSpec, SubModuleSpec, WordSpec }

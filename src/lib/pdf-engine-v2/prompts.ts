@@ -654,7 +654,18 @@ export const RENDERING_RULES = {
 
 export const MODULE_DECOMPOSITION_TAXONOMY_PROMPT = `You are decomposing a hardware product into a fixed set of 12 universal engineering modules. Your output is a JSON object naming which of the 12 modules apply to THIS product, with a 2-3 sentence module_brief for each, derived parameters, the subset of the 22 universal radicals appropriate for this module, plus a fully-specified sub_modules array and grammar_links array for every module.
 
-You MUST output ONLY valid JSON — no preamble, no markdown fences, no commentary.
+CRITICAL OUTPUT FORMAT: Your ENTIRE response MUST be a single JSON object. Your first character MUST be an opening brace. Your last character MUST be a closing brace.
+
+DO NOT begin with phrases like "Decomposing the BESS", "Let me analyze", "Let me carefully review", "I'll evaluate", "Here is my decomposition", "**Decomposing", or any other preamble. DO NOT wrap the JSON in markdown code fences. DO NOT add commentary after the JSON. DO NOT use markdown bold (asterisks) or any other formatting outside the JSON. ALL reasoning and analysis MUST live inside the JSON (in module_brief or rationale_excluded fields).
+
+Bad response (DO NOT do this):
+  **Decomposing the BESS**
+  { "product_class": "energy_storage", ... }
+
+Good response (DO this):
+  { "product_class": "energy_storage", "modules": [ ... ] }
+
+Output ONLY the JSON object. Nothing before. Nothing after.
 
 A module MAY be marked as PRIMARY for a component AND SECONDARY for another universal function it also serves (e.g. a pump is primary actuation_kinematics and secondary mass_fluid_transport_process; a solar panel is primary energy_conversion_transduction and secondary structure_containment). Use the secondary_modules array on a ModuleSpec to express this dual-classification — do NOT force a single choice when both apply.
 
@@ -710,21 +721,57 @@ mass_fluid_transport_process: pressure_vessel_function, fluid_flow_state, copper
 
 hmi_ergonomics: silicon_semiconductor_function, polymer_thermoplastic, optical_sensing_function, mechanical_kinetic_function, digital_logic_function, thermal_transfer_function
 
+=== THE 22 CONTENT RADICALS (canonical alphabet for ContentCharacter) ===
+
+FUNCTION RADICALS (12) — engineering verbs; placed in TL/TR of a content character:
+  electrical_conducting_function, silicon_semiconductor_function, magnetic_coupling_function,
+  photovoltaic_energy_function, electrochemical_energy_function, thermal_transfer_function,
+  electric_heater_element, chemical_sensing_function, bioprocess_chemistry_function,
+  acoustic_wave_function, electromechanical_switching_function, pressure_vessel_function
+
+MATERIAL RADICALS (10) — engineering nouns; placed in BL/BR of a content character:
+  steel, copper, aluminium, composite_fibre_material, polymer_thermoplastic,
+  elastomer, ceramic, lithium_iron_phosphate_chemistry, fluid_flow_state, solid_state_of_matter
+
+Each content character uses 1–2 radicals per dimension (TL/TR for function, BL/BR for material).
+AT LEAST ONE of function_radical_primary OR material_radical_primary MUST be non-null.
+TR (function_radical_secondary) and BR (material_radical_secondary) are usually null.
+
+Examples:
+  lfp_prismatic_cell:   TL=electrochemical_energy_function, BL=lithium_iron_phosphate_chemistry
+  module_steel_frame:   TL=null,                            BL=steel           (pure-material)
+  bms_slave_pcb:        TL=silicon_semiconductor_function,  TR=electrical_conducting_function, BL=polymer_thermoplastic
+  ntc_thermistor:       TL=thermal_transfer_function,       BL=ceramic
+  cell_to_cell_busbar:  TL=electrical_conducting_function,  BL=copper
+
 === SUB-MODULES AND GRAMMAR LINKS ===
 
 Every ModuleSpec MUST include:
   - "sub_modules": array of 3–8 SubModuleSpec objects describing the component groups within this module.
   - "grammar_links": array of GrammarLink objects describing intra-module couplings (may be empty [] only for single-sub-module modules, and only with explicit justification in module_brief).
 
-SubModuleSpec schema:
+SubModuleSpec schema (Piece 1B.1 — each sub-module carries 1-N WORDS; 1-3 typical):
 {
   "id": "<snake_case identifier, unique within this module — e.g. 'cell_string', 'bms_master'>",
   "name_human": "<human-readable name — e.g. 'cell string', 'BMS master'>",
-  "primary_character_id": "<snake_case ID of the leaf-level character — e.g. 'lfp_prismatic_cell'>",
-  "primary_character_name_human": "<human-readable character name — e.g. 'LFP prismatic cell'>",
-  "modifiers": [<ModifyingCharacter objects — see below>],
+  "words": [<WordSpec objects — see below; 1-N per sub-module>],
   "role_verb": "<verb describing what this sub-module does in the parent — e.g. 'consists of', 'monitors', 'distributes', 'supervises'>",
   "topology_clause": "<optional secondary clause — e.g. 'wired in 112 modules of 35-cells in series'>"
+}
+
+WordSpec schema (one content character + 0-N modifier characters):
+{
+  "id": "<snake_case word id, unique within the parent sub-module — e.g. 'cell_string_word', 'interconnect_word'>",
+  "name_human": "<human-readable word label — e.g. 'cell string word', 'interconnect word'>",
+  "content_character": {
+    "character_id": "<snake_case stable ID — e.g. 'lfp_prismatic_cell', 'cell_to_cell_busbar'>",
+    "name_human": "<human-readable character name — e.g. 'LFP prismatic cell', 'cell-to-cell busbar'>",
+    "function_radical_primary": "<one of the 12 function radicals above, or null>",
+    "function_radical_secondary": "<function radical or null — usually null>",
+    "material_radical_primary": "<one of the 10 material radicals above, or null>",
+    "material_radical_secondary": "<material radical or null — usually null>"
+  },
+  "modifier_characters": [<ModifyingCharacter objects — see below>]
 }
 
 ModifyingCharacter schema:
@@ -778,7 +825,8 @@ The array may be empty ([]) only if the product genuinely has no identifiable in
 
 === WORKED EXAMPLE — BESS energy_storage_source ===
 
-This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure for ALL modules in your output.
+This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Each sub-module has 1-3 WORDS.
+Notice each word has a content_character (with radicals) + modifier_characters.
 
 {
   "module": "energy_storage_source",
@@ -790,16 +838,44 @@ This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure
     {
       "id": "cell_string",
       "name_human": "cell string",
-      "primary_character_id": "lfp_prismatic_cell",
-      "primary_character_name_human": "LFP prismatic cell",
-      "modifiers": [
-        { "kind": "quantity", "value": "×3920" },
-        { "kind": "capacity", "value": "280", "unit": "Ah" },
-        { "kind": "form", "value": "prismatic" },
-        { "kind": "topology", "value": "35s×112" },
-        { "kind": "dimension", "value": "3.2", "unit": "V" },
-        { "kind": "lifecycle", "value": "6000 cyc" },
-        { "kind": "regulatory", "value": "IEC 62619" }
+      "words": [
+        {
+          "id": "cell_string_word",
+          "name_human": "cell string word",
+          "content_character": {
+            "character_id": "lfp_prismatic_cell",
+            "name_human": "LFP prismatic cell",
+            "function_radical_primary": "electrochemical_energy_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "lithium_iron_phosphate_chemistry",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×3920" },
+            { "kind": "capacity", "value": "280", "unit": "Ah" },
+            { "kind": "form", "value": "prismatic" },
+            { "kind": "topology", "value": "35s×112" },
+            { "kind": "dimension", "value": "3.2", "unit": "V" },
+            { "kind": "lifecycle", "value": "6000 cyc" },
+            { "kind": "regulatory", "value": "IEC 62619" }
+          ]
+        },
+        {
+          "id": "interconnect_word",
+          "name_human": "interconnect word",
+          "content_character": {
+            "character_id": "cell_to_cell_busbar",
+            "name_human": "cell-to-cell busbar",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×3808" },
+            { "kind": "dimension", "value": "350", "unit": "A" }
+          ]
+        }
       ],
       "role_verb": "consists of",
       "topology_clause": "wired in 112 modules of 35 cells in series"
@@ -807,11 +883,39 @@ This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure
     {
       "id": "rack_structure",
       "name_human": "rack structure",
-      "primary_character_id": "steel_rack_frame",
-      "primary_character_name_human": "steel rack frame",
-      "modifiers": [
-        { "kind": "quantity", "value": "×8" },
-        { "kind": "form", "value": "19-inch rack" }
+      "words": [
+        {
+          "id": "rack_frame_word",
+          "name_human": "rack frame word",
+          "content_character": {
+            "character_id": "module_steel_frame",
+            "name_human": "steel rack frame",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "steel",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×8" },
+            { "kind": "form", "value": "welded" }
+          ]
+        },
+        {
+          "id": "compression_word",
+          "name_human": "compression word",
+          "content_character": {
+            "character_id": "compression_plate",
+            "name_human": "compression plate",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "steel",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×8" },
+            { "kind": "dimension", "value": "3.5", "unit": "kN" }
+          ]
+        }
       ],
       "role_verb": "mounts",
       "topology_clause": "8 racks per container"
@@ -819,10 +923,42 @@ This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure
     {
       "id": "bms_slave",
       "name_human": "BMS slave board",
-      "primary_character_id": "bms_slave_pcb",
-      "primary_character_name_human": "BMS slave PCB",
-      "modifiers": [
-        { "kind": "quantity", "value": "×112" }
+      "words": [
+        {
+          "id": "bms_slave_word",
+          "name_human": "BMS slave word",
+          "content_character": {
+            "character_id": "bms_slave_pcb",
+            "name_human": "BMS slave PCB",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": "electrical_conducting_function",
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×112" },
+            { "kind": "capacity", "value": "14", "unit": "ch" },
+            { "kind": "topology", "value": "CAN daisy" },
+            { "kind": "tolerance", "value": "±5", "unit": "mV" },
+            { "kind": "envelope", "value": "-40→+85", "unit": "°C" }
+          ]
+        },
+        {
+          "id": "cell_temperature_word",
+          "name_human": "cell temperature word",
+          "content_character": {
+            "character_id": "ntc_thermistor",
+            "name_human": "NTC thermistor",
+            "function_radical_primary": "thermal_transfer_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "ceramic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×896" },
+            { "kind": "tolerance", "value": "±0.5", "unit": "°C" }
+          ]
+        }
       ],
       "role_verb": "monitors",
       "topology_clause": "one per module, daisy-chained on CAN"
@@ -830,32 +966,120 @@ This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure
     {
       "id": "bms_master",
       "name_human": "BMS master controller",
-      "primary_character_id": "bms_master_controller",
-      "primary_character_name_human": "BMS master controller",
-      "modifiers": [
-        { "kind": "quantity", "value": "×1" },
-        { "kind": "regulatory", "value": "IEC 62619" }
+      "words": [
+        {
+          "id": "bms_master_word",
+          "name_human": "BMS master controller word",
+          "content_character": {
+            "character_id": "bms_master_pcb",
+            "name_human": "BMS master PCB",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": "electrical_conducting_function",
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "1500", "unit": "V iso" },
+            { "kind": "regulatory", "value": "IEC 62619" }
+          ]
+        },
+        {
+          "id": "can_transceiver_word",
+          "name_human": "CAN transceiver word",
+          "content_character": {
+            "character_id": "can_transceiver",
+            "name_human": "CAN transceiver",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×2" },
+            { "kind": "dimension", "value": "500", "unit": "kbit" },
+            { "kind": "topology", "value": "redundant pair" }
+          ]
+        }
       ],
       "role_verb": "supervises"
     },
     {
       "id": "dc_distribution",
-      "name_human": "DC distribution assembly",
-      "primary_character_id": "dc_busbar_assembly",
-      "primary_character_name_human": "DC busbar assembly",
-      "modifiers": [
-        { "kind": "dimension", "value": "1500", "unit": "V" },
-        { "kind": "performance", "value": "1", "unit": "MW" }
+      "name_human": "DC distribution",
+      "words": [
+        {
+          "id": "pack_dc_busbar_word",
+          "name_human": "pack DC busbar word",
+          "content_character": {
+            "character_id": "pack_dc_busbar",
+            "name_human": "pack DC busbar",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×2" },
+            { "kind": "dimension", "value": "350", "unit": "A continuous" }
+          ]
+        },
+        {
+          "id": "main_dc_contactor_word",
+          "name_human": "main DC contactor word",
+          "content_character": {
+            "character_id": "main_dc_contactor",
+            "name_human": "main DC contactor",
+            "function_radical_primary": "electromechanical_switching_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "300", "unit": "A" }
+          ]
+        }
       ],
       "role_verb": "distributes"
     },
     {
       "id": "pack_instrumentation",
       "name_human": "pack instrumentation",
-      "primary_character_id": "current_voltage_sensor",
-      "primary_character_name_human": "current/voltage sensor",
-      "modifiers": [
-        { "kind": "tolerance", "value": "±0.5%" }
+      "words": [
+        {
+          "id": "current_shunt_word",
+          "name_human": "current shunt word",
+          "content_character": {
+            "character_id": "current_shunt",
+            "name_human": "current shunt",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "1500", "unit": "A" },
+            { "kind": "tolerance", "value": "±0.1", "unit": "% FS" }
+          ]
+        },
+        {
+          "id": "insulation_monitor_word",
+          "name_human": "insulation monitor word",
+          "content_character": {
+            "character_id": "insulation_monitor",
+            "name_human": "insulation monitor",
+            "function_radical_primary": "chemical_sensing_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "regulatory", "value": "IEC 61557-8" }
+          ]
+        }
       ],
       "role_verb": "measures"
     }
@@ -864,7 +1088,8 @@ This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure
     { "from_sub_module": "cell_string", "to_sub_module": "rack_structure", "mechanism": "mechanical_mount", "type": "mutual" },
     { "from_sub_module": "bms_slave", "to_sub_module": "bms_master", "mechanism": "can_bus", "type": "mutual", "detail": "redundant pair" },
     { "from_sub_module": "bms_master", "to_sub_module": "dc_distribution", "mechanism": "contactor_command", "type": "directional" },
-    { "from_sub_module": "cell_string", "to_sub_module": "dc_distribution", "mechanism": "dc_busbar", "type": "mutual", "detail": "1500 V DC" },
+    { "from_sub_module": "cell_string", "to_sub_module": "dc_distribution", "mechanism": "dc_busbar", "type": "mutual", "detail": "800 V DC node" },
+    { "from_sub_module": "cell_string", "to_sub_module": "bms_slave", "mechanism": "voltage_taps", "type": "mutual", "detail": "35 channels per slave" },
     { "from_sub_module": "bms_slave", "to_sub_module": "pack_instrumentation", "mechanism": "sensor_feedback", "type": "directional" }
   ]
 }
@@ -885,9 +1110,21 @@ This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure
         {
           "id": "<snake_case, unique within this module>",
           "name_human": "<human-readable name>",
-          "primary_character_id": "<snake_case character ID>",
-          "primary_character_name_human": "<human-readable character name>",
-          "modifiers": [{ "kind": "<ModifierKind>", "value": "<token>", "unit": "<optional>" }],
+          "words": [
+            {
+              "id": "<snake_case word id, unique within this sub-module>",
+              "name_human": "<human-readable word name>",
+              "content_character": {
+                "character_id": "<snake_case character ID>",
+                "name_human": "<human-readable character name>",
+                "function_radical_primary": "<ContentRadical id or null>",
+                "function_radical_secondary": "<ContentRadical id or null>",
+                "material_radical_primary": "<ContentRadical id or null>",
+                "material_radical_secondary": "<ContentRadical id or null>"
+              },
+              "modifier_characters": [{ "kind": "<ModifierKind>", "value": "<token>", "unit": "<optional>" }]
+            }
+          ],
           "role_verb": "<verb>",
           "topology_clause": "<optional>"
         }
@@ -925,8 +1162,13 @@ This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure
 - secondary_modules entries MUST also be drawn from the 12 module keys.
 - derived_parameters: numeric values MUST be finite and non-negative. String values MUST be a single short phrase, not prose.
 - rationale_excluded MUST contain a one-line "why N/A" for EVERY module listed in excluded_modules.
-- Every ModuleSpec MUST include sub_modules with 1–8 entries (3–8 strongly preferred). A 1- or 2-sub-module module is permitted only with an explicit justification in module_brief explaining why the module cannot be meaningfully decomposed further; the validator will accept the count with a warning rather than reject it.
+- **Every ModuleSpec MUST include 3–6 sub_modules.** The worked-example BESS energy_storage_source module has 6 sub_modules (cell_string, rack_structure, bms_slave, bms_master, dc_distribution, pack_instrumentation) — this is the typical depth, NOT a maximum. Real products decompose into multiple distinct functional subsystems; emitting only 1 sub_module per module is almost always WRONG and means you have not done the decomposition work the brief requires. 1–2 sub_modules is permitted only as a last resort with explicit justification in module_brief explaining why the module cannot be decomposed further (e.g. a tiny CGM patch where one sub-module genuinely captures the whole module).
 - Every sub_module id MUST be unique within its parent ModuleSpec.
+- **Every sub_module MUST have 2–4 words (WordSpec entries).** The worked-example cell_string sub_module has 2 words: cell_string_word (lfp_prismatic_cell content character + 7 modifier characters) and interconnect_word (cell_to_cell_busbar content character + 2 modifier characters). A sub_module containing only 1 word is almost always under-decomposed — most sub-modules contain a primary character PLUS supporting characters (busbars, harnesses, hardware sets, sensors). 1 word is permitted only when the sub_module is genuinely mono-component. Each WordSpec MUST have a unique id within its parent sub_module and a content_character with a non-empty character_id.
+- **Every sub_module SHOULD declare grammar_links to other sub_modules in the same ModuleSpec where physical/electrical/control/thermal coupling exists.** The worked-example energy_storage_source has 5 intra-module grammar_links (cell_string↔rack_structure via mechanical_mount; bms_slave↔bms_master via can_bus; bms_master→dc_distribution via contactor_command; cell_string↔dc_distribution via dc_busbar; bms_slave→pack_instrumentation via sensor_feedback). If your sub_module decomposition has ZERO grammar_links, you have probably under-decomposed (separate sub-modules that don't connect to anything is rarely realistic).
+- **cross_module_grammar_links should typically have 5–10 entries for a multi-module product.** The worked-example BESS has 7 (cooling_loop, dc_busbar, ac_busbar, modbus_tcp, safety_isolation, sensor_feedback, etc.). Modules that DO connect across module boundaries (the BMS reads sensors, the PCS reads the EMS, the safety system trips the contactor) MUST have entries. Fewer than 3 cross_module_grammar_links on a complex hardware product is almost always wrong.
+- Every content_character MUST have at least one non-null radical: either function_radical_primary OR material_radical_primary (or both). A character where BOTH are null is invalid.
+- All radical values MUST be drawn from the 22 canonical content radical IDs listed above. Do NOT invent new radical IDs; use the closest canonical match.
 - Every GrammarLink's from_sub_module and to_sub_module MUST reference IDs that appear in the same ModuleSpec's sub_modules array.
 - Every GrammarLink mechanism and every cross_module_grammar_link mechanism MUST be one of the 26 canonical values listed above — no others.
 - cross_module_grammar_links from_module and to_module MUST reference UniversalModule keys that appear in modules[] (not in excluded_modules).
@@ -960,6 +1202,12 @@ Then give your overall verdict.
 
 === OUTPUT SCHEMA (return EXACTLY this JSON shape, no markdown) ===
 
+Your ENTIRE response MUST be a single JSON object. Your first character MUST be an opening brace. Your last character MUST be a closing brace.
+
+DO NOT begin with phrases like "Let me analyze", "Let me carefully review", "I'll evaluate", "Here is my review", or any other preamble. DO NOT wrap the JSON in markdown code fences. DO NOT add commentary after the JSON. DO NOT explain your reasoning outside the JSON — put all reasoning inside the "notes" array.
+
+Required shape:
+
 {
   "verdict": "OK" | "NEEDS_MINOR" | "NEEDS_MAJOR",
   "coverage_ok": true | false,
@@ -968,7 +1216,14 @@ Then give your overall verdict.
   "notes": ["<short specific issue or recommendation>", ...]
 }
 
-Output ONLY the JSON object — no preamble, no markdown fences, no commentary.`
+Bad response (DO NOT do this):
+  Let me analyze this module catalog...
+  { "verdict": "OK", ... }
+
+Good response (DO this):
+  { "verdict": "OK", "coverage_ok": true, "no_spurious_modules": true, "parameters_plausible": true, "notes": ["clean catalog, BMS master and slaves match brief"] }
+
+Output ONLY the JSON object. Nothing before. Nothing after.`
 
 export const PER_MODULE_LEAF_PROMPT = `You are a systems engineer identifying the LEAF COMPONENTS of a SINGLE module within a hardware product.
 
@@ -988,6 +1243,7 @@ Respond with ONLY a JSON array of objects:
     "character_id": string,         // MUST be from the per-module character library OR "<UNKNOWN>"
     "archetype_id": string|null,
     "sub_module_id": string,        // MUST reference one of the sub_modules ids listed in [Sub-modules] below
+    "word_id": string|null,         // optional — set to the matching word's id when this leaf IS a sub-module's content character; null for supporting leaves
     "multiplicity": integer,        // count of this component type in this module (>= 1)
     "mpn_hint": string|null,
     "manufacturer_hint": string|null,
@@ -999,7 +1255,7 @@ Respond with ONLY a JSON array of objects:
 
 === SUB-MODULE TAGGING RULES ===
 - Every leaf MUST carry a sub_module_id. The value MUST be EITHER one of the sub_modules ids declared in the [Sub-modules] context block of the user message, OR the exact sentinel string "<UNCATEGORISED>" (verbatim — capital letters, angle brackets, no spaces, no synonyms like "uncategorised", "UNKNOWN", "n/a", or any case variant).
-- Each sub-module declares a primary_character_id; the leaf for that primary character MUST set sub_module_id to that sub-module's id.
+- Each sub-module declares one or more words, each with a content_character.character_id. The leaf for any such character MUST set sub_module_id to that sub-module's id. Optionally also set word_id to the matching word's id for finer-grained tagging (when the leaf IS the primary character of a specific word). Supporting characters that belong to the sub-module but are NOT one of the content characters may set word_id to null.
 - Supporting characters (busbars, harnesses, hardware sets, insulation pads, etc.) attach to the sub-module they physically belong to — e.g. a cell-to-cell busbar belongs to the cell_string sub-module, NOT to rack_structure.
 - If a leaf genuinely spans multiple sub-modules, pick the sub-module it is physically mounted on (mechanical primacy) and note the secondary attachment in description.
 - If you genuinely cannot map a leaf to any of the declared sub-modules, set sub_module_id to "<UNCATEGORISED>" — exactly that string. This is a signal that the parent module's sub-module catalogue is incomplete (downstream will surface this as a Stage 1.5 quality warning). Do NOT invent a new sub_module id.
@@ -1007,7 +1263,7 @@ Respond with ONLY a JSON array of objects:
 === QUANTITY RULES ===
 - multiplicity is the count of this SPECIFIC component type within THIS module of a SINGLE unit of the product.
 - Derive from the module's derived_parameters where possible (e.g. capacity_kwh, rated_thermal_kw, dish_diameter_m).
-- For sub-modules whose primary character has a quantity modifier (e.g. cell_string primary lfp_prismatic_cell qty ×3920), the leaf's multiplicity MUST match that modifier's value.
+- For sub-modules whose content character has a quantity modifier (e.g. cell_string word lfp_prismatic_cell qty ×3920), the leaf's multiplicity MUST match that modifier's value.
 - Show calculation in description for non-trivial counts.
 
 === CONSTRAINTS ===
@@ -1020,7 +1276,7 @@ Respond with ONLY a JSON array of objects:
 The user message will give you:
 [Module brief] — what THIS module does on THIS product
 [Derived parameters] — quantitative inputs
-[Sub-modules] — the sub-modules declared for THIS module by Stage 1.5 (id, name_human, primary_character_id, role_verb). Every leaf MUST be tagged with one of these ids via sub_module_id.
+[Sub-modules] — the sub-modules declared for THIS module by Stage 1.5 (id, name_human, words[]{id, content_character.character_id}, role_verb). Every leaf MUST be tagged with one of these sub_module ids via sub_module_id. Optionally set word_id to the matching word id for leaves that directly represent a content character.
 [Allowed character_ids] — narrow library subset; you may ONLY use these IDs (or "<UNKNOWN>")
 [Allowed radicals] — narrow radical subset
 [Product context] — short context about the whole product`

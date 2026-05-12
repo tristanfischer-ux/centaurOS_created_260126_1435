@@ -36,8 +36,8 @@ describe("Radical seed library", () => {
     expect(library.catalogueEntries.size).toBe(2)
   })
 
-  it("loads 6 grammar rules", () => {
-    expect(ALL_GRAMMAR_RULES).toHaveLength(6)
+  it("loads 11 grammar rules", () => {
+    expect(ALL_GRAMMAR_RULES).toHaveLength(11)
   })
 })
 

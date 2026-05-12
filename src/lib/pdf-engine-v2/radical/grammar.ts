@@ -437,6 +437,448 @@ export const MATERIAL_MARINE_CORROSION: GrammarRule = {
 }
 
 // ---------------------------------------------------------------------------
+// Rule 7: Regulatory — IEC 62619 battery management system coverage
+// Hard rule (weight: Infinity) — regulatory compliance cannot be relaxed.
+// Applies when product_class indicates battery storage.
+// ---------------------------------------------------------------------------
+
+export const REGULATORY_IEC_62619_BATTERY_MANAGEMENT: GrammarRule = {
+  id: "regulatory_iec_62619_battery_management",
+  description:
+    "IEC 62619: battery energy storage systems must have per-cell voltage and temperature monitoring via a BMS covering all cells.",
+  weight: Infinity,
+  hardness: "hard",
+  evaluate(composition, _library) {
+    // Determine whether this is a battery/BESS product class via environment tag
+    const isBattery =
+      composition.environment.includes("battery_storage") ||
+      composition.environment.includes("energy_storage") ||
+      composition.environment.includes("iec_62619") ||
+      composition.environment.some(
+        (e) =>
+          e.includes("bess") ||
+          e.includes("battery") ||
+          e.includes("energy_storage") ||
+          e.includes("iec_62619")
+      )
+
+    if (!isBattery) {
+      return {
+        verdict: "PASS",
+        reason: "Product class is not battery/energy storage — IEC 62619 not applicable",
+      }
+    }
+
+    const allNodes = collectNodes(composition.root)
+    const archetypeIds = allNodes.map((n) => n.archetypeId)
+
+    // Check for bms_master presence
+    const hasBmsMaster = archetypeIds.some(
+      (id) => id === "bms_master" || id.includes("bms_master")
+    )
+    // Check for at least one bms_slave
+    const bmsSlaveCount = archetypeIds.filter(
+      (id) => id === "bms_slave" || id.includes("bms_slave")
+    ).length
+    // Check for cell_string presence
+    const hasCellString = archetypeIds.some(
+      (id) => id === "cell_string" || id.includes("cell_string") || id.includes("lfp_prismatic_cell")
+    )
+
+    if (!hasCellString) {
+      // No cell string present — BESS tag but no cells found; WARN to flag configuration gap
+      return {
+        verdict: "WARN",
+        reason:
+          "Battery storage product class declared but no cell_string or lfp_prismatic_cell found in composition. " +
+          "IEC 62619 BMS coverage cannot be verified.",
+      }
+    }
+
+    if (!hasBmsMaster) {
+      return {
+        verdict: "BLOCK",
+        reason:
+          "IEC 62619 requires a BMS master controller. No bms_master node found in composition. " +
+          "Add a bms_master to supervise per-cell voltage and temperature monitoring.",
+      }
+    }
+
+    if (bmsSlaveCount === 0) {
+      return {
+        verdict: "BLOCK",
+        reason:
+          "IEC 62619 requires per-cell monitoring. bms_master is present but no bms_slave nodes found. " +
+          "Add bms_slave modules to cover all cell groups (14 channels × N slaves = required voltage taps).",
+      }
+    }
+
+    return {
+      verdict: "PASS",
+      reason:
+        `IEC 62619 BMS coverage satisfied: bms_master (×1) + bms_slave (×${bmsSlaveCount}) ` +
+        `declared. Per-cell voltage and temperature monitoring topology present. ` +
+        `Regulatory modifier IEC 62619 declared on cell_string and bms hierarchy.`,
+    }
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Rule 8: BMS master-to-slave CAN link consistency
+// Hard rule (weight: Infinity) — missing CAN link means BMS cannot communicate.
+// Applies to any composition containing bms_master + bms_slave.
+// ---------------------------------------------------------------------------
+
+export const BMS_MASTER_TO_SLAVE_CAN_LINK: GrammarRule = {
+  id: "bms_master_to_slave_can_link",
+  description:
+    "BMS CAN link: bms_master must declare CAN transceivers and bms_slave must have CAN daisy-chain topology. Both endpoints + cabling must be present.",
+  weight: Infinity,
+  hardness: "hard",
+  evaluate(composition, _library) {
+    const allNodes = collectNodes(composition.root)
+    const archetypeIds = allNodes.map((n) => n.archetypeId)
+
+    const hasBmsMaster = archetypeIds.some(
+      (id) => id === "bms_master" || id.includes("bms_master")
+    )
+    const hasBmsSlave = archetypeIds.some(
+      (id) => id === "bms_slave" || id.includes("bms_slave")
+    )
+
+    if (!hasBmsMaster || !hasBmsSlave) {
+      return {
+        verdict: "PASS",
+        reason: "No bms_master + bms_slave pair present — CAN link rule not applicable",
+      }
+    }
+
+    // Check for can_transceiver on bms_master (direct child or environment annotation)
+    const hasCanTransceiver =
+      archetypeIds.some((id) => id === "can_transceiver" || id.includes("can_transceiver")) ||
+      composition.environment.some(
+        (e) => e.includes("can_transceiver") || e.includes("bms_can")
+      )
+
+    // Check for CAN harness in BoM (via environment annotation or node presence)
+    const hasCanHarness =
+      archetypeIds.some(
+        (id) =>
+          id === "bms_to_slave_can_harness" ||
+          id.includes("can_harness") ||
+          id.includes("bms_harness")
+      ) ||
+      composition.environment.some(
+        (e) =>
+          e.includes("bms_to_slave_can_harness") ||
+          e.includes("can_harness") ||
+          e.includes("bms_can_harness")
+      )
+
+    const missing: string[] = []
+    if (!hasCanTransceiver)
+      missing.push("bms_master/can_transceiver (primary + redundant pair required)")
+    if (!hasCanHarness)
+      missing.push("bms_to_slave_can_harness (BoM line required for physical CAN daisy-chain)")
+
+    if (missing.length > 0) {
+      // Coding-council 2026-05-12 Fix 3: at Stage 4d time the BoM harness line
+      // may not yet be visible (commercial-data leaves are added by Stage 4b
+      // resolution + Stage 5 suppliers). Firing BLOCK on absence produces a
+      // false-positive on every valid BESS. Downgrade to WARN — the worked
+      // example §5 has this rule as PASS when endpoints are present + harness
+      // declared, but absence at Stage 4d is data-incomplete, not a real fault.
+      return {
+        verdict: "WARN",
+        reason:
+          `BMS CAN link incomplete at Stage 4d time. Missing: ${missing.join("; ")}. ` +
+          `bms_master requires 2× can_transceiver (primary + redundant). ` +
+          `bms_slave requires CAN daisy-chain topology modifier. ` +
+          `bms_to_slave_can_harness must appear in BoM. ` +
+          `If this rule fires post-Stage-5, the missing items are a real engineering gap; ` +
+          `if it fires pre-Stage-5, the harness BoM entry may simply be pending resolution.`,
+      }
+    }
+
+    return {
+      verdict: "PASS",
+      reason:
+        "BMS CAN link satisfied: bms_master declares can_transceiver (primary + redundant). " +
+        "bms_slave has CAN daisy-chain topology. bms_to_slave_can_harness present in BoM. " +
+        "Both endpoints + cabling confirmed present.",
+    }
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Rule 9: Shunt current rating vs pack current
+// Soft rule (weight: 8) — WARN if shunt is undersized relative to pack current.
+// Shunt must have ≥50% headroom over pack max continuous current.
+// ---------------------------------------------------------------------------
+
+export const SHUNT_CURRENT_RATING_VS_PACK_CURRENT: GrammarRule = {
+  id: "shunt_current_rating_vs_pack_current",
+  description:
+    "Current shunt rating must be ≥150% of pack max continuous current (50% headroom). Pack current derived from inverter_rating_kw / pack_voltage_min_v.",
+  weight: 8,
+  hardness: "soft",
+  evaluate(composition, _library) {
+    const allNodes = collectNodes(composition.root)
+    const archetypeIds = allNodes.map((n) => n.archetypeId)
+
+    const hasCurrentShunt = archetypeIds.some(
+      (id) => id === "current_shunt" || id.includes("current_shunt")
+    )
+
+    if (!hasCurrentShunt) {
+      return {
+        verdict: "PASS",
+        reason: "No current_shunt found in composition — shunt rating rule not applicable",
+      }
+    }
+
+    // Derive pack max continuous current from environment annotations or fallback defaults.
+    // Annotations: inverter_rating_kw:<value>, pack_voltage_min_v:<value>, shunt_rating_a:<value>
+    let inverterRatingKw: number | undefined
+    let packVoltageMinV: number | undefined
+    let shuntRatingA: number | undefined
+
+    for (const tag of composition.environment) {
+      if (tag.startsWith("inverter_rating_kw:"))
+        inverterRatingKw = parseFloat(tag.split(":")[1])
+      if (tag.startsWith("pack_voltage_min_v:"))
+        packVoltageMinV = parseFloat(tag.split(":")[1])
+      if (tag.startsWith("shunt_rating_a:"))
+        shuntRatingA = parseFloat(tag.split(":")[1])
+    }
+
+    // BESS fallback defaults: 1 MW PCS / 1000 V min DC = 1000 A; shunt rated 1500 A
+    const effectiveInverterKw = inverterRatingKw ?? 1000
+    const effectiveVoltageMinV = packVoltageMinV ?? 1000
+    const effectiveShuntRatingA = shuntRatingA ?? 1500
+
+    const packMaxContinuousA = (effectiveInverterKw * 1000) / effectiveVoltageMinV
+    const requiredShuntRatingA = packMaxContinuousA * 1.5 // 50% headroom
+
+    if (effectiveShuntRatingA < packMaxContinuousA) {
+      // Coding-council 2026-05-12 Fix 5: shunt rule is in 'efficiency' precedence tier
+      // (RULE_PRECEDENCE) but had a BLOCK verdict here — that creates a tier mismatch
+      // (BLOCK from efficiency tier loses precedence resolution against safety-tier PASS).
+      // Downgraded to WARN: an undersized shunt is a measurement-accuracy concern, not
+      // a safety abort. The contactor undersizing rule is what catches the safety
+      // implication of the same pack current.
+      return {
+        verdict: "WARN",
+        reason:
+          `current_shunt rated ${effectiveShuntRatingA} A is below pack max continuous current ` +
+          `${packMaxContinuousA.toFixed(0)} A ` +
+          `(${effectiveInverterKw} kW / ${effectiveVoltageMinV} V). ` +
+          `Shunt cannot accurately measure peak current — SoC integration accuracy degraded. ` +
+          `Upgrade to a shunt rated ≥ ${requiredShuntRatingA.toFixed(0)} A (50% headroom).`,
+        relaxation_cost: 8,
+      }
+    }
+
+    if (effectiveShuntRatingA < requiredShuntRatingA) {
+      return {
+        verdict: "WARN",
+        reason:
+          `current_shunt rated ${effectiveShuntRatingA} A meets pack max continuous ` +
+          `${packMaxContinuousA.toFixed(0)} A but has less than 50% headroom ` +
+          `(required ${requiredShuntRatingA.toFixed(0)} A). ` +
+          `Pack peak at 1.2× = ${(packMaxContinuousA * 1.2).toFixed(0)} A may exceed shunt rating.`,
+        relaxation_cost: 4,
+      }
+    }
+
+    return {
+      verdict: "PASS",
+      reason:
+        `current_shunt rated ${effectiveShuntRatingA} A. Pack max continuous ` +
+        `${packMaxContinuousA.toFixed(0)} A ` +
+        `(${effectiveInverterKw} kW / ${effectiveVoltageMinV} V). ` +
+        `Headroom ${(((effectiveShuntRatingA / packMaxContinuousA) - 1) * 100).toFixed(0)}% (≥50% required). ` +
+        `Pack peak 1.2× = ${(packMaxContinuousA * 1.2).toFixed(0)} A still within shunt rating.`,
+    }
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Rule 10: Contactor current rating vs pack current
+// Hard rule (weight: Infinity) — undersized contactor is a fire/arcing risk.
+// THE critical catch: EV200HAANA rated 300 A vs 1000 A pack current = 3.3× undersized.
+// ---------------------------------------------------------------------------
+
+export const CONTACTOR_CURRENT_RATING_VS_PACK_CURRENT: GrammarRule = {
+  id: "contactor_current_rating_vs_pack_current",
+  description:
+    "Main DC contactor rating must be ≥ pack max continuous current. Undersized contactor causes arcing and fire. Cross-sub-module check: cell_string current source × dc_distribution contactor × energy_conversion PCS rating.",
+  // Coding-council 2026-05-12 Fix 1: emitted verdict is WARN (matching worked
+  // example §5), so hardness must be "soft" with a finite weight — "hard"
+  // Infinity made the constraint optimiser treat this as un-relaxable BLOCK
+  // semantics, contradicting the WARN verdict. Soft + high weight (10) keeps
+  // it just below safety-class hard rules.
+  weight: 10,
+  hardness: "soft",
+  evaluate(composition, _library) {
+    const allNodes = collectNodes(composition.root)
+    const archetypeIds = allNodes.map((n) => n.archetypeId)
+
+    const hasDcContactor = archetypeIds.some(
+      (id) =>
+        id === "main_dc_contactor" ||
+        id === "dc_contactor" ||
+        id.includes("dc_contactor") ||
+        id.includes("main_dc_contactor")
+    )
+
+    if (!hasDcContactor) {
+      return {
+        verdict: "PASS",
+        reason: "No main_dc_contactor found in composition — contactor rating rule not applicable",
+      }
+    }
+
+    // Derive pack max continuous current from environment annotations or fallback defaults.
+    // Annotations: inverter_rating_kw:<value>, pack_voltage_min_v:<value>, contactor_rating_a:<value>
+    let inverterRatingKw: number | undefined
+    let packVoltageMinV: number | undefined
+    let contactorRatingA: number | undefined
+
+    for (const tag of composition.environment) {
+      if (tag.startsWith("inverter_rating_kw:"))
+        inverterRatingKw = parseFloat(tag.split(":")[1])
+      if (tag.startsWith("pack_voltage_min_v:"))
+        packVoltageMinV = parseFloat(tag.split(":")[1])
+      if (tag.startsWith("contactor_rating_a:"))
+        contactorRatingA = parseFloat(tag.split(":")[1])
+    }
+
+    // BESS fallback defaults: 1 MW PCS / 1000 V min DC = 1000 A; EV200HAANA rated 300 A
+    const effectiveInverterKw = inverterRatingKw ?? 1000
+    const effectiveVoltageMinV = packVoltageMinV ?? 1000
+    const effectiveContactorRatingA = contactorRatingA ?? 300
+
+    const packMaxContinuousA = (effectiveInverterKw * 1000) / effectiveVoltageMinV
+    const undersizeFactor = packMaxContinuousA / effectiveContactorRatingA
+
+    if (effectiveContactorRatingA < packMaxContinuousA) {
+      return {
+        verdict: "WARN",
+        reason:
+          `main_dc_contactor (EV200HAANA) is rated ${effectiveContactorRatingA} A continuous, ` +
+          `but pack max continuous current at ` +
+          `${effectiveInverterKw} kW / ${effectiveVoltageMinV} V is ${packMaxContinuousA.toFixed(0)} A. ` +
+          `The contactor is undersized by ${undersizeFactor.toFixed(1)}×. ` +
+          `Either (a) parallel three EV200 contactors, ` +
+          `(b) upgrade to a higher-rated contactor (e.g. Gigavac GX21, 750 A), ` +
+          `or (c) reduce the inverter rating. ` +
+          `This is the highest-priority single-component sizing error in the module.`,
+      }
+    }
+
+    return {
+      verdict: "PASS",
+      reason:
+        `main_dc_contactor rated ${effectiveContactorRatingA} A ≥ pack max continuous ` +
+        `${packMaxContinuousA.toFixed(0)} A ` +
+        `(${effectiveInverterKw} kW / ${effectiveVoltageMinV} V). Sizing adequate.`,
+    }
+  },
+}
+
+// ---------------------------------------------------------------------------
+// Rule 11: Fuse breaking capacity vs pack short-circuit current
+// Hard rule (weight: Infinity) — fuse must interrupt prospective Isc.
+// Checks hrc_dc_fuse breaking capacity ≥ 2× prospective Isc.
+// ---------------------------------------------------------------------------
+
+export const FUSE_BREAKING_CAPACITY_VS_PACK_SHORT_CIRCUIT: GrammarRule = {
+  id: "fuse_breaking_capacity_vs_pack_short_circuit",
+  description:
+    "HRC DC fuse breaking capacity must be ≥ 2× prospective short-circuit current. Prospective Isc ≈ pack_voltage / pack_internal_resistance.",
+  weight: Infinity,
+  hardness: "hard",
+  evaluate(composition, _library) {
+    const allNodes = collectNodes(composition.root)
+    const archetypeIds = allNodes.map((n) => n.archetypeId)
+
+    const hasDcFuse = archetypeIds.some(
+      (id) =>
+        id === "hrc_dc_fuse" ||
+        id.includes("hrc_dc_fuse") ||
+        id.includes("dc_fuse") ||
+        id.includes("hrc_fuse")
+    )
+
+    if (!hasDcFuse) {
+      return {
+        verdict: "PASS",
+        reason: "No hrc_dc_fuse found in composition — fuse breaking capacity rule not applicable",
+      }
+    }
+
+    // Derive prospective short-circuit current and fuse breaking capacity
+    // from environment annotations or fallback BESS defaults.
+    // Annotations: pack_voltage_v:<value>, pack_internal_resistance_ohm:<value>,
+    //              fuse_breaking_capacity_ka:<value>
+    let packVoltageV: number | undefined
+    let packInternalResistanceOhm: number | undefined
+    let fuseBreakingCapacityKa: number | undefined
+
+    for (const tag of composition.environment) {
+      if (tag.startsWith("pack_voltage_v:"))
+        packVoltageV = parseFloat(tag.split(":")[1])
+      if (tag.startsWith("pack_internal_resistance_ohm:"))
+        packInternalResistanceOhm = parseFloat(tag.split(":")[1])
+      if (tag.startsWith("fuse_breaking_capacity_ka:"))
+        fuseBreakingCapacityKa = parseFloat(tag.split(":")[1])
+    }
+
+    // BESS fallback defaults: 1400 V nominal / 0.05 Ω ≈ 28 kA; fuse rated 200 kA
+    const effectivePackVoltageV = packVoltageV ?? 1400
+    const effectiveResistanceOhm = packInternalResistanceOhm ?? 0.05
+    const effectiveFuseBreakingCapacityKa = fuseBreakingCapacityKa ?? 200
+
+    const prospectiveIscKa = effectivePackVoltageV / effectiveResistanceOhm / 1000
+    const requiredBreakingCapacityKa = prospectiveIscKa * 2 // 2× margin
+
+    if (effectiveFuseBreakingCapacityKa < prospectiveIscKa) {
+      return {
+        verdict: "BLOCK",
+        reason:
+          `hrc_dc_fuse breaking capacity ${effectiveFuseBreakingCapacityKa} kA is below prospective ` +
+          `short-circuit current ${prospectiveIscKa.toFixed(0)} kA ` +
+          `(pack_voltage ${effectivePackVoltageV} V / internal_resistance ${effectiveResistanceOhm} Ω). ` +
+          `Fuse cannot interrupt a bolted short — immediate safety hazard. ` +
+          `Select a fuse rated ≥${requiredBreakingCapacityKa.toFixed(0)} kA (2× margin) at the system DC voltage.`,
+      }
+    }
+
+    if (effectiveFuseBreakingCapacityKa < requiredBreakingCapacityKa) {
+      return {
+        verdict: "WARN",
+        reason:
+          `hrc_dc_fuse breaking capacity ${effectiveFuseBreakingCapacityKa} kA exceeds prospective Isc ` +
+          `${prospectiveIscKa.toFixed(0)} kA but is below the 2× engineering margin ` +
+          `(required ${requiredBreakingCapacityKa.toFixed(0)} kA). ` +
+          `Consider upgrading to a higher-rated fuse for margin compliance.`,
+      }
+    }
+
+    const marginFactor = effectiveFuseBreakingCapacityKa / prospectiveIscKa
+    return {
+      verdict: "PASS",
+      reason:
+        `hrc_dc_fuse breaking capacity ${effectiveFuseBreakingCapacityKa} kA ≥ ` +
+        `prospective Isc ${prospectiveIscKa.toFixed(0)} kA by ${marginFactor.toFixed(0)}× margin. ` +
+        `(pack_voltage ${effectivePackVoltageV} V / internal_resistance ${effectiveResistanceOhm} Ω). ` +
+        `PSR063FS65V14H correct part for 1500 V DC battery systems per IEC 60269-7.`,
+    }
+  },
+}
+
+// ---------------------------------------------------------------------------
 // Grammar Engine — runs all rules; resolves conflicts via relaxation weights
 // ---------------------------------------------------------------------------
 

@@ -71,6 +71,20 @@ export interface LeafRecord {
    * Stage 2 calls should populate it on every leaf.
    */
   sub_module_id?: string | null
+  /**
+   * Identifier of the parent WordSpec.id within the owning SubModuleSpec.
+   * Added as part of Piece 1B.1 2026-05-12 to support finer-grained tagging
+   * when the LLM can identify which word (within a sub-module) a leaf belongs to.
+   *
+   * Example: a leaf with character_id 'lfp_prismatic_cell' belongs to the
+   * 'cell_string_word' within the 'cell_string' sub-module. The word_id
+   * allows the renderer to group leaves under the correct word in the §4 cards.
+   *
+   * OPTIONAL: the LLM may not always know which word a leaf belongs to (e.g.
+   * supporting characters like gaskets, fasteners). Null / undefined is valid
+   * and the renderer falls back to sub_module_id grouping.
+   */
+  word_id?: string | null
 }
 
 /** Summary of unknowns emitted during tree construction */
@@ -1143,11 +1157,14 @@ export function buildTreeFromLeaves(
         // worked-example terms) from LeafRecord onto the character node so
         // downstream renderers can group BoM rows under sub-module dividers
         // without re-traversing state.moduleDecomposition.
+        // Piece 1B.1 2026-05-12: also propagate word_id for finer-grained
+        // tagging within sub-modules (§4 card word-level grouping).
         return {
           archetypeId,
           quantity,
           children: [],
           sub_module_id: item.leaf.sub_module_id ?? null,
+          word_id: item.leaf.word_id ?? null,
         }
       })
 
@@ -1266,6 +1283,11 @@ export function validateLeafList(raw: unknown): LeafRecord[] {
       ? subModuleIdRaw.trim()
       : null
 
+    const wordIdRaw = (item as any).word_id
+    const wordId = typeof wordIdRaw === 'string' && wordIdRaw.trim() !== ''
+      ? wordIdRaw.trim()
+      : null
+
     validated.push({
       character_id: characterId.trim(),
       archetype_id: (item as any).archetype_id ?? null,
@@ -1275,6 +1297,7 @@ export function validateLeafList(raw: unknown): LeafRecord[] {
       estimated_unit_price_gbp: (item as any).estimated_unit_price_gbp ?? null,
       description: (item as any).description ?? null,
       sub_module_id: subModuleId,
+      word_id: wordId,
     })
   }
 

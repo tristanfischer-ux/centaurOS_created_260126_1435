@@ -1283,7 +1283,10 @@ async function runOneModuleDecomposition(
     ? moduleSpec.sub_modules.map(sm => {
         const verb = sm.role_verb ?? 'comprises'
         const topology = sm.topology_clause ? ` — ${sm.topology_clause}` : ''
-        return `  - id="${sm.id}", name="${sm.name_human}", primary_character_id="${sm.primary_character_id}", role_verb="${verb}"${topology}`
+        const wordSummary = (sm.words ?? [])
+          .map(w => `word:${w.id}(char:${w.content_character?.character_id ?? '?'})`)
+          .join(', ')
+        return `  - id="${sm.id}", name="${sm.name_human}", words=[${wordSummary}], role_verb="${verb}"${topology}`
       }).join('\n')
     : `  (no sub-modules declared by Stage 1.5 — emit sub_module_id="<UNCATEGORISED>" for every leaf and flag this in the description so downstream surfaces the gap)`
 

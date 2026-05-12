@@ -2451,6 +2451,81 @@ const EngineeringCalculationsPage = ({ state }: { state: PipelineState }) => {
   )
 }
 
+// ---------------------------------------------------------------------------
+// Patents and Investability — PLACEHOLDER sections (Tristan 2026-05-12)
+// ---------------------------------------------------------------------------
+// Both sections render a "coming soon" placeholder. They exist so the final
+// PDF carries visible reminders that patentability and investor-readiness are
+// part of the canonical report shape, even though the engine doesn't yet
+// produce either analysis. When implementation lands (new Stage 6c/6d + data
+// inputs from moduleDecomposition + radicalCostSummary), the placeholder copy
+// gets replaced with the structured analysis output.
+
+const PatentsPlaceholderPage = ({ state }: { state: PipelineState }) => (
+  <Page size="A4" style={pageStyle}>
+    <DocPageHeader title={`${dash(state.projectId)} | Forge Engineering Report | Patents`} />
+    <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 6 }}>
+      Patents
+    </Text>
+    <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Oblique', color: BESS_AMBER, marginBottom: 18 }}>
+      Coming soon.
+    </Text>
+    <View style={{ borderLeftWidth: 3, borderLeftColor: BESS_TEAL, paddingLeft: 12, paddingVertical: 4, marginBottom: 14 }}>
+      <Text style={{ fontSize: 10.5, color: INK, lineHeight: 1.55 }}>
+        Future versions of this report will include a patentability assessment for the design
+        described in the modules and bill-of-materials sections above. The assessment will draw
+        on the module decomposition, sub-module structure, and cross-module grammar links to
+        identify potentially novel combinations of engineering characters that may be patentable.
+      </Text>
+    </View>
+    <Text style={{ fontSize: 10, color: INK, lineHeight: 1.55, marginBottom: 10 }}>
+      The intended output covers: <Text style={{ fontFamily: 'Helvetica-Bold' }}>novelty assessment</Text> (is this combination present in prior art?);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>candidate claims</Text> (independent + dependent claims drafted from the engine's grammar graph);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>prior-art hits</Text> (similar combinations in UK / EU / US patent databases);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>freedom-to-operate flags</Text> (third-party patents this design may infringe);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>subject-matter eligibility</Text> (jurisdiction-specific notes — UK / EU / US patentability differ);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>recommended actions</Text> (file a UK Patent Office provisional, full PCT route, defensive publication, or trade-secret-only).
+    </Text>
+    <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Oblique', color: MUTED, marginTop: 6 }}>
+      Output will be flagged as engineering opinion. Legal advice from a qualified patent attorney
+      should be sought before any filing decision.
+    </Text>
+    <DocPageFooter />
+  </Page>
+)
+
+const InvestabilityPlaceholderPage = ({ state }: { state: PipelineState }) => (
+  <Page size="A4" style={pageStyle}>
+    <DocPageHeader title={`${dash(state.projectId)} | Forge Engineering Report | Investability`} />
+    <Text style={{ fontSize: 18, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 6 }}>
+      Investability
+    </Text>
+    <Text style={{ fontSize: 11, fontFamily: 'Helvetica-Oblique', color: BESS_AMBER, marginBottom: 18 }}>
+      Coming soon.
+    </Text>
+    <View style={{ borderLeftWidth: 3, borderLeftColor: BESS_TEAL, paddingLeft: 12, paddingVertical: 4, marginBottom: 14 }}>
+      <Text style={{ fontSize: 10.5, color: INK, lineHeight: 1.55 }}>
+        Future versions of this report will include an investability assessment, surfacing the
+        financial-shape signals that early-stage hardware investors evaluate alongside the
+        engineering content of this report. The aim is to make the design legible to a fund
+        partner without further translation work.
+      </Text>
+    </View>
+    <Text style={{ fontSize: 10, color: INK, lineHeight: 1.55, marginBottom: 10 }}>
+      The intended output covers: <Text style={{ fontFamily: 'Helvetica-Bold' }}>cost-of-goods</Text> at target volume vs ASP;
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>capital-equipment requirements</Text> for a credible production line;
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>regulatory complexity</Text> (certifications, time-to-market);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>addressable-market sizing</Text> (top-down TAM/SAM and bottom-up reachable customers);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>competitive landscape</Text> (named comparables + the moat this design plausibly establishes);
+      {' '}<Text style={{ fontFamily: 'Helvetica-Bold' }}>directional verdict</Text> (investable / conditional / not-yet, with the specific gaps to close).
+    </Text>
+    <Text style={{ fontSize: 9.5, fontFamily: 'Helvetica-Oblique', color: MUTED, marginTop: 6 }}>
+      Output will be a directional engineering-economics read, not an investment recommendation.
+    </Text>
+    <DocPageFooter />
+  </Page>
+)
+
 const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
   const projectId = dash(state.projectId)
   const resolvedTree = state.resolvedRadicalTree
@@ -2800,10 +2875,16 @@ export default function PdfRendererV3Radical({ state }: { state: PipelineState }
         projectId={projectId}
       />
 
-      {/* §11 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
+      {/* §11 Patents — placeholder page (Tristan 2026-05-12). Coming soon. */}
+      <PatentsPlaceholderPage state={safe} />
+
+      {/* §12 Investability — placeholder page (Tristan 2026-05-12). Coming soon. */}
+      <InvestabilityPlaceholderPage state={safe} />
+
+      {/* §13 Design Rule Check detail page — always rendered; component shows placeholder when data absent */}
       <GrammarVerdictsPage state={safe} />
 
-      {/* §12 Technical Appendix A/B/C/D — full BOM table, tree dump, grammar defs, glossary */}
+      {/* §14 Technical Appendix A/B/C/D — full BOM table, tree dump, grammar defs, glossary */}
       <TechnicalAppendixPage state={safe} />
     </Document>
   )

@@ -17,6 +17,7 @@ import type {
   ModuleDecomposition,
   ModuleSpec,
   SubModuleSpec,
+  WordSpec,
 } from '../../types/module-decomposition'
 
 // ---------------------------------------------------------------------------
@@ -26,12 +27,24 @@ import type {
 const CELL_STRING: SubModuleSpec = {
   id: 'cell_string',
   name_human: 'cell string',
-  primary_character_id: 'lfp_prismatic_cell',
-  primary_character_name_human: 'LFP prismatic cells',
-  modifiers: [
-    { kind: 'quantity', value: '×3920' },
-    { kind: 'capacity', value: '280', unit: 'Ah' },
-    { kind: 'form',     value: 'prismatic' },
+  words: [
+    {
+      id: 'cell_string_word',
+      name_human: 'cell string word',
+      content_character: {
+        character_id: 'lfp_prismatic_cell',
+        name_human: 'LFP prismatic cells',
+        function_radical_primary: 'electrochemical_energy_function',
+        function_radical_secondary: null,
+        material_radical_primary: 'lithium_iron_phosphate_chemistry',
+        material_radical_secondary: null,
+      },
+      modifier_characters: [
+        { kind: 'quantity', value: '×3920' },
+        { kind: 'capacity', value: '280', unit: 'Ah' },
+        { kind: 'form',     value: 'prismatic' },
+      ],
+    },
   ],
   role_verb: 'consists of',
   topology_clause: 'wired in 112s',
@@ -40,11 +53,23 @@ const CELL_STRING: SubModuleSpec = {
 const BMS_MASTER: SubModuleSpec = {
   id: 'bms_master',
   name_human: 'BMS master',
-  primary_character_id: 'bms_master_pcb',
-  primary_character_name_human: 'BMS master PCB',
-  modifiers: [
-    { kind: 'quantity', value: '×2' },
-    { kind: 'topology', value: 'redundant pair' },
+  words: [
+    {
+      id: 'bms_master_word',
+      name_human: 'BMS master word',
+      content_character: {
+        character_id: 'bms_master_pcb',
+        name_human: 'BMS master PCB',
+        function_radical_primary: 'silicon_semiconductor_function',
+        function_radical_secondary: 'electrical_conducting_function',
+        material_radical_primary: 'polymer_thermoplastic',
+        material_radical_secondary: null,
+      },
+      modifier_characters: [
+        { kind: 'quantity', value: '×2' },
+        { kind: 'topology', value: 'redundant pair' },
+      ],
+    },
   ],
 }
 
@@ -67,6 +92,8 @@ const POWER_DISTRIBUTION: ModuleSpec = {
   derived_parameters: {},
   allowed_radicals: ['copper'],
   applicability_confidence: 'medium',
+  sub_modules: [],
+  grammar_links: [],
 }
 
 const DECOMP: ModuleDecomposition = {
@@ -75,6 +102,7 @@ const DECOMP: ModuleDecomposition = {
   modules: [ENERGY_STORAGE, POWER_DISTRIBUTION],
   excluded_modules: [],
   rationale_excluded: {},
+  cross_module_grammar_links: [],
   council_verdict: 'OK',
   council_seats: [],
   council_notes: [],
@@ -116,12 +144,14 @@ describe('getModuleDecomposition — type-safe state accessor', () => {
 // ---------------------------------------------------------------------------
 
 describe('buildSubModuleLookup', () => {
-  it('indexes sub-modules by both id and primary_character_id', () => {
+  it('indexes sub-modules by sub-module id, word id, and content_character.character_id', () => {
     const lookup = buildSubModuleLookup(DECOMP)
     expect(lookup.get('cell_string')).toBe(CELL_STRING)
-    expect(lookup.get('lfp_prismatic_cell')).toBe(CELL_STRING)
+    expect(lookup.get('lfp_prismatic_cell')).toBe(CELL_STRING)       // content_character.character_id
+    expect(lookup.get('cell_string_word')).toBe(CELL_STRING)          // word.id
     expect(lookup.get('bms_master')).toBe(BMS_MASTER)
-    expect(lookup.get('bms_master_pcb')).toBe(BMS_MASTER)
+    expect(lookup.get('bms_master_pcb')).toBe(BMS_MASTER)             // content_character.character_id
+    expect(lookup.get('bms_master_word')).toBe(BMS_MASTER)            // word.id
   })
 
   it('returns an empty map when decomposition is undefined', () => {
@@ -149,12 +179,16 @@ describe('buildSubModuleLookup', () => {
 describe('findSubModuleForLeaf', () => {
   const lookup = buildSubModuleLookup(DECOMP)
 
-  it('finds by primary_character_id (typical leaf archetypeId)', () => {
+  it('finds by content_character.character_id (typical leaf archetypeId)', () => {
     expect(findSubModuleForLeaf('lfp_prismatic_cell', lookup)).toBe(CELL_STRING)
   })
 
   it('finds by sub-module id (when archetypeId mirrors id)', () => {
     expect(findSubModuleForLeaf('cell_string', lookup)).toBe(CELL_STRING)
+  })
+
+  it('finds by word.id', () => {
+    expect(findSubModuleForLeaf('cell_string_word', lookup)).toBe(CELL_STRING)
   })
 
   it('returns undefined when no match', () => {
@@ -182,9 +216,21 @@ describe('renderInlineModifiersForLeaf', () => {
     const sub: SubModuleSpec = {
       id: 'plain_part',
       name_human: 'plain part',
-      primary_character_id: 'plain_part_id',
-      primary_character_name_human: 'plain part',
-      modifiers: [],
+      words: [
+        {
+          id: 'plain_word',
+          name_human: 'plain word',
+          content_character: {
+            character_id: 'plain_part_id',
+            name_human: 'plain part',
+            function_radical_primary: null,
+            function_radical_secondary: null,
+            material_radical_primary: 'solid_state_of_matter',
+            material_radical_secondary: null,
+          },
+          modifier_characters: [],
+        },
+      ],
     }
     const decomp: ModuleDecomposition = {
       ...DECOMP,
@@ -203,7 +249,9 @@ describe('renderInlineModifiersForLeaf', () => {
 
 describe('renderInlineModifiers — direct list passthrough', () => {
   it('matches modifierStripInline output', () => {
-    expect(renderInlineModifiers(CELL_STRING.modifiers))
+    // Use the first word's modifier_characters from CELL_STRING
+    const firstWordModifiers = CELL_STRING.words[0].modifier_characters
+    expect(renderInlineModifiers(firstWordModifiers))
       .toBe('qty ×3920, cap 280 Ah, prismatic')
   })
 })

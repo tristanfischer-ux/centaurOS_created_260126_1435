@@ -25,6 +25,7 @@ import type {
   ModifyingCharacter,
   ModuleSpec,
   SubModuleSpec,
+  WordSpec,
 } from '../../types/module-decomposition'
 
 // ---------------------------------------------------------------------------
@@ -150,20 +151,49 @@ describe('GRAMMAR_OPERATORS', () => {
 
 // ---------------------------------------------------------------------------
 // Worked-example fixture: BESS energy_storage_source — 6 sub-modules
+// Updated to Piece 1B.1 words[] shape (2026-05-12).
 // ---------------------------------------------------------------------------
 
 const BESS_SUB_MODULES: SubModuleSpec[] = [
   {
     id: 'cell_string',
     name_human: 'cell string',
-    primary_character_id: 'lfp_prismatic_cell',
-    primary_character_name_human: 'LFP prismatic cells',
-    modifiers: [
-      { kind: 'quantity',  value: '×3920' },
-      { kind: 'capacity',  value: '280', unit: 'Ah' },
-      { kind: 'form',      value: 'prismatic' },
-      { kind: 'lifecycle', value: '6000 cyc' },
-      { kind: 'regulatory', value: 'IEC 62619' },
+    words: [
+      {
+        id: 'cell_string_word',
+        name_human: 'cell string word',
+        content_character: {
+          character_id: 'lfp_prismatic_cell',
+          name_human: 'LFP prismatic cells',
+          function_radical_primary: 'electrochemical_energy_function',
+          function_radical_secondary: null,
+          material_radical_primary: 'lithium_iron_phosphate_chemistry',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',   value: '×3920' },
+          { kind: 'capacity',   value: '280', unit: 'Ah' },
+          { kind: 'form',       value: 'prismatic' },
+          { kind: 'lifecycle',  value: '6000 cyc' },
+          { kind: 'regulatory', value: 'IEC 62619' },
+        ],
+      },
+      {
+        id: 'interconnect_word',
+        name_human: 'interconnect word',
+        content_character: {
+          character_id: 'cell_to_cell_busbar',
+          name_human: 'cell-to-cell busbar',
+          function_radical_primary: 'electrical_conducting_function',
+          function_radical_secondary: null,
+          material_radical_primary: 'copper',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',  value: '×3808' },
+          { kind: 'dimension', value: '350', unit: 'A' },
+        ],
+      },
     ],
     role_verb: 'consists of',
     topology_clause: 'wired in 112 modules of 35-cells in series',
@@ -171,11 +201,39 @@ const BESS_SUB_MODULES: SubModuleSpec[] = [
   {
     id: 'rack_structure',
     name_human: 'rack structure',
-    primary_character_id: 'steel_rack_frame',
-    primary_character_name_human: 'steel rack frame',
-    modifiers: [
-      { kind: 'quantity', value: '×4' },
-      { kind: 'dimension', value: '2200×600×800', unit: 'mm' },
+    words: [
+      {
+        id: 'rack_frame_word',
+        name_human: 'rack frame word',
+        content_character: {
+          character_id: 'module_steel_frame',
+          name_human: 'steel rack frame',
+          function_radical_primary: null,
+          function_radical_secondary: null,
+          material_radical_primary: 'steel',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',   value: '×4' },
+          { kind: 'dimension',  value: '2200×600×800', unit: 'mm' },
+        ],
+      },
+      {
+        id: 'compression_word',
+        name_human: 'compression word',
+        content_character: {
+          character_id: 'compression_plate',
+          name_human: 'compression plate',
+          function_radical_primary: null,
+          function_radical_secondary: null,
+          material_radical_primary: 'steel',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',  value: '×4' },
+          { kind: 'dimension', value: '3.5', unit: 'kN' },
+        ],
+      },
     ],
     role_verb: 'mounts',
     topology_clause: 'with redundant pack-level seismic bracing',
@@ -183,11 +241,39 @@ const BESS_SUB_MODULES: SubModuleSpec[] = [
   {
     id: 'bms_slave',
     name_human: 'BMS slave',
-    primary_character_id: 'bms_slave_pcb',
-    primary_character_name_human: 'BMS slave PCB',
-    modifiers: [
-      { kind: 'quantity',  value: '×112' },
-      { kind: 'topology',  value: '1-per-module' },
+    words: [
+      {
+        id: 'bms_slave_word',
+        name_human: 'BMS slave word',
+        content_character: {
+          character_id: 'bms_slave_pcb',
+          name_human: 'BMS slave PCB',
+          function_radical_primary: 'silicon_semiconductor_function',
+          function_radical_secondary: 'electrical_conducting_function',
+          material_radical_primary: 'polymer_thermoplastic',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',  value: '×112' },
+          { kind: 'topology',  value: '1-per-module' },
+        ],
+      },
+      {
+        id: 'cell_temperature_word',
+        name_human: 'cell temperature word',
+        content_character: {
+          character_id: 'ntc_thermistor',
+          name_human: 'NTC thermistor',
+          function_radical_primary: 'thermal_transfer_function',
+          function_radical_secondary: null,
+          material_radical_primary: 'ceramic',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',  value: '×896' },
+          { kind: 'tolerance', value: '±0.5', unit: '°C' },
+        ],
+      },
     ],
     role_verb: 'monitors',
     topology_clause: 'reading 35 cell voltages and 5 module temperatures per board',
@@ -195,11 +281,23 @@ const BESS_SUB_MODULES: SubModuleSpec[] = [
   {
     id: 'bms_master',
     name_human: 'BMS master',
-    primary_character_id: 'bms_master_pcb',
-    primary_character_name_human: 'BMS master PCB',
-    modifiers: [
-      { kind: 'quantity', value: '×2' },
-      { kind: 'topology', value: 'redundant pair' },
+    words: [
+      {
+        id: 'bms_master_word',
+        name_human: 'BMS master word',
+        content_character: {
+          character_id: 'bms_master_pcb',
+          name_human: 'BMS master PCB',
+          function_radical_primary: 'silicon_semiconductor_function',
+          function_radical_secondary: 'electrical_conducting_function',
+          material_radical_primary: 'polymer_thermoplastic',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',  value: '×2' },
+          { kind: 'topology',  value: 'redundant pair' },
+        ],
+      },
     ],
     role_verb: 'supervises',
     topology_clause: 'aggregating slave telemetry over CAN and arbitrating contactor command',
@@ -207,12 +305,24 @@ const BESS_SUB_MODULES: SubModuleSpec[] = [
   {
     id: 'dc_disconnect',
     name_human: 'DC disconnect',
-    primary_character_id: 'dc_contactor',
-    primary_character_name_human: 'DC contactor',
-    modifiers: [
-      { kind: 'quantity',    value: '×2' },
-      { kind: 'performance', value: '1500 V DC' },
-      { kind: 'regulatory',  value: 'UL 508' },
+    words: [
+      {
+        id: 'dc_contactor_word',
+        name_human: 'DC contactor word',
+        content_character: {
+          character_id: 'dc_contactor',
+          name_human: 'DC contactor',
+          function_radical_primary: 'electromechanical_switching_function',
+          function_radical_secondary: null,
+          material_radical_primary: 'copper',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'quantity',    value: '×2' },
+          { kind: 'performance', value: '1500 V DC' },
+          { kind: 'regulatory',  value: 'UL 508' },
+        ],
+      },
     ],
     role_verb: 'isolates',
     topology_clause: 'on the pack +/- rails with pre-charge resistor and IMD interlock',
@@ -220,12 +330,24 @@ const BESS_SUB_MODULES: SubModuleSpec[] = [
   {
     id: 'thermal_loop',
     name_human: 'thermal loop',
-    primary_character_id: 'liquid_cooling_circuit',
-    primary_character_name_human: 'liquid cooling circuit',
-    modifiers: [
-      { kind: 'capacity',    value: '12', unit: 'kW' },
-      { kind: 'envelope',    value: '-20…+55', unit: '°C' },
-      { kind: 'performance', value: 'ΔT ≤ 5 K' },
+    words: [
+      {
+        id: 'cooling_circuit_word',
+        name_human: 'cooling circuit word',
+        content_character: {
+          character_id: 'liquid_cooling_circuit',
+          name_human: 'liquid cooling circuit',
+          function_radical_primary: 'thermal_transfer_function',
+          function_radical_secondary: null,
+          material_radical_primary: 'fluid_flow_state',
+          material_radical_secondary: null,
+        },
+        modifier_characters: [
+          { kind: 'capacity',    value: '12', unit: 'kW' },
+          { kind: 'envelope',    value: '-20…+55', unit: '°C' },
+          { kind: 'performance', value: 'ΔT ≤ 5 K' },
+        ],
+      },
     ],
     role_verb: 'cools',
     topology_clause: 'via cold-plate manifolds bonded to each module',
@@ -266,15 +388,15 @@ const BESS_MODULE: ModuleSpec = {
 // generateSubmoduleSentence — per-sub-module
 // ---------------------------------------------------------------------------
 
-describe('generateSubmoduleSentence — BESS worked example', () => {
-  it('renders the cell_string sub-module verbatim', () => {
+describe('generateSubmoduleSentence — BESS worked example (Piece 1B.1 words[] shape)', () => {
+  it('renders the cell_string sub-module with 2 words joined by "and"', () => {
     const out = generateSubmoduleSentence(BESS_SUB_MODULES[0])
     expect(out).toBe(
-      'The cell string consists of LFP prismatic cells (qty ×3920, cap 280 Ah, prismatic, life 6000 cyc, IEC 62619) wired in 112 modules of 35-cells in series.',
+      'The cell string consists of LFP prismatic cells (qty ×3920, cap 280 Ah, prismatic, life 6000 cyc, IEC 62619) and cell-to-cell busbar (qty ×3808, dim 350 A) wired in 112 modules of 35-cells in series.',
     )
   })
 
-  it('renders the bms_master sub-module', () => {
+  it('renders the bms_master sub-module (single word)', () => {
     const out = generateSubmoduleSentence(BESS_SUB_MODULES[3])
     expect(out).toBe(
       'The BMS master supervises BMS master PCB (qty ×2, redundant pair) aggregating slave telemetry over CAN and arbitrating contactor command.',
@@ -284,7 +406,7 @@ describe('generateSubmoduleSentence — BESS worked example', () => {
   it('compact style omits topology clause', () => {
     const out = generateSubmoduleSentence(BESS_SUB_MODULES[0], { style: 'compact' })
     expect(out).toBe(
-      'The cell string consists of LFP prismatic cells (qty ×3920, cap 280 Ah, prismatic, life 6000 cyc, IEC 62619).',
+      'The cell string consists of LFP prismatic cells (qty ×3920, cap 280 Ah, prismatic, life 6000 cyc, IEC 62619) and cell-to-cell busbar (qty ×3808, dim 350 A).',
     )
   })
 
@@ -292,11 +414,24 @@ describe('generateSubmoduleSentence — BESS worked example', () => {
     const sub: SubModuleSpec = {
       id: 'edge_inverter_pcb',
       name_human: '',
-      primary_character_id: 'igbt_module',
-      primary_character_name_human: '',
-      modifiers: [],
+      words: [
+        {
+          id: 'igbt_word',
+          name_human: '',
+          content_character: {
+            character_id: 'igbt_module',
+            name_human: '',
+            function_radical_primary: 'electromechanical_switching_function',
+            function_radical_secondary: null,
+            material_radical_primary: 'silicon_semiconductor_function',
+            material_radical_secondary: null,
+          },
+          modifier_characters: [],
+        },
+      ],
     }
     const out = generateSubmoduleSentence(sub)
+    // name_human is empty so humaniseId('igbt_module') → 'IGBT module'
     expect(out).toBe('The edge inverter PCB comprises IGBT module.')
   })
 
@@ -304,9 +439,21 @@ describe('generateSubmoduleSentence — BESS worked example', () => {
     const sub: SubModuleSpec = {
       id: 'mounting_bracket',
       name_human: 'mounting bracket',
-      primary_character_id: 'steel_bracket',
-      primary_character_name_human: 'steel bracket',
-      modifiers: [],
+      words: [
+        {
+          id: 'steel_bracket_word',
+          name_human: 'steel bracket word',
+          content_character: {
+            character_id: 'steel_bracket',
+            name_human: 'steel bracket',
+            function_radical_primary: null,
+            function_radical_secondary: null,
+            material_radical_primary: 'steel',
+            material_radical_secondary: null,
+          },
+          modifier_characters: [],
+        },
+      ],
     }
     expect(generateSubmoduleSentence(sub)).toBe('The mounting bracket comprises steel bracket.')
   })
@@ -323,6 +470,16 @@ describe('generateSubmoduleSentence — BESS worked example', () => {
     const a = generateSubmoduleSentence(BESS_SUB_MODULES[2])
     const b = generateSubmoduleSentence(BESS_SUB_MODULES[2])
     expect(a).toBe(b)
+  })
+
+  it('handles empty words[] gracefully', () => {
+    const sub: SubModuleSpec = {
+      id: 'empty_sub',
+      name_human: 'empty sub',
+      words: [],
+    }
+    const out = generateSubmoduleSentence(sub)
+    expect(out).toBe('The empty sub comprises (uncategorised).')
   })
 })
 
@@ -341,7 +498,8 @@ describe('generateModuleSentence — ModuleSpec summary', () => {
   })
 
   it('falls back to module_brief when no sub_modules declared', () => {
-    const m: ModuleSpec = { ...BESS_MODULE, sub_modules: undefined, grammar_links: undefined }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = { ...BESS_MODULE, sub_modules: undefined, grammar_links: undefined } as any as ModuleSpec
     const out = generateModuleSentence(m)
     expect(out).toContain('Stores 3.5 MWh')
   })
@@ -392,7 +550,7 @@ describe('generateModuleParagraph', () => {
 // generateGrammarTrace
 // ---------------------------------------------------------------------------
 
-describe('generateGrammarTrace — symbolic trace', () => {
+describe('generateGrammarTrace — symbolic trace (Piece 1B.1 words[] shape)', () => {
   it('uses ⊕ within sub-modules and link operators between them', () => {
     const trace = generateGrammarTrace(BESS_MODULE)
     expect(trace).toContain('⊕')
@@ -400,9 +558,15 @@ describe('generateGrammarTrace — symbolic trace', () => {
     expect(trace).toContain('→')
   })
 
-  it('renders the cell_string sub-module clause with all modifiers chained by ⊕', () => {
+  it('renders the cell_string sub-module clause with all words + modifiers chained by ⊕', () => {
     const trace = generateGrammarTrace(BESS_MODULE)
-    expect(trace).toMatch(/lfp_prismatic_cell ⊕ ×3920 ⊕ 280Ah ⊕ prismatic ⊕ 6000 cyc ⊕ IEC 62619/)
+    // cell_string has 2 words — both character_ids should appear in the trace
+    expect(trace).toContain('lfp_prismatic_cell')
+    expect(trace).toContain('×3920')
+    expect(trace).toContain('280Ah')
+    expect(trace).toContain('cell_to_cell_busbar')
+    expect(trace).toContain('×3808')
+    expect(trace).toContain('350A')
   })
 
   it('tags links with the canonical mechanism name in square brackets', () => {
@@ -416,7 +580,8 @@ describe('generateGrammarTrace — symbolic trace', () => {
   })
 
   it('returns empty string for ModuleSpec with no sub-modules', () => {
-    const m: ModuleSpec = { ...BESS_MODULE, sub_modules: undefined }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const m = { ...BESS_MODULE, sub_modules: undefined } as any as ModuleSpec
     expect(generateGrammarTrace(m)).toBe('')
   })
 
@@ -430,9 +595,21 @@ describe('generateGrammarTrace — symbolic trace', () => {
         {
           id: 'spare_module',
           name_human: 'spare module',
-          primary_character_id: 'spare_part',
-          primary_character_name_human: 'spare part',
-          modifiers: [],
+          words: [
+            {
+              id: 'spare_word',
+              name_human: 'spare word',
+              content_character: {
+                character_id: 'spare_part',
+                name_human: 'spare part',
+                function_radical_primary: null,
+                function_radical_secondary: null,
+                material_radical_primary: 'solid_state_of_matter',
+                material_radical_secondary: null,
+              },
+              modifier_characters: [],
+            },
+          ],
         },
       ],
       grammar_links: [

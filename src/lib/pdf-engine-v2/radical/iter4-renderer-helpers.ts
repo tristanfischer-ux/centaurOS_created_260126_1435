@@ -18,6 +18,7 @@ import type {
   ModuleDecomposition,
   ModuleSpec,
   SubModuleSpec,
+  WordSpec,
 } from '../types/module-decomposition'
 import {
   generateGrammarTrace,
@@ -57,12 +58,13 @@ export function getModuleDecomposition(
  * Build an archetype-id → SubModuleSpec lookup map across all modules in
  * a decomposition.
  *
- * Two indexing keys are populated per sub-module:
- *   - SubModuleSpec.id                  (eg "cell_string")
- *   - SubModuleSpec.primary_character_id (eg "lfp_prismatic_cell")
+ * Three indexing keys are populated per sub-module:
+ *   - SubModuleSpec.id                                     (eg "cell_string")
+ *   - each word's content_character.character_id           (eg "lfp_prismatic_cell")
+ *   - each word's WordSpec.id                              (eg "cell_string_word")
  *
  * The renderer matches resolved-tree leaves by their `archetypeId`, which
- * usually corresponds to the primary character ID. Falling back to
+ * usually corresponds to a word's content_character.character_id. Falling back to
  * SubModuleSpec.id covers cases where a sub-module's id mirrors the
  * leaf's archetypeId (eg word-level groups).
  *
@@ -76,11 +78,13 @@ export function buildSubModuleLookup(
   if (!decomposition) return lookup
   for (const mod of decomposition.modules) {
     for (const sub of mod.sub_modules ?? []) {
-      // Prefer the first writer wins — explicit IDs are higher confidence
-      // than primary-character-id back-references.
+      // Index by sub-module id — first writer wins across the whole decomposition
       if (!lookup.has(sub.id)) lookup.set(sub.id, sub)
-      if (!lookup.has(sub.primary_character_id)) {
-        lookup.set(sub.primary_character_id, sub)
+      // Index by each word's content_character.character_id and word.id
+      for (const word of sub.words ?? []) {
+        const charId = word.content_character?.character_id
+        if (charId && !lookup.has(charId)) lookup.set(charId, sub)
+        if (word.id && !lookup.has(word.id)) lookup.set(word.id, sub)
       }
     }
   }
@@ -133,8 +137,21 @@ export function renderInlineModifiersForLeaf(
 ): string {
   const sub = findSubModuleForLeaf(archetypeId, lookup)
   if (!sub) return ''
-  if (!sub.modifiers || sub.modifiers.length === 0) return ''
-  return modifierStripInline(sub.modifiers)
+  // Find the specific word matching the archetypeId (character_id or word.id)
+  const matchingWord = (sub.words ?? []).find(
+    w => w.content_character?.character_id === archetypeId || w.id === archetypeId,
+  )
+  if (matchingWord) {
+    const mods = matchingWord.modifier_characters ?? []
+    if (mods.length === 0) return ''
+    return modifierStripInline(mods)
+  }
+  // Coding-council 1B 2026-05-12 P2 fix: when the leaf resolves only by sub.id
+  // (NOT by any word's character_id or word.id), do NOT guess words[0]'s
+  // modifiers. For multi-word sub-modules that fallback silently attached the
+  // wrong modifier data to §4.5 cards and the §6 BoM row. Return empty string
+  // so the caller renders '—' instead of incorrect-but-plausible qualifiers.
+  return ''
 }
 
 /**
@@ -234,6 +251,7 @@ export type {
   ModuleDecomposition,
   ModuleSpec,
   SubModuleSpec,
+  WordSpec,
 }
 
 export {

@@ -2,7 +2,7 @@
  * @file stages/4d-radical-grammar.ts — Phase 4: Production Grammar Engine
  *
  * Lifts radical/demo/grammar-pass.ts to production. Builds a RadicalLibrary
- * from the resolved tree, then runs all 6 v1 grammar rules. Wires verdicts
+ * from the resolved tree, then runs all 11 v1 grammar rules. Wires verdicts
  * into state.grammarVerdicts for Phase 5 renderer consumption.
  *
  * Feature flag: RADICAL_PHASE_4_GRAMMAR=true enables this path.
@@ -19,8 +19,8 @@
  *   - PURELY DETERMINISTIC — zero LLM calls. Same input → same verdicts.
  *   - Hard rules (weight: Infinity) never relax: KCL, galvanic, mass balance.
  *   - Soft/adjustable rules relax with explicit tradeoff disclosed.
- *   - v1 rule cap: 15 rules (only 6 implemented; stub conflict-resolution
- *     system in place for clean addition of the next 9 in v1.5).
+ *   - v1 rule cap: 15 rules (11 implemented; stub conflict-resolution
+ *     system in place for clean addition of the next 4 in v1.5).
  *   - Rule conflict resolution: Safety > Efficiency > Cost precedence.
  *     Contradictory verdicts on the same node are deduped with precedence log.
  *   - Strictly additive — existing feasibility gate and state.costSummary UNCHANGED.
@@ -39,6 +39,11 @@ import {
   MASS_BALANCE_CLOSED_LOOP,
   THERMAL_CAPACITY_VS_LOAD,
   MATERIAL_MARINE_CORROSION,
+  REGULATORY_IEC_62619_BATTERY_MANAGEMENT,
+  BMS_MASTER_TO_SLAVE_CAN_LINK,
+  SHUNT_CURRENT_RATING_VS_PACK_CURRENT,
+  CONTACTOR_CURRENT_RATING_VS_PACK_CURRENT,
+  FUSE_BREAKING_CAPACITY_VS_PACK_SHORT_CIRCUIT,
   type GrammarRule,
   type EngineResult,
   type RuleResult,
@@ -115,11 +120,11 @@ export interface GrammarPassState {
 // ---------------------------------------------------------------------------
 
 /** Maximum number of grammar rules allowed in v1. Architecture supports growth. */
-const V1_RULE_CAP = 15
+const V1_RULE_CAP = 15  // 11 implemented; 4 slots remain for v1.5
 
 /**
- * The 6 v1 grammar rules, ordered by Safety > Efficiency > Cost precedence.
- * Adding a 7th–15th rule here is the ONLY thing needed to grow to v1 capacity.
+ * The 11 v1 grammar rules, ordered by Safety > Efficiency > Cost precedence.
+ * Adding a 12th–15th rule here is the ONLY thing needed to grow to v1 capacity.
  * Beyond 15: bump to v1.5 (per council mandate, Q6).
  */
 const V1_GRAMMAR_RULES: GrammarRule[] = [
@@ -127,9 +132,14 @@ const V1_GRAMMAR_RULES: GrammarRule[] = [
   KCL_NODE_BALANCE,
   GALVANIC_ALUMINIUM_COPPER_CONTACT,
   MASS_BALANCE_CLOSED_LOOP,
-  // ── Efficiency / reliability rules (adjustable) ───────────────────────────
+  REGULATORY_IEC_62619_BATTERY_MANAGEMENT,
+  BMS_MASTER_TO_SLAVE_CAN_LINK,
+  CONTACTOR_CURRENT_RATING_VS_PACK_CURRENT,
+  FUSE_BREAKING_CAPACITY_VS_PACK_SHORT_CIRCUIT,
+  // ── Efficiency / reliability rules (adjustable/soft) ─────────────────────
   VOLTAGE_DERATE_80PCT,
   THERMAL_CAPACITY_VS_LOAD,
+  SHUNT_CURRENT_RATING_VS_PACK_CURRENT,
   // ── Cost / material rules (adjustable, lower weight) ─────────────────────
   MATERIAL_MARINE_CORROSION,
 ]
@@ -152,8 +162,13 @@ const RULE_PRECEDENCE: Record<string, RulePrecedence> = {
   KCL_node_balance: 'safety',
   galvanic_aluminium_copper_contact: 'safety',
   mass_balance_closed_loop: 'safety',
+  regulatory_iec_62619_battery_management: 'safety',
+  bms_master_to_slave_can_link: 'safety',
+  contactor_current_rating_vs_pack_current: 'safety',
+  fuse_breaking_capacity_vs_pack_short_circuit: 'safety',
   voltage_derate_80pct: 'efficiency',
   thermal_capacity_vs_load: 'efficiency',
+  shunt_current_rating_vs_pack_current: 'efficiency',
   material_marine_corrosion: 'cost',
 }
 

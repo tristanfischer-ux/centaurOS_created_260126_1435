@@ -124,6 +124,19 @@ export type CompositionNode = {
    * Stage 2 paths populate this on every character node.
    */
   sub_module_id?: string | null
+  /**
+   * Piece 1B.1 (2026-05-12) — finer-grained word-level tagging within a sub-module.
+   * Mirrors LeafRecord.word_id — propagated by the structural builder from leaf
+   * to tree node so the renderer can group characters under the correct WordSpec
+   * in the §4 sub-module radical-translation cards.
+   *
+   * Example: character node 'lfp_prismatic_cell' carries word_id='cell_string_word'
+   * within sub_module_id='cell_string'.
+   *
+   * OPTIONAL: null when the leaf did not tag a word (supporting characters,
+   * fallback paths). Renderer falls back to sub_module_id grouping.
+   */
+  word_id?: string | null
 }
 
 export type Composition = {

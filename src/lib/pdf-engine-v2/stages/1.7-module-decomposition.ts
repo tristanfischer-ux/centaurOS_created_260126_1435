@@ -28,6 +28,8 @@ import type {
 } from '../types'
 import type {
   ApplicabilityConfidence,
+  ContentCharacter,
+  ContentRadical,
   CouncilSeatId,
   CouncilSeatReview,
   CouncilVerdict,
@@ -43,8 +45,10 @@ import type {
   SeatVerdict,
   SubModuleSpec,
   UniversalModule,
+  WordSpec,
 } from '../types/module-decomposition'
 import {
+  CONTENT_RADICALS,
   MODULE_DEFAULT_ALLOWED_RADICALS,
   UNIVERSAL_MODULES,
 } from '../types/module-decomposition'
@@ -90,6 +94,9 @@ const KNOWN_RADICALS = new Set<string>([
 ])
 
 const UNIVERSAL_MODULE_SET = new Set<UniversalModule>(UNIVERSAL_MODULES as readonly UniversalModule[])
+
+/** The 22 canonical content radical IDs — used to validate ContentCharacter radicals. */
+const CONTENT_RADICAL_SET = new Set<string>(CONTENT_RADICALS)
 
 /** All 26 canonical GrammarMechanism values. Used to validate grammar_links and cross_module_grammar_links. */
 const GRAMMAR_MECHANISM_SET = new Set<GrammarMechanism>([
@@ -307,6 +314,7 @@ function validateModuleSpecShape(
   // in an unrecoverable retry loop. Demoted 1-2 entries from error to warning.
   // Genuinely empty output remains a hard error since it's structurally unusable
   // downstream (Stage 2 needs at least one sub_module_id to tag leaves against).
+  // Piece 1B.1: each sub_module now carries words[] instead of primary_character_id.
   const subModulesRaw = Array.isArray(r.sub_modules) ? r.sub_modules : []
   if (subModulesRaw.length === 0) {
     errors.push(`modules[${index}].sub_modules is missing or empty — at least 1 sub-module is required (3–8 strongly preferred)`)
@@ -338,45 +346,132 @@ function validateModuleSpecShape(
     if (nameHuman.length === 0) {
       errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").name_human is empty`)
     }
-    const primaryCharId = typeof smr.primary_character_id === 'string' ? smr.primary_character_id.trim() : ''
-    if (primaryCharId.length === 0) {
-      errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").primary_character_id is empty`)
+
+    // ── words[] validation (Piece 1B.1) ──────────────────────────────────
+    // Coding-council 1B 2026-05-12 P1 fix: prompt HARD CONSTRAINTS says 1–4
+    // words; validator warning threshold previously at >8 created a silent
+    // gap where the LLM could emit 5–8 words without surfacing the deviation.
+    // Aligned to >4 so prompt-validator agreement holds.
+    const wordsRaw = Array.isArray(smr.words) ? smr.words : []
+    if (wordsRaw.length === 0) {
+      errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").words is missing or empty — at least 1 word is required`)
+    } else if (wordsRaw.length > 4) {
+      paramWarnings.push(`modules[${index}].sub_modules[${si}] ("${smId}").words has ${wordsRaw.length} entries (>4 — prompt HARD CONSTRAINT caps at 4); accepted but flag for review`)
     }
-    const primaryCharNameHuman = typeof smr.primary_character_name_human === 'string' ? smr.primary_character_name_human.trim() : ''
-    if (primaryCharNameHuman.length === 0) {
-      errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").primary_character_name_human is empty`)
-    }
-    // modifiers
-    const modifiersRaw = Array.isArray(smr.modifiers) ? smr.modifiers : []
-    const modifiers: ModifyingCharacter[] = []
-    for (let mi = 0; mi < modifiersRaw.length; mi++) {
-      const mod = modifiersRaw[mi]
-      if (!mod || typeof mod !== 'object') {
-        paramWarnings.push(`modules[${index}].sub_modules[${si}].modifiers[${mi}] is not an object; skipped`)
+    const words: WordSpec[] = []
+    const seenWordIds = new Set<string>()
+    for (let wi = 0; wi < wordsRaw.length; wi++) {
+      const wr = wordsRaw[wi]
+      if (!wr || typeof wr !== 'object') {
+        errors.push(`modules[${index}].sub_modules[${si}].words[${wi}] is not an object`)
         continue
       }
-      const modr = mod as Record<string, unknown>
-      const kind = typeof modr.kind === 'string' ? modr.kind.trim() : ''
-      if (kind.length === 0) {
-        paramWarnings.push(`modules[${index}].sub_modules[${si}].modifiers[${mi}].kind is empty; skipped`)
+      const wrr = wr as Record<string, unknown>
+      const wordId = typeof wrr.id === 'string' ? wrr.id.trim() : ''
+      if (wordId.length === 0) {
+        errors.push(`modules[${index}].sub_modules[${si}].words[${wi}].id is empty`)
         continue
       }
-      const value = typeof modr.value === 'string' ? modr.value.trim() : ''
-      if (value.length === 0) {
-        paramWarnings.push(`modules[${index}].sub_modules[${si}].modifiers[${mi}].value is empty; skipped`)
+      if (seenWordIds.has(wordId)) {
+        errors.push(`modules[${index}].sub_modules[${si}].words[${wi}].id "${wordId}" duplicates an earlier word id within this sub-module`)
         continue
       }
-      const unit = typeof modr.unit === 'string' && modr.unit.trim().length > 0 ? modr.unit.trim() : undefined
-      modifiers.push({ kind, value, unit })
+      seenWordIds.add(wordId)
+      const wordNameHuman = typeof wrr.name_human === 'string' ? wrr.name_human.trim() : ''
+      if (wordNameHuman.length === 0) {
+        paramWarnings.push(`modules[${index}].sub_modules[${si}].words[${wi}] ("${wordId}").name_human is empty; accepted`)
+      }
+
+      // content_character validation
+      const ccRaw = wrr.content_character
+      if (!ccRaw || typeof ccRaw !== 'object') {
+        errors.push(`modules[${index}].sub_modules[${si}].words[${wi}] ("${wordId}").content_character is missing or not an object`)
+        continue
+      }
+      const cc = ccRaw as Record<string, unknown>
+      const charId = typeof cc.character_id === 'string' ? cc.character_id.trim() : ''
+      if (charId.length === 0) {
+        errors.push(`modules[${index}].sub_modules[${si}].words[${wi}].content_character.character_id is empty`)
+        continue
+      }
+      const charNameHuman = typeof cc.name_human === 'string' ? cc.name_human.trim() : ''
+      if (charNameHuman.length === 0) {
+        paramWarnings.push(`modules[${index}].sub_modules[${si}].words[${wi}].content_character.name_human is empty; accepted`)
+      }
+
+      // Radical validation helper
+      const validateRadical = (field: string, val: unknown): ContentRadical | null => {
+        if (val === null || val === undefined) return null
+        if (typeof val !== 'string') {
+          paramWarnings.push(`modules[${index}].sub_modules[${si}].words[${wi}].content_character.${field} is not a string; treated as null`)
+          return null
+        }
+        const trimmed = val.trim()
+        if (trimmed.length === 0) return null
+        if (!CONTENT_RADICAL_SET.has(trimmed)) {
+          paramWarnings.push(`modules[${index}].sub_modules[${si}].words[${wi}].content_character.${field}="${trimmed}" is not in the 22-radical canonical set; accepted as extension radical`)
+        }
+        return trimmed as ContentRadical
+      }
+
+      const fnPrimary = validateRadical('function_radical_primary', cc.function_radical_primary)
+      const fnSecondary = validateRadical('function_radical_secondary', cc.function_radical_secondary)
+      const matPrimary = validateRadical('material_radical_primary', cc.material_radical_primary)
+      const matSecondary = validateRadical('material_radical_secondary', cc.material_radical_secondary)
+
+      // At least one radical must be set
+      if (fnPrimary === null && matPrimary === null) {
+        errors.push(`modules[${index}].sub_modules[${si}].words[${wi}].content_character ("${charId}"): at least one of function_radical_primary or material_radical_primary MUST be non-null`)
+        continue
+      }
+
+      const contentCharacter: ContentCharacter = {
+        character_id: charId,
+        name_human: charNameHuman,
+        function_radical_primary: fnPrimary,
+        function_radical_secondary: fnSecondary,
+        material_radical_primary: matPrimary,
+        material_radical_secondary: matSecondary,
+      }
+
+      // modifier_characters on the word
+      const modCharsRaw = Array.isArray(wrr.modifier_characters) ? wrr.modifier_characters : []
+      const modifierCharacters: ModifyingCharacter[] = []
+      for (let mi = 0; mi < modCharsRaw.length; mi++) {
+        const mod = modCharsRaw[mi]
+        if (!mod || typeof mod !== 'object') {
+          paramWarnings.push(`modules[${index}].sub_modules[${si}].words[${wi}].modifier_characters[${mi}] is not an object; skipped`)
+          continue
+        }
+        const modr = mod as Record<string, unknown>
+        const kind = typeof modr.kind === 'string' ? modr.kind.trim() : ''
+        if (kind.length === 0) {
+          paramWarnings.push(`modules[${index}].sub_modules[${si}].words[${wi}].modifier_characters[${mi}].kind is empty; skipped`)
+          continue
+        }
+        const value = typeof modr.value === 'string' ? modr.value.trim() : ''
+        if (value.length === 0) {
+          paramWarnings.push(`modules[${index}].sub_modules[${si}].words[${wi}].modifier_characters[${mi}].value is empty; skipped`)
+          continue
+        }
+        const unit = typeof modr.unit === 'string' && modr.unit.trim().length > 0 ? modr.unit.trim() : undefined
+        modifierCharacters.push({ kind, value, unit })
+      }
+
+      words.push({
+        id: wordId,
+        name_human: wordNameHuman,
+        content_character: contentCharacter,
+        modifier_characters: modifierCharacters,
+      })
     }
+
     const roleVerb = typeof smr.role_verb === 'string' && smr.role_verb.trim().length > 0 ? smr.role_verb.trim() : undefined
     const topologyClause = typeof smr.topology_clause === 'string' && smr.topology_clause.trim().length > 0 ? smr.topology_clause.trim() : undefined
     subModules.push({
       id: smId,
       name_human: nameHuman,
-      primary_character_id: primaryCharId,
-      primary_character_name_human: primaryCharNameHuman,
-      modifiers,
+      words,
       role_verb: roleVerb,
       topology_clause: topologyClause,
     })
@@ -651,13 +746,35 @@ function parseSeatReview(raw: unknown, seat: CouncilSeatId): CouncilSeatReview {
 function aggregateCouncilVerdict(seats: CouncilSeatReview[], lowConfidenceCount: number): CouncilVerdict {
   // Data-quality back-stop: ≥2 low-confidence modules → NEEDS_MAJOR regardless of seats
   if (lowConfidenceCount >= 2) return 'NEEDS_MAJOR'
-  const majorCount = seats.filter(s => s.verdict === 'NEEDS_MAJOR').length
+
+  // Piece 1B fix 2026-05-12: separate transport-failed seats from legitimate
+  // votes. A transport failure means the seat couldn't review; counting it as
+  // NEEDS_MAJOR (the old default) treated council-LLM noise as a structural
+  // block. Now: transport-failed seats are ABSTAIN-equivalent.
+  const speaking = seats.filter(s => !s.transport_failed)
+  const failedCount = seats.length - speaking.length
+
+  // Piece 1B fix 2 (coding-council 2026-05-12): check 2+ NEEDS_MAJOR among
+  // SPEAKING seats BEFORE the quorum check. Earlier ordering had `failedCount
+  // >= 2 → NEEDS_MINOR` first, which would mask a genuine block (2 speaking
+  // seats vote MAJOR + 2 seats transport-fail) by short-circuiting to MINOR.
+  // Real blocking votes from speaking seats must never be downgraded by
+  // transport noise on the OTHER seats.
+  const majorCount = speaking.filter(s => s.verdict === 'NEEDS_MAJOR').length
   if (majorCount >= 2) return 'NEEDS_MAJOR'
+
+  // Insufficient quorum — 2+ seats failed at transport → NEEDS_MINOR (proceed
+  // with flag) rather than blocking. The catalog already passed schema
+  // validation upstream; council just couldn't confirm it.
+  if (failedCount >= 2) return 'NEEDS_MINOR'
+
+  // 1 NEEDS_MAJOR among speaking seats: promote to NEEDS_MINOR (the lone block
+  // is logged in council_notes; remaining speaking seats agree to proceed).
   if (majorCount === 1) {
-    // Worst non-block verdict from the other three; promote one NEEDS_MAJOR to NEEDS_MINOR
+    // Worst non-block verdict from the other speaking seats; promote one NEEDS_MAJOR to NEEDS_MINOR
     return 'NEEDS_MINOR'
   }
-  const minorCount = seats.filter(s => s.verdict === 'NEEDS_MINOR').length
+  const minorCount = speaking.filter(s => s.verdict === 'NEEDS_MINOR').length
   if (minorCount >= 1) return 'NEEDS_MINOR'
   return 'OK'
 }
@@ -678,12 +795,17 @@ async function runCouncil(
         MODULE_DECOMPOSITION_COUNCIL_PROMPT,
         userContent,
         [model],
-        2048,
+        4096,  // Piece 1B fix 2026-05-12: was 2048; raised to fit reasoning-style responses without truncating the JSON.
       )
       const review = parseSeatReview(result.parsed, id)
       return { ...review, tokens: { input: result.inputTokens, output: result.outputTokens } }
     } catch (err) {
       console.warn(`[module-decomposition] council seat "${id}" (${model}) failed: ${(err as Error).message}`)
+      // Piece 1B fix 2026-05-12: mark transport_failed=true so the aggregator can
+      // distinguish "couldn't speak" (transport noise) from a legitimate review.
+      // The verdict here remains NEEDS_MAJOR as a safe default IF the aggregator
+      // ever ignores transport_failed, but the aggregator will treat this as
+      // ABSTAIN rather than counting toward the 2+ NEEDS_MAJOR block threshold.
       return {
         seat: id,
         verdict: 'NEEDS_MAJOR',
@@ -691,6 +813,7 @@ async function runCouncil(
         no_spurious_modules: false,
         parameters_plausible: false,
         notes: [`seat call failed: ${(err as Error).message}`],
+        transport_failed: true,
         tokens: { input: 0, output: 0 },
       }
     }
@@ -754,17 +877,28 @@ function buildFallbackDecomposition(
     secondary_modules: undefined,
     // Piece 1A coding-council 2026-05-12 fix (GLM NEEDS_MAJOR): fallback must emit
     // at least one sub_module to satisfy the validator's "length >= 1" hard check.
-    // The sentinel ("uncategorised") carries no engineering content but unblocks
-    // downstream consumers; Stage 2 will tag any leaves it produces against this
-    // single id, and the renderer can surface "Stage 1.5 fallback fired" as a
-    // quality warning rather than an unrecoverable failure.
+    // Piece 1B.1: sentinel now uses words[] shape. material_radical_primary is set
+    // to solid_state_of_matter to satisfy the "at least one radical" constraint
+    // without lying about the engineering content.
     sub_modules: [
       {
         id: 'uncategorised',
         name_human: 'Uncategorised (fallback)',
-        primary_character_id: 'uncategorised',
-        primary_character_name_human: 'Uncategorised primary character',
-        modifiers: [],
+        words: [
+          {
+            id: 'uncategorised_word',
+            name_human: 'Uncategorised',
+            content_character: {
+              character_id: 'uncategorised',
+              name_human: 'Uncategorised',
+              function_radical_primary: null,
+              function_radical_secondary: null,
+              material_radical_primary: 'solid_state_of_matter' as const,
+              material_radical_secondary: null,
+            },
+            modifier_characters: [],
+          },
+        ],
         role_verb: 'contains',
       },
     ],
@@ -807,7 +941,13 @@ function buildFallbackDecomposition(
 // Main entry
 // ---------------------------------------------------------------------------
 
-const STAGE_1_7_PRIMARY_MODELS = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3']
+// Council 2026-05-12 + BESS v3/v5 evidence: Gemini 3.1 Pro emits markdown preamble
+// ("**Decomposing the BESS**", "Let me analyze...") despite explicit JSON-only
+// instructions, while Grok 4.3 reliably emits pure JSON. Order swapped so Grok
+// is the primary; Gemini is the fallback used only when Grok call fails at the
+// transport layer. The MODULE_DECOMPOSITION_TAXONOMY_PROMPT has been hardened
+// with explicit bad/good examples too — but model-order is the cheaper insurance.
+const STAGE_1_7_PRIMARY_MODELS = ['x-ai/grok-4.3', 'google/gemini-3.1-pro-preview']
 const STAGE_1_7_MAX_TOKENS = 16384
 
 /**

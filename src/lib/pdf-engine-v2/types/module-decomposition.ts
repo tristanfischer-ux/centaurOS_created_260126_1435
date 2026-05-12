@@ -226,8 +226,175 @@ export const MODULE_DEFAULT_ALLOWED_RADICALS: Record<UniversalModule, string[]> 
 }
 
 // ---------------------------------------------------------------------------
-// 2. Natural-language layer (Iter 4) — sub-modules, modifiers, grammar links
+// 2. Natural-language layer (Iter 4) — content radicals, words, sub-modules,
+//    modifiers, grammar links
 // ---------------------------------------------------------------------------
+
+// ── 2a. ContentRadical — the 22-radical alphabet ─────────────────────────────
+
+/**
+ * A single content radical from the 22-radical alphabet.
+ *
+ * Split into two groups:
+ *   - Function radicals (12) — engineering verbs, placed in TL/TR quadrant
+ *   - Material radicals (10) — engineering nouns, placed in BL/BR quadrant
+ *
+ * The escape hatch `string & { __brand?: 'extensible' }` allows novel-domain
+ * extension without breaking the closed-enum type check. Validators will warn
+ * on non-canonical values but accept them (non-blocking for new domains).
+ *
+ * Source of truth: §1A of `radical-compiler-pipeline-worked-example.html`.
+ */
+export type ContentRadical =
+  // Function radicals (engineering verbs — placed in TL / TR of a content character)
+  | 'electrical_conducting_function'
+  | 'silicon_semiconductor_function'
+  | 'magnetic_coupling_function'
+  | 'photovoltaic_energy_function'
+  | 'electrochemical_energy_function'
+  | 'thermal_transfer_function'
+  | 'electric_heater_element'
+  | 'chemical_sensing_function'
+  | 'bioprocess_chemistry_function'
+  | 'acoustic_wave_function'
+  | 'electromechanical_switching_function'
+  | 'pressure_vessel_function'
+  // Material radicals (engineering nouns — placed in BL / BR of a content character)
+  | 'steel'
+  | 'copper'
+  | 'aluminium'
+  | 'composite_fibre_material'
+  | 'polymer_thermoplastic'
+  | 'elastomer'
+  | 'ceramic'
+  | 'lithium_iron_phosphate_chemistry'
+  | 'fluid_flow_state'
+  | 'solid_state_of_matter'
+  // Escape hatch — validator warns but accepts; use for novel domains
+  | (string & { __brand?: 'extensible' })
+
+/**
+ * The 22 canonical content radical IDs as an array for membership checks.
+ * Any radical not in this list will generate a validation warning (not error).
+ */
+export const CONTENT_RADICALS: readonly string[] = [
+  // 12 function radicals
+  'electrical_conducting_function',
+  'silicon_semiconductor_function',
+  'magnetic_coupling_function',
+  'photovoltaic_energy_function',
+  'electrochemical_energy_function',
+  'thermal_transfer_function',
+  'electric_heater_element',
+  'chemical_sensing_function',
+  'bioprocess_chemistry_function',
+  'acoustic_wave_function',
+  'electromechanical_switching_function',
+  'pressure_vessel_function',
+  // 10 material radicals
+  'steel',
+  'copper',
+  'aluminium',
+  'composite_fibre_material',
+  'polymer_thermoplastic',
+  'elastomer',
+  'ceramic',
+  'lithium_iron_phosphate_chemistry',
+  'fluid_flow_state',
+  'solid_state_of_matter',
+] as const
+
+// ── 2b. ContentCharacter — the BLACK-bordered 2×2 quadrant in §4 cards ───────
+
+/**
+ * A content character: the engineering noun + function bound together via
+ * 1–2 radicals in each dimension.
+ *
+ * Worked-example terminology: this is the BLACK-bordered 2×2 quadrant in
+ * §4 sub-module cards:
+ *   TL = function_radical_primary   (e.g. electrochemical_energy_function)
+ *   TR = function_radical_secondary (often null)
+ *   BL = material_radical_primary   (e.g. lithium_iron_phosphate_chemistry)
+ *   BR = material_radical_secondary (often null)
+ *
+ * Examples from worked example:
+ *   lfp_prismatic_cell  → TL=electrochemical_energy_function, BL=lithium_iron_phosphate_chemistry
+ *   module_steel_frame  → TL=null, BL=steel  (pure-material character)
+ *   bms_slave_pcb       → TL=silicon_semiconductor_function, TR=electrical_conducting_function, BL=polymer_thermoplastic
+ *   ntc_thermistor      → TL=thermal_transfer_function, BL=ceramic
+ *   cell_to_cell_busbar → TL=electrical_conducting_function, BL=copper
+ *
+ * CONSTRAINT: at least ONE of function_radical_primary OR material_radical_primary
+ * MUST be non-null. A character with all four quadrants null is invalid.
+ */
+export interface ContentCharacter {
+  /**
+   * Snake_case stable ID (e.g. "lfp_prismatic_cell").
+   * Same id used by Stage 2 leaves for joining commercial data.
+   * Must be unique within the whole decomposition (across all sub-modules).
+   */
+  character_id: string
+  /** Human-readable name (e.g. "LFP prismatic cell"). */
+  name_human: string
+  /**
+   * TL quadrant — primary function radical (one of the 12 function radicals).
+   * Null when the character is pure-material (e.g. module_steel_frame).
+   */
+  function_radical_primary: ContentRadical | null
+  /**
+   * TR quadrant — secondary function/state radical.
+   * Used when a character has two function aspects (e.g. bms_slave_pcb uses
+   * silicon_semiconductor_function + electrical_conducting_function).
+   * Usually null.
+   */
+  function_radical_secondary: ContentRadical | null
+  /**
+   * BL quadrant — primary material radical (one of the 10 material radicals).
+   * Null only for pure-function characters (rare in practice).
+   */
+  material_radical_primary: ContentRadical | null
+  /**
+   * BR quadrant — secondary material radical (coating, fill, substrate).
+   * Usually null.
+   */
+  material_radical_secondary: ContentRadical | null
+}
+
+// ── 2c. WordSpec — one content character + 0-N modifier characters ────────────
+
+/**
+ * A word: one content character + 0-N modifier characters bound by ⊕.
+ *
+ * Worked-example terminology: the DASHED-GREY-FRAME group of characters in
+ * §4 sub-module cards. Multiple words combine into a sentence (= sub-module)
+ * via ⊕.
+ *
+ * Examples from worked example (BESS energy_storage_source):
+ *   cell_string_word   → content=lfp_prismatic_cell + 7 modifiers (qty, cap, form, topo, dim, life, reg)
+ *   interconnect_word  → content=cell_to_cell_busbar + 2 modifiers (qty, dim)
+ *   rack_frame_word    → content=module_steel_frame + 4 modifiers (qty, form, dim, tol)
+ *   compression_word   → content=compression_plate + 2 modifiers (qty, dim)
+ *   bms_slave_word     → content=bms_slave_pcb + 5 modifiers (qty, cap, topo, tol, env)
+ *   cell_temperature_word → content=ntc_thermistor + 2 modifiers (qty, tol)
+ */
+export interface WordSpec {
+  /**
+   * Snake_case stable ID within the parent SubModuleSpec
+   * (e.g. "cell_string_word", "interconnect_word").
+   * Must be unique within the parent SubModuleSpec.
+   */
+  id: string
+  /** Human-readable label (e.g. "cell string word"). */
+  name_human: string
+  /** The content character this word centres on. */
+  content_character: ContentCharacter
+  /**
+   * Modifier characters (qty, capacity, form, topology, dimension, lifecycle,
+   * regulatory, performance, tolerance, envelope) qualifying the content
+   * character. Empty array is valid (plain character with no modifiers).
+   */
+  modifier_characters: ModifyingCharacter[]
+}
 
 /**
  * Engineering-grammar mechanism vocabulary.
@@ -392,21 +559,53 @@ export interface ModifyingCharacter {
 /**
  * A sub-module — one component group within a parent ModuleSpec.
  *
- * Maps to a "word" in the radical hierarchy (subsystem group). Each sub-module
- * has a single PRIMARY character plus 0..N MODIFYING characters that qualify
- * it. Sub-modules within a ModuleSpec are linked via `ModuleSpec.grammar_links`.
+ * Maps to a "sentence" in the radical hierarchy (a group of words). Each
+ * sub-module carries 1-N WORDS, each word carrying a content character + 0-N
+ * modifier characters. Sub-modules within a ModuleSpec are linked via
+ * `ModuleSpec.grammar_links`.
  *
- * Example (BESS energy_storage_source.cell_string):
+ * Example (BESS energy_storage_source.cell_string — §4 of worked example):
  *   {
  *     id: 'cell_string',
  *     name_human: 'cell string',
- *     primary_character_id: 'lfp_prismatic_cell',
- *     primary_character_name_human: 'LFP prismatic cell',
- *     modifiers: [
- *       { kind: 'quantity', value: '×3920' },
- *       { kind: 'capacity', value: '280', unit: 'Ah' },
- *       { kind: 'form',     value: 'prismatic' },
- *       { kind: 'lifecycle', value: '6000 cyc' },
+ *     words: [
+ *       {
+ *         id: 'cell_string_word',
+ *         name_human: 'cell string word',
+ *         content_character: {
+ *           character_id: 'lfp_prismatic_cell',
+ *           name_human: 'LFP prismatic cell',
+ *           function_radical_primary: 'electrochemical_energy_function',
+ *           function_radical_secondary: null,
+ *           material_radical_primary: 'lithium_iron_phosphate_chemistry',
+ *           material_radical_secondary: null,
+ *         },
+ *         modifier_characters: [
+ *           { kind: 'quantity',  value: '×3920' },
+ *           { kind: 'capacity',  value: '280', unit: 'Ah' },
+ *           { kind: 'form',      value: 'prismatic' },
+ *           { kind: 'topology',  value: '35s×112' },
+ *           { kind: 'dimension', value: '3.2', unit: 'V' },
+ *           { kind: 'lifecycle', value: '6000 cyc' },
+ *           { kind: 'regulatory', value: 'IEC 62619' },
+ *         ],
+ *       },
+ *       {
+ *         id: 'interconnect_word',
+ *         name_human: 'interconnect word',
+ *         content_character: {
+ *           character_id: 'cell_to_cell_busbar',
+ *           name_human: 'cell-to-cell busbar',
+ *           function_radical_primary: 'electrical_conducting_function',
+ *           function_radical_secondary: null,
+ *           material_radical_primary: 'copper',
+ *           material_radical_secondary: null,
+ *         },
+ *         modifier_characters: [
+ *           { kind: 'quantity',  value: '×3808' },
+ *           { kind: 'dimension', value: '350', unit: 'A' },
+ *         ],
+ *       },
  *     ],
  *     role_verb: 'consists of',
  *     topology_clause: 'wired in 112 modules of 35-cells in series',
@@ -420,12 +619,16 @@ export interface SubModuleSpec {
   id: string
   /** Human-readable name of the sub-module ("cell string", "BMS slave"). */
   name_human: string
-  /** Primary character ID (snake_case, must match a known character in the library). */
-  primary_character_id: string
-  /** Human-readable name of the primary character ("LFP prismatic cell"). */
-  primary_character_name_human: string
-  /** Modifying characters qualifying the primary character. Empty array if none. */
-  modifiers: ModifyingCharacter[]
+  /**
+   * 1-N words per sub-module. Each word carries a content character + 0-N modifier characters.
+   * 1-3 words typical; no hard upper cap. At least 1 required.
+   *
+   * Worked-example §4 cards show 2 words per sub-module:
+   *   cell_string    → [cell_string_word, interconnect_word]
+   *   rack_structure → [rack_frame_word, compression_word]
+   *   bms_slave      → [bms_slave_word, cell_temperature_word]
+   */
+  words: WordSpec[]
   /**
    * Verb describing this sub-module's role within the parent ModuleSpec
    * ("consists of", "monitors", "supervises", "distributes"). Used by
@@ -649,6 +852,18 @@ export interface CouncilSeatReview {
   parameters_plausible: boolean
   /** Specific challenges / suggestions surfaced by this seat. */
   notes: string[]
+  /**
+   * Piece 1B fix 2026-05-12: true when the seat call failed at transport
+   * or JSON-parse layer (no genuine review took place). The aggregator
+   * does NOT count transport-failed seats as NEEDS_MAJOR votes; if 2+
+   * seats fail at transport, the council is treated as insufficient-
+   * quorum and the result is NEEDS_MINOR (proceed-with-flag) rather than
+   * blocked.
+   *
+   * Distinguishes "seat reviewed and flagged blocking issue" (legitimate
+   * NEEDS_MAJOR) from "seat couldn't speak at all" (transport noise).
+   */
+  transport_failed?: boolean
 }
 
 /**
