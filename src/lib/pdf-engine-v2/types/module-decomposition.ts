@@ -284,6 +284,36 @@ export type GrammarMechanism =
   | 'air_duct'
 
 /**
+ * A grammar link that crosses module boundaries — i.e. couples a sub-module
+ * (or the module as a whole) in one UniversalModule to a sub-module in another.
+ *
+ * Examples:
+ *   - energy_storage_source ↔ environmental_interface via cooling_loop
+ *   - control_compute_communication → safety_protection via contactor_command
+ *   - power_distribution ↔ energy_storage_source via dc_busbar
+ *
+ * Lives at the top-level `ModuleDecomposition.cross_module_grammar_links[]` rather
+ * than inside any single `ModuleSpec.grammar_links[]` because it crosses
+ * the module boundary.
+ *
+ * Validators: `from_module` and `to_module` must be UniversalModule keys present
+ * in `ModuleDecomposition.modules` (not in `excluded_modules`). `mechanism` must
+ * be one of the 26 canonical GrammarMechanism values.
+ */
+export interface CrossModuleGrammarLink {
+  /** Identifier of the source module — must be a UniversalModule present in the parent ModuleDecomposition.modules[]. */
+  from_module: UniversalModule
+  /** Identifier of the target module — must be a UniversalModule present in the parent ModuleDecomposition.modules[]. */
+  to_module: UniversalModule
+  /** Canonical coupling mechanism. */
+  mechanism: GrammarMechanism
+  /** Direction: 'mutual' for bidirectional, 'directional' for one-way. */
+  type: 'mutual' | 'directional'
+  /** Short free-form qualifier (eg "1500 V DC", "redundant pair"). Optional. */
+  detail?: string
+}
+
+/**
  * A single grammar link between two sub-modules within the SAME ModuleSpec.
  *
  *   - `from_sub_module` / `to_sub_module` reference `SubModuleSpec.id` values
@@ -486,25 +516,24 @@ export interface ModuleSpec {
   applicability_confidence: ApplicabilityConfidence
 
   /**
-   * OPTIONAL — natural-language layer (Iter 4).
+   * REQUIRED as of Piece 1A 2026-05-12 — every module must declare 3-8 sub-modules.
    *
    * Sub-modules within this ModuleSpec, each carrying a primary character +
    * a list of modifying characters. Consumed by `generateSubmoduleSentence()`
    * and `generateModuleParagraph()` in `radical/sentence-generator.ts` to
    * emit canonical English prose alongside the engineering radical trace.
    *
-   * Backward compatible: existing snapshots that lack this field continue
-   * to render via the legacy `RadicalModulesSection` tree view. New runs
-   * SHOULD populate it; legacy runs MUST still validate.
+   * Fallback-path modules (ClassModulePriors) emit `sub_modules: []` to keep
+   * the type-checker happy; downstream "warn but proceed" behaviour is preserved.
    *
    * See memory drawer `forgeos_decisions_393756e2f253f189` for the
    * architectural framing (the missing natural-language layer between
    * structured snapshot and PDF output).
    */
-  sub_modules?: SubModuleSpec[]
+  sub_modules: SubModuleSpec[]
 
   /**
-   * OPTIONAL — natural-language layer (Iter 4).
+   * REQUIRED as of Piece 1A 2026-05-12 — intra-module grammar links.
    *
    * First-class declaration of how sub-modules within THIS module connect
    * to each other (mechanical mounts, bus couplings, control links, etc.).
@@ -514,14 +543,12 @@ export interface ModuleSpec {
    * Each link references sub-module identifiers from `sub_modules[]` above
    * (ie `from_sub_module` and `to_sub_module` must match a `SubModuleSpec.id`
    * within the same ModuleSpec). Cross-module links live at the
-   * ModuleDecomposition level (out of scope for Iter 4).
+   * `ModuleDecomposition.cross_module_grammar_links` level.
    *
-   * Empty array semantics: an empty `grammar_links: []` means "no internal
-   * links declared". A missing/undefined value means "field not provided
-   * by upstream stage" — for new ModuleSpec construction sites, prefer
-   * `grammar_links: []` over omission to surface intent explicitly.
+   * Empty array semantics: `grammar_links: []` is valid for a single-sub-module
+   * module with no internal links. Fallback-path modules also emit `[]`.
    */
-  grammar_links?: GrammarLink[]
+  grammar_links: GrammarLink[]
 
   /**
    * Optional secondary classifications. A single component or sub-system
@@ -680,6 +707,15 @@ export interface ModuleDecomposition {
    * Used in the PDF and in dual-run diff diagnostics.
    */
   council_notes: string[]
+
+  /**
+   * Inter-module grammar links — connections that cross module boundaries
+   * (e.g. energy_storage_source ↔ environmental_interface via cooling_loop).
+   * Drives the §2.5 Module Connection Map in the PDF Design Modules section.
+   * Each link's from_module and to_module must reference UniversalModule keys
+   * present in `modules` (not in `excluded_modules`).
+   */
+  cross_module_grammar_links: CrossModuleGrammarLink[]
 
   /**
    * Wall-clock + token-cost telemetry for cost-discipline monitoring.

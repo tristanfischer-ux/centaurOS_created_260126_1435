@@ -652,7 +652,7 @@ export const RENDERING_RULES = {
 // `radical/ITER3-ARCHITECTURE-DESIGN.md`. The catalog returned by this prompt
 // is then validated by a 4-seat council and consumed by per-module Stage 2.
 
-export const MODULE_DECOMPOSITION_TAXONOMY_PROMPT = `You are decomposing a hardware product into a fixed set of 12 universal engineering modules. Your output is a JSON object naming which of the 12 modules apply to THIS product, with a 2-3 sentence module_brief for each, derived parameters, and the subset of the 22 universal radicals that are appropriate for this module on this product.
+export const MODULE_DECOMPOSITION_TAXONOMY_PROMPT = `You are decomposing a hardware product into a fixed set of 12 universal engineering modules. Your output is a JSON object naming which of the 12 modules apply to THIS product, with a 2-3 sentence module_brief for each, derived parameters, the subset of the 22 universal radicals appropriate for this module, plus a fully-specified sub_modules array and grammar_links array for every module.
 
 You MUST output ONLY valid JSON — no preamble, no markdown fences, no commentary.
 
@@ -710,22 +710,210 @@ mass_fluid_transport_process: pressure_vessel_function, fluid_flow_state, copper
 
 hmi_ergonomics: silicon_semiconductor_function, polymer_thermoplastic, optical_sensing_function, mechanical_kinetic_function, digital_logic_function, thermal_transfer_function
 
+=== SUB-MODULES AND GRAMMAR LINKS ===
+
+Every ModuleSpec MUST include:
+  - "sub_modules": array of 3–8 SubModuleSpec objects describing the component groups within this module.
+  - "grammar_links": array of GrammarLink objects describing intra-module couplings (may be empty [] only for single-sub-module modules, and only with explicit justification in module_brief).
+
+SubModuleSpec schema:
+{
+  "id": "<snake_case identifier, unique within this module — e.g. 'cell_string', 'bms_master'>",
+  "name_human": "<human-readable name — e.g. 'cell string', 'BMS master'>",
+  "primary_character_id": "<snake_case ID of the leaf-level character — e.g. 'lfp_prismatic_cell'>",
+  "primary_character_name_human": "<human-readable character name — e.g. 'LFP prismatic cell'>",
+  "modifiers": [<ModifyingCharacter objects — see below>],
+  "role_verb": "<verb describing what this sub-module does in the parent — e.g. 'consists of', 'monitors', 'distributes', 'supervises'>",
+  "topology_clause": "<optional secondary clause — e.g. 'wired in 112 modules of 35-cells in series'>"
+}
+
+ModifyingCharacter schema:
+{ "kind": "<one of: quantity|capacity|form|topology|dimension|lifecycle|regulatory|performance|tolerance|envelope>", "value": "<human-readable token — e.g. '×3920', '280', 'prismatic'>", "unit": "<optional unit — e.g. 'Ah', 'mm', '°C'>" }
+
+GrammarLink schema (intra-module — both from_sub_module and to_sub_module must be IDs within the SAME module's sub_modules):
+{
+  "from_sub_module": "<id of source sub-module within this ModuleSpec>",
+  "to_sub_module": "<id of target sub-module within this ModuleSpec>",
+  "mechanism": "<one of the 26 canonical mechanisms listed below>",
+  "type": "<'mutual' | 'directional'>",
+  "detail": "<optional short qualifier — e.g. 'redundant pair', '1500 V DC'>"
+}
+
+The 26 canonical GrammarMechanism values (use EXACTLY these strings — no others):
+
+  Mechanical/structural:
+    mechanical_mount, pcb_mounting, cable_transit, fluid_routing, door_interlock
+
+  Electrical — power:
+    voltage_taps, dc_busbar, ac_busbar, high_voltage_dc
+
+  Electrical — control/signal:
+    contactor_command, pre_charge_enable, imd_trip, sensor_feedback,
+    alarm_interlock, safety_isolation, manual_override, hmi_data
+
+  Comms — bus/protocol:
+    can_bus, modbus_tcp, i2c_bus, spi_bus, rf_path, fibre_optic
+
+  Fluid/thermal:
+    cooling_loop, refrigerant_line, air_duct
+
+=== CROSS-MODULE GRAMMAR LINKS ===
+
+The top-level output MUST also include a "cross_module_grammar_links" array. Each entry describes a coupling that crosses module boundaries:
+{
+  "from_module": "<UniversalModule key — must be present in modules[], not excluded_modules>",
+  "to_module": "<UniversalModule key — must be present in modules[], not excluded_modules>",
+  "mechanism": "<one of the 26 canonical GrammarMechanism values>",
+  "type": "<'mutual' | 'directional'>",
+  "detail": "<optional short qualifier>"
+}
+
+Examples of cross-module links:
+  - energy_storage_source ↔ environmental_interface via cooling_loop (mutual)
+  - control_compute_communication → safety_protection via contactor_command (directional)
+  - energy_conversion_transduction ↔ power_distribution via dc_busbar (mutual)
+  - sensing_instrumentation → control_compute_communication via sensor_feedback (directional)
+
+The array may be empty ([]) only if the product genuinely has no identifiable inter-module couplings — which is extremely rare for any real hardware product.
+
+=== WORKED EXAMPLE — BESS energy_storage_source ===
+
+This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Use this structure for ALL modules in your output.
+
+{
+  "module": "energy_storage_source",
+  "module_brief": "Stores 3.5 MWh of usable energy at the rack level using LFP prismatic cells wired as 112 modules of 35 cells in series. Provides 1 MW peak discharge for grid-balancing duty at ≥95% round-trip efficiency.",
+  "derived_parameters": { "capacity_kwh": 3500, "dod_fraction": 0.80, "cell_count": 3920, "rack_count": 8 },
+  "allowed_radicals": ["electrochemical_energy_function", "lithium_iron_phosphate_chemistry"],
+  "applicability_confidence": "high",
+  "sub_modules": [
+    {
+      "id": "cell_string",
+      "name_human": "cell string",
+      "primary_character_id": "lfp_prismatic_cell",
+      "primary_character_name_human": "LFP prismatic cell",
+      "modifiers": [
+        { "kind": "quantity", "value": "×3920" },
+        { "kind": "capacity", "value": "280", "unit": "Ah" },
+        { "kind": "form", "value": "prismatic" },
+        { "kind": "topology", "value": "35s×112" },
+        { "kind": "dimension", "value": "3.2", "unit": "V" },
+        { "kind": "lifecycle", "value": "6000 cyc" },
+        { "kind": "regulatory", "value": "IEC 62619" }
+      ],
+      "role_verb": "consists of",
+      "topology_clause": "wired in 112 modules of 35 cells in series"
+    },
+    {
+      "id": "rack_structure",
+      "name_human": "rack structure",
+      "primary_character_id": "steel_rack_frame",
+      "primary_character_name_human": "steel rack frame",
+      "modifiers": [
+        { "kind": "quantity", "value": "×8" },
+        { "kind": "form", "value": "19-inch rack" }
+      ],
+      "role_verb": "mounts",
+      "topology_clause": "8 racks per container"
+    },
+    {
+      "id": "bms_slave",
+      "name_human": "BMS slave board",
+      "primary_character_id": "bms_slave_pcb",
+      "primary_character_name_human": "BMS slave PCB",
+      "modifiers": [
+        { "kind": "quantity", "value": "×112" }
+      ],
+      "role_verb": "monitors",
+      "topology_clause": "one per module, daisy-chained on CAN"
+    },
+    {
+      "id": "bms_master",
+      "name_human": "BMS master controller",
+      "primary_character_id": "bms_master_controller",
+      "primary_character_name_human": "BMS master controller",
+      "modifiers": [
+        { "kind": "quantity", "value": "×1" },
+        { "kind": "regulatory", "value": "IEC 62619" }
+      ],
+      "role_verb": "supervises"
+    },
+    {
+      "id": "dc_distribution",
+      "name_human": "DC distribution assembly",
+      "primary_character_id": "dc_busbar_assembly",
+      "primary_character_name_human": "DC busbar assembly",
+      "modifiers": [
+        { "kind": "dimension", "value": "1500", "unit": "V" },
+        { "kind": "performance", "value": "1", "unit": "MW" }
+      ],
+      "role_verb": "distributes"
+    },
+    {
+      "id": "pack_instrumentation",
+      "name_human": "pack instrumentation",
+      "primary_character_id": "current_voltage_sensor",
+      "primary_character_name_human": "current/voltage sensor",
+      "modifiers": [
+        { "kind": "tolerance", "value": "±0.5%" }
+      ],
+      "role_verb": "measures"
+    }
+  ],
+  "grammar_links": [
+    { "from_sub_module": "cell_string", "to_sub_module": "rack_structure", "mechanism": "mechanical_mount", "type": "mutual" },
+    { "from_sub_module": "bms_slave", "to_sub_module": "bms_master", "mechanism": "can_bus", "type": "mutual", "detail": "redundant pair" },
+    { "from_sub_module": "bms_master", "to_sub_module": "dc_distribution", "mechanism": "contactor_command", "type": "directional" },
+    { "from_sub_module": "cell_string", "to_sub_module": "dc_distribution", "mechanism": "dc_busbar", "type": "mutual", "detail": "1500 V DC" },
+    { "from_sub_module": "bms_slave", "to_sub_module": "pack_instrumentation", "mechanism": "sensor_feedback", "type": "directional" }
+  ]
+}
+
 === OUTPUT SCHEMA (return EXACTLY this JSON shape) ===
 
 {
   "product_class": "<echoed classification string>",
   "modules": [
     {
-      "module": "<one of the 12 module keys above>",
-      "module_brief": "<2-3 sentences specific to THIS product, NOT a generic definition>",
+      "module": "<one of the 12 module keys>",
+      "module_brief": "<2-3 sentences specific to THIS product>",
       "derived_parameters": { "<key>": <number|string> },
       "allowed_radicals": ["<radical_id>", ...],
       "applicability_confidence": "high" | "medium" | "low",
-      "secondary_modules": ["<universal_module>", ...]   // OMIT if no secondary
+      "secondary_modules": ["<universal_module>", ...],
+      "sub_modules": [
+        {
+          "id": "<snake_case, unique within this module>",
+          "name_human": "<human-readable name>",
+          "primary_character_id": "<snake_case character ID>",
+          "primary_character_name_human": "<human-readable character name>",
+          "modifiers": [{ "kind": "<ModifierKind>", "value": "<token>", "unit": "<optional>" }],
+          "role_verb": "<verb>",
+          "topology_clause": "<optional>"
+        }
+      ],
+      "grammar_links": [
+        {
+          "from_sub_module": "<sub_module id within this module>",
+          "to_sub_module": "<sub_module id within this module>",
+          "mechanism": "<GrammarMechanism>",
+          "type": "mutual" | "directional",
+          "detail": "<optional>"
+        }
+      ]
     }
   ],
   "excluded_modules": ["<module>", ...],
-  "rationale_excluded": { "<module>": "<why N/A for this product>" }
+  "rationale_excluded": { "<module>": "<why N/A for this product>" },
+  "cross_module_grammar_links": [
+    {
+      "from_module": "<UniversalModule in modules[]>",
+      "to_module": "<UniversalModule in modules[]>",
+      "mechanism": "<GrammarMechanism>",
+      "type": "mutual" | "directional",
+      "detail": "<optional>"
+    }
+  ]
 }
 
 === HARD CONSTRAINTS (validator will reject otherwise) ===
@@ -737,6 +925,11 @@ hmi_ergonomics: silicon_semiconductor_function, polymer_thermoplastic, optical_s
 - secondary_modules entries MUST also be drawn from the 12 module keys.
 - derived_parameters: numeric values MUST be finite and non-negative. String values MUST be a single short phrase, not prose.
 - rationale_excluded MUST contain a one-line "why N/A" for EVERY module listed in excluded_modules.
+- Every ModuleSpec MUST include sub_modules with 1–8 entries (3–8 strongly preferred). A 1- or 2-sub-module module is permitted only with an explicit justification in module_brief explaining why the module cannot be meaningfully decomposed further; the validator will accept the count with a warning rather than reject it.
+- Every sub_module id MUST be unique within its parent ModuleSpec.
+- Every GrammarLink's from_sub_module and to_sub_module MUST reference IDs that appear in the same ModuleSpec's sub_modules array.
+- Every GrammarLink mechanism and every cross_module_grammar_link mechanism MUST be one of the 26 canonical values listed above — no others.
+- cross_module_grammar_links from_module and to_module MUST reference UniversalModule keys that appear in modules[] (not in excluded_modules).
 
 === APPLICABILITY CONFIDENCE GUIDANCE ===
 
@@ -794,6 +987,7 @@ Respond with ONLY a JSON array of objects:
   {
     "character_id": string,         // MUST be from the per-module character library OR "<UNKNOWN>"
     "archetype_id": string|null,
+    "sub_module_id": string,        // MUST reference one of the sub_modules ids listed in [Sub-modules] below
     "multiplicity": integer,        // count of this component type in this module (>= 1)
     "mpn_hint": string|null,
     "manufacturer_hint": string|null,
@@ -803,21 +997,30 @@ Respond with ONLY a JSON array of objects:
   ...
 ]
 
+=== SUB-MODULE TAGGING RULES ===
+- Every leaf MUST carry a sub_module_id. The value MUST be EITHER one of the sub_modules ids declared in the [Sub-modules] context block of the user message, OR the exact sentinel string "<UNCATEGORISED>" (verbatim — capital letters, angle brackets, no spaces, no synonyms like "uncategorised", "UNKNOWN", "n/a", or any case variant).
+- Each sub-module declares a primary_character_id; the leaf for that primary character MUST set sub_module_id to that sub-module's id.
+- Supporting characters (busbars, harnesses, hardware sets, insulation pads, etc.) attach to the sub-module they physically belong to — e.g. a cell-to-cell busbar belongs to the cell_string sub-module, NOT to rack_structure.
+- If a leaf genuinely spans multiple sub-modules, pick the sub-module it is physically mounted on (mechanical primacy) and note the secondary attachment in description.
+- If you genuinely cannot map a leaf to any of the declared sub-modules, set sub_module_id to "<UNCATEGORISED>" — exactly that string. This is a signal that the parent module's sub-module catalogue is incomplete (downstream will surface this as a Stage 1.5 quality warning). Do NOT invent a new sub_module id.
+
 === QUANTITY RULES ===
 - multiplicity is the count of this SPECIFIC component type within THIS module of a SINGLE unit of the product.
 - Derive from the module's derived_parameters where possible (e.g. capacity_kwh, rated_thermal_kw, dish_diameter_m).
+- For sub-modules whose primary character has a quantity modifier (e.g. cell_string primary lfp_prismatic_cell qty ×3920), the leaf's multiplicity MUST match that modifier's value.
 - Show calculation in description for non-trivial counts.
 
 === CONSTRAINTS ===
 - Aim for 15-30 leaves PER MODULE. Stop at 60 leaves max.
 - Do NOT emit leaves for OTHER modules — they are decomposed in their own calls.
 - Do NOT wrap the array in an object. Return the bare array [ ... ].
-- No duplicate (character_id, archetype_id) pairs — differentiate by archetype_id or add description.
-- Sort records by character_id alphabetically — helps determinism.
+- No duplicate (character_id, archetype_id, sub_module_id) triples — differentiate by archetype_id, sub_module_id, or add description.
+- Sort records by sub_module_id then character_id alphabetically — helps determinism and BoM rendering.
 
 The user message will give you:
 [Module brief] — what THIS module does on THIS product
 [Derived parameters] — quantitative inputs
+[Sub-modules] — the sub-modules declared for THIS module by Stage 1.5 (id, name_human, primary_character_id, role_verb). Every leaf MUST be tagged with one of these ids via sub_module_id.
 [Allowed character_ids] — narrow library subset; you may ONLY use these IDs (or "<UNKNOWN>")
 [Allowed radicals] — narrow radical subset
 [Product context] — short context about the whole product`

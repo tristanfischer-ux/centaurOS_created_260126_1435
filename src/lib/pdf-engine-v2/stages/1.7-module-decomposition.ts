@@ -31,12 +31,17 @@ import type {
   CouncilSeatId,
   CouncilSeatReview,
   CouncilVerdict,
+  CrossModuleGrammarLink,
   DerivedParameters,
+  GrammarLink,
+  GrammarMechanism,
+  ModifyingCharacter,
   ModuleDecomposition,
   ModuleDecompositionTelemetry,
   ModuleDecompositionValidation,
   ModuleSpec,
   SeatVerdict,
+  SubModuleSpec,
   UniversalModule,
 } from '../types/module-decomposition'
 import {
@@ -85,6 +90,21 @@ const KNOWN_RADICALS = new Set<string>([
 ])
 
 const UNIVERSAL_MODULE_SET = new Set<UniversalModule>(UNIVERSAL_MODULES as readonly UniversalModule[])
+
+/** All 26 canonical GrammarMechanism values. Used to validate grammar_links and cross_module_grammar_links. */
+const GRAMMAR_MECHANISM_SET = new Set<GrammarMechanism>([
+  // Mechanical/structural
+  'mechanical_mount', 'pcb_mounting', 'cable_transit', 'fluid_routing', 'door_interlock',
+  // Electrical — power
+  'voltage_taps', 'dc_busbar', 'ac_busbar', 'high_voltage_dc',
+  // Electrical — control/signal
+  'contactor_command', 'pre_charge_enable', 'imd_trip', 'sensor_feedback',
+  'alarm_interlock', 'safety_isolation', 'manual_override', 'hmi_data',
+  // Comms
+  'can_bus', 'modbus_tcp', 'i2c_bus', 'spi_bus', 'rf_path', 'fibre_optic',
+  // Fluid/thermal
+  'cooling_loop', 'refrigerant_line', 'air_duct',
+])
 const COUNCIL_SEATS: ReadonlyArray<{ id: CouncilSeatId; model: string }> = [
   { id: 'grok',   model: 'x-ai/grok-4.3' },
   { id: 'gemini', model: 'google/gemini-3.1-pro-preview' },
@@ -280,6 +300,134 @@ function validateModuleSpecShape(
     if (secondary.length === 0) secondary = undefined
   }
 
+  // ── sub_modules ──────────────────────────────────────────────────────────
+  // Coding-council 2026-05-12 (NEEDS_MAJOR, Gemini + GLM): a hard `length < 3` error
+  // creates a paradox with the prompt's "single-sub-module modules allowed with
+  // justification" exception AND traps `buildFallbackDecomposition`'s empty array
+  // in an unrecoverable retry loop. Demoted 1-2 entries from error to warning.
+  // Genuinely empty output remains a hard error since it's structurally unusable
+  // downstream (Stage 2 needs at least one sub_module_id to tag leaves against).
+  const subModulesRaw = Array.isArray(r.sub_modules) ? r.sub_modules : []
+  if (subModulesRaw.length === 0) {
+    errors.push(`modules[${index}].sub_modules is missing or empty — at least 1 sub-module is required (3–8 strongly preferred)`)
+  } else if (subModulesRaw.length > 8) {
+    paramWarnings.push(`modules[${index}].sub_modules has ${subModulesRaw.length} entries (max 8); extras will still be accepted but review`)
+  } else if (subModulesRaw.length < 3) {
+    paramWarnings.push(`modules[${index}].sub_modules has only ${subModulesRaw.length} entries (3–8 strongly preferred); accepted but flag for review — module_brief should justify the sparse decomposition`)
+  }
+  const subModules: SubModuleSpec[] = []
+  const seenSubIds = new Set<string>()
+  for (let si = 0; si < subModulesRaw.length; si++) {
+    const sm = subModulesRaw[si]
+    if (!sm || typeof sm !== 'object') {
+      errors.push(`modules[${index}].sub_modules[${si}] is not an object`)
+      continue
+    }
+    const smr = sm as Record<string, unknown>
+    const smId = typeof smr.id === 'string' ? smr.id.trim() : ''
+    if (smId.length === 0) {
+      errors.push(`modules[${index}].sub_modules[${si}].id is empty`)
+      continue
+    }
+    if (seenSubIds.has(smId)) {
+      errors.push(`modules[${index}].sub_modules[${si}].id "${smId}" duplicates an earlier sub_module id within this module`)
+      continue
+    }
+    seenSubIds.add(smId)
+    const nameHuman = typeof smr.name_human === 'string' ? smr.name_human.trim() : ''
+    if (nameHuman.length === 0) {
+      errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").name_human is empty`)
+    }
+    const primaryCharId = typeof smr.primary_character_id === 'string' ? smr.primary_character_id.trim() : ''
+    if (primaryCharId.length === 0) {
+      errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").primary_character_id is empty`)
+    }
+    const primaryCharNameHuman = typeof smr.primary_character_name_human === 'string' ? smr.primary_character_name_human.trim() : ''
+    if (primaryCharNameHuman.length === 0) {
+      errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").primary_character_name_human is empty`)
+    }
+    // modifiers
+    const modifiersRaw = Array.isArray(smr.modifiers) ? smr.modifiers : []
+    const modifiers: ModifyingCharacter[] = []
+    for (let mi = 0; mi < modifiersRaw.length; mi++) {
+      const mod = modifiersRaw[mi]
+      if (!mod || typeof mod !== 'object') {
+        paramWarnings.push(`modules[${index}].sub_modules[${si}].modifiers[${mi}] is not an object; skipped`)
+        continue
+      }
+      const modr = mod as Record<string, unknown>
+      const kind = typeof modr.kind === 'string' ? modr.kind.trim() : ''
+      if (kind.length === 0) {
+        paramWarnings.push(`modules[${index}].sub_modules[${si}].modifiers[${mi}].kind is empty; skipped`)
+        continue
+      }
+      const value = typeof modr.value === 'string' ? modr.value.trim() : ''
+      if (value.length === 0) {
+        paramWarnings.push(`modules[${index}].sub_modules[${si}].modifiers[${mi}].value is empty; skipped`)
+        continue
+      }
+      const unit = typeof modr.unit === 'string' && modr.unit.trim().length > 0 ? modr.unit.trim() : undefined
+      modifiers.push({ kind, value, unit })
+    }
+    const roleVerb = typeof smr.role_verb === 'string' && smr.role_verb.trim().length > 0 ? smr.role_verb.trim() : undefined
+    const topologyClause = typeof smr.topology_clause === 'string' && smr.topology_clause.trim().length > 0 ? smr.topology_clause.trim() : undefined
+    subModules.push({
+      id: smId,
+      name_human: nameHuman,
+      primary_character_id: primaryCharId,
+      primary_character_name_human: primaryCharNameHuman,
+      modifiers,
+      role_verb: roleVerb,
+      topology_clause: topologyClause,
+    })
+  }
+
+  // ── grammar_links ─────────────────────────────────────────────────────────
+  const grammarLinksRaw = Array.isArray(r.grammar_links) ? r.grammar_links : []
+  const grammarLinks: GrammarLink[] = []
+  for (let gi = 0; gi < grammarLinksRaw.length; gi++) {
+    const gl = grammarLinksRaw[gi]
+    if (!gl || typeof gl !== 'object') {
+      errors.push(`modules[${index}].grammar_links[${gi}] is not an object`)
+      continue
+    }
+    const glr = gl as Record<string, unknown>
+    const fromId = typeof glr.from_sub_module === 'string' ? glr.from_sub_module.trim() : ''
+    const toId = typeof glr.to_sub_module === 'string' ? glr.to_sub_module.trim() : ''
+    if (fromId.length === 0) {
+      errors.push(`modules[${index}].grammar_links[${gi}].from_sub_module is empty`)
+      continue
+    }
+    if (toId.length === 0) {
+      errors.push(`modules[${index}].grammar_links[${gi}].to_sub_module is empty`)
+      continue
+    }
+    if (!seenSubIds.has(fromId)) {
+      errors.push(`modules[${index}].grammar_links[${gi}].from_sub_module "${fromId}" does not match any sub_module id in this module`)
+    }
+    if (!seenSubIds.has(toId)) {
+      errors.push(`modules[${index}].grammar_links[${gi}].to_sub_module "${toId}" does not match any sub_module id in this module`)
+    }
+    const mechanism = typeof glr.mechanism === 'string' ? glr.mechanism.trim() : ''
+    if (!GRAMMAR_MECHANISM_SET.has(mechanism as GrammarMechanism)) {
+      errors.push(`modules[${index}].grammar_links[${gi}].mechanism "${mechanism}" is not in the 26-mechanism canonical set`)
+      continue
+    }
+    const linkType = glr.type
+    if (linkType !== 'mutual' && linkType !== 'directional') {
+      errors.push(`modules[${index}].grammar_links[${gi}].type must be "mutual" or "directional" (got "${String(linkType)}")`)
+      continue
+    }
+    const detail = typeof glr.detail === 'string' && glr.detail.trim().length > 0 ? glr.detail.trim() : undefined
+    grammarLinks.push({
+      from_sub_module: fromId,
+      to_sub_module: toId,
+      mechanism: mechanism as GrammarMechanism,
+      type: linkType,
+      detail,
+    })
+  }
+
   return {
     module: moduleKey as UniversalModule,
     module_brief: moduleBrief,
@@ -287,6 +435,8 @@ function validateModuleSpecShape(
     allowed_radicals: allowedRadicals,
     applicability_confidence: conf,
     secondary_modules: secondary,
+    sub_modules: subModules,
+    grammar_links: grammarLinks,
   }
 }
 
@@ -300,6 +450,7 @@ function validateModuleDecompositionPayload(
   rationale: Partial<Record<UniversalModule, string>>
   productClass: string
   priorResult: PriorValidationResult
+  crossModuleGrammarLinks: CrossModuleGrammarLink[]
 } {
   const errors: string[] = []
   const paramWarnings: string[] = []
@@ -309,6 +460,7 @@ function validateModuleDecompositionPayload(
       validation: { ok: false, schema_errors: ['response is not an object'], prior_warnings: [], parameter_warnings: [] },
       modules: [], excluded: [], rationale: {}, productClass: classification,
       priorResult: { ok: false, missing_required: [], forbidden_present: [], optional_present: [] },
+      crossModuleGrammarLinks: [],
     }
   }
   const root = raw as Record<string, unknown>
@@ -384,6 +536,47 @@ function validateModuleDecompositionPayload(
     errors.push(`forbidden_present modules per ${normClass} prior: ${priorResult.forbidden_present.join(', ')}`)
   }
 
+  // ── cross_module_grammar_links ─────────────────────────────────────────────
+  const includedModuleSet = new Set<UniversalModule>(modules.map(m => m.module))
+  const crossLinksRaw = Array.isArray(root.cross_module_grammar_links) ? root.cross_module_grammar_links : []
+  const crossModuleGrammarLinks: CrossModuleGrammarLink[] = []
+  for (let ci = 0; ci < crossLinksRaw.length; ci++) {
+    const cl = crossLinksRaw[ci]
+    if (!cl || typeof cl !== 'object') {
+      errors.push(`cross_module_grammar_links[${ci}] is not an object`)
+      continue
+    }
+    const clr = cl as Record<string, unknown>
+    const fromMod = typeof clr.from_module === 'string' ? clr.from_module.trim() : ''
+    const toMod = typeof clr.to_module === 'string' ? clr.to_module.trim() : ''
+    if (!UNIVERSAL_MODULE_SET.has(fromMod as UniversalModule) || !includedModuleSet.has(fromMod as UniversalModule)) {
+      errors.push(`cross_module_grammar_links[${ci}].from_module "${fromMod}" is not a valid UniversalModule present in modules[]`)
+      continue
+    }
+    if (!UNIVERSAL_MODULE_SET.has(toMod as UniversalModule) || !includedModuleSet.has(toMod as UniversalModule)) {
+      errors.push(`cross_module_grammar_links[${ci}].to_module "${toMod}" is not a valid UniversalModule present in modules[]`)
+      continue
+    }
+    const mechanism = typeof clr.mechanism === 'string' ? clr.mechanism.trim() : ''
+    if (!GRAMMAR_MECHANISM_SET.has(mechanism as GrammarMechanism)) {
+      errors.push(`cross_module_grammar_links[${ci}].mechanism "${mechanism}" is not in the 26-mechanism canonical set`)
+      continue
+    }
+    const linkType = clr.type
+    if (linkType !== 'mutual' && linkType !== 'directional') {
+      errors.push(`cross_module_grammar_links[${ci}].type must be "mutual" or "directional" (got "${String(linkType)}")`)
+      continue
+    }
+    const detail = typeof clr.detail === 'string' && clr.detail.trim().length > 0 ? clr.detail.trim() : undefined
+    crossModuleGrammarLinks.push({
+      from_module: fromMod as UniversalModule,
+      to_module: toMod as UniversalModule,
+      mechanism: mechanism as GrammarMechanism,
+      type: linkType,
+      detail,
+    })
+  }
+
   return {
     validation: {
       ok: errors.length === 0,
@@ -396,6 +589,7 @@ function validateModuleDecompositionPayload(
     rationale,
     productClass,
     priorResult,
+    crossModuleGrammarLinks,
   }
 }
 
@@ -558,6 +752,23 @@ function buildFallbackDecomposition(
     allowed_radicals: [...MODULE_DEFAULT_ALLOWED_RADICALS[m]],
     applicability_confidence: 'low',
     secondary_modules: undefined,
+    // Piece 1A coding-council 2026-05-12 fix (GLM NEEDS_MAJOR): fallback must emit
+    // at least one sub_module to satisfy the validator's "length >= 1" hard check.
+    // The sentinel ("uncategorised") carries no engineering content but unblocks
+    // downstream consumers; Stage 2 will tag any leaves it produces against this
+    // single id, and the renderer can surface "Stage 1.5 fallback fired" as a
+    // quality warning rather than an unrecoverable failure.
+    sub_modules: [
+      {
+        id: 'uncategorised',
+        name_human: 'Uncategorised (fallback)',
+        primary_character_id: 'uncategorised',
+        primary_character_name_human: 'Uncategorised primary character',
+        modifiers: [],
+        role_verb: 'contains',
+      },
+    ],
+    grammar_links: [],
   }))
   const excluded: UniversalModule[] = (UNIVERSAL_MODULES as readonly UniversalModule[])
     .filter(m => !modules.some(x => x.module === m))
@@ -576,6 +787,8 @@ function buildFallbackDecomposition(
     council_verdict: 'NEEDS_MINOR',
     council_seats: [],
     council_notes: [failureNote, `fallback: built from CLASS_MODULE_PRIORS[${normClass}]`],
+    // Piece 1A: required field — fallback emits empty cross-module links.
+    cross_module_grammar_links: [],
     telemetry: {
       llm_call_ms: 0,
       council_ms: 0,
@@ -595,7 +808,7 @@ function buildFallbackDecomposition(
 // ---------------------------------------------------------------------------
 
 const STAGE_1_7_PRIMARY_MODELS = ['google/gemini-3.1-pro-preview', 'x-ai/grok-4.3']
-const STAGE_1_7_MAX_TOKENS = 4096
+const STAGE_1_7_MAX_TOKENS = 16384
 
 /**
  * Run Stage 1.5 module decomposition.
@@ -718,6 +931,7 @@ export async function runModuleDecomposition(
   let finalModules = v.modules
   let finalExcluded = v.excluded
   let finalRationale = v.rationale
+  let finalCrossModuleLinks = v.crossModuleGrammarLinks
   let finalCouncil = council
   let totalInput = llmInput + council.inputTokens
   let totalOutput = llmOutput + council.outputTokens
@@ -764,6 +978,7 @@ export async function runModuleDecomposition(
         finalModules = v2.modules
         finalExcluded = v2.excluded
         finalRationale = v2.rationale
+        finalCrossModuleLinks = v2.crossModuleGrammarLinks
         finalCouncil = council2
       } else {
         // Couldn't even validate the retry; fall back to priors
@@ -821,6 +1036,7 @@ export async function runModuleDecomposition(
     modules: finalModules,
     excluded_modules: finalExcluded,
     rationale_excluded: finalRationale,
+    cross_module_grammar_links: finalCrossModuleLinks,
     council_verdict: finalCouncil.aggregate,
     council_seats: finalCouncil.seats,
     council_notes: allCouncilNotes,

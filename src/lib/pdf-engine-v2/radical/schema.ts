@@ -108,6 +108,22 @@ export type CompositionNode = {
     current_in_A: number // positive = current flowing into this node
     current_out_A: number // positive = current flowing out of this node
   }
+  /**
+   * Piece 1A.2 (2026-05-12) — preserves sub-module tagging from the per-module
+   * Stage 2 LLM output (LeafRecord.sub_module_id) through the structural builder
+   * so downstream renderers can group characters under sub-module / sentence
+   * dividers in the §6 BoM and §4 sub-module radical-translation cards.
+   *
+   * Worked-example terminology: a CHARACTER node carries the id of the SENTENCE
+   * (sub-module) it belongs to. Module-level nodes and the root do not need
+   * this — they ARE the parent containers, not contained.
+   *
+   * OPTIONAL during the legacy → sub-module-aware migration: legacy paths emit
+   * leaves without a sub_module_id (rendering falls back to the existing
+   * character_id → archetype → word → sentence inference). New per-module
+   * Stage 2 paths populate this on every character node.
+   */
+  sub_module_id?: string | null
 }
 
 export type Composition = {

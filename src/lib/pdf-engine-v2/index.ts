@@ -1099,7 +1099,7 @@ export async function runPipeline(
         )
         if (decompositionResult.ok && decompositionResult.data) {
           const moduleDecomposition = decompositionResult.data
-          ;(state as any).moduleDecomposition = moduleDecomposition
+          state.moduleDecomposition = moduleDecomposition
           console.log(
             `[pipeline] Stage 1.5 complete: ${moduleDecomposition.modules.length} modules, ` +
             `${moduleDecomposition.excluded_modules.length} excluded, ` +
@@ -1914,6 +1914,7 @@ export async function runPipeline(
           resolvedRadicalTree: state.resolvedRadicalTree,
           radicalCostSummary: state.radicalCostSummary ?? null,
           grammarVerdicts: state.grammarVerdicts ?? null,
+          moduleDecomposition: state.moduleDecomposition ?? null,
           // Fix 4 (task #91-phase4): legacy costSummary.bomTotal paired field so the
           // aggregator can compute cost delta = (radical - legacy) / legacy.
           // v2-integrated path sets state.costSummary; v1 legacy path sets only

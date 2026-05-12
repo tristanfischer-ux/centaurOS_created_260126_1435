@@ -782,6 +782,14 @@ export interface PipelineState {
    */
   radicalCostSummary?: import('./stages/4c-radical-cost-rollup.js').RadicalCostSummary
   /**
+   * Iter 3 — Stage 1.5 module decomposition output.
+   * Populated when RADICAL_PHASE_3_PER_MODULE=true and Stage 1.5 succeeded.
+   * Contains the 12-universal-modules catalog with sub_modules, grammar_links
+   * (intra-module), and cross_module_grammar_links (inter-module). Drives the
+   * §2.5 module connection map and §3/§4 sub-module rendering in the PDF.
+   */
+  moduleDecomposition?: import('./types/module-decomposition.js').ModuleDecomposition
+  /**
    * Phase 4 — Grammar Verdicts.
    * Populated when RADICAL_PHASE_4_GRAMMAR=true AND resolvedRadicalTree exists.
    * Contains one GrammarVerdict per rule fired, plus overall_verdict and

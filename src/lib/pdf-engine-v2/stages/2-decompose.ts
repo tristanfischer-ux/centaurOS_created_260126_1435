@@ -1275,6 +1275,18 @@ async function runOneModuleDecomposition(
   const lib = buildPerModuleCharacterLibrary(moduleSpec, productClass)
   const allowedRadicals = unionAllowedRadicals(moduleSpec)
 
+  // Piece 1A 2026-05-12 — emit sub_modules context so the LLM can tag each leaf
+  // with its parent sub_module_id. Sub-modules come from Stage 1.5 (required
+  // since piece 1A; legacy paths emit empty arrays which renders an explicit
+  // warning to the LLM).
+  const subModulesBlock = moduleSpec.sub_modules && moduleSpec.sub_modules.length > 0
+    ? moduleSpec.sub_modules.map(sm => {
+        const verb = sm.role_verb ?? 'comprises'
+        const topology = sm.topology_clause ? ` — ${sm.topology_clause}` : ''
+        return `  - id="${sm.id}", name="${sm.name_human}", primary_character_id="${sm.primary_character_id}", role_verb="${verb}"${topology}`
+      }).join('\n')
+    : `  (no sub-modules declared by Stage 1.5 — emit sub_module_id="<UNCATEGORISED>" for every leaf and flag this in the description so downstream surfaces the gap)`
+
   const userContent = [
     `[Module brief]`,
     moduleSpec.module_brief,
@@ -1284,6 +1296,9 @@ async function runOneModuleDecomposition(
     ``,
     `[Derived parameters]`,
     JSON.stringify(moduleSpec.derived_parameters, null, 2),
+    ``,
+    `[Sub-modules] — every leaf MUST set sub_module_id to one of these ids`,
+    subModulesBlock,
     ``,
     `[Allowed character_ids — you may ONLY use these IDs or "<UNKNOWN>"]`,
     lib.characterIds.length > 0

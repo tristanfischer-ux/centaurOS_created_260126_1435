@@ -57,6 +57,20 @@ export interface LeafRecord {
   estimated_unit_price_gbp?: number | null
   /** Human-readable description — used for UNKNOWN leaves */
   description?: string | null
+  /**
+   * Identifier of the parent SubModuleSpec.id within the owning ModuleSpec.
+   * Added as part of Piece 1A 2026-05-12 so the per-module Stage 2 LLM tags
+   * each leaf with the sub-module it belongs to (cell_string, bms_slave, etc.).
+   * Consumed downstream by the renderer to group leaves under sub-module
+   * dividers in the §6 BoM and §4 sub-module radical-translation cards.
+   *
+   * OPTIONAL during the legacy → sub-module-aware migration: legacy Stage 2
+   * paths (non-per-module) emit leaves without this field; the structural
+   * builder treats undefined as "ungrouped" and falls back to the existing
+   * character_id → archetype → word → sentence inference path. New per-module
+   * Stage 2 calls should populate it on every leaf.
+   */
+  sub_module_id?: string | null
 }
 
 /** Summary of unknowns emitted during tree construction */
@@ -1125,10 +1139,15 @@ export function buildTreeFromLeaves(
         const quantity = override !== undefined
           ? override
           : Math.max(1, Math.round(item.leaf.multiplicity))
+        // Piece 1A.2 2026-05-12: propagate sub_module_id (= sentence id, in
+        // worked-example terms) from LeafRecord onto the character node so
+        // downstream renderers can group BoM rows under sub-module dividers
+        // without re-traversing state.moduleDecomposition.
         return {
           archetypeId,
           quantity,
           children: [],
+          sub_module_id: item.leaf.sub_module_id ?? null,
         }
       })
 
@@ -1242,6 +1261,11 @@ export function validateLeafList(raw: unknown): LeafRecord[] {
       ? rawMultiplicity
       : 1
 
+    const subModuleIdRaw = (item as any).sub_module_id
+    const subModuleId = typeof subModuleIdRaw === 'string' && subModuleIdRaw.trim() !== ''
+      ? subModuleIdRaw.trim()
+      : null
+
     validated.push({
       character_id: characterId.trim(),
       archetype_id: (item as any).archetype_id ?? null,
@@ -1250,6 +1274,7 @@ export function validateLeafList(raw: unknown): LeafRecord[] {
       manufacturer_hint: (item as any).manufacturer_hint ?? null,
       estimated_unit_price_gbp: (item as any).estimated_unit_price_gbp ?? null,
       description: (item as any).description ?? null,
+      sub_module_id: subModuleId,
     })
   }
 
