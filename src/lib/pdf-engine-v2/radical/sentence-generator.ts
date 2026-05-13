@@ -270,6 +270,15 @@ export function generateSubmoduleSentence(
   subModule: SubModuleSpec,
   options?: SubmoduleSentenceOptions,
 ): string {
+  // WS-A council R-C1 (2026-05-13): when the Tier-4/monolith multi-emitter
+  // path emits a verbatim §4.5 English sentence, prefer it over the
+  // deterministic build. The emitter has more context (the worked-example
+  // pattern + modifier modal data) than the rule-based template here. When
+  // the field is empty/absent (legacy single-emitter path), fall back to
+  // the deterministic generator below — preserves backward compatibility.
+  if (typeof subModule.english_sentence === 'string' && subModule.english_sentence.trim().length > 0) {
+    return ensureTerminalPunctuation(subModule.english_sentence.trim())
+  }
   const style = options?.style ?? 'verbose'
   const subject = subModule.name_human || humaniseId(subModule.id)
   const verb = (subModule.role_verb && subModule.role_verb.trim()) || 'comprises'
@@ -617,6 +626,12 @@ export function buildNaturalLanguageLayer(
  * within-word ⊕ from between-word ⊕ (council 2026-05-12 P3 fix).
  */
 function generateSubmoduleRadSentence(sub: SubModuleSpec): string {
+  // WS-A council R-C1 (2026-05-13): prefer the LLM-emitted verbatim §4.5
+  // RAD-syntax line over the deterministic build when present. Falls back
+  // to the deterministic word-by-word render for the legacy path.
+  if (typeof sub.rad_syntax === 'string' && sub.rad_syntax.trim().length > 0) {
+    return sub.rad_syntax.trim()
+  }
   const words = sub.words ?? []
   if (words.length === 0) return `<${sub.id}>`
   const wordClauses = words.map(w => renderWordRadClause(w))

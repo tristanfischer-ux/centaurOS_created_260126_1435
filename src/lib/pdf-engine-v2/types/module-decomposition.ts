@@ -641,6 +641,24 @@ export interface SubModuleSpec {
    * with two redundant CAN slaves per module").
    */
   topology_clause?: string
+  /**
+   * WS-A council R-C1 (2026-05-13): the §4.5 English sentence emitted by
+   * the Tier 4 LLM. When present, `generateSubmoduleSentence` prefers this
+   * verbatim string over the deterministic build from `words[]`.
+   *
+   * Populated ONLY by the tiered pipeline (RADICAL_TIERED_DECOMPOSITION=true).
+   * Legacy monolith path leaves this undefined; sentence-generator falls back
+   * to deterministic emission, preserving backward compatibility.
+   */
+  english_sentence?: string
+  /**
+   * WS-A council R-C1 (2026-05-13): the §4.5 RAD-syntax line emitted by the
+   * Tier 4 LLM. One word per cluster, formatted as
+   *   "content_character (mod1) ⊕ next_character (mod1, mod2)".
+   *
+   * Audit trail + verbatim render target for the §4.5 PDF block.
+   */
+  rad_syntax?: string
 }
 
 // ---------------------------------------------------------------------------
@@ -1101,4 +1119,129 @@ export interface ModuleRadicalSubTreeValidation {
   out_of_scope_leaves: number
   /** Leaves with multiplicity ≤ 0 or non-finite. */
   invalid_multiplicity_count: number
+}
+
+// ---------------------------------------------------------------------------
+// 8. WS-A tier emission types (2026-05-13) — splits the Stage 1.7 monolith
+// into three sequential LLM stages per memo §4.5 worked-example pattern.
+// Existing ModuleSpec / ModuleDecomposition stay untouched — these are the
+// PRODUCTION emission shapes that get assembled into the legacy shape by
+// `stages/1.7-module-decomposition.ts::runTieredModuleDecomposition`.
+// ---------------------------------------------------------------------------
+
+/**
+ * Tier 2 emission — module catalogue ONLY (no sub_modules, no words).
+ *
+ * Emitted by `stages/1.7a-modules.ts::runTier2Modules`. Each ModuleBrief
+ * carries a 2-3 sentence brief, derived_parameters, allowed_radicals,
+ * applicability_confidence, and the secondary_modules hint. NO sub-modules
+ * yet — those are emitted by Tier 3.
+ */
+export interface ModuleBrief {
+  module: UniversalModule
+  module_brief: string
+  derived_parameters: DerivedParameters
+  allowed_radicals: string[]
+  applicability_confidence: ApplicabilityConfidence
+  secondary_modules?: UniversalModule[]
+}
+
+/**
+ * Tier 2 top-level emission. Output of `runTier2Modules()`.
+ */
+export interface Tier2Decomposition {
+  product_class: string
+  normalised_class: ProductClass | null
+  modules: ModuleBrief[]
+  excluded_modules: UniversalModule[]
+  rationale_excluded: Partial<Record<UniversalModule, string>>
+  council_verdict: CouncilVerdict
+  council_seats: CouncilSeatReview[]
+  council_notes: string[]
+  telemetry: ModuleDecompositionTelemetry
+}
+
+/**
+ * Tier 3 emission — sub-modules for ONE module (no words yet).
+ *
+ * Emitted by `stages/1.7b-submodules.ts::runTier3SubModules`. Each
+ * SubModuleBrief carries id, name_human, role_verb, topology_clause,
+ * a 1-3 sentence sub_module_brief (seed for Tier 4 English expansion),
+ * and intra-module grammar_links_out. NO words yet — those are emitted
+ * by Tier 4.
+ */
+export interface SubModuleBrief {
+  id: string
+  name_human: string
+  role_verb?: string
+  topology_clause?: string
+  /**
+   * 1-3 sentence plain-English description of what this sub-module is and
+   * does. Tier 4 uses this as the seed for the §4.5 english_sentence.
+   */
+  sub_module_brief: string
+  /**
+   * Intra-module grammar links sourced from this sub-module. Tier 3 emits
+   * these; Tier 4 may refine them with mechanism detail. Union-merged with
+   * Tier 4 emissions in the assembler.
+   */
+  grammar_links_out: GrammarLink[]
+}
+
+/**
+ * Tier 3 per-module emission. One Tier3Decomposition per included module
+ * from Tier 2. Output of `runTier3SubModules()`.
+ */
+export interface Tier3Decomposition {
+  module: UniversalModule
+  sub_modules: SubModuleBrief[]
+  council_verdict: CouncilVerdict
+  council_seats: CouncilSeatReview[]
+  council_notes: string[]
+  telemetry: ModuleDecompositionTelemetry
+}
+
+/**
+ * Tier 4 emission — parts + RAD + grammar for ONE sub-module.
+ *
+ * The high-value tier: produces the §4.5 English sentence, the verbatim
+ * RAD-syntax line, the words[] (one BoM row per word.content_character),
+ * and the cross-sub-module grammar links. Emitted by
+ * `stages/1.7c-parts-rad.ts::runTier4PartsRad`.
+ *
+ * Council R-C1 (2026-05-13): the assembler MUST propagate
+ * `english_sentence` and `rad_syntax` into the assembled SubModuleSpec.
+ */
+export interface PartsRadEmission {
+  module: UniversalModule
+  sub_module_id: string
+  /**
+   * The §4.5 English line — one or two sentences describing what this
+   * sub-module is made of. Drives both the PDF prose and the LLM-paragraph
+   * fallback. Council R-C1 propagates this into SubModuleSpec.english_sentence.
+   */
+  english_sentence: string
+  /**
+   * Verbatim §4.5 RAD-syntax line. One word per cluster, formatted as
+   *   "char_id (mod1, mod2) ⊕ next_char (mod1)". Audit-trail + PDF render.
+   */
+  rad_syntax: string
+  /**
+   * The RAD-syntax words (becomes SubModuleSpec.words downstream).
+   */
+  words: WordSpec[]
+  /**
+   * Intra-module grammar links sourced from this sub-module (merged with
+   * Tier 3's grammar_links_out by the assembler — Tier 4 wins on
+   * mechanism-detail disagreement per memo §11 R3).
+   */
+  grammar_links: GrammarLink[]
+  /**
+   * Cross-module grammar links sourced from this sub-module.
+   */
+  cross_module_grammar_links: CrossModuleGrammarLink[]
+  council_verdict: CouncilVerdict
+  council_seats: CouncilSeatReview[]
+  council_notes: string[]
+  telemetry: ModuleDecompositionTelemetry
 }

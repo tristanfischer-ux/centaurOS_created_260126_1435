@@ -63,6 +63,11 @@ import {
   buildFallbackModuleList,
   type PriorValidationResult,
 } from './class-module-priors'
+import {
+  synthesiseMultiEmitterDecomposition,
+  type MultiEmitterOutput,
+  type JudgeVerdict,
+} from '../radical/council-synthesis'
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -74,6 +79,16 @@ import {
  */
 export function isPhase3PerModuleEnabled(): boolean {
   const raw = (process.env.RADICAL_PHASE_3_PER_MODULE ?? '').toLowerCase().trim()
+  return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
+}
+
+/**
+ * WS-A 2026-05-13: opt in to the 6-emitter + 2-judge monolith pattern.
+ * When false (default), the legacy 1-emitter + 4-reviewer path runs unchanged.
+ * Drives `runModuleDecomposition` to delegate to `runMultiEmitterModuleDecomposition`.
+ */
+export function isMultiEmitterEnabled(): boolean {
+  const raw = (process.env.RADICAL_MULTI_EMITTER ?? '').toLowerCase().trim()
   return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
 }
 
@@ -478,12 +493,24 @@ function validateModuleSpecShape(
 
     const roleVerb = typeof smr.role_verb === 'string' && smr.role_verb.trim().length > 0 ? smr.role_verb.trim() : undefined
     const topologyClause = typeof smr.topology_clause === 'string' && smr.topology_clause.trim().length > 0 ? smr.topology_clause.trim() : undefined
+    // WS-A 2026-05-13 R-C1: accept optional english_sentence + rad_syntax. Both
+    // are non-fatal when missing (legacy path doesn't emit them); multi-emitter
+    // path requires them in the prompt but doesn't block synthesis if 1 of N
+    // emitters skipped — the synthesiser picks the longest non-empty emission.
+    const englishSentence = typeof smr.english_sentence === 'string' && smr.english_sentence.trim().length > 0
+      ? smr.english_sentence.trim()
+      : undefined
+    const radSyntax = typeof smr.rad_syntax === 'string' && smr.rad_syntax.trim().length > 0
+      ? smr.rad_syntax.trim()
+      : undefined
     subModules.push({
       id: smId,
       name_human: nameHuman,
       words,
       role_verb: roleVerb,
       topology_clause: topologyClause,
+      english_sentence: englishSentence,
+      rad_syntax: radSyntax,
     })
   }
 
@@ -990,7 +1017,11 @@ function buildFallbackDecomposition(
 // with explicit bad/good examples too — but model-order is the cheaper insurance.
 const STAGE_1_7_PRIMARY_MODELS = ['x-ai/grok-4.3', 'google/gemini-3.1-pro-preview']
 // WS-D 2026-05-13: 150k (was 32768) — Tristan approved; truncation more expensive than unused tokens.
-const STAGE_1_7_MAX_TOKENS = 150_000
+// WS-A 2026-05-13: 250k for multi-emitter mode — emitters now must emit §4.5
+// fidelity (english_sentence + rad_syntax + grammar per sub-module), which
+// roughly doubles output token volume. Legacy single-emitter path also uses
+// 250k to allow the expanded few-shot to fit upstream.
+const STAGE_1_7_MAX_TOKENS = 250_000
 
 /**
  * Run Stage 1.5 module decomposition.
@@ -1010,6 +1041,12 @@ export async function runModuleDecomposition(
   classification: string,
   regulatoryExtraction?: RegulatoryExtraction,
 ): Promise<StageResult<ModuleDecomposition>> {
+  // WS-A 2026-05-13: when RADICAL_MULTI_EMITTER=true, delegate to the
+  // 6-emitter + 2-judge path. Legacy 1-emitter + 4-reviewer path stays the
+  // default until the multi-emitter pattern proves out on full pipeline runs.
+  if (isMultiEmitterEnabled()) {
+    return runMultiEmitterModuleDecomposition(parsedBrief, classification, regulatoryExtraction)
+  }
   const startedAt = Date.now()
   console.log('[module-decomposition] Stage 1.5 starting (RADICAL_PHASE_3_PER_MODULE)...')
 
@@ -1242,6 +1279,396 @@ export async function runModuleDecomposition(
 }
 
 // ---------------------------------------------------------------------------
+// WS-A 2026-05-13 — Multi-emitter monolith pattern (6 emitters + 2 judges)
+// ---------------------------------------------------------------------------
+
+/**
+ * 6 emitters (balanced 3 Western + 3 Asian — no lineage overlap with judges).
+ * Order is informational only; emitters dispatch in parallel via Promise.allSettled.
+ */
+const MULTI_EMITTER_MODELS: ReadonlyArray<string> = [
+  'google/gemini-3.1-pro-preview',     // US / Google
+  'x-ai/grok-4.3',                     // US / xAI
+  'anthropic/claude-opus-4-7',         // US / Anthropic (via OpenRouter)
+  'qwen/qwen3.6-max-preview',          // Asia / Alibaba
+  'xiaomi/mimo-v2.5-pro',              // Asia / Xiaomi
+  'moonshotai/kimi-k2.6',              // Asia / Moonshot
+] as const
+
+/**
+ * 2 judges (independent vendors, no lineage overlap with emitters in role).
+ * - GLM = schema-strict (IFBench top, low hallucination)
+ * - Sonnet = independent vendor breadth check (IFBench mid, GDPval-AA #3)
+ */
+const MULTI_EMITTER_JUDGE_MODELS: ReadonlyArray<{ id: string; model: string }> = [
+  { id: 'glm',    model: 'z-ai/glm-5.1' },
+  { id: 'sonnet', model: 'anthropic/claude-sonnet-4-6' },
+] as const
+
+const MULTI_EMITTER_MIN_SPEAKING = 3
+
+/**
+ * Build the council-style judge prompt over the SYNTHESISED catalog.
+ * The judge sees the synthesised output and must emit OK/NEEDS_MINOR/NEEDS_MAJOR
+ * with optional `schema_violations: string[]` (per R-C3 schema-vs-quality
+ * tiebreak in council-synthesis.ts).
+ */
+function buildMultiEmitterJudgePrompt(): string {
+  return MODULE_DECOMPOSITION_COUNCIL_PROMPT +
+    `\n\nADDITIONAL FIELD (WS-A 2026-05-13): if you find SCHEMA-grade violations ` +
+    `in the synthesised catalog (invalid radical_id, duplicate sub_module id, ` +
+    `malformed RAD string, missing required field), emit them in an array field ` +
+    `"schema_violations" alongside your verdict. Quality concerns (under-decomposition, ` +
+    `wrong parameter magnitude) stay in your "notes" array. ` +
+    `Per the WS-A tiebreak rule, EITHER judge citing a schema_violation → engine ` +
+    `auto-drops the offending field (no retry). BOTH judges voting NEEDS_MAJOR on ` +
+    `quality only → engine retries the synthesis once. A single quality NEEDS_MAJOR ` +
+    `is logged and synthesis proceeds.`
+}
+
+function parseJudgeResponse(raw: unknown, judgeId: string, model: string): JudgeVerdict {
+  const fallback: JudgeVerdict = {
+    judge: judgeId,
+    model,
+    verdict: 'NEEDS_MAJOR',
+    notes: ['failed to parse judge response — treated as quality NEEDS_MAJOR'],
+    schemaViolations: [],
+  }
+  if (!raw || typeof raw !== 'object') return fallback
+  const r = raw as Record<string, unknown>
+  const v = r.verdict
+  const verdict: 'OK' | 'NEEDS_MINOR' | 'NEEDS_MAJOR' =
+    v === 'OK' || v === 'NEEDS_MINOR' || v === 'NEEDS_MAJOR' ? v : 'NEEDS_MAJOR'
+  const notes = Array.isArray(r.notes)
+    ? (r.notes as unknown[]).filter((n): n is string => typeof n === 'string')
+    : []
+  const schemaViolations = Array.isArray(r.schema_violations)
+    ? (r.schema_violations as unknown[]).filter((s): s is string => typeof s === 'string')
+    : []
+  return { judge: judgeId, model, verdict, notes, schemaViolations }
+}
+
+/**
+ * WS-A 2026-05-13 — 6-emitter + 2-judge monolith pattern. Feature-flagged
+ * by RADICAL_MULTI_EMITTER. Pattern:
+ *
+ *   1. Build the user prompt from parsedBrief + classification + regulatory.
+ *   2. Dispatch 6 emitters in parallel via Promise.allSettled. Failed emissions
+ *      are logged but not fatal — synthesis proceeds with ≥3 surviving emitters.
+ *   3. Synthesise the 6 outputs into a single MultiEmitterDecompositionPayload
+ *      using majority-vote rules from council-synthesis.ts (≥3 of 6 module
+ *      inclusion, ≥4 of 6 excluded-intersection, union sub_modules by id,
+ *      R-C2 quantity ≥3 of 6 agreement, R-C1 english_sentence + rad_syntax
+ *      propagated).
+ *   4. Dispatch 2 judges in parallel over the synthesised output. Apply
+ *      tiebreak rule: schema_violation → drop offending field, no retry.
+ *      Both quality-NEEDS_MAJOR → retry synthesis once with judge notes
+ *      appended to each emitter prompt.
+ *   5. Validate the final synthesised catalog through the existing schema
+ *      validator (re-uses validateModuleDecompositionPayload — keeps prior
+ *      cross-check, forbidden-module strip, etc.).
+ *   6. Return wrapped in ModuleDecomposition with telemetry.
+ */
+export async function runMultiEmitterModuleDecomposition(
+  parsedBrief: StructuredBriefJSON,
+  classification: string,
+  regulatoryExtraction?: RegulatoryExtraction,
+): Promise<StageResult<ModuleDecomposition>> {
+  const startedAt = Date.now()
+  console.log('[module-decomposition] WS-A multi-emitter Stage 1.7 starting (RADICAL_MULTI_EMITTER)...')
+
+  if (!process.env.OPENROUTER_API_KEY) {
+    return {
+      ok: false,
+      error: 'OPENROUTER_API_KEY is not set; multi-emitter Stage 1.7 cannot dispatch LLM calls',
+      durationMs: Date.now() - startedAt,
+    }
+  }
+
+  const allEntries = regulatoryExtraction?.regulatory_entries ?? []
+  const regSummary = allEntries.length
+    ? `\n\n[Regulatory entries from Stage 4 — first 20 of ${allEntries.length}]\n` +
+      allEntries.slice(0, 20).map(e => `- ${e.standard_name} (${e.jurisdiction}): ${e.engineering_impact}`).join('\n')
+    : ''
+
+  const baseUserContent =
+    `[Structured brief JSON from Stage 1]\n${JSON.stringify(parsedBrief, null, 2)}\n\n` +
+    `[Product classification]\n${classification}` +
+    regSummary
+
+  // Wrapper to call ONE emitter and collect parsed payload + diagnostics.
+  async function callEmitter(model: string, userContent: string): Promise<MultiEmitterOutput & { durationMs: number; inputTokens: number; outputTokens: number }> {
+    try {
+      const result = await callOpenRouterJson(
+        MODULE_DECOMPOSITION_TAXONOMY_PROMPT,
+        userContent,
+        [model],
+        STAGE_1_7_MAX_TOKENS,
+      )
+      const v = validateModuleDecompositionPayload(result.parsed, classification)
+      // Even if v.validation.ok is false, capture whatever modules parsed —
+      // the synthesiser's majority-vote drops outliers anyway. But mark
+      // schemaViolations so the judge can see them.
+      if (!v.validation.ok && v.modules.length === 0) {
+        return {
+          ok: false,
+          model,
+          schemaViolations: v.validation.schema_errors,
+          durationMs: result.durationMs,
+          inputTokens: result.inputTokens,
+          outputTokens: result.outputTokens,
+        }
+      }
+      return {
+        ok: true,
+        model,
+        data: {
+          product_class: v.productClass,
+          modules: v.modules,
+          excluded_modules: v.excluded,
+          rationale_excluded: v.rationale,
+          cross_module_grammar_links: v.crossModuleGrammarLinks,
+        },
+        schemaViolations: v.validation.schema_errors,
+        durationMs: result.durationMs,
+        inputTokens: result.inputTokens,
+        outputTokens: result.outputTokens,
+      }
+    } catch (err) {
+      console.warn(`[module-decomposition][multi-emitter] emitter ${model} failed: ${(err as Error).message}`)
+      return {
+        ok: false,
+        model,
+        schemaViolations: [`transport: ${(err as Error).message}`],
+        durationMs: 0,
+        inputTokens: 0,
+        outputTokens: 0,
+      }
+    }
+  }
+
+  // Dispatch all 6 emitters in parallel.
+  console.log(`[module-decomposition][multi-emitter] dispatching ${MULTI_EMITTER_MODELS.length} emitters in parallel...`)
+  const emitterStartedAt = Date.now()
+  const emitterResults = await Promise.allSettled(
+    MULTI_EMITTER_MODELS.map(m => callEmitter(m, baseUserContent)),
+  )
+  let emitterWallMs = Date.now() - emitterStartedAt
+  let totalInput = 0
+  let totalOutput = 0
+
+  const emitterOutputs: MultiEmitterOutput[] = []
+  for (let i = 0; i < emitterResults.length; i++) {
+    const r = emitterResults[i]
+    const model = MULTI_EMITTER_MODELS[i]
+    if (r.status === 'fulfilled') {
+      totalInput += r.value.inputTokens
+      totalOutput += r.value.outputTokens
+      emitterOutputs.push({
+        ok: r.value.ok,
+        data: r.value.data,
+        model: r.value.model,
+        schemaViolations: r.value.schemaViolations,
+      })
+    } else {
+      console.warn(`[module-decomposition][multi-emitter] emitter ${model} promise rejected: ${String(r.reason)}`)
+      emitterOutputs.push({ ok: false, model, schemaViolations: [`promise: ${String(r.reason)}`] })
+    }
+  }
+
+  const speakingCount = emitterOutputs.filter(e => e.ok).length
+  console.log(`[module-decomposition][multi-emitter] ${speakingCount}/${MULTI_EMITTER_MODELS.length} emitters succeeded`)
+
+  if (speakingCount < MULTI_EMITTER_MIN_SPEAKING) {
+    console.warn(
+      `[module-decomposition][multi-emitter] only ${speakingCount} of ${MULTI_EMITTER_MODELS.length} emitters succeeded (min ${MULTI_EMITTER_MIN_SPEAKING}); falling back to ClassModulePriors`,
+    )
+    const fallback = buildFallbackDecomposition(
+      classification,
+      parsedBrief,
+      `Multi-emitter: only ${speakingCount}/${MULTI_EMITTER_MODELS.length} emitters succeeded; below quorum`,
+    )
+    if (fallback) return { ok: true, data: fallback, durationMs: Date.now() - startedAt }
+    return {
+      ok: false,
+      error: `Multi-emitter Stage 1.7 below quorum (${speakingCount} speaking) and no class prior for "${classification}"`,
+      durationMs: Date.now() - startedAt,
+    }
+  }
+
+  // First synthesis pass (no judges yet)
+  let synth = synthesiseMultiEmitterDecomposition(emitterOutputs, [])
+
+  // Dispatch judges over the synthesised output
+  const judgePrompt = buildMultiEmitterJudgePrompt()
+  const judgeUserContent = buildCouncilUserContent(
+    synth.synthesised.modules,
+    synth.synthesised.excluded_modules,
+    synth.synthesised.rationale_excluded,
+    parsedBrief,
+    classification,
+  )
+
+  async function callJudge(id: string, model: string): Promise<JudgeVerdict & { inputTokens: number; outputTokens: number }> {
+    try {
+      const result = await callOpenRouterJson(judgePrompt, judgeUserContent, [model], 8192)
+      const parsed = parseJudgeResponse(result.parsed, id, model)
+      return { ...parsed, inputTokens: result.inputTokens, outputTokens: result.outputTokens }
+    } catch (err) {
+      console.warn(`[module-decomposition][multi-emitter] judge ${id} (${model}) failed: ${(err as Error).message}`)
+      return {
+        judge: id,
+        model,
+        verdict: 'NEEDS_MINOR',
+        notes: [`judge call failed: ${(err as Error).message}`],
+        schemaViolations: [],
+        inputTokens: 0,
+        outputTokens: 0,
+      }
+    }
+  }
+
+  const judgeStartedAt = Date.now()
+  const judgeSettled = await Promise.all(
+    MULTI_EMITTER_JUDGE_MODELS.map(j => callJudge(j.id, j.model)),
+  )
+  const judgeWallMs = Date.now() - judgeStartedAt
+  for (const j of judgeSettled) {
+    totalInput += j.inputTokens
+    totalOutput += j.outputTokens
+  }
+  const judges: JudgeVerdict[] = judgeSettled.map(j => ({
+    judge: j.judge,
+    model: j.model,
+    verdict: j.verdict,
+    notes: j.notes,
+    schemaViolations: j.schemaViolations,
+  }))
+
+  // Re-synthesise with judges populated (so verdict is computed correctly)
+  synth = synthesiseMultiEmitterDecomposition(emitterOutputs, judges)
+  let retried = false
+
+  // Tiebreak: BOTH judges NEEDS_MAJOR on quality → retry ONCE with judge notes
+  // appended to each emitter prompt. Schema-violation flagged → no retry (the
+  // synthesiser already dropped offending fields when it could; downstream
+  // validateModuleDecompositionPayload will strip anything that doesn't pass).
+  if (synth.shouldRetry) {
+    const judgeNotes = judges.flatMap(j => j.notes ?? [])
+    const reminder =
+      `\n\nCRITICAL JUDGE FEEDBACK ON THE PREVIOUS SYNTHESIS (BOTH judges voted NEEDS_MAJOR on quality):\n` +
+      judgeNotes.map(n => `- ${n}`).join('\n') +
+      `\n\nReturn a fully corrected JSON catalog addressing every point above. Re-emit with §4.5 fidelity (english_sentence + rad_syntax + grammar per sub-module).`
+
+    console.warn('[module-decomposition][multi-emitter] BOTH judges NEEDS_MAJOR — retrying all 6 emitters with judge notes appended...')
+    const retryStartedAt = Date.now()
+    const retryResults = await Promise.allSettled(
+      MULTI_EMITTER_MODELS.map(m => callEmitter(m, baseUserContent + reminder)),
+    )
+    emitterWallMs += Date.now() - retryStartedAt
+    retried = true
+
+    const retryOutputs: MultiEmitterOutput[] = []
+    for (let i = 0; i < retryResults.length; i++) {
+      const r = retryResults[i]
+      const model = MULTI_EMITTER_MODELS[i]
+      if (r.status === 'fulfilled') {
+        totalInput += r.value.inputTokens
+        totalOutput += r.value.outputTokens
+        retryOutputs.push({
+          ok: r.value.ok,
+          data: r.value.data,
+          model: r.value.model,
+          schemaViolations: r.value.schemaViolations,
+        })
+      } else {
+        retryOutputs.push({ ok: false, model, schemaViolations: [`promise: ${String(r.reason)}`] })
+      }
+    }
+
+    const retrySpeaking = retryOutputs.filter(e => e.ok).length
+    if (retrySpeaking >= MULTI_EMITTER_MIN_SPEAKING) {
+      // Re-synthesise with retry outputs + same judges (judges don't re-vote
+      // per spec — single retry chance; final synthesis is authoritative).
+      synth = synthesiseMultiEmitterDecomposition(retryOutputs, judges)
+    } else {
+      synth.notes.push(
+        `[multi-emitter] retry produced only ${retrySpeaking}/${MULTI_EMITTER_MODELS.length} speaking emitters; kept first-pass synthesis`,
+      )
+    }
+  }
+
+  // Final validation pass through the existing payload validator (applies
+  // prior cross-check, auto-strip of forbidden modules, etc.).
+  const rawForValidator = {
+    product_class: synth.synthesised.product_class,
+    modules: synth.synthesised.modules,
+    excluded_modules: synth.synthesised.excluded_modules,
+    rationale_excluded: synth.synthesised.rationale_excluded,
+    cross_module_grammar_links: synth.synthesised.cross_module_grammar_links,
+  }
+  const finalValidation = validateModuleDecompositionPayload(rawForValidator, classification)
+
+  if (!finalValidation.validation.ok) {
+    console.warn(`[module-decomposition][multi-emitter] final validation failed (${finalValidation.validation.schema_errors.length} errors); falling back to ClassModulePriors`)
+    for (const err of finalValidation.validation.schema_errors) {
+      console.warn(`[module-decomposition][multi-emitter]   error: ${err}`)
+    }
+    const fallback = buildFallbackDecomposition(
+      classification,
+      parsedBrief,
+      `Multi-emitter: synthesised catalog failed validation: ${finalValidation.validation.schema_errors.join('; ')}`,
+    )
+    if (fallback) return { ok: true, data: fallback, durationMs: Date.now() - startedAt }
+    return {
+      ok: false,
+      error: `Multi-emitter Stage 1.7 final validation failed: ${finalValidation.validation.schema_errors.join('; ')}`,
+      durationMs: Date.now() - startedAt,
+    }
+  }
+
+  // Assemble final ModuleDecomposition
+  const allNotes = [
+    ...synth.notes,
+    ...finalValidation.validation.parameter_warnings,
+    ...finalValidation.validation.prior_warnings,
+    ...judges.flatMap(j => [
+      `[judge:${j.judge}] verdict=${j.verdict}`,
+      ...(j.notes ?? []),
+      ...(j.schemaViolations ?? []).map(s => `[judge:${j.judge}][schema] ${s}`),
+    ]),
+  ]
+
+  const telemetry: ModuleDecompositionTelemetry = {
+    llm_call_ms: emitterWallMs,
+    council_ms: judgeWallMs,
+    input_tokens: totalInput,
+    output_tokens: totalOutput,
+    estimated_cost_gbp: estimateCostGbp(totalInput, totalOutput),
+    retried,
+  }
+
+  const data: ModuleDecomposition = {
+    product_class: finalValidation.productClass,
+    normalised_class: normaliseProductClass(finalValidation.productClass),
+    modules: finalValidation.modules,
+    excluded_modules: finalValidation.excluded,
+    rationale_excluded: finalValidation.rationale,
+    cross_module_grammar_links: finalValidation.crossModuleGrammarLinks,
+    council_verdict: synth.verdict,
+    council_seats: synth.seats,
+    council_notes: allNotes,
+    telemetry,
+  }
+
+  console.log(
+    `[module-decomposition][multi-emitter] complete: ${data.modules.length} modules, verdict=${data.council_verdict}, cost≈£${telemetry.estimated_cost_gbp.toFixed(3)}, retried=${retried}`,
+  )
+
+  return { ok: true, data, durationMs: Date.now() - startedAt }
+}
+
+// ---------------------------------------------------------------------------
 // Test-only exports (kept stable so unit tests can hit the helpers directly)
 // ---------------------------------------------------------------------------
 
@@ -1252,4 +1679,6 @@ export const __test = {
   buildFallbackDecomposition,
   KNOWN_RADICALS,
   COUNCIL_SEATS,
+  MULTI_EMITTER_MODELS,
+  MULTI_EMITTER_JUDGE_MODELS,
 }

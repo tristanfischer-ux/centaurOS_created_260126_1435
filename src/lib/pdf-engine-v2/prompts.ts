@@ -756,7 +756,9 @@ SubModuleSpec schema (Piece 1B.1 + Fix B 2026-05-13 — each sub-module carries 
   "name_human": "<human-readable name — e.g. 'cell string', 'BMS master'>",
   "words": [<WordSpec objects — see below; 3-9 per sub-module is the realistic range>],
   "role_verb": "<verb describing what this sub-module does in the parent — e.g. 'consists of', 'monitors', 'distributes', 'supervises'>",
-  "topology_clause": "<optional secondary clause — e.g. 'wired in 112 modules of 35-cells in series'>"
+  "topology_clause": "<optional secondary clause — e.g. 'wired in 112 modules of 35-cells in series'>",
+  "english_sentence": "<WS-A 2026-05-13 REQUIRED: §4.5 plain-English description of this sub-module — 1-2 sentences, names the role, names the principal parts. Drives the PDF §4.5 Sentence View. Example: 'The cell string consists of 3,920 LFP prismatic cells wired in 112 modules of 35 cells in series, linked by 3,808 cell-to-cell copper busbars and held by a stainless-steel terminal hardware set.'>",
+  "rad_syntax": "<WS-A 2026-05-13 REQUIRED: §4.5 verbatim RAD-syntax line — one cluster per word, formatted as 'char_id (mod1, mod2) ⊙ next_char (mod1, mod2)' joining the same words listed in this sub-module's words[]. Use ⊙ (U+2299) between word clusters. Example: 'lfp_prismatic_cell (×3920, 280Ah, prismatic, 35s×112) ⊙ cell_to_cell_busbar (×3808, 350A) ⊙ cell_terminal_hardware_set (×3920, stainless steel terminal set) ⊙ cell_voltage_tap_wire (×3920, 22AWG, UL 1015) ⊙ cell_insulation_pad (×3920, UL94 V-0)'>"
 }
 
 WordSpec schema (one content character + 0-N modifier characters):
@@ -825,19 +827,22 @@ The array may be empty ([]) only if the product genuinely has no identifiable in
 
 === WORKED EXAMPLE — BESS energy_storage_source ===
 
-This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Each sub-module typically has 3-9 WORDS — see the cell_string sub-module which shows 5 distinct part types.
+This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Every sub-module here has 5-9 WORDS so the §6 BoM hits realistic part counts.
+Every sub-module ALSO emits "english_sentence" (1-2 sentence §4.5 prose) and "rad_syntax" (verbatim RAD-syntax line). These two fields drive the §4.5 PDF render — they are NOT optional.
 Notice each word has a content_character (with radicals) + modifier_characters.
 
 {
   "module": "energy_storage_source",
   "module_brief": "Stores 3.5 MWh of usable energy at the rack level using LFP prismatic cells wired as 112 modules of 35 cells in series. Provides 1 MW peak discharge for grid-balancing duty at ≥95% round-trip efficiency.",
   "derived_parameters": { "capacity_kwh": 3500, "dod_fraction": 0.80, "cell_count": 3920, "rack_count": 8 },
-  "allowed_radicals": ["electrochemical_energy_function", "lithium_iron_phosphate_chemistry"],
+  "allowed_radicals": ["electrochemical_energy_function", "lithium_iron_phosphate_chemistry", "copper", "steel", "polymer_thermoplastic"],
   "applicability_confidence": "high",
   "sub_modules": [
     {
       "id": "cell_string",
       "name_human": "cell string",
+      "english_sentence": "The cell string consists of 3,920 LFP prismatic cells wired in 112 modules of 35 cells in series, linked by 3,808 cell-to-cell copper busbars and held by a stainless-steel terminal hardware set. Each cell carries a 22 AWG voltage tap wire and a UL94 V-0 insulation pad.",
+      "rad_syntax": "lfp_prismatic_cell (×3920, 280Ah, prismatic, 35s×112, IEC 62619) ⊙ cell_to_cell_busbar (×3808, 350A) ⊙ cell_terminal_hardware_set (×3920, stainless steel terminal set) ⊙ cell_voltage_tap_wire (×3920, 22AWG, UL 1015) ⊙ cell_insulation_pad (×3920, UL94 V-0)",
       "words": [
         {
           "id": "lfp_prismatic_cell_word",
@@ -932,6 +937,8 @@ Notice each word has a content_character (with radicals) + modifier_characters.
     {
       "id": "rack_structure",
       "name_human": "rack structure",
+      "english_sentence": "The rack structure mounts the cell strings inside a welded steel module frame, capped by a steel top cover and seated in a sheet-steel bottom tray. Compression plates apply 3.5 kN pre-load through compression tie-rod sets, and a module-level safety label set ensures regulatory marking on every rack.",
+      "rad_syntax": "module_steel_frame (×8, welded) ⊙ module_top_cover (×8, sheet steel) ⊙ module_bottom_tray (×8, sheet steel) ⊙ compression_plate (×8, 3.5kN) ⊙ compression_tie_rod_set (×8, M12×4) ⊙ module_label_safety_signage (×8, IEC 62619)",
       "words": [
         {
           "id": "rack_frame_word",
@@ -950,8 +957,40 @@ Notice each word has a content_character (with radicals) + modifier_characters.
           ]
         },
         {
-          "id": "compression_word",
-          "name_human": "compression word",
+          "id": "module_top_cover_word",
+          "name_human": "module top cover word",
+          "content_character": {
+            "character_id": "module_top_cover",
+            "name_human": "module top cover",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "steel",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×8" },
+            { "kind": "form", "value": "sheet steel" }
+          ]
+        },
+        {
+          "id": "module_bottom_tray_word",
+          "name_human": "module bottom tray word",
+          "content_character": {
+            "character_id": "module_bottom_tray",
+            "name_human": "module bottom tray",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "steel",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×8" },
+            { "kind": "form", "value": "sheet steel" }
+          ]
+        },
+        {
+          "id": "compression_plate_word",
+          "name_human": "compression plate word",
           "content_character": {
             "character_id": "compression_plate",
             "name_human": "compression plate",
@@ -964,6 +1003,38 @@ Notice each word has a content_character (with radicals) + modifier_characters.
             { "kind": "quantity", "value": "×8" },
             { "kind": "dimension", "value": "3.5", "unit": "kN" }
           ]
+        },
+        {
+          "id": "compression_tie_rod_set_word",
+          "name_human": "compression tie rod set word",
+          "content_character": {
+            "character_id": "compression_tie_rod_set",
+            "name_human": "compression tie rod set",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "steel",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×8" },
+            { "kind": "form", "value": "M12×4 rod set" }
+          ]
+        },
+        {
+          "id": "module_label_safety_signage_word",
+          "name_human": "module label safety signage word",
+          "content_character": {
+            "character_id": "module_label_safety_signage",
+            "name_human": "module safety label / signage set",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×8" },
+            { "kind": "regulatory", "value": "IEC 62619" }
+          ]
         }
       ],
       "role_verb": "mounts",
@@ -972,13 +1043,15 @@ Notice each word has a content_character (with radicals) + modifier_characters.
     {
       "id": "bms_slave",
       "name_human": "BMS slave board",
+      "english_sentence": "Each rack carries a BMS slave PCB assembly built on an ISL94212 analogue front-end with NTC thermistor inputs, voltage and temperature harnesses, and a 125 A module terminal fuse. The slave reports cell voltages and temperatures to the BMS master over CAN.",
+      "rad_syntax": "bms_slave_pcb_assembled (×112, 14ch, CAN daisy, ±5mV, -40→+85°C) ⊙ bms_slave_afe_ic_isl94212 (×112, 12ch) ⊙ ntc_thermistor (×896, ±0.5°C) ⊙ module_voltage_harness (×112, 14ch) ⊙ module_temp_harness (×112, 8ch) ⊙ module_terminal_fuse_125A (×112, 125A)",
       "words": [
         {
-          "id": "bms_slave_word",
-          "name_human": "BMS slave word",
+          "id": "bms_slave_pcb_assembled_word",
+          "name_human": "BMS slave PCB assembled word",
           "content_character": {
-            "character_id": "bms_slave_pcb",
-            "name_human": "BMS slave PCB",
+            "character_id": "bms_slave_pcb_assembled",
+            "name_human": "BMS slave PCB (assembled)",
             "function_radical_primary": "silicon_semiconductor_function",
             "function_radical_secondary": "electrical_conducting_function",
             "material_radical_primary": "polymer_thermoplastic",
@@ -990,6 +1063,22 @@ Notice each word has a content_character (with radicals) + modifier_characters.
             { "kind": "topology", "value": "CAN daisy" },
             { "kind": "tolerance", "value": "±5", "unit": "mV" },
             { "kind": "envelope", "value": "-40→+85", "unit": "°C" }
+          ]
+        },
+        {
+          "id": "bms_slave_afe_ic_isl94212_word",
+          "name_human": "BMS slave AFE IC (ISL94212) word",
+          "content_character": {
+            "character_id": "bms_slave_afe_ic_isl94212",
+            "name_human": "BMS slave AFE IC (ISL94212)",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×112" },
+            { "kind": "capacity", "value": "12", "unit": "ch" }
           ]
         },
         {
@@ -1007,6 +1096,54 @@ Notice each word has a content_character (with radicals) + modifier_characters.
             { "kind": "quantity", "value": "×896" },
             { "kind": "tolerance", "value": "±0.5", "unit": "°C" }
           ]
+        },
+        {
+          "id": "module_voltage_harness_word",
+          "name_human": "module voltage harness word",
+          "content_character": {
+            "character_id": "module_voltage_harness",
+            "name_human": "module voltage harness",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×112" },
+            { "kind": "capacity", "value": "14", "unit": "ch" }
+          ]
+        },
+        {
+          "id": "module_temp_harness_word",
+          "name_human": "module temperature harness word",
+          "content_character": {
+            "character_id": "module_temp_harness",
+            "name_human": "module temperature harness",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×112" },
+            { "kind": "capacity", "value": "8", "unit": "ch" }
+          ]
+        },
+        {
+          "id": "module_terminal_fuse_125A_word",
+          "name_human": "module terminal fuse 125 A word",
+          "content_character": {
+            "character_id": "module_terminal_fuse_125A",
+            "name_human": "module terminal fuse 125 A",
+            "function_radical_primary": "electromechanical_switching_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×112" },
+            { "kind": "dimension", "value": "125", "unit": "A" }
+          ]
         }
       ],
       "role_verb": "monitors",
@@ -1015,13 +1152,15 @@ Notice each word has a content_character (with radicals) + modifier_characters.
     {
       "id": "bms_master",
       "name_human": "BMS master controller",
+      "english_sentence": "The BMS master controller PCB hosts an STM32F427 MCU with two CAN transceivers, a four-channel 5 kV digital isolator, a buck DC-DC regulator, watchdog and relay-driver ICs, and is housed in a steel enclosure connected to the slave boards over a CAN harness.",
+      "rad_syntax": "bms_master_pcb_assembled (×1, 1500V iso, IEC 62619) ⊙ mcu_stm32f427 (×1, 168MHz) ⊙ can_transceiver (×2, 500kbit, redundant pair) ⊙ digital_isolator_4ch_5kV (×1, 4ch, 5kV) ⊙ dcdc_buck_regulator (×1, 5V→3.3V, 1A) ⊙ watchdog_ic (×1) ⊙ relay_driver_ic (×1, 8ch) ⊙ bms_master_housing (×1, steel) ⊙ bms_to_slave_can_harness (×1, CAN, 8 racks)",
       "words": [
         {
-          "id": "bms_master_word",
-          "name_human": "BMS master controller word",
+          "id": "bms_master_pcb_assembled_word",
+          "name_human": "BMS master PCB assembled word",
           "content_character": {
-            "character_id": "bms_master_pcb",
-            "name_human": "BMS master PCB",
+            "character_id": "bms_master_pcb_assembled",
+            "name_human": "BMS master PCB (assembled)",
             "function_radical_primary": "silicon_semiconductor_function",
             "function_radical_secondary": "electrical_conducting_function",
             "material_radical_primary": "polymer_thermoplastic",
@@ -1031,6 +1170,22 @@ Notice each word has a content_character (with radicals) + modifier_characters.
             { "kind": "quantity", "value": "×1" },
             { "kind": "dimension", "value": "1500", "unit": "V iso" },
             { "kind": "regulatory", "value": "IEC 62619" }
+          ]
+        },
+        {
+          "id": "mcu_stm32f427_word",
+          "name_human": "MCU STM32F427 word",
+          "content_character": {
+            "character_id": "mcu_stm32f427",
+            "name_human": "MCU STM32F427",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": "digital_logic_function",
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "performance", "value": "168", "unit": "MHz" }
           ]
         },
         {
@@ -1049,6 +1204,102 @@ Notice each word has a content_character (with radicals) + modifier_characters.
             { "kind": "dimension", "value": "500", "unit": "kbit" },
             { "kind": "topology", "value": "redundant pair" }
           ]
+        },
+        {
+          "id": "digital_isolator_4ch_5kV_word",
+          "name_human": "digital isolator 4ch 5 kV word",
+          "content_character": {
+            "character_id": "digital_isolator_4ch_5kV",
+            "name_human": "digital isolator 4ch 5 kV",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "capacity", "value": "4", "unit": "ch" },
+            { "kind": "dimension", "value": "5", "unit": "kV" }
+          ]
+        },
+        {
+          "id": "dcdc_buck_regulator_word",
+          "name_human": "DC-DC buck regulator word",
+          "content_character": {
+            "character_id": "dcdc_buck_regulator",
+            "name_human": "DC-DC buck regulator",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "performance", "value": "5V→3.3V, 1A" }
+          ]
+        },
+        {
+          "id": "watchdog_ic_word",
+          "name_human": "watchdog IC word",
+          "content_character": {
+            "character_id": "watchdog_ic",
+            "name_human": "watchdog IC",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": "digital_logic_function",
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" }
+          ]
+        },
+        {
+          "id": "relay_driver_ic_word",
+          "name_human": "relay driver IC word",
+          "content_character": {
+            "character_id": "relay_driver_ic",
+            "name_human": "relay driver IC",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": "electromechanical_switching_function",
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "capacity", "value": "8", "unit": "ch" }
+          ]
+        },
+        {
+          "id": "bms_master_housing_word",
+          "name_human": "BMS master housing word",
+          "content_character": {
+            "character_id": "bms_master_housing",
+            "name_human": "BMS master housing",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "steel",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "form", "value": "sheet steel" }
+          ]
+        },
+        {
+          "id": "bms_to_slave_can_harness_word",
+          "name_human": "BMS to slave CAN harness word",
+          "content_character": {
+            "character_id": "bms_to_slave_can_harness",
+            "name_human": "BMS to slave CAN harness",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "topology", "value": "CAN, 8 racks" }
+          ]
         }
       ],
       "role_verb": "supervises"
@@ -1056,20 +1307,38 @@ Notice each word has a content_character (with radicals) + modifier_characters.
     {
       "id": "dc_distribution",
       "name_human": "DC distribution",
+      "english_sentence": "DC distribution carries the pack's positive and negative copper busbars to a main DC contactor and precharge contactor / 100 Ω 200 W precharge resistor pair, with two 630 A high-rupture-capacity fuses (one per pole) providing fault isolation on the DC side.",
+      "rad_syntax": "pack_dc_busbar_positive (×1, 350A continuous) ⊙ pack_dc_busbar_negative (×1, 350A continuous) ⊙ main_dc_contactor (×1, 300A) ⊙ precharge_contactor (×1, 30A) ⊙ precharge_resistor_100R_200W (×1, 100Ω, 200W) ⊙ hrc_dc_fuse_630A_pos (×1, 630A) ⊙ hrc_dc_fuse_630A_neg (×1, 630A)",
       "words": [
         {
-          "id": "pack_dc_busbar_word",
-          "name_human": "pack DC busbar word",
+          "id": "pack_dc_busbar_positive_word",
+          "name_human": "pack DC busbar (+) word",
           "content_character": {
-            "character_id": "pack_dc_busbar",
-            "name_human": "pack DC busbar",
+            "character_id": "pack_dc_busbar_positive",
+            "name_human": "pack DC busbar (+)",
             "function_radical_primary": "electrical_conducting_function",
             "function_radical_secondary": null,
             "material_radical_primary": "copper",
             "material_radical_secondary": null
           },
           "modifier_characters": [
-            { "kind": "quantity", "value": "×2" },
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "350", "unit": "A continuous" }
+          ]
+        },
+        {
+          "id": "pack_dc_busbar_negative_word",
+          "name_human": "pack DC busbar (-) word",
+          "content_character": {
+            "character_id": "pack_dc_busbar_negative",
+            "name_human": "pack DC busbar (-)",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
             { "kind": "dimension", "value": "350", "unit": "A continuous" }
           ]
         },
@@ -1088,6 +1357,71 @@ Notice each word has a content_character (with radicals) + modifier_characters.
             { "kind": "quantity", "value": "×1" },
             { "kind": "dimension", "value": "300", "unit": "A" }
           ]
+        },
+        {
+          "id": "precharge_contactor_word",
+          "name_human": "precharge contactor word",
+          "content_character": {
+            "character_id": "precharge_contactor",
+            "name_human": "precharge contactor",
+            "function_radical_primary": "electromechanical_switching_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "30", "unit": "A" }
+          ]
+        },
+        {
+          "id": "precharge_resistor_100R_200W_word",
+          "name_human": "precharge resistor 100 Ω 200 W word",
+          "content_character": {
+            "character_id": "precharge_resistor_100R_200W",
+            "name_human": "precharge resistor 100 Ω 200 W",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "ceramic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "capacity", "value": "100", "unit": "Ω" },
+            { "kind": "performance", "value": "200", "unit": "W" }
+          ]
+        },
+        {
+          "id": "hrc_dc_fuse_630A_pos_word",
+          "name_human": "HRC DC fuse 630 A (+) word",
+          "content_character": {
+            "character_id": "hrc_dc_fuse_630A_pos",
+            "name_human": "HRC DC fuse 630 A (+)",
+            "function_radical_primary": "electromechanical_switching_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "630", "unit": "A" }
+          ]
+        },
+        {
+          "id": "hrc_dc_fuse_630A_neg_word",
+          "name_human": "HRC DC fuse 630 A (-) word",
+          "content_character": {
+            "character_id": "hrc_dc_fuse_630A_neg",
+            "name_human": "HRC DC fuse 630 A (-)",
+            "function_radical_primary": "electromechanical_switching_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "630", "unit": "A" }
+          ]
         }
       ],
       "role_verb": "distributes"
@@ -1095,6 +1429,8 @@ Notice each word has a content_character (with radicals) + modifier_characters.
     {
       "id": "pack_instrumentation",
       "name_human": "pack instrumentation",
+      "english_sentence": "Pack instrumentation measures pack current via a 1,500 A copper shunt and a hall-effect sensor for redundancy, monitors DC-bus insulation per IEC 61557-8, and tracks bus voltage and a long-life temperature log channel.",
+      "rad_syntax": "current_shunt (×1, 1500A, ±0.1% FS) ⊙ insulation_monitor (×1, IEC 61557-8) ⊙ hall_effect_current_sensor (×1, 1500A, ±0.5%) ⊙ voltage_meter (×1, 1500V, ±0.2%) ⊙ temperature_logger (×1, 32ch)",
       "words": [
         {
           "id": "current_shunt_word",
@@ -1127,6 +1463,56 @@ Notice each word has a content_character (with radicals) + modifier_characters.
           "modifier_characters": [
             { "kind": "quantity", "value": "×1" },
             { "kind": "regulatory", "value": "IEC 61557-8" }
+          ]
+        },
+        {
+          "id": "hall_effect_current_sensor_word",
+          "name_human": "hall-effect current sensor word",
+          "content_character": {
+            "character_id": "hall_effect_current_sensor",
+            "name_human": "hall-effect current sensor",
+            "function_radical_primary": "magnetic_coupling_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "1500", "unit": "A" },
+            { "kind": "tolerance", "value": "±0.5", "unit": "%" }
+          ]
+        },
+        {
+          "id": "voltage_meter_word",
+          "name_human": "voltage meter word",
+          "content_character": {
+            "character_id": "voltage_meter",
+            "name_human": "voltage meter",
+            "function_radical_primary": "silicon_semiconductor_function",
+            "function_radical_secondary": "electrical_conducting_function",
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "dimension", "value": "1500", "unit": "V" },
+            { "kind": "tolerance", "value": "±0.2", "unit": "%" }
+          ]
+        },
+        {
+          "id": "temperature_logger_word",
+          "name_human": "temperature logger word",
+          "content_character": {
+            "character_id": "temperature_logger",
+            "name_human": "temperature logger",
+            "function_radical_primary": "thermal_transfer_function",
+            "function_radical_secondary": "digital_logic_function",
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×1" },
+            { "kind": "capacity", "value": "32", "unit": "ch" }
           ]
         }
       ],
@@ -1175,7 +1561,9 @@ Notice each word has a content_character (with radicals) + modifier_characters.
             }
           ],
           "role_verb": "<verb>",
-          "topology_clause": "<optional>"
+          "topology_clause": "<optional>",
+          "english_sentence": "<WS-A REQUIRED — 1-2 sentence §4.5 description naming the parts in words[]>",
+          "rad_syntax": "<WS-A REQUIRED — RAD-syntax line: char_id (mods) ⊙ char_id (mods) ⊙ ... mirroring words[]>"
         }
       ],
       "grammar_links": [
@@ -1221,6 +1609,7 @@ Notice each word has a content_character (with radicals) + modifier_characters.
 - Every GrammarLink's from_sub_module and to_sub_module MUST reference IDs that appear in the same ModuleSpec's sub_modules array.
 - Every GrammarLink mechanism and every cross_module_grammar_link mechanism MUST be one of the 26 canonical values listed above — no others.
 - cross_module_grammar_links from_module and to_module MUST reference UniversalModule keys that appear in modules[] (not in excluded_modules).
+- **WS-A 2026-05-13: every sub_module MUST emit both \`english_sentence\` (1-2 sentence §4.5 description of what the sub-module is and the part list) AND \`rad_syntax\` (verbatim RAD-syntax line: \`char_id (mod1, mod2) ⊙ next_char (mod1, mod2)\` mirroring the words[] order with ⊙ U+2299 between word clusters).** These two fields drive the §4.5 PDF Sentence + Paragraph View. The english_sentence MUST name the principal parts (cells, busbars, harnesses, the bus voltage, etc.) — generic prose like "houses the components" is REJECTED. The rad_syntax MUST list every content_character_id from the words[] array in order; missing a word = field rejected.
 
 === APPLICABILITY CONFIDENCE GUIDANCE ===
 
