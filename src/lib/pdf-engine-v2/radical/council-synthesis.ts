@@ -936,11 +936,25 @@ function excludedInclusionThreshold(speakingEmitters: number): number {
 }
 
 /**
- * Word-inclusion threshold across emitter sub-modules per spec:
- * "Words per sub-module: majority vote by character_id (≥3 of 6 emitters must emit it)."
+ * Word-inclusion rule (iter-06 v2 fix, 2026-05-13):
+ *
+ * Previously: majority vote by character_id (≥3 of 6 emitters must emit it). This
+ * was too strict — emitters at temp=0 disagree on naming (e.g. `lfp_prismatic_cell`
+ * vs `lfp_cell` vs `battery_cell`). With 4 surviving emitters in iter-06, ALL words
+ * fell below the ≥3 threshold and got dropped, producing empty words[] → final
+ * validation 101 errors → fallback to ClassModulePriors. Defeat-the-purpose.
+ *
+ * Now: UNION. Any speaking emitter's word is included. Judges (2nd-pass review)
+ * have authority to drop schema violators (invalid radical_id, duplicate id,
+ * malformed RAD). Per Tristan: "more LLMs proposing things is better — diversity
+ * surfaces things any single model would miss." The cost of one extra word that
+ * later gets QA-flagged is far smaller than the cost of dropping a legitimate part.
+ *
+ * Quantity-modifier majority-vote (R-C2) is unchanged — that's about VALUE
+ * AGREEMENT on an already-included word, not about whether the word exists.
  */
-function wordInclusionThreshold(speakingEmitters: number): number {
-  return moduleInclusionThreshold(speakingEmitters)
+function wordInclusionThreshold(_speakingEmitters: number): number {
+  return 1  // UNION: any emitter that surfaces the word gets it included
 }
 
 /**
