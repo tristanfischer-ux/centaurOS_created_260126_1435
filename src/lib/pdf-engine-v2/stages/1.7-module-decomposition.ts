@@ -348,15 +348,20 @@ function validateModuleSpecShape(
     }
 
     // ── words[] validation (Piece 1B.1) ──────────────────────────────────
-    // Coding-council 1B 2026-05-12 P1 fix: prompt HARD CONSTRAINTS says 1–4
-    // words; validator warning threshold previously at >8 created a silent
-    // gap where the LLM could emit 5–8 words without surfacing the deviation.
-    // Aligned to >4 so prompt-validator agreement holds.
+    // Fix B (Tristan, 2026-05-13): the previous cap of 4 was based on a
+    // misreading of the worked-example §4 cards (which abbreviated to 2 words
+    // per sub-module for visual compression). §6 of the worked example shows
+    // each sub-module actually emits 5-9 distinct BoM rows — one per WordSpec
+    // (each WordSpec contributes exactly one content_character → one BoM
+    // line). Binding-spec target is ~300-540 BoM lines for a 3.5 MWh BESS;
+    // engine emitting 101 was the symptom of this cap. Raised to >9 so the
+    // BMS_MASTER worst-case (9 words) doesn't trip the warning while still
+    // flagging genuine over-decomposition.
     const wordsRaw = Array.isArray(smr.words) ? smr.words : []
     if (wordsRaw.length === 0) {
       errors.push(`modules[${index}].sub_modules[${si}] ("${smId}").words is missing or empty — at least 1 word is required`)
-    } else if (wordsRaw.length > 4) {
-      paramWarnings.push(`modules[${index}].sub_modules[${si}] ("${smId}").words has ${wordsRaw.length} entries (>4 — prompt HARD CONSTRAINT caps at 4); accepted but flag for review`)
+    } else if (wordsRaw.length > 9) {
+      paramWarnings.push(`modules[${index}].sub_modules[${si}] ("${smId}").words has ${wordsRaw.length} entries (>9 — prompt HARD CONSTRAINT caps at 9, with BMS_MASTER worst-case being 9 words); accepted but flag for review`)
     }
     const words: WordSpec[] = []
     const seenWordIds = new Set<string>()
@@ -979,7 +984,13 @@ function buildFallbackDecomposition(
 // transport layer. The MODULE_DECOMPOSITION_TAXONOMY_PROMPT has been hardened
 // with explicit bad/good examples too — but model-order is the cheaper insurance.
 const STAGE_1_7_PRIMARY_MODELS = ['x-ai/grok-4.3', 'google/gemini-3.1-pro-preview']
-const STAGE_1_7_MAX_TOKENS = 16384
+// Fix B (Tristan, 2026-05-13): max tokens lifted from 16384 → 32768 to match
+// the new 3-9 word-per-sub-module cap. Math: 10 modules × 8 sub-modules × 6
+// words avg × ~150 tokens/word ≈ 72k worst case; realistic mean ~32k. Council
+// Seat 4 previously flagged 16384 as truncation risk at the new word cap;
+// 32768 is conservative against the worst-case while leaving headroom for
+// derived_parameters, grammar_links, and the cross_module section.
+const STAGE_1_7_MAX_TOKENS = 32768
 
 /**
  * Run Stage 1.5 module decomposition.

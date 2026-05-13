@@ -750,11 +750,11 @@ Every ModuleSpec MUST include:
   - "sub_modules": array of 3–8 SubModuleSpec objects describing the component groups within this module.
   - "grammar_links": array of GrammarLink objects describing intra-module couplings (may be empty [] only for single-sub-module modules, and only with explicit justification in module_brief).
 
-SubModuleSpec schema (Piece 1B.1 — each sub-module carries 1-N WORDS; 1-3 typical):
+SubModuleSpec schema (Piece 1B.1 + Fix B 2026-05-13 — each sub-module carries 3-9 WORDS; one WordSpec = one BoM row, so a real sub-module needs as many words as distinct part types):
 {
   "id": "<snake_case identifier, unique within this module — e.g. 'cell_string', 'bms_master'>",
   "name_human": "<human-readable name — e.g. 'cell string', 'BMS master'>",
-  "words": [<WordSpec objects — see below; 1-N per sub-module>],
+  "words": [<WordSpec objects — see below; 3-9 per sub-module is the realistic range>],
   "role_verb": "<verb describing what this sub-module does in the parent — e.g. 'consists of', 'monitors', 'distributes', 'supervises'>",
   "topology_clause": "<optional secondary clause — e.g. 'wired in 112 modules of 35-cells in series'>"
 }
@@ -825,7 +825,7 @@ The array may be empty ([]) only if the product genuinely has no identifiable in
 
 === WORKED EXAMPLE — BESS energy_storage_source ===
 
-This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Each sub-module has 1-3 WORDS.
+This shows ONE fully-specified ModuleSpec for a 3.5 MWh BESS. Each sub-module typically has 3-9 WORDS — see the cell_string sub-module which shows 5 distinct part types.
 Notice each word has a content_character (with radicals) + modifier_characters.
 
 {
@@ -840,8 +840,8 @@ Notice each word has a content_character (with radicals) + modifier_characters.
       "name_human": "cell string",
       "words": [
         {
-          "id": "cell_string_word",
-          "name_human": "cell string word",
+          "id": "lfp_prismatic_cell_word",
+          "name_human": "LFP prismatic cell word",
           "content_character": {
             "character_id": "lfp_prismatic_cell",
             "name_human": "LFP prismatic cell",
@@ -861,8 +861,8 @@ Notice each word has a content_character (with radicals) + modifier_characters.
           ]
         },
         {
-          "id": "interconnect_word",
-          "name_human": "interconnect word",
+          "id": "cell_to_cell_busbar_word",
+          "name_human": "cell-to-cell busbar word",
           "content_character": {
             "character_id": "cell_to_cell_busbar",
             "name_human": "cell-to-cell busbar",
@@ -874,6 +874,55 @@ Notice each word has a content_character (with radicals) + modifier_characters.
           "modifier_characters": [
             { "kind": "quantity", "value": "×3808" },
             { "kind": "dimension", "value": "350", "unit": "A" }
+          ]
+        },
+        {
+          "id": "cell_terminal_hardware_set_word",
+          "name_human": "cell terminal hardware set word",
+          "content_character": {
+            "character_id": "cell_terminal_hardware_set",
+            "name_human": "cell terminal hardware set",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "steel",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×3920" },
+            { "kind": "form", "value": "stainless steel terminal set" }
+          ]
+        },
+        {
+          "id": "cell_voltage_tap_wire_word",
+          "name_human": "cell voltage tap wire word",
+          "content_character": {
+            "character_id": "cell_voltage_tap_wire",
+            "name_human": "cell voltage tap wire",
+            "function_radical_primary": "electrical_conducting_function",
+            "function_radical_secondary": null,
+            "material_radical_primary": "copper",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×3920" },
+            { "kind": "dimension", "value": "22", "unit": "AWG" },
+            { "kind": "regulatory", "value": "UL 1015" }
+          ]
+        },
+        {
+          "id": "cell_insulation_pad_word",
+          "name_human": "cell insulation pad word",
+          "content_character": {
+            "character_id": "cell_insulation_pad",
+            "name_human": "cell insulation pad",
+            "function_radical_primary": null,
+            "function_radical_secondary": null,
+            "material_radical_primary": "polymer_thermoplastic",
+            "material_radical_secondary": null
+          },
+          "modifier_characters": [
+            { "kind": "quantity", "value": "×3920" },
+            { "kind": "regulatory", "value": "UL94 V-0" }
           ]
         }
       ],
@@ -1164,7 +1213,7 @@ Notice each word has a content_character (with radicals) + modifier_characters.
 - rationale_excluded MUST contain a one-line "why N/A" for EVERY module listed in excluded_modules.
 - **Every ModuleSpec MUST include 4–10 sub_modules. 4–8 is typical for a complex hardware product. Up to 10 is permitted when the module genuinely decomposes that way (e.g. a multi-system enclosure).** The worked-example BESS energy_storage_source module has 6 sub_modules (cell_string, rack_structure, bms_slave, bms_master, dc_distribution, pack_instrumentation) — this is the typical depth, NOT a maximum. Real products decompose into multiple distinct functional subsystems; emitting only 1 sub_module per module is almost always WRONG and means you have not done the decomposition work the brief requires. 1–2 sub_modules is permitted only as a last resort with explicit justification in module_brief explaining why the module cannot be decomposed further (e.g. a tiny CGM patch where one sub-module genuinely captures the whole module).
 - Every sub_module id MUST be unique within its parent ModuleSpec.
-- **Every sub_module MUST have 2–4 words (WordSpec entries).** The worked-example cell_string sub_module has 2 words: cell_string_word (lfp_prismatic_cell content character + 7 modifier characters) and interconnect_word (cell_to_cell_busbar content character + 2 modifier characters). A sub_module containing only 1 word is almost always under-decomposed — most sub-modules contain a primary character PLUS supporting characters (busbars, harnesses, hardware sets, sensors). 1 word is permitted only when the sub_module is genuinely mono-component. Each WordSpec MUST have a unique id within its parent sub_module and a content_character with a non-empty character_id.
+- **Every sub_module MUST have 3-9 words (WordSpec entries).** A complex sub-module like BMS_MASTER has 9 distinct words: bms_master_pcb_assembled, mcu_stm32f427, can_transceiver, digital_isolator_4ch_5kV, dcdc_buck_regulator, watchdog_ic, relay_driver_ic, bms_master_housing, bms_to_slave_can_harness — each is a distinct part type, not a modifier. cell_string has 5 (lfp_prismatic_cell, cell_to_cell_busbar, cell_terminal_hardware_set, cell_voltage_tap_wire, cell_insulation_pad). The previous worked-example abbreviation showing only 2 words per sub-module was a typographical compression — REAL sub-modules contain 3-9 distinct content_characters. A sub-module with only 1-2 words is almost always under-decomposed. Each WordSpec MUST have a unique id within its parent sub_module and a content_character with a non-empty character_id.
 - **Every sub_module SHOULD declare grammar_links to other sub_modules in the same ModuleSpec where physical/electrical/control/thermal coupling exists.** The worked-example energy_storage_source has 5 intra-module grammar_links (cell_string↔rack_structure via mechanical_mount; bms_slave↔bms_master via can_bus; bms_master→dc_distribution via contactor_command; cell_string↔dc_distribution via dc_busbar; bms_slave→pack_instrumentation via sensor_feedback). If your sub_module decomposition has ZERO grammar_links, you have probably under-decomposed (separate sub-modules that don't connect to anything is rarely realistic).
 - **cross_module_grammar_links should typically have 5–10 entries for a multi-module product.** The worked-example BESS has 7 (cooling_loop, dc_busbar, ac_busbar, modbus_tcp, safety_isolation, sensor_feedback, etc.). Modules that DO connect across module boundaries (the BMS reads sensors, the PCS reads the EMS, the safety system trips the contactor) MUST have entries. Fewer than 3 cross_module_grammar_links on a complex hardware product is almost always wrong.
 - Every content_character MUST have at least one non-null radical: either function_radical_primary OR material_radical_primary (or both). A character where BOTH are null is invalid.
