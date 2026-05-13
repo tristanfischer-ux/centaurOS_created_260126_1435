@@ -317,11 +317,11 @@ function validateModuleSpecShape(
   // Piece 1B.1: each sub_module now carries words[] instead of primary_character_id.
   const subModulesRaw = Array.isArray(r.sub_modules) ? r.sub_modules : []
   if (subModulesRaw.length === 0) {
-    errors.push(`modules[${index}].sub_modules is missing or empty — at least 1 sub-module is required (3–8 strongly preferred)`)
-  } else if (subModulesRaw.length > 8) {
-    paramWarnings.push(`modules[${index}].sub_modules has ${subModulesRaw.length} entries (max 8); extras will still be accepted but review`)
+    errors.push(`modules[${index}].sub_modules is missing or empty — at least 1 sub-module is required (4–8 strongly preferred, up to 10 permitted)`)
+  } else if (subModulesRaw.length > 10) {
+    paramWarnings.push(`modules[${index}].sub_modules has ${subModulesRaw.length} entries (max 10); extras will still be accepted but review`)
   } else if (subModulesRaw.length < 3) {
-    paramWarnings.push(`modules[${index}].sub_modules has only ${subModulesRaw.length} entries (3–8 strongly preferred); accepted but flag for review — module_brief should justify the sparse decomposition`)
+    paramWarnings.push(`modules[${index}].sub_modules has only ${subModulesRaw.length} entries (4–8 strongly preferred, up to 10 permitted); accepted but flag for review — module_brief should justify the sparse decomposition`)
   }
   const subModules: SubModuleSpec[] = []
   const seenSubIds = new Set<string>()

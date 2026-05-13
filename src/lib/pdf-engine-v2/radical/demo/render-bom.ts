@@ -27,6 +27,7 @@ function gbp(n: number | null, decimals = 0): string {
 function statusIcon(grade: string): string {
   switch (grade) {
     case 'verified': return '✓ VERIFIED'
+    case 'grade_c': return '◐ GRADE-C'
     case 'estimated': return '~ EST'
     case 'grade_d': return '⚠ GRADE-D'
     case 'stub': return '○ STUB'
@@ -78,6 +79,7 @@ export function renderBom(
   const overBudget = systemTotal > budgetTarget
 
   const verifiedCount = resolvedLeaves.filter(l => l.verification_grade === 'verified').length
+  const gradeCCount = resolvedLeaves.filter(l => l.verification_grade === 'grade_c').length
   const estimatedCount = resolvedLeaves.filter(l => l.verification_grade === 'estimated').length
   const gradeDCount = resolvedLeaves.filter(l => l.verification_grade === 'grade_d').length
   const stubCount = resolvedLeaves.filter(l => l.verification_grade === 'stub').length
@@ -98,6 +100,7 @@ export function renderBom(
   lines.push(`| **Lines with real MPN** | ${withMpn} / ${resolvedLeaves.length} (${Math.round(withMpn / resolvedLeaves.length * 100)}%) |`)
   lines.push(`| **Verified by distributor** | ${verifiedCount} lines |`)
   lines.push(`| **From vendor catalog** | ${estimatedCount} lines |`)
+  lines.push(`| **Catalog-Priced (Grade C)** | ${gradeCCount} lines |`)
   lines.push(`| **Grade-D (no price data)** | ${gradeDCount} lines |`)
   lines.push(`| **Structural stub** | ${stubCount} lines |`)
   lines.push(`| **System total (incl. integration markup)** | **${gbp(systemTotal)}** |`)

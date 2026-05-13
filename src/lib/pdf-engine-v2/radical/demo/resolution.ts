@@ -9,20 +9,21 @@
  *   - structural_fabricated             → stub ("needs corpus query")
  *   - software_ip                       → LLM_ESTIMATE
  *
- * Budget guard: at most MAX_DISTRIBUTOR_CALLS live API calls total.
+ * Budget guard: at most MAX_DISTRIBUTOR_CALLS live API calls total (currently 60).
+ * Distributor calls average 0.5-2s so the cap adds at most ~60s to pipeline runtime.
  * Cherry-picks the highest-value (non-null unit_cost_gbp) lines first.
  */
 
 import type { AggregateResult } from '../../lib/distributors/index.js'
 import { findSkuForPart } from '../../lib/distributors/index.js'
-import { findEntriesByPartTerm, VENDOR_CATALOG, type VendorCatalogEntry } from '../../lib/vendor-catalog.js'
+import { findEntriesByPartTerm, VENDOR_CATALOG, type VendorCatalogEntry, type VendorEntry } from '../../lib/vendor-catalog.js'
 import bessDecomp from '../week-2/decomposition-bess.json' assert { type: 'json' }
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type VerificationGrade = 'verified' | 'estimated' | 'grade_d' | 'stub'
+export type VerificationGrade = 'verified' | 'grade_c' | 'estimated' | 'grade_d' | 'stub'
 
 export interface ResolvedLeaf {
   line_id: number
@@ -225,7 +226,7 @@ interface BessLine {
 // Resolution logic
 // ---------------------------------------------------------------------------
 
-const MAX_DISTRIBUTOR_CALLS = 28
+const MAX_DISTRIBUTOR_CALLS = 60
 
 async function resolveDistributorLine(
   line: BessLine,
@@ -327,6 +328,18 @@ function resolveOemSubsystemLine(line: BessLine): ResolvedLeaf {
 
   if (catalogEntry && catalogEntry.vendors.length > 0) {
     const topVendor = catalogEntry.vendors[0]
+    // Prefer vendor catalog price (source-cited) over BOM line estimate (LLM estimate).
+    // When vendor.typicalUnitPriceGbp is present, use it and surface as grade_c with source.
+    const hasVendorPrice = typeof topVendor.typicalUnitPriceGbp === 'number'
+    const unitPrice = hasVendorPrice
+      ? (topVendor.typicalUnitPriceGbp as number)
+      : line.unit_cost_gbp
+    const vendorUrl = (topVendor as VendorEntry & { url?: string }).url ?? null
+    const baseNotes = topVendor.notes ?? null
+    const priceNote = hasVendorPrice
+      ? `OEM price estimate from vendor catalog: ${topVendor.name}`
+      : null
+    const combinedNotes = [priceNote, baseNotes].filter(Boolean).join(' — ') || null
     return {
       line_id: line.line_id,
       name: line.name,
@@ -335,13 +348,13 @@ function resolveOemSubsystemLine(line: BessLine): ResolvedLeaf {
       qty,
       mpn: null,
       manufacturer: topVendor.name,
-      unit_price_gbp: line.unit_cost_gbp, // vendor catalog doesn't have pricing — use BOM
+      unit_price_gbp: unitPrice,
       lead_weeks: topVendor.typicalLeadWeeks,
-      verification_grade: 'estimated',
+      verification_grade: hasVendorPrice ? 'grade_c' : 'estimated',
       source: 'vendor_catalog',
-      source_url: null,
+      source_url: hasVendorPrice ? vendorUrl : null,
       distributor: 'vendor_catalog',
-      notes: topVendor.notes ?? null,
+      notes: combinedNotes,
     }
   }
 
@@ -395,6 +408,7 @@ export interface ResolutionResult {
     total: number
     verified_by_distributor: number
     from_vendor_catalog: number
+    grade_c: number
     grade_d: number
     stub: number
     estimated: number
@@ -467,6 +481,7 @@ export async function resolveBessTree(): Promise<ResolutionResult> {
     total: resolvedLeaves.length,
     verified_by_distributor: resolvedLeaves.filter(l => l.verification_grade === 'verified').length,
     from_vendor_catalog: resolvedLeaves.filter(l => l.distributor === 'vendor_catalog').length,
+    grade_c: resolvedLeaves.filter(l => l.verification_grade === 'grade_c').length,
     grade_d: resolvedLeaves.filter(l => l.verification_grade === 'grade_d').length,
     stub: resolvedLeaves.filter(l => l.verification_grade === 'stub').length,
     estimated: resolvedLeaves.filter(l => l.verification_grade === 'estimated').length,
@@ -475,7 +490,7 @@ export async function resolveBessTree(): Promise<ResolutionResult> {
 
   console.log(`[resolution] Done. ${stats.distributor_calls_made} API calls. ` +
     `Verified: ${stats.verified_by_distributor}, Catalog: ${stats.from_vendor_catalog}, ` +
-    `Estimated: ${stats.estimated}, Grade-D: ${stats.grade_d}, Stub: ${stats.stub}`)
+    `Grade-C: ${stats.grade_c}, Estimated: ${stats.estimated}, Grade-D: ${stats.grade_d}, Stub: ${stats.stub}`)
 
   return { resolvedLeaves, stats }
 }

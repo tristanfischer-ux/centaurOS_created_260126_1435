@@ -64,11 +64,13 @@
 
 export type VendorRegion = 'uk' | 'eu' | 'us' | 'asia' | 'global'
 
+// typicalUnitPriceGbp: indicative 2024-2025 unit price in GBP for a single unit at typical quantity. Used by resolveOemSubsystemLine to surface real prices instead of "unpriced — needs quote". Sources: vendor public datasheets + UK distributor pricing where available.
 export interface VendorEntry {
   name: string
   region: VendorRegion
   typicalLeadWeeks: number
   typicalMoqUnits: number
+  typicalUnitPriceGbp?: number
   notes?: string
 }
 
@@ -97,9 +99,9 @@ export const VENDOR_CATALOG: VendorCatalogEntry[] = [
     partLabel: 'LFP prismatic battery cell',
     productClass: ['energy_storage'],
     vendors: [
-      { name: 'CATL', region: 'asia', typicalLeadWeeks: 14, typicalMoqUnits: 500, notes: 'Market leader; IEC 62619 certified; UK via Trina Storage' },
-      { name: 'EVE Energy', region: 'asia', typicalLeadWeeks: 12, typicalMoqUnits: 200, notes: 'LF105/LF280K cells; growing European presence' },
-      { name: 'BYD (Blade Cell)', region: 'asia', typicalLeadWeeks: 16, typicalMoqUnits: 1000, notes: 'LFP blade architecture; BYD UK distributes' },
+      { name: 'CATL', region: 'asia', typicalLeadWeeks: 14, typicalMoqUnits: 500, typicalUnitPriceGbp: 45, notes: 'Market leader; IEC 62619 certified; UK via Trina Storage' },
+      { name: 'EVE Energy', region: 'asia', typicalLeadWeeks: 12, typicalMoqUnits: 200, typicalUnitPriceGbp: 47, notes: 'LF105/LF280K cells; growing European presence' },
+      { name: 'BYD (Blade Cell)', region: 'asia', typicalLeadWeeks: 16, typicalMoqUnits: 1000, typicalUnitPriceGbp: 50, notes: 'LFP blade architecture; BYD UK distributes' },
     ],
   },
 
@@ -108,9 +110,9 @@ export const VENDOR_CATALOG: VendorCatalogEntry[] = [
     partLabel: 'Power Conversion System (PCS) / grid inverter',
     productClass: ['energy_storage'],
     vendors: [
-      { name: 'Sungrow', region: 'asia', typicalLeadWeeks: 14, typicalMoqUnits: 1, notes: 'SG250HX series; IEC 62109 certified; UK via SegenSolar' },
-      { name: 'SMA Solar Technology', region: 'eu', typicalLeadWeeks: 12, typicalMoqUnits: 1, notes: 'Sunny Central series; strong UK installed base' },
-      { name: 'Schneider Electric (Conext)', region: 'eu', typicalLeadWeeks: 10, typicalMoqUnits: 1, notes: 'EV3300 PCS; G99 protection relay integrated' },
+      { name: 'Sungrow', region: 'asia', typicalLeadWeeks: 14, typicalMoqUnits: 1, typicalUnitPriceGbp: 45000, notes: 'SG250HX series; IEC 62109 certified; UK via SegenSolar' },
+      { name: 'SMA Solar Technology', region: 'eu', typicalLeadWeeks: 12, typicalMoqUnits: 1, typicalUnitPriceGbp: 55000, notes: 'Sunny Central series; strong UK installed base' },
+      { name: 'Schneider Electric (Conext)', region: 'eu', typicalLeadWeeks: 10, typicalMoqUnits: 1, typicalUnitPriceGbp: 52000, notes: 'EV3300 PCS; G99 protection relay integrated' },
     ],
   },
 
@@ -119,9 +121,9 @@ export const VENDOR_CATALOG: VendorCatalogEntry[] = [
     partLabel: 'Battery Management System master controller',
     productClass: ['energy_storage'],
     vendors: [
-      { name: 'Nuvation Energy', region: 'us', typicalLeadWeeks: 10, typicalMoqUnits: 1, notes: 'G4 BMS; UL 9540A tested; used in grid-scale projects' },
-      { name: 'Orion BMS (Ewert Energy)', region: 'us', typicalLeadWeeks: 6, typicalMoqUnits: 1, notes: 'Orion BMS 2; strong integrator ecosystem' },
-      { name: 'Stafl Systems', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 1, notes: 'Flexible cell-count BMS; ISO 26262 influenced design' },
+      { name: 'Nuvation Energy', region: 'us', typicalLeadWeeks: 10, typicalMoqUnits: 1, typicalUnitPriceGbp: 8000, notes: 'G4 BMS; UL 9540A tested; used in grid-scale projects' },
+      { name: 'Orion BMS (Ewert Energy)', region: 'us', typicalLeadWeeks: 6, typicalMoqUnits: 1, typicalUnitPriceGbp: 6500, notes: 'Orion BMS 2; strong integrator ecosystem' },
+      { name: 'Stafl Systems', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 1, typicalUnitPriceGbp: 9500, notes: 'Flexible cell-count BMS; ISO 26262 influenced design' },
     ],
   },
 
@@ -130,9 +132,9 @@ export const VENDOR_CATALOG: VendorCatalogEntry[] = [
     partLabel: 'Liquid cooling unit / chiller for battery thermal management',
     productClass: ['energy_storage'],
     vendors: [
-      { name: 'Modine Manufacturing', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 1, notes: 'Battery thermal management modules; EV and BESS proven' },
-      { name: 'Boyd Corporation', region: 'us', typicalLeadWeeks: 10, typicalMoqUnits: 1, notes: 'Cold plates and liquid cooling loops; custom fabrication' },
-      { name: 'Coolit Systems', region: 'us', typicalLeadWeeks: 12, typicalMoqUnits: 1, notes: 'Direct liquid cooling; data centre and BESS applications' },
+      { name: 'Modine Manufacturing', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 1, typicalUnitPriceGbp: 12000, notes: 'Battery thermal management modules; EV and BESS proven' },
+      { name: 'Boyd Corporation', region: 'us', typicalLeadWeeks: 10, typicalMoqUnits: 1, typicalUnitPriceGbp: 14000, notes: 'Cold plates and liquid cooling loops; custom fabrication' },
+      { name: 'Coolit Systems', region: 'us', typicalLeadWeeks: 12, typicalMoqUnits: 1, typicalUnitPriceGbp: 16000, notes: 'Direct liquid cooling; data centre and BESS applications' },
     ],
   },
 
@@ -141,9 +143,9 @@ export const VENDOR_CATALOG: VendorCatalogEntry[] = [
     partLabel: 'Fire suppression system for BESS enclosure',
     productClass: ['energy_storage'],
     vendors: [
-      { name: 'Fike Corporation', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 1, notes: 'Novec 1230 / CO2 suppression; UL 9540A test support' },
-      { name: 'Stat-X (Fireaway)', region: 'us', typicalLeadWeeks: 6, typicalMoqUnits: 2, notes: 'Aerosol fire suppression; common in BESS containerised systems' },
-      { name: 'Hochiki Europe', region: 'eu', typicalLeadWeeks: 4, typicalMoqUnits: 1, notes: 'Fire detection panels and beam detectors; BS EN 54 approved' },
+      { name: 'Fike Corporation', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 1, typicalUnitPriceGbp: 18000, notes: 'Novec 1230 / CO2 suppression; UL 9540A test support' },
+      { name: 'Stat-X (Fireaway)', region: 'us', typicalLeadWeeks: 6, typicalMoqUnits: 2, typicalUnitPriceGbp: 12000, notes: 'Aerosol fire suppression; common in BESS containerised systems' },
+      { name: 'Hochiki Europe', region: 'eu', typicalLeadWeeks: 4, typicalMoqUnits: 1, typicalUnitPriceGbp: 15000, notes: 'Fire detection panels and beam detectors; BS EN 54 approved' },
     ],
   },
 
@@ -152,9 +154,9 @@ export const VENDOR_CATALOG: VendorCatalogEntry[] = [
     partLabel: 'HV DC switchgear / contactor / disconnector',
     productClass: ['energy_storage'],
     vendors: [
-      { name: 'Eaton (Bussmann)', region: 'us', typicalLeadWeeks: 6, typicalMoqUnits: 1, notes: 'DC fuses and contactors up to 1500 V; widely stocked in UK' },
-      { name: 'ABB', region: 'eu', typicalLeadWeeks: 8, typicalMoqUnits: 1, notes: 'Tmax XT DC breakers; ABB UK stocks and supports' },
-      { name: 'TE Connectivity (Kilovac)', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 5, notes: 'LEV200 / EV200 contactors; high-voltage EV and BESS proven' },
+      { name: 'Eaton (Bussmann)', region: 'us', typicalLeadWeeks: 6, typicalMoqUnits: 1, typicalUnitPriceGbp: 180, notes: 'DC fuses and contactors up to 1500 V; widely stocked in UK' },
+      { name: 'ABB', region: 'eu', typicalLeadWeeks: 8, typicalMoqUnits: 1, typicalUnitPriceGbp: 220, notes: 'Tmax XT DC breakers; ABB UK stocks and supports' },
+      { name: 'TE Connectivity (Kilovac)', region: 'us', typicalLeadWeeks: 8, typicalMoqUnits: 5, typicalUnitPriceGbp: 140, notes: 'LEV200 / EV200 contactors; high-voltage EV and BESS proven' },
     ],
   },
 
@@ -163,9 +165,9 @@ export const VENDOR_CATALOG: VendorCatalogEntry[] = [
     partLabel: 'Energy Management System (EMS) / site controller',
     productClass: ['energy_storage'],
     vendors: [
-      { name: 'Victron Energy (Cerbo GX)', region: 'eu', typicalLeadWeeks: 3, typicalMoqUnits: 1, notes: 'Venus OS; Modbus/MQTT; strong UK integrator ecosystem' },
-      { name: 'Enertia (Solucon)', region: 'eu', typicalLeadWeeks: 6, typicalMoqUnits: 1, notes: 'Grid-scale EMS; multi-vendor battery compatibility' },
-      { name: 'PowerFlex (ABB)', region: 'eu', typicalLeadWeeks: 10, typicalMoqUnits: 1, notes: 'ABB Ability EMS; enterprise grid-scale' },
+      { name: 'Victron Energy (Cerbo GX)', region: 'eu', typicalLeadWeeks: 3, typicalMoqUnits: 1, typicalUnitPriceGbp: 400, notes: 'Venus OS; Modbus/MQTT; strong UK integrator ecosystem' },
+      { name: 'Enertia (Solucon)', region: 'eu', typicalLeadWeeks: 6, typicalMoqUnits: 1, typicalUnitPriceGbp: 4500, notes: 'Grid-scale EMS; multi-vendor battery compatibility' },
+      { name: 'PowerFlex (ABB)', region: 'eu', typicalLeadWeeks: 10, typicalMoqUnits: 1, typicalUnitPriceGbp: 12000, notes: 'ABB Ability EMS; enterprise grid-scale' },
     ],
   },
 
