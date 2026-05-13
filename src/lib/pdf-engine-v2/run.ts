@@ -23,6 +23,9 @@ import { homedir } from 'os'
 const envFilesToLoad = [
   resolve(process.cwd(), '.env.local'),
   resolve(homedir(), '.claude/secrets/distributor-apis.env'),
+  // 2026-05-13: Tavily search API for Stage 13 (Assembly Partner Discovery) +
+  // Stage 7 plausibility-grounding fallback. Free tier: 1k searches/month.
+  resolve(homedir(), '.claude/secrets/tavily.env'),
 ]
 
 for (const envPath of envFilesToLoad) {

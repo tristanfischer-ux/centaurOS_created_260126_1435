@@ -100,7 +100,7 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
       if (!raw) throw new Error(`${model}: empty content`)
 
       console.log(`[bom] ${model} responded: ${raw.length} chars`)
-      return parseJsonFromLlm(raw, { stage: 'bom', expectKey: 'parts', model })
+      return await parseJsonFromLlm(raw, { stage: 'bom', expectKey: 'parts', model })
     } catch (err) {
       clearTimeout(timeout)
       lastErr = err

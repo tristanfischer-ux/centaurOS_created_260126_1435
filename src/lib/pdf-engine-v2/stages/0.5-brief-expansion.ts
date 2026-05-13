@@ -1,4 +1,5 @@
 import { parseJsonFromLlm } from '../lib/llm-json'
+import { callFastExtract } from '../lib/openrouter-models'
 import type { StageResult } from '../types'
 
 export interface BriefExpansionResult {
@@ -58,26 +59,26 @@ export async function runBriefExpansion(
   const prompt = buildBriefExpansionPrompt(briefText, productClass, classification.technologyDomains)
 
   try {
-    const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'deepseek/deepseek-v4-flash',
-        messages: [{ role: 'user', content: prompt }],
-      }),
+    // Iter-09 (2026-05-13): swapped from DeepSeek V4-Flash (96% hallucination —
+    // catastrophic for upstream creative inference) to Gemini 3.1 Flash-Lite
+    // grounded (8.2% hallucination, native Google Search grounding for
+    // regulatory/market facts). Per drawer forgeos_gotchas_2029897b28682440.
+    // thinkingLevel='high' — one-shot per pipeline, latency hit invisible;
+    // reasoning depth matters for inference accuracy.
+    // groundWithGoogleSearch=true — real-time web check for regulatory
+    // standards, market data, certifications drops hallucination near zero on
+    // factual claims.
+    const content = await callFastExtract(prompt, {
+      thinkingLevel: 'high',
+      groundWithGoogleSearch: true,
     })
 
-    if (!res.ok) {
-      throw new Error(`OpenRouter API error: ${res.statusText}`)
-    }
-
-    const data = await res.json()
-    const content = data.choices[0].message.content
-
-    const parsed = parseJsonFromLlm(content, { expectKey: 'inferred_fields', model: 'deepseek-v4-flash', stage: 'brief-expansion' })
+    const parsed = await parseJsonFromLlm(content, {
+      expectKey: 'inferred_fields',
+      model: 'gemini-3.1-flash-lite',
+      stage: 'brief-expansion',
+      enableLlmRepair: true,
+    })
 
     const inferredAssumptions = parsed.inferred_fields || []
     const expandedFields: Record<string, unknown> = {}

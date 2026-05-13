@@ -348,23 +348,26 @@ Return ONLY valid JSON:
   // dense tables (multimodal council memory). Replaced with
   // mistralai/mistral-large — different lineage from all content generators,
   // reliable JSON schema compliance, no self-judge risk.
+  //
+  // Iter-09 (2026-05-13): Mistral Large replaced — recurring HTTP 400s in
+  // iter-06/07/08 (drawer forgeos_gotchas_mistral_unreliable). Flash-Lite is
+  // 8.2% hallucination, 329 tok/s, judges quality+schema reliably. Different
+  // lineage (Google) from the content generators (Anthropic + xAI + Asian).
   const judges = [
     'x-ai/grok-4.3',                // honest adversary, 98% tool-use, 75% non-hallucination
     'openai/gpt-5.4',               // B2: replaced MiMo — OpenAI lineage, no overlap with content generators
-    'mistralai/mistral-large',      // B5: replaced GLM-5.1 — Mistral lineage, reliable JSON compliance
+    'google/gemini-3.1-flash-lite', // Iter-09: replaced Mistral Large — Google lineage, 8.2% hallucination, fast + reliable JSON
   ]
 
   // B6 (2026-05-10): per-judge retry + timeout config.
-  // Mistral is capped at 1 retry (2 attempts total) with a 30s per-call
-  // timeout. GLM-5.1 exhibited the simultaneous-failure-accumulation pattern
-  // that killed pipelines (B5 above). Mistral hardening prevents the same
-  // failure mode from re-emerging if Mistral degrades: 1 retry × 11 sections
-  // × 30s cap = worst-case 660s overhead, versus an unbounded 60s × 3 × 11
-  // that previously timed out the entire pipeline.
+  // Iter-09 (2026-05-13): Flash-Lite inherits Mistral's hardened config
+  // (maxAttempts: 2, timeoutMs: 30_000) — keeps the worst-case overhead
+  // bounded (2 attempts × 11 sections × 30s = 660s cap) even though
+  // Flash-Lite is far faster and more reliable than Mistral was.
   // Other judges keep the default (2 retries = 3 attempts, 60s timeout).
   interface JudgeConfig { maxAttempts: number; timeoutMs: number }
   const JUDGE_CONFIG: Record<string, JudgeConfig> = {
-    'mistralai/mistral-large': { maxAttempts: 2, timeoutMs: 30_000 },
+    'google/gemini-3.1-flash-lite': { maxAttempts: 2, timeoutMs: 30_000 },
   }
   const DEFAULT_JUDGE_CONFIG: JudgeConfig = { maxAttempts: 3, timeoutMs: 60_000 }
 
@@ -397,9 +400,10 @@ Return ONLY valid JSON:
         }
       }
     }
-    // B6: if this is Mistral and it failed all attempts, log the skip-and-mean fallback
-    if (model === 'mistralai/mistral-large') {
-      console.warn(`[council-scorer] Mistral skipped for section ${section} — using 2-judge mean`)
+    // Iter-09 (2026-05-13): replaced Mistral with Flash-Lite — same skip-and-mean
+    // fallback applies if Flash-Lite fails all attempts.
+    if (model === 'google/gemini-3.1-flash-lite') {
+      console.warn(`[council-scorer] Flash-Lite skipped for section ${section} — using 2-judge mean`)
     }
     return null
   })
@@ -461,7 +465,7 @@ Return ONLY valid JSON:
 // ─── Call a Single Judge ───────────────────────────────────────────────────
 
 // B6 (2026-05-10): timeoutMs param added — callers supply per-judge timeout.
-// Mistral uses 30_000; all others default to 60_000.
+// Iter-09 (2026-05-13): Flash-Lite uses 30_000; all others default to 60_000.
 async function callJudge(model: string, prompt: string, timeoutMs = 60_000): Promise<any> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
@@ -480,10 +484,16 @@ async function callJudge(model: string, prompt: string, timeoutMs = 60_000): Pro
         // B3 (2026-05-08): deterministic reward signal required for RL.
         // temperature: 0 forces greedy decoding. top_p: 1 is a no-op at
         // temperature 0 but included for explicit clarity. OpenRouter passes
-        // these through to all three judges (Grok, GPT, GLM).
+        // these through to all three judges (Grok, GPT, Flash-Lite).
         temperature: 0,
         top_p: 1,
         messages: [{ role: 'user', content: prompt }],
+        // Iter-09 (2026-05-13): Flash-Lite specific — council scoring is multi-hop
+        // reasoning on structured data, so use thinking_level: 'medium' for the
+        // judgement quality lift. No-op on other models.
+        ...(model === 'google/gemini-3.1-flash-lite'
+          ? { thinking_level: 'medium' }
+          : {}),
       }),
       signal: controller.signal,
     })

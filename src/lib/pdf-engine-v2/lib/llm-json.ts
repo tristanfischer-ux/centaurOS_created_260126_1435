@@ -23,6 +23,7 @@
  */
 
 import { writeFileSync } from 'fs'
+import { callFastExtract } from './openrouter-models'
 
 export interface ParseOpts {
   /** Tag used to locate the top-level object (e.g. "modules" for {"modules": [...]}). */
@@ -31,6 +32,18 @@ export interface ParseOpts {
   model?: string
   /** Used in log messages. */
   stage?: string
+  /**
+   * When true, attempt a Gemini 3.1 Flash-Lite "JSON repair" pass if all local
+   * parse strategies fail. The repair model receives the malformed raw string
+   * and is instructed to return valid JSON only (no commentary, no fences).
+   *
+   * Use selectively in stages where transient JSON failures are common
+   * (Stage 0.5 brief expansion, PA Stage 3 research synthesis, Stage 1.7
+   * multi-emitter). Adds ~£0.0005 per failed-parse occurrence.
+   *
+   * Default: false (caller must opt in).
+   */
+  enableLlmRepair?: boolean
 }
 
 /**
@@ -38,9 +51,16 @@ export interface ParseOpts {
  * Throws with a helpful error message if nothing parses. Also writes the
  * raw response to /tmp/ on final failure so it can be inspected without
  * re-running the pipeline.
+ *
+ * Now async: when `opts.enableLlmRepair === true`, a final repair pass is
+ * attempted via Gemini 3.1 Flash-Lite (Piece 8, 2026-05-13). The repair
+ * model receives the malformed raw string and is instructed to return only
+ * valid JSON. If repair also fails, the ORIGINAL parse error is thrown
+ * (failures are not swallowed). Default behaviour (enableLlmRepair=false)
+ * is unchanged: throw on parse failure.
  */
-export function parseJsonFromLlm(raw: string, opts: ParseOpts = {}): any {
-  const { expectKey, model = 'unknown', stage = 'unknown' } = opts
+export async function parseJsonFromLlm(raw: string, opts: ParseOpts = {}): Promise<any> {
+  const { expectKey, model = 'unknown', stage = 'unknown', enableLlmRepair = false } = opts
 
   if (!raw || typeof raw !== 'string') {
     throw new Error('No LLM content to parse')
@@ -90,7 +110,47 @@ export function parseJsonFromLlm(raw: string, opts: ParseOpts = {}): any {
     }
   }
 
-  // Step 6: dump and fail
+  // Step 6 (Piece 8, 2026-05-13): optional LLM-based repair pass.
+  //
+  // When the caller has opted in via `enableLlmRepair: true`, dispatch a
+  // single Gemini 3.1 Flash-Lite call asking the model to repair the
+  // malformed JSON. Use thinkingLevel='minimal' (pure transformation, no
+  // reasoning needed) and grounding off (offline transformation). If repair
+  // succeeds we return the parsed result. If repair ALSO fails, we throw
+  // the original error — the failure is not swallowed.
+  const originalErr = new Error('Failed to parse JSON response from LLM')
+  if (enableLlmRepair) {
+    try {
+      const repairSystem =
+        'You are a JSON repair tool. The input is malformed JSON. Output ONLY ' +
+        'valid JSON matching the intended schema. Do NOT add commentary. Do NOT ' +
+        'wrap in markdown fences. Your first character MUST be `{` or `[`.'
+      const repaired = await callFastExtract(raw, {
+        systemPrompt: repairSystem,
+        thinkingLevel: 'minimal',
+        groundWithGoogleSearch: false,
+        maxTokens: 32_000,
+      })
+      // Strip any stray fences just in case the repair model ignored instructions.
+      const stripped = repaired
+        .replace(/```json\s*/gi, '')
+        .replace(/```\s*/g, '')
+        .trim()
+      const parsed = JSON.parse(stripped)
+      console.warn(
+        `[${stage}] ${model} JSON parse failed; Flash-Lite repair fallback SUCCEEDED.`,
+      )
+      return parsed
+    } catch (repairErr) {
+      console.error(
+        `[${stage}] ${model} Flash-Lite repair fallback FAILED: ` +
+        `${(repairErr as Error).message ?? String(repairErr)}`,
+      )
+      // fall through to dump + throw
+    }
+  }
+
+  // Step 7: dump and fail
   try {
     const tag = `${stage}-${model.replace(/[^a-z0-9]+/gi, '_')}-${Date.now()}`
     const dumpPath = `/tmp/llm-raw-${tag}.txt`
@@ -100,7 +160,7 @@ export function parseJsonFromLlm(raw: string, opts: ParseOpts = {}): any {
       `First 500 chars: ${raw.slice(0, 500)}`,
     )
   } catch { /* ignore dump failures */ }
-  throw new Error('Failed to parse JSON response from LLM')
+  throw originalErr
 }
 
 /**

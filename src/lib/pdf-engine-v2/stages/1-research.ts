@@ -3,6 +3,8 @@ import type { StructuredBriefJSON } from '../types'
 import { sanitiseLlmOutput } from '../sanitiser'
 import { RESEARCH_SYNTHESIS_SYSTEM, RESEARCH_SYNTHESIS_SYSTEM_PA } from '../prompts'
 import { STAGE_TEMPERATURES } from '../llm-temperature-config'
+import { callFastExtract } from '../lib/openrouter-models'
+import { parseJsonFromLlm } from '../lib/llm-json'
 
 // Stage 1: Research — uses RESEARCH_SYNTHESIS_SYSTEM from prompts.ts
 // The prompt is defined in prompts.ts and imported above.
@@ -35,7 +37,19 @@ If a value is not found, omit the object or use null/0 where appropriate, but tr
   }
 }
 
-async function callOpenRouter(systemPrompt: string, userContent: string, jsonFormat = false): Promise<any> {
+async function callOpenRouter(
+  systemPrompt: string,
+  userContent: string,
+  jsonFormat = false,
+  /**
+   * Piece 8 (2026-05-13): when true, on local parse exhaustion, fall back to
+   * Gemini 3.1 Flash-Lite JSON-repair via `parseJsonFromLlm({ enableLlmRepair:
+   * true })`. Used by PA Stage 3 Research Synthesis where intermittent MiMo
+   * JSON failures are the most common pipeline-killer (per CLAUDE.md gotcha 8).
+   */
+  enableLlmRepair = false,
+  stageTag = 'research',
+): Promise<any> {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 300_000)
 
@@ -139,6 +153,25 @@ async function callOpenRouter(systemPrompt: string, userContent: string, jsonFor
         return { report: raw, sources: [], regulatory: [], designBrief: {} }
       }
 
+      // Strategy 7 (Piece 8, 2026-05-13): Gemini 3.1 Flash-Lite JSON-repair
+      // fallback. Only fires when caller opted in (enableLlmRepair=true) —
+      // typically the PA Stage 3 Research Synthesis path where MiMo parse
+      // failures are the most common pipeline-killer (CLAUDE.md gotcha 8).
+      if (enableLlmRepair) {
+        try {
+          return await parseJsonFromLlm(raw, {
+            stage: stageTag,
+            model: 'mimo-v2.5-pro',
+            enableLlmRepair: true,
+          })
+        } catch (repairErr) {
+          console.error(
+            `[research] Flash-Lite repair fallback also failed: ${(repairErr as Error).message}`,
+          )
+          // fall through to throw the original error
+        }
+      }
+
       console.error('[research] JSON parsing failed. First 500 chars:', raw.slice(0, 500))
       throw new Error('Failed to parse JSON response from LLM')
     }
@@ -183,8 +216,42 @@ export async function runResearchSynthesis(
     `\n\nProduct classification context: ${classification}`
 
   try {
+    // Iter-09 (2026-05-13): MiMo V2.5 Pro stays primary (Asian market-data lineage),
+    // but Flash-Lite grounded is the fallback when MiMo errors. Prevents iter-06 v1's
+    // catastrophic pipeline death from intermittent MiMo JSON parse failure / transport.
     console.log('[research-synthesis] Calling OpenRouter with PA Stage 3 prompt...')
-    const rawJson = await callOpenRouter(RESEARCH_SYNTHESIS_SYSTEM_PA, userContent, true)
+    let rawJson: any
+    try {
+      // Piece 8 (2026-05-13): enableLlmRepair=true — PA Stage 3 is the most
+      // common MiMo JSON-failure site in the pipeline (CLAUDE.md gotcha 8).
+      rawJson = await callOpenRouter(
+        RESEARCH_SYNTHESIS_SYSTEM_PA,
+        userContent,
+        true,
+        true,
+        'research-synthesis',
+      )
+    } catch (mimoErr) {
+      console.warn('[research-synthesis] MiMo failed, retrying with Gemini 3.1 Flash-Lite (grounded)')
+      const text = await callFastExtract(userContent, {
+        systemPrompt: RESEARCH_SYNTHESIS_SYSTEM_PA,
+        thinkingLevel: 'high',
+        groundWithGoogleSearch: true,
+        maxTokens: 150_000,
+        temperature: STAGE_TEMPERATURES.research,
+      })
+      try {
+        rawJson = _parseSynthesisJson(text)
+      } catch (parseErr) {
+        // Piece 8 final safety net: Flash-Lite repair pass on Flash-Lite's
+        // own output (in case of pretty-printer drift).
+        rawJson = await parseJsonFromLlm(text, {
+          stage: 'research-synthesis-fallback',
+          model: 'gemini-3.1-flash-lite',
+          enableLlmRepair: true,
+        })
+      }
+    }
 
     // ── Normalise competitors ───────────────────────────────────────────
     const competitors: ResearchCompetitor[] = Array.isArray(rawJson.competitors)
@@ -248,6 +315,39 @@ export async function runResearchSynthesis(
       error: error.message || 'Unknown error during PA Research Synthesis',
       durationMs: Date.now() - startTime,
     }
+  }
+}
+
+/**
+ * Iter-09 (2026-05-13): parse Flash-Lite raw text output into the same JSON
+ * shape that `callOpenRouter(..., true)` returns. Mirrors the strip/parse
+ * strategies in callOpenRouter (think tags, markdown fences, trailing commas,
+ * first/last brace slicing). Throws if no valid JSON object is recoverable.
+ */
+function _parseSynthesisJson(raw: string): any {
+  let s = raw
+  s = s.replace(/<think>[\s\S]*?<\/think>/g, '').trim()
+  s = s.replace(/<reasoning>[\s\S]*?<\/reasoning>/g, '').trim()
+  s = s.replace(/```json/g, '').replace(/```/g, '').trim()
+  s = s.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, '')
+  s = s.replace(/,\s*([}\]])/g, '$1')
+
+  const firstBrace = s.indexOf('{')
+  const lastBrace = s.lastIndexOf('}')
+  if (firstBrace >= 0 && lastBrace > firstBrace) {
+    s = s.slice(firstBrace, lastBrace + 1)
+  }
+
+  try {
+    return JSON.parse(s)
+  } catch {
+    // Trim trailing chars until parseable
+    for (let i = s.lastIndexOf('}'); i > firstBrace; i--) {
+      try {
+        return JSON.parse(s.slice(0, i + 1))
+      } catch { /* continue */ }
+    }
+    throw new Error('Flash-Lite fallback: failed to parse JSON synthesis output')
   }
 }
 

@@ -3239,6 +3239,102 @@ function collectResolvedSourceLeaves(
   return out
 }
 
+// ---------------------------------------------------------------------------
+// §6 BoM plausibility taxonomy — Wave 1 Piece 5 (2026-05-13)
+//
+// Multimodal scoring iter-08 showed the BoM section dropped from iter-04's
+// 7.0 to 3.0 because the renderer surfaces 387 unverified lines without
+// clearly grading their provenance. Per Tristan: "prefer more leaves with
+// plausibility transparency over a thin verified BoM." This taxonomy maps
+// each leaf to ONE of 7 badges so scorers can read provenance directly
+// instead of inferring "fabricated content" from missing MPNs.
+//
+// Precedence (high → low):
+//   1. ⚠ MISSING-QTY  — verification_status === 'missing-quantity'
+//   2. ⚠ STUB          — verification_status === 'stub' OR grade === 'stub'
+//   3. ✅ VERIFIED     — grade === 'verified' (distributor MPN match)
+//   4. 💰 PRICED       — grade === 'grade_c' (vendor-catalog priced)
+//   5. 🟢 PLAUSIBLE    — Wave 2 web-evidence flag (placeholder via param)
+//   6. 📐 CANONICAL    — grade === 'estimated' (canonical few-shot vocab)
+//   7. ⚪ UNVERIFIED   — fallback (grade_d, data_gap, anything else)
+//
+// `has_mpn`, `has_vendor_catalog_price`, `has_plausibility_check` are
+// optional refinement signals reserved for Wave 2 — currently Wave 1
+// derives everything from verification_grade + verification_status.
+// ---------------------------------------------------------------------------
+
+type BomBadgeKey =
+  | 'verified'
+  | 'priced'
+  | 'canonical'
+  | 'plausible'
+  | 'missing-quantity'
+  | 'stub'
+  | 'unverified'
+
+type BomBadge = {
+  key: BomBadgeKey
+  text: string
+  colour: string
+  description: string
+}
+
+function bomStatusBadge(
+  verification_grade: string | null | undefined,
+  verification_status: 'missing-quantity' | 'stub' | null | undefined,
+  has_mpn: boolean = false,
+  has_vendor_catalog_price: boolean = false,
+  has_plausibility_check: boolean = false,
+): BomBadge {
+  // Precedence: warnings beat positive signals so a missing-qty leaf with a
+  // priced MPN still surfaces the warning (the qty is the integrity issue).
+  if (verification_status === 'missing-quantity') {
+    return { key: 'missing-quantity', text: '⚠ MISSING-QTY', colour: BESS_AMBER,
+      description: 'Quantity modifier missing on non-singleton part — needs review' }
+  }
+  if (verification_status === 'stub' || verification_grade === 'stub') {
+    return { key: 'stub', text: '⚠ STUB', colour: BESS_AMBER,
+      description: 'Empty sub-module — placeholder leaf' }
+  }
+  if (verification_grade === 'verified' || has_mpn) {
+    return { key: 'verified', text: '✅ VERIFIED', colour: BESS_GREEN,
+      description: 'Distributor MPN match — real manufacturer, real price, sourceable URL' }
+  }
+  if (verification_grade === 'grade_c' || has_vendor_catalog_price) {
+    return { key: 'priced', text: '\u{1F4B0} PRICED', colour: BESS_TEAL,
+      description: 'Vendor catalog match — real manufacturer + indicative price (no MPN)' }
+  }
+  if (has_plausibility_check) {
+    return { key: 'plausible', text: '\u{1F7E2} PLAUSIBLE', colour: BESS_GREEN,
+      description: 'Plausibility spot-check passed (web evidence found)' }
+  }
+  if (verification_grade === 'estimated') {
+    return { key: 'canonical', text: '\u{1F4D0} CANONICAL', colour: BESS_NAVY,
+      description: 'Character_id in canonical vocabulary — plausibility high' }
+  }
+  return { key: 'unverified', text: '⚪ UNVERIFIED', colour: MUTED,
+    description: 'No provenance signal — lower confidence' }
+}
+
+// Static legend rows — rendered both in the Appendix A header and (in count form)
+// in the BoM Data Sources sourcing breakdown.
+const BOM_BADGE_LEGEND: ReadonlyArray<{ key: BomBadgeKey; text: string; colour: string; description: string }> = [
+  { key: 'verified', text: '✅ VERIFIED', colour: BESS_GREEN,
+    description: 'Distributor MPN match — real manufacturer, real price, sourceable URL' },
+  { key: 'priced', text: '\u{1F4B0} PRICED', colour: BESS_TEAL,
+    description: 'Vendor catalog match — real manufacturer + indicative price (no MPN)' },
+  { key: 'canonical', text: '\u{1F4D0} CANONICAL', colour: BESS_NAVY,
+    description: 'Character_id in canonical vocabulary — plausibility high' },
+  { key: 'plausible', text: '\u{1F7E2} PLAUSIBLE', colour: BESS_GREEN,
+    description: 'Plausibility spot-check passed (web evidence found)' },
+  { key: 'missing-quantity', text: '⚠ MISSING-QTY', colour: BESS_AMBER,
+    description: 'Quantity modifier missing on non-singleton part — needs review' },
+  { key: 'stub', text: '⚠ STUB', colour: BESS_AMBER,
+    description: 'Empty sub-module — placeholder leaf' },
+  { key: 'unverified', text: '⚪ UNVERIFIED', colour: MUTED,
+    description: 'No provenance signal — lower confidence' },
+]
+
 // Pretty source-name map for distributor and vendor sources
 function distributorDisplayName(source: string): string {
   switch (source) {
@@ -3291,15 +3387,67 @@ const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
   }
 
   // --- Build distributor MPN source stats from resolvedRadicalTree ---
+  // Wave 1 Piece 5 (2026-05-13): replace the legacy 4-row summary with the
+  // 7-badge plausibility taxonomy so the §10 sourcing breakdown matches the
+  // per-line badge column in §6/Appendix A. Counts derived by walking the
+  // resolved tree and applying bomStatusBadge() to every leaf — keeps a
+  // single source of truth (no divergence between row badges and the
+  // sourcing-breakdown totals).
   const resolvedTree = state.resolvedRadicalTree
   const rMeta = resolvedTree?.resolution_meta?.stats
-  const distributorSources: Array<{ label: string; count: number; pct: string }> = []
-  if (rMeta) {
-    const total = rMeta.total_leaves || 1
-    distributorSources.push({ label: 'Verified by Distributor (MPN)', count: rMeta.verified_by_distributor, pct: ((rMeta.verified_by_distributor / total) * 100).toFixed(0) })
-    distributorSources.push({ label: 'Vendor Catalog Reference', count: rMeta.from_vendor_catalog, pct: ((rMeta.from_vendor_catalog / total) * 100).toFixed(0) })
-    distributorSources.push({ label: 'LLM Estimate (Grade D)', count: (rMeta.from_llm_estimate ?? 0) + (rMeta.grade_d ?? 0), pct: ((((rMeta.from_llm_estimate ?? 0) + (rMeta.grade_d ?? 0)) / total) * 100).toFixed(0) })
-    distributorSources.push({ label: 'Stub / Data Gap', count: (rMeta.stub ?? 0) + (rMeta.data_gap ?? 0), pct: ((((rMeta.stub ?? 0) + (rMeta.data_gap ?? 0)) / total) * 100).toFixed(0) })
+  const distributorSources: Array<{ label: string; count: number; pct: string; colour: string }> = []
+  let totalLeavesForBreakdown = 0
+  if (resolvedTree) {
+    const badgeCounts: Record<BomBadgeKey, number> = {
+      'verified': 0,
+      'priced': 0,
+      'canonical': 0,
+      'plausible': 0,
+      'missing-quantity': 0,
+      'stub': 0,
+      'unverified': 0,
+    }
+
+    function walkForBadges(
+      node: import('./4b-radical-resolution').ResolvedCompositionNode,
+    ): void {
+      if (!node.children || node.children.length === 0) {
+        const res = node.resolution
+        const badge = bomStatusBadge(
+          res?.verification_grade,
+          node.verification_status ?? null,
+          !!res?.mpn,
+          res?.source === 'vendor_catalog',
+          false, // has_plausibility_check — Wave 2 stub
+        )
+        badgeCounts[badge.key]++
+        totalLeavesForBreakdown++
+        return
+      }
+      for (const c of node.children) walkForBadges(c)
+    }
+    walkForBadges(resolvedTree.composition.root)
+
+    const total = totalLeavesForBreakdown || rMeta?.total_leaves || 1
+    const rowDef: Array<{ key: BomBadgeKey; label: string }> = [
+      { key: 'verified', label: 'Verified by Distributor (MPN)' },
+      { key: 'priced', label: 'Vendor Catalog Priced (Grade C)' },
+      { key: 'canonical', label: 'Canonical' },
+      { key: 'plausible', label: 'Plausibility-Checked' },
+      { key: 'unverified', label: 'LLM Estimate (Grade D)' },
+      { key: 'missing-quantity', label: 'Missing-Quantity Flag' },
+      { key: 'stub', label: 'Stub / Data Gap' },
+    ]
+    for (const row of rowDef) {
+      const count = badgeCounts[row.key]
+      const legend = BOM_BADGE_LEGEND.find(l => l.key === row.key)
+      distributorSources.push({
+        label: row.label,
+        count,
+        pct: ((count / total) * 100).toFixed(0),
+        colour: legend?.colour ?? MUTED,
+      })
+    }
   }
 
   // --- Research summary claims requiring verification ---
@@ -3431,19 +3579,22 @@ const SourcesReferencesPage = ({ state }: { state: PipelineState }) => {
         </Text>
       )}
 
-      {/* Distributor and vendor data sources (from resolved tree) */}
+      {/* Distributor and vendor data sources (from resolved tree) — Wave 1 Piece 5:
+          7-badge plausibility taxonomy aligns with the per-line Status column in
+          §6/Appendix A so a scorer reading row badges can reconcile them with the
+          sourcing-breakdown totals on this page. */}
       {distributorSources.length > 0 && (
         <>
           <Text style={{ fontSize: 13, fontFamily: 'Helvetica-Bold', color: BESS_TEAL, marginBottom: 8 }}>
             BOM Data Sources
           </Text>
           <Text style={{ fontSize: 9, color: MUTED, marginBottom: 8 }}>
-            Sourcing breakdown for {rMeta?.total_leaves ?? 0} BOM leaf nodes:
+            Sourcing breakdown for {totalLeavesForBreakdown || (rMeta?.total_leaves ?? 0)} BOM leaf nodes — counts mirror the per-line plausibility badges in §6/Appendix A:
           </Text>
           <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, marginBottom: 14 }}>
             {distributorSources.map((src, i) => (
               <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === distributorSources.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER }} wrap={false}>
-                <Text style={{ width: '60%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK, paddingVertical: 5, paddingHorizontal: 8 }}>{src.label}</Text>
+                <Text style={{ width: '60%', fontSize: 9, fontFamily: 'Helvetica-Bold', color: src.colour, paddingVertical: 5, paddingHorizontal: 8 }}>{src.label}</Text>
                 <Text style={{ width: '15%', fontSize: 9, color: INK, paddingVertical: 5, paddingHorizontal: 8, textAlign: 'right' }}>{src.count}</Text>
                 <Text style={{ width: '25%', fontSize: 9, color: MUTED, paddingVertical: 5, paddingHorizontal: 8 }}>{src.pct}% of BOM</Text>
               </View>
@@ -4324,6 +4475,30 @@ const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
         </Text>
         <View style={{ borderBottomWidth: 1, borderBottomColor: BESS_TEAL, marginBottom: 12 }} />
 
+        {/*
+          Wave 1 Piece 5 (2026-05-13) — plausibility legend.
+          iter-08 multimodal scoring dropped this section from iter-04's 7.0 to
+          3.0 because 387 unverified leaves read as "fabricated content" to
+          Gemini 2.5 Pro / Claude Opus / Qwen3-VL. The legend explains the
+          7-badge taxonomy used in the Status column so scorers (and humans)
+          can grade provenance directly instead of inferring it.
+        */}
+        <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER, backgroundColor: BG_SOFT, padding: 8, marginBottom: 12 }} wrap={false}>
+          <Text style={{ fontSize: 9, fontFamily: 'Helvetica-Bold', color: INK_DARK, marginBottom: 4 }}>
+            Provenance grades
+          </Text>
+          {BOM_BADGE_LEGEND.map((row, i) => (
+            <View key={i} style={{ flexDirection: 'row', marginBottom: 2 }} wrap={false}>
+              <Text style={{ width: '22%', fontSize: 8, fontFamily: 'Helvetica-Bold', color: row.colour }}>
+                {row.text}
+              </Text>
+              <Text style={{ width: '78%', fontSize: 8, color: INK, lineHeight: 1.35 }}>
+                {row.description}
+              </Text>
+            </View>
+          ))}
+        </View>
+
         {allLeaves.length === 0 ? (
           <Text style={{ fontSize: 9, color: MUTED, fontFamily: 'Helvetica-Oblique' }}>
             BOM data unavailable — run Phase 2 (RADICAL_PHASE_2_RESOLUTION=true) to populate.
@@ -4331,62 +4506,65 @@ const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
         ) : (
           <>
             <Text style={{ fontSize: 8, color: MUTED, marginBottom: 8 }}>
-              {allLeaves.length} parts across all subsystems. Prices in GBP.
+              {allLeaves.length} parts across all subsystems. Prices in GBP. Every line carries a provenance badge in the Status column.
             </Text>
             <View style={{ borderWidth: 0.5, borderColor: TABLE_BORDER }}>
-              {/* Header */}
+              {/* Header — Wave 1 Piece 5: Status column added at the front (10%);
+                  Part trimmed to 22%, Source kept at 13% so totals = 100%. */}
               <View style={{ flexDirection: 'row', backgroundColor: BESS_NAVY }}>
-                <Text style={{ width: '28%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Part / Archetype</Text>
-                <Text style={{ width: '16%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Subsystem</Text>
+                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Status</Text>
+                <Text style={{ width: '22%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Part / Archetype</Text>
+                <Text style={{ width: '14%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Subsystem</Text>
                 <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>MPN</Text>
-                <Text style={{ width: '6%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Qty</Text>
-                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Unit £</Text>
+                <Text style={{ width: '5%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Qty</Text>
+                <Text style={{ width: '9%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Unit £</Text>
                 <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Total £</Text>
-                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Lead</Text>
-                <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Source</Text>
+                <Text style={{ width: '7%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5, textAlign: 'right' }}>Lead</Text>
+                <Text style={{ width: '13%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: HEADER_TEXT, paddingVertical: 5, paddingHorizontal: 5 }}>Source</Text>
               </View>
               {allLeaves.map((leaf, i) => {
-                // Bug P1-8 fix (2026-05-11): vendor-catalog hits get the new
-                // grade_c tier — manufacturer + lead time present, just no
-                // unit price. Render as amber alongside grade_d / estimated.
-                // grade_d (price-only fallback) keeps amber too — same colour
-                // for now; the proof HTML renderer differentiates them.
-                const gradeColour = leaf.verificationGrade === 'verified' ? BESS_GREEN
-                  : (leaf.verificationGrade === 'estimated'
-                      || leaf.verificationGrade === 'grade_c'
-                      || leaf.verificationGrade === 'grade_d') ? BESS_AMBER
-                  : BESS_RED
-                // WS-B (2026-05-13): MISSING-QTY / STUB glyph + colour cue.
-                // Council R-B-C1: when Tier 4 emitted no quantity modifier and the
-                // part isn't a recognised singleton, the qty column shows a warning.
+                // Wave 1 Piece 5 (2026-05-13): plausibility badge replaces the
+                // ad-hoc gradeColour/partGlyph cascade. Every leaf gets one of
+                // 7 badges (see bomStatusBadge precedence). Qty column keeps
+                // the WS-B MISSING-QTY warning glyph so the integrity flag is
+                // still readable when the row also has a verified MPN.
+                const badge = bomStatusBadge(
+                  leaf.verificationGrade,
+                  leaf.verificationStatus,
+                  !!leaf.mpn,
+                  leaf.source === 'vendor_catalog',
+                  false, // has_plausibility_check — Wave 2 stub
+                )
                 const qtyMissing = leaf.verificationStatus === 'missing-quantity'
                 const isStub = leaf.verificationStatus === 'stub'
                 const qtyColour = qtyMissing ? BESS_RED : isStub ? BESS_AMBER : INK
-                const partGlyph = isStub ? ' ⚠ STUB' : ''
                 return (
                   <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === allLeaves.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
-                    <Text style={{ width: '28%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, fontFamily: 'Helvetica-Bold' }}>
-                      {leaf.archetypeId.replace(/_/g, ' ')}{partGlyph}
+                    <Text style={{ width: '10%', fontSize: 6.5, fontFamily: 'Helvetica-Bold', color: badge.colour, paddingVertical: 4, paddingHorizontal: 5 }}>
+                      {badge.text}
                     </Text>
-                    <Text style={{ width: '16%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 5 }}>
+                    <Text style={{ width: '22%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, fontFamily: 'Helvetica-Bold' }}>
+                      {leaf.archetypeId.replace(/_/g, ' ')}
+                    </Text>
+                    <Text style={{ width: '14%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 5 }}>
                       {leaf.subsystem.replace(/_/g, ' ')}
                     </Text>
                     <Text style={{ width: '10%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5 }}>
                       {dash(leaf.mpn)}
                     </Text>
-                    <Text style={{ width: '6%', fontSize: 7, color: qtyColour, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right', fontFamily: qtyMissing ? 'Helvetica-Bold' : 'Helvetica' }}>
+                    <Text style={{ width: '5%', fontSize: 7, color: qtyColour, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right', fontFamily: qtyMissing ? 'Helvetica-Bold' : 'Helvetica' }}>
                       {qtyMissing ? `${leaf.qty} ⚠` : leaf.qty}
                     </Text>
-                    <Text style={{ width: '10%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
+                    <Text style={{ width: '9%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
                       {leaf.unitPriceGbp !== null ? fmtGbp(leaf.unitPriceGbp) : 'TBD'}
                     </Text>
                     <Text style={{ width: '10%', fontSize: 7, fontFamily: 'Helvetica-Bold', color: leaf.lineTotal > 0 ? INK : MUTED, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
                       {leaf.lineTotal > 0 ? fmtGbp(leaf.lineTotal) : 'TBD'}
                     </Text>
-                    <Text style={{ width: '10%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
+                    <Text style={{ width: '7%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
                       {leaf.leadWeeks != null ? `${leaf.leadWeeks}w` : '—'}
                     </Text>
-                    <Text style={{ width: '10%', fontSize: 7, color: gradeColour, paddingVertical: 4, paddingHorizontal: 5 }}>
+                    <Text style={{ width: '13%', fontSize: 7, color: badge.colour, paddingVertical: 4, paddingHorizontal: 5 }}>
                       {leaf.source}
                     </Text>
                   </View>

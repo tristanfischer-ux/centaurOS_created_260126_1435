@@ -1516,12 +1516,16 @@ function collectLeaves(root: CompositionNode): LeafWithContext[] {
 // Main resolution function
 // ---------------------------------------------------------------------------
 
-// Iter-03 lift (2026-05-13): 28 → 60. Distributor calls average 0.5-2s,
-// so 60 sequential calls add ≤60s to pipeline runtime (≤4% of a 25-50 min run).
-// Under Mouser 30 req/min, DigiKey 240 req/min, Farnell ~60 req/min limits.
-// Larger cap lets us reach high-cost lines (cells, PCS, cooling, fire) that
-// previously hit budget_exhausted before being queried.
-const MAX_DISTRIBUTOR_CALLS = 60
+// Iter-09 lift (2026-05-13): 60 → 1000. Per Tristan: don't engineer around
+// imaginary scarcity. Distributor calls average 0.5-2s; with WS-B's ~387-leaf
+// trees and Path B's expanded MPN_HINTS coverage (40-80 character_ids), the
+// historical 60-call cap structurally limited verified-rate to ~8%. Lifting
+// to 1000 means every leaf that has an MPN hint gets queried. Provider rate
+// limits (Mouser 30/min, DigiKey 240/min, Farnell ~60/min) handled by the
+// per-provider stagger; we don't hit them at 1000 sequential calls over ~20 min.
+// Hard upper safety bound: 2000 (set by HARD_UPPER_DISTRIBUTOR_CALLS below).
+const MAX_DISTRIBUTOR_CALLS = 1000
+const HARD_UPPER_DISTRIBUTOR_CALLS = 2000
 
 /**
  * Resolve all leaves in a RadicalTree, returning a ResolvedRadicalTree.

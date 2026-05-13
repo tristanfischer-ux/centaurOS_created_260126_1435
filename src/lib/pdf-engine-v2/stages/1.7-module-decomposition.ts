@@ -68,6 +68,7 @@ import {
   type MultiEmitterOutput,
   type JudgeVerdict,
 } from '../radical/council-synthesis'
+import { parseJsonFromLlm } from '../lib/llm-json'
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -152,6 +153,14 @@ async function callOpenRouterJson(
   userContent: string,
   models: string[],
   maxTokens: number,
+  /**
+   * Piece 8 (2026-05-13): when true, fall back to Gemini 3.1 Flash-Lite
+   * JSON-repair when the local strip+brace-slice parser fails. Used by the
+   * multi-emitter `callEmitter` path (Stage 1.7) where ~6 LLMs run in parallel
+   * and a single transient parse failure forces a same-model retry (expensive).
+   * The repair path is far cheaper than another emitter call.
+   */
+  enableLlmRepair = false,
 ): Promise<LlmCallResult> {
   const startedAt = Date.now()
   let lastErr: unknown
@@ -217,6 +226,24 @@ async function callOpenRouterJson(
           try {
             parsed = JSON.parse(jsonStr.slice(firstBrace, lastBrace + 1))
           } catch { /* fall through */ }
+        }
+      }
+      if (parsed === null) {
+        // Piece 8 (2026-05-13): optional Flash-Lite repair fallback when caller
+        // has opted in. Cheaper than dispatching a backup emitter.
+        if (enableLlmRepair) {
+          try {
+            parsed = await parseJsonFromLlm(raw, {
+              stage: 'module-decomposition',
+              model,
+              enableLlmRepair: true,
+            })
+          } catch (repairErr) {
+            console.error(
+              `[module-decomposition] Flash-Lite repair fallback failed for ${model}: ` +
+              `${(repairErr as Error).message}`,
+            )
+          }
         }
       }
       if (parsed === null) {
@@ -1295,6 +1322,15 @@ const MULTI_EMITTER_MODELS: ReadonlyArray<string> = [
   'moonshotai/kimi-k2.6',              // Asia / Moonshot
 ] as const
 
+// Iter-09 backup pool (2026-05-13): when a preferred emitter fails (HTTP 400,
+// JSON parse error, transport timeout), dispatch ONE backup serially per failure.
+// Order: cheapest + lowest-hallucination first.
+const MULTI_EMITTER_BACKUPS: ReadonlyArray<string> = [
+  'google/gemini-3.1-flash-lite',   // 8.2% hallucination, 329 tok/s, £0.25/M input — best cheap option
+  'qwen/qwen3.5-405b',               // Asian backup, different variant from qwen3.6-max
+  'minimax/minimax-m2.7',            // Asian backup, 34% hallucination, distinct lineage
+] as const
+
 /**
  * 2 judges (independent vendors, no lineage overlap with emitters in role).
  * - GLM = schema-strict (IFBench top, low hallucination)
@@ -1397,57 +1433,91 @@ export async function runMultiEmitterModuleDecomposition(
     regSummary
 
   // Wrapper to call ONE emitter and collect parsed payload + diagnostics.
+  // Iter-09 (2026-05-13): on JSON-parse failure (200 OK but unparseable), retry
+  // the SAME model ONCE — LLM nondeterminism may yield clean JSON on retry.
+  // HTTP errors / transport failures are NOT retried here (caller dispatches
+  // a backup model instead).
   async function callEmitter(model: string, userContent: string): Promise<MultiEmitterOutput & { durationMs: number; inputTokens: number; outputTokens: number }> {
-    try {
-      const result = await callOpenRouterJson(
-        MODULE_DECOMPOSITION_TAXONOMY_PROMPT,
-        userContent,
-        [model],
-        STAGE_1_7_MAX_TOKENS,
-      )
-      const v = validateModuleDecompositionPayload(result.parsed, classification)
-      // Even if v.validation.ok is false, capture whatever modules parsed —
-      // the synthesiser's majority-vote drops outliers anyway. But mark
-      // schemaViolations so the judge can see them.
-      if (!v.validation.ok && v.modules.length === 0) {
+    let attempt = 0
+    let lastErr: Error | null = null
+    while (attempt < 2) {
+      try {
+        const result = await callOpenRouterJson(
+          MODULE_DECOMPOSITION_TAXONOMY_PROMPT,
+          userContent,
+          [model],
+          STAGE_1_7_MAX_TOKENS,
+          // Piece 8 (2026-05-13): opt-in Flash-Lite JSON-repair fallback —
+          // far cheaper than the same-model retry below or a backup emitter dispatch.
+          true,
+        )
+        const v = validateModuleDecompositionPayload(result.parsed, classification)
+        // Even if v.validation.ok is false, capture whatever modules parsed —
+        // the synthesiser's majority-vote drops outliers anyway. But mark
+        // schemaViolations so the judge can see them.
+        if (!v.validation.ok && v.modules.length === 0) {
+          return {
+            ok: false,
+            model,
+            schemaViolations: v.validation.schema_errors,
+            durationMs: result.durationMs,
+            inputTokens: result.inputTokens,
+            outputTokens: result.outputTokens,
+          }
+        }
         return {
-          ok: false,
+          ok: true,
           model,
+          data: {
+            product_class: v.productClass,
+            modules: v.modules,
+            excluded_modules: v.excluded,
+            rationale_excluded: v.rationale,
+            cross_module_grammar_links: v.crossModuleGrammarLinks,
+          },
           schemaViolations: v.validation.schema_errors,
           durationMs: result.durationMs,
           inputTokens: result.inputTokens,
           outputTokens: result.outputTokens,
         }
+      } catch (err) {
+        lastErr = err as Error
+        const msg = lastErr.message
+        // JSON-parse failure signal from callOpenRouterJson — same-model retry
+        // is worthwhile because the HTTP call succeeded (200 OK) and the model
+        // produced output; the parser just couldn't extract JSON. Retry once.
+        const isJsonParseError = msg.includes('Could not parse JSON from') ||
+          msg.includes('Empty response from')
+        if (isJsonParseError && attempt === 0) {
+          console.warn(`[module-decomposition][multi-emitter] emitter ${model} JSON-parse failed; retrying SAME model once...`)
+          attempt += 1
+          continue
+        }
+        console.warn(`[module-decomposition][multi-emitter] emitter ${model} failed: ${msg}`)
+        return {
+          ok: false,
+          model,
+          schemaViolations: [`transport: ${msg}`],
+          durationMs: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+        }
       }
-      return {
-        ok: true,
-        model,
-        data: {
-          product_class: v.productClass,
-          modules: v.modules,
-          excluded_modules: v.excluded,
-          rationale_excluded: v.rationale,
-          cross_module_grammar_links: v.crossModuleGrammarLinks,
-        },
-        schemaViolations: v.validation.schema_errors,
-        durationMs: result.durationMs,
-        inputTokens: result.inputTokens,
-        outputTokens: result.outputTokens,
-      }
-    } catch (err) {
-      console.warn(`[module-decomposition][multi-emitter] emitter ${model} failed: ${(err as Error).message}`)
-      return {
-        ok: false,
-        model,
-        schemaViolations: [`transport: ${(err as Error).message}`],
-        durationMs: 0,
-        inputTokens: 0,
-        outputTokens: 0,
-      }
+    }
+    // Exhausted retry attempts on JSON-parse path.
+    const msg = lastErr?.message ?? 'unknown'
+    console.warn(`[module-decomposition][multi-emitter] emitter ${model} failed after same-model retry: ${msg}`)
+    return {
+      ok: false,
+      model,
+      schemaViolations: [`transport: ${msg}`],
+      durationMs: 0,
+      inputTokens: 0,
+      outputTokens: 0,
     }
   }
 
-  // Dispatch all 6 emitters in parallel.
+  // Dispatch all 6 preferred emitters in parallel.
   console.log(`[module-decomposition][multi-emitter] dispatching ${MULTI_EMITTER_MODELS.length} emitters in parallel...`)
   const emitterStartedAt = Date.now()
   const emitterResults = await Promise.allSettled(
@@ -1476,8 +1546,53 @@ export async function runMultiEmitterModuleDecomposition(
     }
   }
 
+  const preferredSpeaking = emitterOutputs.filter(e => e.ok).length
+  console.log(
+    `[multi-emitter] preferred ${MULTI_EMITTER_MODELS.length}/${MULTI_EMITTER_MODELS.length} dispatched, ${preferredSpeaking} succeeded`,
+  )
+
+  // Iter-09 (2026-05-13): if any preferred emitter failed, dispatch backups
+  // SERIALLY (one at a time). Each successful backup fills one missing slot.
+  // Stop when we reach 6 total successes OR exhaust the backup pool.
+  const TARGET_SPEAKING = MULTI_EMITTER_MODELS.length
+  let backupsUsed = 0
+  if (preferredSpeaking < TARGET_SPEAKING) {
+    const maxBackupAttempts = Math.min(
+      TARGET_SPEAKING - preferredSpeaking,
+      MULTI_EMITTER_BACKUPS.length,
+    )
+    for (let b = 0; b < maxBackupAttempts; b++) {
+      const backupModel = MULTI_EMITTER_BACKUPS[b]
+      const backupIndex = b + 1
+      console.log(`[multi-emitter] dispatching backup ${backupIndex}: ${backupModel}`)
+      const backupStartedAt = Date.now()
+      const result = await callEmitter(backupModel, baseUserContent)
+      emitterWallMs += Date.now() - backupStartedAt
+      totalInput += result.inputTokens
+      totalOutput += result.outputTokens
+      emitterOutputs.push({
+        ok: result.ok,
+        data: result.data,
+        model: result.model,
+        schemaViolations: result.schemaViolations,
+      })
+      backupsUsed += 1
+      if (result.ok) {
+        console.log(`[multi-emitter] backup ${backupIndex} succeeded`)
+        const speakingNow = emitterOutputs.filter(e => e.ok).length
+        if (speakingNow >= TARGET_SPEAKING) break
+      } else {
+        const reason = result.schemaViolations?.[0] ?? 'unknown'
+        console.warn(`[multi-emitter] backup ${backupIndex} failed: ${reason}`)
+      }
+    }
+  }
+
   const speakingCount = emitterOutputs.filter(e => e.ok).length
-  console.log(`[module-decomposition][multi-emitter] ${speakingCount}/${MULTI_EMITTER_MODELS.length} emitters succeeded`)
+  const backupSpeaking = speakingCount - preferredSpeaking
+  console.log(
+    `[multi-emitter] complete: ${speakingCount}/${TARGET_SPEAKING} emitters (${preferredSpeaking} preferred + ${backupSpeaking} backups; ${backupsUsed} backup attempts)`,
+  )
 
   if (speakingCount < MULTI_EMITTER_MIN_SPEAKING) {
     console.warn(
@@ -1662,7 +1777,7 @@ export async function runMultiEmitterModuleDecomposition(
   }
 
   console.log(
-    `[module-decomposition][multi-emitter] complete: ${data.modules.length} modules, verdict=${data.council_verdict}, cost≈£${telemetry.estimated_cost_gbp.toFixed(3)}, retried=${retried}`,
+    `[multi-emitter] complete: ${speakingCount}/${TARGET_SPEAKING} emitters (${preferredSpeaking} preferred + ${backupSpeaking} backups), verdict=${data.council_verdict}, ${data.modules.length} modules, cost≈£${telemetry.estimated_cost_gbp.toFixed(3)}, retried=${retried}`,
   )
 
   return { ok: true, data, durationMs: Date.now() - startedAt }

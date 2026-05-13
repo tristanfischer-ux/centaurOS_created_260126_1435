@@ -345,7 +345,7 @@ async function callOpenRouterJson(systemPrompt: string, userContent: string): Pr
       if (!raw) throw new Error(`${model}: empty content`)
 
       console.log(`[bom-v2] ${model} responded: ${raw.length} chars`)
-      return parseJsonFromLlm(raw, { stage: 'bom_integrated', model })
+      return await parseJsonFromLlm(raw, { stage: 'bom_integrated', model })
     } catch (err) {
       clearTimeout(timeout)
       lastErr = err
