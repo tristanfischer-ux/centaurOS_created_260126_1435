@@ -85,7 +85,8 @@ async function callFmeaLlm(systemPrompt: string, userContent: string): Promise<a
         body: JSON.stringify({
           model,
           temperature: STAGE_TEMPERATURES.regulatory ?? 0.2,
-          max_tokens: 8192,
+          // WS-D 2026-05-13: 150k (was 8192) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },

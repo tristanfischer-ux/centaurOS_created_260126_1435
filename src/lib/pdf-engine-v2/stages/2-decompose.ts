@@ -269,7 +269,8 @@ async function callOpenRouterLeaves(systemPrompt: string, userContent: string): 
         body: JSON.stringify({
           model,
           temperature: 0.0,   // DETERMINISM: must be 0 — Opus-risk mitigation
-          max_tokens: 8192,
+          // WS-D 2026-05-13: 150k (was 8192) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
@@ -285,6 +286,11 @@ async function callOpenRouterLeaves(systemPrompt: string, userContent: string): 
       }
 
       const json = await response.json()
+      // WS-D 2026-05-13: log truncation as ERROR — even with 150k budget we want loud signal
+      const finishReason = json.choices?.[0]?.finish_reason
+      if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
+        console.error(`[decompose-radical-leaves] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
+      }
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''
       if (!raw && msg?.reasoning_details?.length) {
@@ -764,7 +770,8 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
         body: JSON.stringify({
           model,
           temperature: STAGE_TEMPERATURES.decompose,
-          max_tokens: 16384,
+          // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
@@ -780,6 +787,11 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
     }
 
     const json = await response.json()
+    // WS-D 2026-05-13: log truncation as ERROR — even with 150k budget we want loud signal
+    const finishReason = json.choices?.[0]?.finish_reason
+    if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
+      console.error(`[decompose] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
+    }
     const msg = json.choices?.[0]?.message
     let raw = msg?.content || msg?.reasoning || ''
     if (!raw && msg?.reasoning_details?.length) {
@@ -1187,7 +1199,8 @@ async function callOpenRouterPerModule(
         body: JSON.stringify({
           model,
           temperature: 0.0,
-          max_tokens: 8192,
+          // WS-D 2026-05-13: 150k (was 8192) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },
@@ -1200,8 +1213,13 @@ async function callOpenRouterPerModule(
         throw new Error(`OpenRouter API status ${response.status} from ${model}`)
       }
       const json = await response.json() as {
-        choices?: Array<{ message?: { content?: string; reasoning?: string; reasoning_details?: Array<{ type?: string; text?: string }> } }>
+        choices?: Array<{ message?: { content?: string; reasoning?: string; reasoning_details?: Array<{ type?: string; text?: string }> }; finish_reason?: string }>
         usage?: { prompt_tokens?: number; completion_tokens?: number }
+      }
+      // WS-D 2026-05-13: log truncation as ERROR — even with 150k budget we want loud signal
+      const finishReason = json.choices?.[0]?.finish_reason
+      if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
+        console.error(`[decompose-per-module] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
       }
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''

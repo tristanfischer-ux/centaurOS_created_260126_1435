@@ -77,7 +77,8 @@ Return ONLY valid JSON:
         },
         body: JSON.stringify({
           model,
-          max_tokens: 4096,
+          // WS-D 2026-05-13: 150k (was 4096) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
           messages: [{ role: 'user', content: prompt }],
         }),
         signal: AbortSignal.timeout(60000),

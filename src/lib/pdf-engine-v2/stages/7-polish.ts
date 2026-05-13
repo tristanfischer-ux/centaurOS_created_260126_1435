@@ -67,7 +67,8 @@ export async function runPolish(
       },
       body: JSON.stringify({
         model: 'xiaomi/mimo-v2.5-pro',
-        max_tokens: 16384,
+        // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+        max_tokens: 150_000,
         messages: [
           { role: 'system', content: POLISH_SYSTEM_PROMPT },
           { role: 'user', content: JSON.stringify({ modules: inputModules }) },

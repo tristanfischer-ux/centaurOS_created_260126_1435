@@ -167,8 +167,13 @@ async function callOpenRouterJson(
         throw new Error(`OpenRouter API status ${response.status} from ${model}`)
       }
       const json = await response.json() as {
-        choices?: Array<{ message?: { content?: string; reasoning?: string; reasoning_details?: Array<{ type?: string; text?: string }> } }>
+        choices?: Array<{ message?: { content?: string; reasoning?: string; reasoning_details?: Array<{ type?: string; text?: string }> }; finish_reason?: string }>
         usage?: { prompt_tokens?: number; completion_tokens?: number }
+      }
+      // WS-D 2026-05-13: log truncation as ERROR — even with 150k budget we want loud signal
+      const finishReason = json.choices?.[0]?.finish_reason
+      if (finishReason && finishReason !== 'stop' && finishReason !== 'tool_calls') {
+        console.error(`[module-decomposition] TRUNCATION DETECTED: finish_reason='${finishReason}' (raised max_tokens?) — model: ${model}`)
       }
       const msg = json.choices?.[0]?.message
       let raw = msg?.content || msg?.reasoning || ''
@@ -984,13 +989,8 @@ function buildFallbackDecomposition(
 // transport layer. The MODULE_DECOMPOSITION_TAXONOMY_PROMPT has been hardened
 // with explicit bad/good examples too — but model-order is the cheaper insurance.
 const STAGE_1_7_PRIMARY_MODELS = ['x-ai/grok-4.3', 'google/gemini-3.1-pro-preview']
-// Fix B (Tristan, 2026-05-13): max tokens lifted from 16384 → 32768 to match
-// the new 3-9 word-per-sub-module cap. Math: 10 modules × 8 sub-modules × 6
-// words avg × ~150 tokens/word ≈ 72k worst case; realistic mean ~32k. Council
-// Seat 4 previously flagged 16384 as truncation risk at the new word cap;
-// 32768 is conservative against the worst-case while leaving headroom for
-// derived_parameters, grammar_links, and the cross_module section.
-const STAGE_1_7_MAX_TOKENS = 32768
+// WS-D 2026-05-13: 150k (was 32768) — Tristan approved; truncation more expensive than unused tokens.
+const STAGE_1_7_MAX_TOKENS = 150_000
 
 /**
  * Run Stage 1.5 module decomposition.

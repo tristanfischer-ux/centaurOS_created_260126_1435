@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>shadow-mode-report-2026-05-10T17-45-56</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --text: #1f2328;
+    --muted: #656d76;
+    --border: #d0d7de;
+    --code-bg: #f6f8fa;
+    --link: #0969da;
+    --accent: #1f6feb;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 860px; margin: 0 auto; padding: 56px 28px 160px;
+    line-height: 1.7; color: var(--text); background: var(--bg);
+    font-size: 16px;
+    -webkit-font-smoothing: antialiased;
+  }
+  h1, h2, h3, h4, h5, h6 { margin-top: 2em; margin-bottom: 0.5em; font-weight: 600; line-height: 1.25; }
+  h1 { font-size: 2em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h2 { font-size: 1.5em; padding-bottom: 0.3em; border-bottom: 1px solid var(--border); }
+  h3 { font-size: 1.25em; }
+  h4 { font-size: 1em; }
+  p { margin: 0 0 1em 0; }
+  a { color: var(--link); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { background: var(--code-bg); padding: 2px 6px; border-radius: 4px; font-size: 0.88em;
+         font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+  pre { background: var(--code-bg); padding: 16px; border-radius: 6px; overflow-x: auto; }
+  pre code { background: none; padding: 0; font-size: 0.9em; }
+  blockquote { border-left: 4px solid var(--border); margin: 0 0 1em; padding: 0 1em; color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; margin: 1em 0; display: block; overflow-x: auto; }
+  th, td { border: 1px solid var(--border); padding: 8px 14px; text-align: left; vertical-align: top; }
+  th { background: var(--code-bg); font-weight: 600; }
+  hr { border: 0; border-top: 1px solid var(--border); margin: 2em 0; }
+  ul, ol { padding-left: 2em; margin: 0 0 1em; }
+  li { margin: 0.2em 0; }
+  li > p { margin: 0; }
+  img { max-width: 100%; }
+  strong { font-weight: 600; }
+</style>
+</head>
+<body>
+<div id="content">Loading…</div>
+<script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"></script>
+<script>
+  const md = "# Shadow-Mode Phase 5 Aggregator Report\n\n**Generated:** 2026-05-10T17:45:56.488Z\n**Evidence directory:** `/Users/tristanfischer/Downloads/engine-evidence/radical-shadow-20260510T1643`\n**Runs processed:** 10 (10 succeeded, 0 failed)\n\n## Cutover-Readiness Verdict\n\n### \u2705 READY\n\n**Notes:**\n- Cost delta: no data (no runs with both radical and legacy cost summaries).\n\n## Overall Aggregated Metrics\n\n| Metric | Value | Criterion | Pass? |\n|--------|-------|-----------|-------|\n| Cost delta \u2014 % runs within \u00b12% | N/A | >99.5% | \u274c |\n| Cost delta \u2014 median | N/A | \u2014 | \u2014 |\n| Cost delta \u2014 p95 (abs) | N/A | \u00b12% | \u2705 |\n| Cost delta \u2014 p99 (abs) | N/A | \u2014 | \u2014 |\n| Pipeline success rate | 100.0% | >99.9% | \u2705 |\n| Both-PDF write success rate | 100.0% | >99.9% | \u2705 |\n| Latency ratio \u2014 median | 22% | \u2264120% | \u2014 |\n| Latency ratio \u2014 p95 | 28% | \u2264120% | \u2705 |\n| Latency ratio \u2014 max | 28% | \u2014 | \u2014 |\n| Grammar firing rate (\u22651 WARN/BLOCK) | 20.0% | >10% | \u2705 |\n| Avg verified-MPN% | 19.8% | informational | \u2014 |\n| Avg data-gap% | 46.8% | informational | \u2014 |\n\n## Per-Class Breakdown\n\n| Class | n | Cost \u0394 median | Cost \u0394 p95 | Success | Both PDFs | Grammar | Verified% | Data-gap% |\n|-------|---|--------------|------------|---------|-----------|---------|-----------|-----------|\n| auv | 1 | N/A | N/A | 100.0% | 100.0% | 100.0% | 25.0% | 50.0% |\n| energy_storage | 1 | N/A | N/A | 100.0% | 100.0% | 100.0% | 21.1% | 0.0% |\n| bioreactor | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 12.5% | 37.5% |\n| wearable_medical | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 33.3% | 66.7% |\n| drone | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 14.3% | 71.4% |\n| edge_ai_server | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 16.7% | 66.7% |\n| ev_charger | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 17.6% | 41.2% |\n| vertical_farm | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 18.8% | 37.5% |\n| haps | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 25.0% | 50.0% |\n| thermal_system | 1 | N/A | N/A | 100.0% | 100.0% | 0.0% | 13.3% | 46.7% |\n\n## Per-Run Detail\n\n| Slug | Class | OK | Cost \u0394 | Both PDFs | Latency ratio | Grammar | Verified | DataGap | Error |\n|------|-------|----|--------|-----------|---------------|---------|----------|---------|-------|\n| rs-auv | auv | \u2705 | N/A | \u2705 | 18% | \u2705 FIRED | 25.0% | 50.0% | \u2014 |\n| rs-bess | energy_storage | \u2705 | N/A | \u2705 | 28% | \u2705 FIRED | 21.1% | 0.0% | \u2014 |\n| rs-bioreactor | bioreactor | \u2705 | N/A | \u2705 | 27% | \u2014 | 12.5% | 37.5% | \u2014 |\n| rs-cgm | wearable_medical | \u2705 | N/A | \u2705 | 14% | \u2014 | 33.3% | 66.7% | \u2014 |\n| rs-drone | drone | \u2705 | N/A | \u2705 | 17% | \u2014 | 14.3% | 71.4% | \u2014 |\n| rs-edge-ai | edge_ai_server | \u2705 | N/A | \u2705 | 19% | \u2014 | 16.7% | 66.7% | \u2014 |\n| rs-ev-charger | ev_charger | \u2705 | N/A | \u2705 | 26% | \u2014 | 17.6% | 41.2% | \u2014 |\n| rs-farm | vertical_farm | \u2705 | N/A | \u2705 | 27% | \u2014 | 18.8% | 37.5% | \u2014 |\n| rs-haps | haps | \u2705 | N/A | \u2705 | 18% | \u2014 | 25.0% | 50.0% | \u2014 |\n| rs-heatpump | thermal_system | \u2705 | N/A | \u2705 | 25% | \u2014 | 13.3% | 46.7% | \u2014 |\n\n## Cutover Readiness Ranking\n\nClasses sorted by cost delta p95 ascending (lowest divergence = most ready first):\n\n1. **auv** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n2. **energy_storage** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n3. **bioreactor** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n4. **wearable_medical** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n5. **drone** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n6. **edge_ai_server** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n7. **ev_charger** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n8. **vertical_farm** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n9. **haps** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n10. **thermal_system** \u2014 cost p95=N/A, within\u00b12%=N/A, status=NOT READY\n\n## Methodology\n\n- **Cost delta** = `(radicalCostSummary.bomTotal - legacyCostBomTotal) / legacyCostBomTotal`\n- **Pipeline success rate** = % runs where `.done` sentinel was written and `ok=true`\n- **Both-PDF rate** = % successful runs where both `report.pdf` and `radical.pdf` exist with size >0\n- **Latency ratio** = Phase 5 render time / primary PDF render time (from run-manifest.json)\n- **Grammar firing rate** = % runs where \u22651 WARN or BLOCK verdict fires\n- **Verified-MPN%** = `verified_by_distributor / total_leaves` from resolution_meta.stats\n- **Data-gap%** = `data_gap / total_leaves` from resolution_meta.stats\n\nAll data sourced from `run-manifest.json` + `state.json` per run directory.\nLatency data is only available when the batch runner writes timing into `run-manifest.json`.";
+  marked.setOptions({ breaks: false, gfm: true });
+  const rawHtml = marked.parse(md);
+  const safeHtml = DOMPurify.sanitize(rawHtml);
+  document.getElementById('content').innerHTML = safeHtml;
+  const h1 = md.match(/^#\s+(.+)$/m);
+  if (h1) document.title = h1[1];
+</script>
+</body>
+</html>

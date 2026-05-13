@@ -475,7 +475,8 @@ async function callJudge(model: string, prompt: string, timeoutMs = 60_000): Pro
       },
       body: JSON.stringify({
         model,
-        max_tokens: 4096,
+        // WS-D 2026-05-13: 150k (was 4096) — Tristan approved; truncation more expensive than unused tokens.
+        max_tokens: 150_000,
         // B3 (2026-05-08): deterministic reward signal required for RL.
         // temperature: 0 forces greedy decoding. top_p: 1 is a no-op at
         // temperature 0 but included for explicit clarity. OpenRouter passes

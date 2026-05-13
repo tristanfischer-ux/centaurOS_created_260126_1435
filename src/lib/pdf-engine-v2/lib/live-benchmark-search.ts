@@ -117,7 +117,8 @@ Rules: emit at most 3 anchors, only if the results actually state prices. Never 
       },
       body: JSON.stringify({
         model: 'google/gemini-2.5-flash',  // cheap aggregator
-        max_tokens: 1024,
+        // WS-D 2026-05-13: 150k (was 1024) — Tristan approved; truncation more expensive than unused tokens.
+        max_tokens: 150_000,
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: systemPrompt },

@@ -1,0 +1,690 @@
+{
+  "path_label": "LEGACY",
+  "n_runs": 3,
+  "cells_ge8": 43,
+  "cells_present": 120,
+  "by_class": {
+    "AUV": {
+      "Cover": {
+        "mean": 7.0,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Executive Summary": {
+        "mean": 7.33,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Brief Requirements": {
+        "mean": 8.5,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      },
+      "Design Modules": {
+        "mean": 6.0,
+        "stddev": 0.4666904755831215,
+        "n": 2
+      },
+      "Bom": {
+        "mean": 5.0,
+        "stddev": 0.4666904755831215,
+        "n": 2
+      },
+      "Cost Analysis": {
+        "mean": 5.25,
+        "stddev": 0.3535533905932738,
+        "n": 2
+      },
+      "Sourcing Strategy": {
+        "mean": 6.33,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Feasibility Notes": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Grammar Language": {
+        "mean": 7.0,
+        "stddev": 0.4666904755831215,
+        "n": 2
+      },
+      "Sources References": {
+        "mean": 6.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Appendix Technical": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Visual Layout": {
+        "mean": 8.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      }
+    },
+    "BESS": {
+      "Cover": {
+        "mean": 7.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Executive Summary": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Brief Requirements": {
+        "mean": 9.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Design Modules": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Bom": {
+        "mean": 5.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Cost Analysis": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sourcing Strategy": {
+        "mean": 7.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Feasibility Notes": {
+        "mean": 7.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Grammar Language": {
+        "mean": 8.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sources References": {
+        "mean": 5.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Appendix Technical": {
+        "mean": 8.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Visual Layout": {
+        "mean": 8.67,
+        "stddev": 0.0,
+        "n": 1
+      }
+    },
+    "Bioreactor": {
+      "Cover": {
+        "mean": 7.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Executive Summary": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Brief Requirements": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Design Modules": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Bom": {
+        "mean": 5.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Cost Analysis": {
+        "mean": 5.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sourcing Strategy": {
+        "mean": 4.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Feasibility Notes": {
+        "mean": 7.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Grammar Language": {
+        "mean": 8.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sources References": {
+        "mean": 5.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Appendix Technical": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Visual Layout": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 1
+      }
+    },
+    "CGM": {
+      "Cover": {
+        "mean": 7.165,
+        "stddev": 0.23334523779156074,
+        "n": 2
+      },
+      "Executive Summary": {
+        "mean": 8.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Brief Requirements": {
+        "mean": 8.835,
+        "stddev": 0.23334523779156074,
+        "n": 2
+      },
+      "Design Modules": {
+        "mean": 5.17,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      },
+      "Bom": {
+        "mean": 4.25,
+        "stddev": 1.7677669529663689,
+        "n": 2
+      },
+      "Cost Analysis": {
+        "mean": 6.335,
+        "stddev": 0.9404520189781083,
+        "n": 2
+      },
+      "Sourcing Strategy": {
+        "mean": 4.165,
+        "stddev": 1.6475588001646557,
+        "n": 2
+      },
+      "Feasibility Notes": {
+        "mean": 7.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Grammar Language": {
+        "mean": 8.25,
+        "stddev": 0.3535533905932738,
+        "n": 2
+      },
+      "Sources References": {
+        "mean": 6.585,
+        "stddev": 0.12020815280171303,
+        "n": 2
+      },
+      "Appendix Technical": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Visual Layout": {
+        "mean": 7.835,
+        "stddev": 0.23334523779156074,
+        "n": 2
+      }
+    },
+    "Drone": {
+      "Cover": {
+        "mean": 6.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Executive Summary": {
+        "mean": 7.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Brief Requirements": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Design Modules": {
+        "mean": 5.165,
+        "stddev": 1.6475588001646557,
+        "n": 2
+      },
+      "Bom": {
+        "mean": 4.0,
+        "stddev": 1.4142135623730951,
+        "n": 2
+      },
+      "Cost Analysis": {
+        "mean": 6.5,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      },
+      "Sourcing Strategy": {
+        "mean": 6.0,
+        "stddev": 1.8809040379562165,
+        "n": 2
+      },
+      "Feasibility Notes": {
+        "mean": 7.165,
+        "stddev": 0.23334523779156074,
+        "n": 2
+      },
+      "Grammar Language": {
+        "mean": 5.415,
+        "stddev": 2.948635277547903,
+        "n": 2
+      },
+      "Sources References": {
+        "mean": 6.17,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      },
+      "Appendix Technical": {
+        "mean": 7.75,
+        "stddev": 0.3535533905932738,
+        "n": 2
+      },
+      "Visual Layout": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 2
+      }
+    },
+    "Edge-AI": {
+      "Cover": {
+        "mean": 7.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Executive Summary": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Brief Requirements": {
+        "mean": 8.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Design Modules": {
+        "mean": 5.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Bom": {
+        "mean": 4.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Cost Analysis": {
+        "mean": 6.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sourcing Strategy": {
+        "mean": 6.33,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Feasibility Notes": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Grammar Language": {
+        "mean": 7.67,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sources References": {
+        "mean": 7.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Appendix Technical": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Visual Layout": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 1
+      }
+    },
+    "EV-Charger": {
+      "Cover": {
+        "mean": 7.5,
+        "stddev": 0.24041630560342606,
+        "n": 2
+      },
+      "Executive Summary": {
+        "mean": 8.0,
+        "stddev": 0.4666904755831215,
+        "n": 2
+      },
+      "Brief Requirements": {
+        "mean": 9.0,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Design Modules": {
+        "mean": 7.165,
+        "stddev": 0.23334523779156074,
+        "n": 2
+      },
+      "Bom": {
+        "mean": 4.67,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Cost Analysis": {
+        "mean": 6.25,
+        "stddev": 1.0606601717798212,
+        "n": 2
+      },
+      "Sourcing Strategy": {
+        "mean": 6.33,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Feasibility Notes": {
+        "mean": 7.835,
+        "stddev": 1.1808683245815343,
+        "n": 2
+      },
+      "Grammar Language": {
+        "mean": 8.085,
+        "stddev": 0.5868986283848344,
+        "n": 2
+      },
+      "Sources References": {
+        "mean": 6.17,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      },
+      "Appendix Technical": {
+        "mean": 7.5,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      },
+      "Visual Layout": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 2
+      }
+    },
+    "Farm": {
+      "Cover": {
+        "mean": 7.335,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Executive Summary": {
+        "mean": 7.83,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      },
+      "Brief Requirements": {
+        "mean": 8.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Design Modules": {
+        "mean": 7.335,
+        "stddev": 0.9404520189781083,
+        "n": 2
+      },
+      "Bom": {
+        "mean": 5.585,
+        "stddev": 0.12020815280171303,
+        "n": 2
+      },
+      "Cost Analysis": {
+        "mean": 6.335,
+        "stddev": 0.9404520189781083,
+        "n": 2
+      },
+      "Sourcing Strategy": {
+        "mean": 6.665,
+        "stddev": 0.9404520189781083,
+        "n": 2
+      },
+      "Feasibility Notes": {
+        "mean": 7.5,
+        "stddev": 0.24041630560342606,
+        "n": 2
+      },
+      "Grammar Language": {
+        "mean": 8.25,
+        "stddev": 1.0606601717798212,
+        "n": 2
+      },
+      "Sources References": {
+        "mean": 7.335,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Appendix Technical": {
+        "mean": 8.75,
+        "stddev": 1.0606601717798212,
+        "n": 2
+      },
+      "Visual Layout": {
+        "mean": 8.17,
+        "stddev": 0.7071067811865476,
+        "n": 2
+      }
+    },
+    "HAPS": {
+      "Cover": {
+        "mean": 6.835,
+        "stddev": 1.1808683245815343,
+        "n": 2
+      },
+      "Executive Summary": {
+        "mean": 8.33,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Brief Requirements": {
+        "mean": 8.165,
+        "stddev": 0.23334523779156074,
+        "n": 2
+      },
+      "Design Modules": {
+        "mean": 6.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Bom": {
+        "mean": 4.835,
+        "stddev": 0.23334523779156074,
+        "n": 2
+      },
+      "Cost Analysis": {
+        "mean": 5.415,
+        "stddev": 0.12020815280171303,
+        "n": 2
+      },
+      "Sourcing Strategy": {
+        "mean": 6.33,
+        "stddev": 0.0,
+        "n": 2
+      },
+      "Feasibility Notes": {
+        "mean": 7.665,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      },
+      "Grammar Language": {
+        "mean": 8.0,
+        "stddev": 1.4142135623730951,
+        "n": 2
+      },
+      "Sources References": {
+        "mean": 6.585,
+        "stddev": 0.12020815280171303,
+        "n": 2
+      },
+      "Appendix Technical": {
+        "mean": 7.75,
+        "stddev": 0.3535533905932738,
+        "n": 2
+      },
+      "Visual Layout": {
+        "mean": 8.335,
+        "stddev": 0.4737615433949868,
+        "n": 2
+      }
+    },
+    "Heatpump": {
+      "Cover": {
+        "mean": 7.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Executive Summary": {
+        "mean": 7.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Brief Requirements": {
+        "mean": 8.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Design Modules": {
+        "mean": 7.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Bom": {
+        "mean": 5.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Cost Analysis": {
+        "mean": 7.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sourcing Strategy": {
+        "mean": 5.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Feasibility Notes": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Grammar Language": {
+        "mean": 7.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Sources References": {
+        "mean": 7.0,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Appendix Technical": {
+        "mean": 5.5,
+        "stddev": 0.0,
+        "n": 1
+      },
+      "Visual Layout": {
+        "mean": 8.0,
+        "stddev": 0.0,
+        "n": 1
+      }
+    }
+  },
+  "class_summaries": [
+    {
+      "label": "AUV",
+      "avg": 6.978333333333334,
+      "ge8": 4,
+      "present": 12
+    },
+    {
+      "label": "BESS",
+      "avg": 7.708333333333333,
+      "ge8": 7,
+      "present": 12
+    },
+    {
+      "label": "Bioreactor",
+      "avg": 7.0975,
+      "ge8": 6,
+      "present": 12
+    },
+    {
+      "label": "CGM",
+      "avg": 6.909999999999999,
+      "ge8": 4,
+      "present": 12
+    },
+    {
+      "label": "Drone",
+      "avg": 6.5687500000000005,
+      "ge8": 2,
+      "present": 12
+    },
+    {
+      "label": "Edge-AI",
+      "avg": 7.2225,
+      "ge8": 5,
+      "present": 12
+    },
+    {
+      "label": "EV-Charger",
+      "avg": 7.236250000000001,
+      "ge8": 4,
+      "present": 12
+    },
+    {
+      "label": "Farm",
+      "avg": 7.479583333333333,
+      "ge8": 4,
+      "present": 12
+    },
+    {
+      "label": "HAPS",
+      "avg": 7.075833333333333,
+      "ge8": 4,
+      "present": 12
+    },
+    {
+      "label": "Heatpump",
+      "avg": 7.041666666666667,
+      "ge8": 3,
+      "present": 12
+    }
+  ]
+}

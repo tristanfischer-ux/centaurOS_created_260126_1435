@@ -77,7 +77,8 @@ export async function runBriefRevision(
       },
       body: JSON.stringify({
         model: 'google/gemini-3.1-pro-preview',
-        max_tokens: 16384,
+        // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+        max_tokens: 150_000,
         temperature: 0.3,
         messages: [
           { role: 'system', content: REVISION_PROMPT },

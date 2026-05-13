@@ -73,7 +73,8 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
         body: JSON.stringify({
           model,
           temperature: STAGE_TEMPERATURES.bom,
-          max_tokens: 16384,
+          // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
           response_format: { type: 'json_object' },
           messages: [
             { role: 'system', content: systemPrompt },

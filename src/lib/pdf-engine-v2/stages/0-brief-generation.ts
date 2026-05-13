@@ -3,11 +3,16 @@
  *
  * Contains TWO functions:
  *
- *   runBriefParsing()  — PA Stage 1 (new). Called first in the pipeline when
+ *   runBriefParsing()  — PA Stage 1 (active). Called first in the pipeline when
  *                        PA_PIPELINE=true. Outputs StructuredBriefJSON.
  *
- *   runBriefGeneration() — Legacy 5-section brief (default path, PA_PIPELINE=false).
- *                          DO NOT DELETE until Phase H cleanup.
+ *   runBriefGeneration() — Legacy entry point on PA_PIPELINE=false.
+ *                          WS-E 2026-05-13: this is now a thin delegating
+ *                          wrapper around Stage 0.5 (runBriefExpansion). No
+ *                          separate LLM call. Kept for backwards-compat with
+ *                          the legacy orchestrator path and the RL harnesses
+ *                          (feasibility-rl-iterate, decompose-rl-iterate,
+ *                          stage-rl-iterate, feasibility-full-rl).
  *
  * Pipeline position (PA path):   runBriefParsing → Classification → Research → …
  * Pipeline position (legacy path): Classification → Training Data → Research → runBriefGeneration → …
@@ -38,59 +43,10 @@ export interface GeneratedBrief {
   }
 }
 
-const BRIEF_SYSTEM_PROMPT = `You are writing the Brief section of an engineering report. You MUST follow this exact structure with these exact headings:
-
-# Project Brief: [One-line project name + purpose]
-
-## 1. Project Purpose
-[1 sentence. State the primary engineering goal in measurable terms. Include a quantifiable outcome.]
-
-## 2. Core Objectives
-- [3-5 bullets. Each must be testable/verifiable and tied to a metric.]
-
-## 3. Key Requirements & Constraints
-### Requirements
-- [Manufacturing process, materials, tolerances, compliance standards]
-### Constraints
-- [Mass, cost ceiling, production volume, jurisdiction, envelope dimensions, operating temperature]
-
-## 4. Scope Boundaries
-**In scope:** [What this report covers]
-**Out of scope:** [What is explicitly excluded — at least 2 items]
-
-## 5. Success Criteria
-- [2-3 bullets. Each must be numeric and independent of design choices.]
-
-RULES:
-- Total length: 180-280 words main body
-- Every metric must include units
-- No vague language ("appropriate", "suitable", "reasonable")
-- No placeholders or TBD
-- Cost ceiling MUST be a specific number with currency
-- Mass MUST be a specific number with units
-- Production volume MUST be a specific number with frequency
-- If a field is unknown, write "Not specified — requires [specific input]"
-
-Also extract structured data as JSON at the end:
-\`\`\`json
-{
-  "projectName": "...",
-  "purpose": "...",
-  "objectives": ["..."],
-  "requirements": ["..."],
-  "constraints": ["..."],
-  "inScope": "...",
-  "outOfScope": ["..."],
-  "successCriteria": ["..."],
-  "costCeiling": null,
-  "maxMass": null,
-  "productionVolume": null,
-  "jurisdiction": null,
-  "envelope": null,
-  "operatingTemp": null,
-  "standards": ["..."]
-}
-\`\`\``
+// WS-E 2026-05-13: BRIEF_SYSTEM_PROMPT removed — runBriefGeneration no longer
+// makes its own LLM call to re-write the founder text into a 5-section
+// template. It now delegates to Stage 0.5 (runBriefExpansion). The PA path
+// (runBriefParsing below) has its own prompt imported from ../prompts.ts.
 
 /**
  * Extract structured fields from brief text when JSON extraction fails.
@@ -198,51 +154,31 @@ async function fetchWithTimeout(url: string, options: RequestInit, timeoutMs: nu
  *
  * @deprecated Use `runBriefParsing()` on the PA path (PA_PIPELINE=true / default).
  * This function is preserved for the legacy rollback path only (PA_PIPELINE=false).
- * See STRICT-ADOPTION-MIGRATION-PLAN.md §Phase A.
+ *
+ * WS-E 2026-05-13: merged into Stage 0.5 (brief-expansion). The previous
+ * implementation made its own LLM call to re-write the founder's text into a
+ * 5-section template — vestigial since there's always SOME brief and the PA
+ * path uses `runBriefParsing()` instead. New implementation:
+ *   1. Uses `extractFieldsFromText` on the raw founder text to pick up
+ *      whatever structured constraints are already present (cost, mass, volume,
+ *      jurisdiction, envelope, temperature, standards, objectives, etc.).
+ *   2. Calls `runBriefExpansion` (Stage 0.5) to infer any missing fields.
+ *   3. Returns the founder's text as `briefText` (no LLM re-write) plus the
+ *      merged structured fields.
+ * Callers that consumed the old 5-section re-write (RL harnesses, the legacy
+ * orchestrator path) now get the founder's brief verbatim plus extracted +
+ * inferred constraint fields.
  */
 export async function runBriefGeneration(
   rawBriefText: string,
   productClass: string,
 ): Promise<StageResult<GeneratedBrief>> {
   const startTime = Date.now()
-  console.log('[brief-gen] Generating structured Brief...')
+  console.log('[brief-gen] WS-E: delegating to Stage 0.5 (brief-expansion)...')
   console.log(`[brief-gen] Input: ${rawBriefText.length} chars, product class: ${productClass}`)
 
   try {
-    const response = await fetchWithTimeout('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-3.1-pro-preview',
-        max_tokens: 16384,
-        temperature: 0.3,
-        messages: [
-          { role: 'system', content: BRIEF_SYSTEM_PROMPT },
-          { role: 'user', content: `FOUNDER BRIEF:\n${rawBriefText}\n\nPRODUCT CLASS: ${productClass}` },
-        ],
-      }),
-    }, 180000)
-
-    if (!response.ok) {
-      throw new Error(`OpenRouter API ${response.status}`)
-    }
-
-    const json = await response.json()
-    const raw = json.choices?.[0]?.message?.content || ''
-    
-    if (!raw) {
-      throw new Error('Empty response from LLM')
-    }
-
-    // Extract the brief text (everything before the JSON block)
-    const briefText = raw.replace(/```json[\s\S]*?```/, '').trim()
-
-    // Extract the structured JSON from the end of the response
-    const jsonMatch = raw.match(/```json\s*([\s\S]*?)\s*```/)
-    let fields: GeneratedBrief['fields'] = {
+    const fields: GeneratedBrief['fields'] = {
       projectName: '',
       purpose: '',
       objectives: [],
@@ -260,25 +196,65 @@ export async function runBriefGeneration(
       standards: [],
     }
 
-    if (jsonMatch) {
-      try {
-        const parsed = JSON.parse(jsonMatch[1])
-        fields = { ...fields, ...parsed }
-      } catch (e) {
-        console.warn('[brief-gen] Failed to parse structured JSON, extracting from text')
-        extractFieldsFromText(briefText, fields)
+    // Step 1: deterministic extraction from the founder's raw text.
+    // Most concrete facts (cost, mass, jurisdiction, etc.) are already there —
+    // no LLM needed.
+    extractFieldsFromText(rawBriefText, fields)
+
+    // Step 2: delegate to Stage 0.5 to infer missing fields.
+    // Dynamic import to avoid a static cycle (run-brief-only.ts imports both
+    // sides) and to keep this function callable from RL drivers that import
+    // the file with no Stage 0.5 dependency loaded yet.
+    const { runBriefExpansion } = await import('./0.5-brief-expansion')
+    const expansionResult = await runBriefExpansion(rawBriefText, productClass, {
+      confidence: 'LOW',
+      technologyDomains: [],
+    })
+
+    if (expansionResult.ok && expansionResult.data) {
+      const exp = expansionResult.data
+      // Map Stage 0.5 inferred fields onto the GeneratedBrief.fields shape.
+      // expandedFields uses snake_case keys (target_cost, target_mass, etc.);
+      // map only when the deterministic extraction did not already fill the
+      // slot. This preserves "founder text wins; Stage 0.5 fills the gaps".
+      const ef = exp.expandedFields as Record<string, unknown>
+      if (fields.costCeiling == null) {
+        const v = ef.target_cost ?? ef.cost_ceiling ?? ef.unit_cost
+        if (typeof v === 'number') fields.costCeiling = v
+      }
+      if (fields.maxMass == null) {
+        const v = ef.max_mass ?? ef.target_mass ?? ef.mass_kg
+        if (typeof v === 'number') fields.maxMass = v
+      }
+      if (!fields.productionVolume) {
+        const v = ef.production_volume ?? ef.target_volume ?? ef.quantity_target
+        if (typeof v === 'string' || typeof v === 'number') fields.productionVolume = String(v)
+      }
+      if (!fields.jurisdiction) {
+        const v = ef.jurisdiction ?? ef.target_market
+        if (typeof v === 'string') fields.jurisdiction = v
+      }
+      if (!fields.envelope) {
+        const v = ef.envelope ?? ef.dimensions
+        if (typeof v === 'string') fields.envelope = v
+      }
+      if (!fields.operatingTemp) {
+        const v = ef.operating_temp ?? ef.operating_temperature
+        if (typeof v === 'string') fields.operatingTemp = v
       }
     } else {
-      // No JSON block found — extract fields from the brief text
-      console.warn('[brief-gen] No JSON block found, extracting from text')
-      extractFieldsFromText(briefText, fields)
+      console.warn(`[brief-gen] Stage 0.5 expansion failed (${expansionResult.error ?? 'unknown'}); proceeding with deterministic extraction only`)
     }
 
-    console.log(`[brief-gen] Generated: ${briefText.length} chars, ${fields.objectives.length} objectives, ${fields.constraints.length} constraints`)
+    // briefText is the founder's raw text — no re-write. Downstream stages
+    // (renderer, BoM, etc.) read the structured `fields` for facts and the
+    // `briefText` for prose, so handing back the founder's original prose is
+    // the most faithful representation.
+    console.log(`[brief-gen] Built: ${rawBriefText.length} chars briefText, ${fields.objectives.length} objectives, ${fields.constraints.length} constraints`)
 
     return {
       ok: true,
-      data: { briefText, fields },
+      data: { briefText: rawBriefText, fields },
       durationMs: Date.now() - startTime,
     }
   } catch (err) {
@@ -321,7 +297,8 @@ export async function runBriefParsing(
       },
       body: JSON.stringify({
         model: 'google/gemini-3.1-pro-preview',
-        max_tokens: 16384,
+        // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+        max_tokens: 150_000,
         temperature: 0.1,
         messages: [
           { role: 'system', content: BRIEF_PARSING_SYSTEM_PROMPT },

@@ -88,7 +88,8 @@ Respond in valid JSON matching this schema:
     body: JSON.stringify({
       model: 'xiaomi/mimo-v2.5-pro',
       temperature: STAGE_TEMPERATURES['fang-review'],
-      max_tokens: 16384,
+      // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+      max_tokens: 150_000,
       response_format: { type: 'json_object' },
       messages: [
         { role: 'system', content: 'You are an expert manufacturing engineer. Output valid JSON only.' },
@@ -185,7 +186,8 @@ Return a structured text summary of your findings.`
     body: JSON.stringify({
       model: 'xiaomi/mimo-v2.5-pro',
       temperature: STAGE_TEMPERATURES.proofreader,
-      max_tokens: 16384,
+      // WS-D 2026-05-13: 150k (was 16384) — Tristan approved; truncation more expensive than unused tokens.
+      max_tokens: 150_000,
       messages: [
         { role: 'system', content: 'You are an expert engineering proofreader.' },
         { role: 'user', content: prompt }

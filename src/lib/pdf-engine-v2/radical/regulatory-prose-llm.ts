@@ -137,10 +137,8 @@ export async function generateRegulatoryProseLayer(
             body: JSON.stringify({
               model: 'x-ai/grok-4.3',
               temperature: 0.3,
-              // Council 2026-05-12 fix: 1024 was tight for 4 prose blocks on
-              // complex multi-jurisdiction standards. Raised to 1536 to avoid
-              // length-truncation that finish_reason check now surfaces.
-              max_tokens: 1536,
+              // WS-D 2026-05-13: 150k (was 1536) — Tristan approved; truncation more expensive than unused tokens.
+              max_tokens: 150_000,
               messages: [
                 { role: 'system', content: SYSTEM_PROMPT },
                 { role: 'user', content: userContent },

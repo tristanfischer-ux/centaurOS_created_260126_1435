@@ -56,7 +56,8 @@ async function callOpenRouter(systemPrompt: string, userContent: string): Promis
           // research temperature. Precision extraction does not benefit from
           // the creative variance that research requires.
           temperature: STAGE_TEMPERATURES.regulatory_extraction ?? 0.15,
-          max_tokens: 8192,
+          // WS-D 2026-05-13: 150k (was 8192) — Tristan approved; truncation more expensive than unused tokens.
+          max_tokens: 150_000,
           messages: [
             { role: 'system', content: systemPrompt },
             { role: 'user', content: userContent },

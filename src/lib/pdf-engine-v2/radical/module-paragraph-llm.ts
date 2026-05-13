@@ -92,7 +92,8 @@ export async function generateLlmModuleParagraph(
     body: JSON.stringify({
       model: 'x-ai/grok-4.3',
       temperature: 0.3,
-      max_tokens: 1024,
+      // WS-D 2026-05-13: 150k (was 1024) — Tristan approved; truncation more expensive than unused tokens.
+      max_tokens: 150_000,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
         { role: 'user', content: userContent },
