@@ -1230,24 +1230,37 @@ function resolveOemSubsystemLeaf(
 
   if (catalogEntry && catalogEntry.vendors.length > 0) {
     const topVendor = catalogEntry.vendors[0]
+    // Iter-03 follow-up (2026-05-13): prefer the vendor catalog's
+    // typicalUnitPriceGbp over the LLM's estimatedUnitPriceGbp when present —
+    // the vendor figure is source-cited (vendor public datasheets + UK
+    // distributor pricing in vendor-catalog.ts), the LLM estimate is not.
+    const hasVendorPrice = typeof topVendor.typicalUnitPriceGbp === 'number'
+    const unitPrice = hasVendorPrice
+      ? (topVendor.typicalUnitPriceGbp as number)
+      : estimatedUnitPriceGbp
+    const priceNote = hasVendorPrice
+      ? `OEM price estimate from vendor catalog: ${topVendor.name}`
+      : null
+    const baseNotes = topVendor.notes ?? null
+    const combinedNotes = [priceNote, baseNotes].filter(Boolean).join(' — ') || null
     return {
       archetype_id: archetypeId,
       part_class: 'oem_subsystem',
       qty,
       mpn: null,
       manufacturer: topVendor.name,
-      unit_price_gbp: estimatedUnitPriceGbp, // vendor catalog has no pricing
+      unit_price_gbp: unitPrice,
       lead_weeks: topVendor.typicalLeadWeeks,
       // Bug P1-8 fix (2026-05-11): vendor_catalog gives us a real
       // manufacturer + lead time (stronger evidence than the price-only
-      // grade_d table). Tag as grade_c when no LLM price; estimated
-      // when an LLM price is provided.
-      verification_grade: estimatedUnitPriceGbp !== null ? 'estimated' : 'grade_c',
+      // grade_d table). Tag as grade_c when vendor price OR no LLM price;
+      // estimated only when LLM gave a price and vendor catalog has none.
+      verification_grade: hasVendorPrice || estimatedUnitPriceGbp === null ? 'grade_c' : 'estimated',
       source: 'vendor_catalog',
       source_url: null,
       distributor: 'vendor_catalog',
       grade_d_basis: null,
-      notes: topVendor.notes ?? null,
+      notes: combinedNotes,
     }
   }
 
@@ -1497,7 +1510,12 @@ function collectLeaves(root: CompositionNode): LeafWithContext[] {
 // Main resolution function
 // ---------------------------------------------------------------------------
 
-const MAX_DISTRIBUTOR_CALLS = 28
+// Iter-03 lift (2026-05-13): 28 → 60. Distributor calls average 0.5-2s,
+// so 60 sequential calls add ≤60s to pipeline runtime (≤4% of a 25-50 min run).
+// Under Mouser 30 req/min, DigiKey 240 req/min, Farnell ~60 req/min limits.
+// Larger cap lets us reach high-cost lines (cells, PCS, cooling, fire) that
+// previously hit budget_exhausted before being queried.
+const MAX_DISTRIBUTOR_CALLS = 60
 
 /**
  * Resolve all leaves in a RadicalTree, returning a ResolvedRadicalTree.
