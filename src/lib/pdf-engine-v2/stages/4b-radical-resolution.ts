@@ -36,6 +36,11 @@ import type { RadicalTree, CompositionNode } from '../radical/schema.js'
 import { findSkuForPart, type AggregateResult } from '../lib/distributors/index.js'
 import { findEntriesByPartTerm, VENDOR_CATALOG, type VendorCatalogEntry } from '../lib/vendor-catalog.js'
 import { findSuppliersBySpecialism } from '../lib/local-corpus.js'
+import {
+  getCharactersFromRegistry,
+  writeCharacterToRegistry,
+  type CharacterRegistryRow,
+} from '../lib/character-registry.js'
 
 // ---------------------------------------------------------------------------
 // Feature flag
@@ -48,6 +53,21 @@ import { findSuppliersBySpecialism } from '../lib/local-corpus.js'
 export function isPhase2ResolutionEnabled(): boolean {
   const raw = (process.env.RADICAL_PHASE_2_RESOLUTION ?? '').toLowerCase().trim()
   return raw === 'true' || raw === '1' || raw === 'yes' || raw === 'on'
+}
+
+/**
+ * Wave 1 Piece 4 (2026-05-13): character_registry feature flag.
+ *
+ * Default is TRUE — opt OUT instead of opt IN. The registry has 212 seeded
+ * rows for energy_storage and is the source of truth for MPN hints + vendor
+ * catalog mappings going forward. Set RADICAL_USE_REGISTRY=false to fall
+ * back to the legacy MPN_HINTS_BY_CHARACTER / OEM_CATALOG_BY_CHARACTER path
+ * exactly as before this migration.
+ */
+export function isCharacterRegistryEnabled(): boolean {
+  const raw = (process.env.RADICAL_USE_REGISTRY ?? '').toLowerCase().trim()
+  if (raw === '') return true // default-on
+  return !(raw === 'false' || raw === '0' || raw === 'no' || raw === 'off')
 }
 
 // ---------------------------------------------------------------------------
@@ -74,6 +94,32 @@ export type PartClass =
  * grade_d → grey so the user can see the difference.
  */
 export type VerificationGrade = 'verified' | 'estimated' | 'grade_c' | 'grade_d' | 'stub' | 'data_gap'
+
+/**
+ * Wave 2 follow-up (2026-05-13, council SEAT 1 fix): when a registry row
+ * supplies the resolution, its source_grade should propagate through to
+ * the leaf's verification_grade so the renderer surfaces it correctly.
+ * Previously all registry-derived leaves were hardcoded to 'grade_c' even
+ * when the registry row was 'verified' — that blunted the BoM score lift.
+ *
+ * Mapping registry.source_grade → ResolvedLeafAnnotation.verification_grade:
+ *   verified   → verified  (distributor MPN match — full provenance)
+ *   priced     → grade_c   (vendor catalog price, real manufacturer)
+ *   canonical  → grade_c   (real manufacturer, no price — same render bucket)
+ *   plausible  → estimated (LLM-only, plausibility-checked)
+ *   unverified → grade_d   (no provenance signal)
+ */
+function registryGradeToVerificationGrade(
+  registrySourceGrade: 'verified' | 'priced' | 'canonical' | 'plausible' | 'unverified',
+): VerificationGrade {
+  switch (registrySourceGrade) {
+    case 'verified':   return 'verified'
+    case 'priced':     return 'grade_c'
+    case 'canonical':  return 'grade_c'
+    case 'plausible':  return 'estimated'
+    case 'unverified': return 'grade_d'
+  }
+}
 
 /**
  * A resolved leaf — one BOM line with all sourcing data populated.
@@ -1080,8 +1126,38 @@ async function resolveDistributorLeaf(
   callsUsed: { count: number },
   maxCalls: number,
   productClass: string = 'unknown',
+  registryRow: CharacterRegistryRow | null = null,
 ): Promise<ResolvedLeafAnnotation> {
+  // Wave 1 Piece 4: when the registry has MPN hints OR a known unit price we
+  // prefer those over the legacy hardcoded tables. Manufacturer + price from
+  // the registry also become the fallback evidence when no distributor hit
+  // succeeds, instead of the Grade-D table.
+  const registryHints = registryRow?.mpn_hints && registryRow.mpn_hints.length > 0
+    ? registryRow.mpn_hints
+    : null
+  const registryPrice = registryRow?.unit_price_gbp ?? null
+  const registryManufacturer = registryRow?.manufacturer ?? null
+  const registrySourceUrl = registryRow?.source_url ?? null
+
   if (callsUsed.count >= maxCalls) {
+    // Budget exhausted — prefer registry price → Grade-D → estimated.
+    if (registryRow && registryPrice !== null) {
+      return {
+        archetype_id: archetypeId,
+        part_class: partClass,
+        qty,
+        mpn: registryHints ? registryHints[0] : null,
+        manufacturer: registryManufacturer,
+        unit_price_gbp: registryPrice,
+        lead_weeks: null,
+        verification_grade: 'grade_c',
+        source: 'budget_exhausted',
+        source_url: registrySourceUrl,
+        distributor: 'estimated',
+        grade_d_basis: null,
+        notes: `Distributor budget exhausted — using character_registry price (${registryRow.source_grade})`,
+      }
+    }
     const gradeD = GRADE_D_BY_CHARACTER[archetypeId]
     return {
       archetype_id: archetypeId,
@@ -1103,7 +1179,11 @@ async function resolveDistributorLeaf(
   // Bug P0-2 fix (2026-05-11): use class-aware MPN hints so pcb_controller
   // (and any other context-sensitive archetype) resolves to a part appropriate
   // for the product class — heat pump → STM32F407, CGM → nRF52832, BESS → ISL94212.
-  const hints = getMpnHintsForArchetype(archetypeId, productClass)
+  //
+  // Wave 1 Piece 4 (2026-05-13): registry hints take priority over the legacy
+  // hardcoded tables. We fall through to the legacy path only when the
+  // registry has no hints for this character.
+  const hints = registryHints ?? getMpnHintsForArchetype(archetypeId, productClass)
   let result: AggregateResult | null = null
 
   for (const mpn of hints) {
@@ -1153,7 +1233,29 @@ async function resolveDistributorLeaf(
     }
   }
 
-  // No distributor hit — try Grade D, then LLM estimate, then data_gap
+  // No distributor hit — try registry price first, then Grade D, then LLM estimate, then data_gap.
+  // Wave 1 Piece 4: registry price is stronger evidence than Grade-D static
+  // table (we know the manufacturer + provenance), so promote to grade_c.
+  if (registryRow && registryPrice !== null) {
+    return {
+      archetype_id: archetypeId,
+      part_class: partClass,
+      qty,
+      mpn: hints[0] ?? null,
+      manufacturer: registryManufacturer,
+      unit_price_gbp: registryPrice,
+      lead_weeks: null,
+      verification_grade: registryGradeToVerificationGrade(registryRow.source_grade),
+      source: 'vendor_catalog',
+      source_url: registrySourceUrl,
+      distributor: 'vendor_catalog',
+      grade_d_basis: null,
+      notes: hints.length > 0
+        ? `Attempted MPN: ${hints[0]}; no distributor hit — using character_registry (${registryRow.source_grade})`
+        : `No distributor hit — using character_registry (${registryRow.source_grade})`,
+    }
+  }
+
   const gradeD = GRADE_D_BY_CHARACTER[archetypeId]
   if (gradeD) {
     return {
@@ -1219,8 +1321,12 @@ function resolveOemSubsystemLeaf(
   qty: number,
   estimatedUnitPriceGbp: number | null,
   productClass: string = 'unknown',
+  registryRow: CharacterRegistryRow | null = null,
 ): ResolvedLeafAnnotation {
-  const catalogKey = OEM_CATALOG_BY_CHARACTER[archetypeId]
+  // Wave 1 Piece 4: registry's vendor_catalog_part_type takes priority over
+  // the legacy hardcoded OEM_CATALOG_BY_CHARACTER mapping.
+  const catalogKey =
+    registryRow?.vendor_catalog_part_type ?? OEM_CATALOG_BY_CHARACTER[archetypeId]
   let catalogEntry: VendorCatalogEntry | undefined
 
   if (catalogKey) {
@@ -1232,6 +1338,26 @@ function resolveOemSubsystemLeaf(
     const searchTerm = archetypeId.replace(/_/g, ' ')
     const results = findEntriesByPartTerm(searchTerm)
     catalogEntry = results[0]
+  }
+
+  // If the catalog yields nothing but the registry has its own price/manufacturer,
+  // synthesise a grade_c annotation from the registry directly.
+  if (!catalogEntry && registryRow && registryRow.unit_price_gbp !== null) {
+    return {
+      archetype_id: archetypeId,
+      part_class: 'oem_subsystem',
+      qty,
+      mpn: null,
+      manufacturer: registryRow.manufacturer,
+      unit_price_gbp: registryRow.unit_price_gbp,
+      lead_weeks: null,
+      verification_grade: registryGradeToVerificationGrade(registryRow.source_grade),
+      source: 'vendor_catalog',
+      source_url: registryRow.source_url,
+      distributor: 'vendor_catalog',
+      grade_d_basis: null,
+      notes: `OEM subsystem from character_registry (${registryRow.source_grade})`,
+    }
   }
 
   if (catalogEntry && catalogEntry.vendors.length > 0) {
@@ -1365,9 +1491,14 @@ async function resolveStructuralFabricatedLeaf(
   productClass: string = 'unknown',
   callsUsed?: { count: number },
   maxCalls?: number,
+  registryRow: CharacterRegistryRow | null = null,
 ): Promise<ResolvedLeafAnnotation> {
   // Bug P1-9: opportunistic distributor lookup when MPN hint exists.
-  const hints = getMpnHintsForArchetype(archetypeId, productClass)
+  // Wave 1 Piece 4: registry hints take priority.
+  const registryHints = registryRow?.mpn_hints && registryRow.mpn_hints.length > 0
+    ? registryRow.mpn_hints
+    : null
+  const hints = registryHints ?? getMpnHintsForArchetype(archetypeId, productClass)
   if (hints.length > 0 && callsUsed && maxCalls && callsUsed.count < maxCalls) {
     for (const mpn of hints) {
       if (callsUsed.count >= maxCalls) break
@@ -1397,6 +1528,25 @@ async function resolveStructuralFabricatedLeaf(
       } catch (err) {
         console.warn(`  [Phase2/warn-P1-9] structural lookup failed for ${mpn}: ${(err as Error).message}`)
       }
+    }
+  }
+
+  // Wave 1 Piece 4: registry-priced fallback before Grade-D.
+  if (registryRow && registryRow.unit_price_gbp !== null) {
+    return {
+      archetype_id: archetypeId,
+      part_class: 'structural_fabricated',
+      qty,
+      mpn: hints[0] ?? null,
+      manufacturer: registryRow.manufacturer,
+      unit_price_gbp: registryRow.unit_price_gbp,
+      lead_weeks: null,
+      verification_grade: registryGradeToVerificationGrade(registryRow.source_grade),
+      source: 'vendor_catalog',
+      source_url: registryRow.source_url,
+      distributor: 'vendor_catalog',
+      grade_d_basis: null,
+      notes: `Structural fabrication from character_registry (${registryRow.source_grade})`,
     }
   }
 
@@ -1542,6 +1692,7 @@ export async function runRadicalResolution(
 
   const callsUsed = { count: 0 }
   const distributorPriority = getDistributorPriority(productClass)
+  const useRegistry = isCharacterRegistryEnabled()
 
   // ── Step 1: collect leaves and sort by priority ────────────────────────────
   // Priority: leaves with MPN hints come first (guaranteed distributor call);
@@ -1549,6 +1700,40 @@ export async function runRadicalResolution(
   // so we spend the call budget on the most-resolvable leaves first.
 
   const leaves = collectLeaves(tree.composition.root)
+
+  // ── Step 1b: bulk fetch character_registry rows ───────────────────────────
+  // Wave 1 Piece 4 (2026-05-13): single round-trip to load every leaf's
+  // registry row before the resolution loop. This avoids N+1 queries while
+  // still letting each per-leaf resolver consult its registry entry.
+  let registryMap: Map<string, CharacterRegistryRow> = new Map()
+  if (useRegistry) {
+    const uniqueIds = Array.from(new Set(leaves.map(l => l.archetypeId)))
+    try {
+      registryMap = await getCharactersFromRegistry(uniqueIds, productClass)
+      console.log(
+        `[radical-resolution] character_registry: ${registryMap.size}/${uniqueIds.length} ` +
+        `unique character_ids hit registry`,
+      )
+    } catch (err) {
+      console.warn(
+        `[radical-resolution] character_registry bulk fetch failed: ${(err as Error).message} ` +
+        `— falling back to legacy hardcoded path`,
+      )
+      registryMap = new Map()
+    }
+  } else {
+    console.log('[radical-resolution] character_registry: disabled via RADICAL_USE_REGISTRY=false')
+  }
+
+  // Helper: true when this character has authoritative MPN hints anywhere
+  // (registry first, legacy second). Used to prioritise distributor calls.
+  const hasAnyMpnHints = (id: string): boolean => {
+    if (useRegistry) {
+      const row = registryMap.get(id)
+      if (row && row.mpn_hints.length > 0) return true
+    }
+    return MPN_HINTS_BY_CHARACTER[id] !== undefined
+  }
 
   const PART_CLASS_PRIORITY: Record<PartClass, number> = {
     'electronic_cots': 0,
@@ -1559,8 +1744,8 @@ export async function runRadicalResolution(
   }
 
   const prioritised = [...leaves].sort((a, b) => {
-    const aHasMpn = MPN_HINTS_BY_CHARACTER[a.archetypeId] !== undefined ? 0 : 1
-    const bHasMpn = MPN_HINTS_BY_CHARACTER[b.archetypeId] !== undefined ? 0 : 1
+    const aHasMpn = hasAnyMpnHints(a.archetypeId) ? 0 : 1
+    const bHasMpn = hasAnyMpnHints(b.archetypeId) ? 0 : 1
     if (aHasMpn !== bHasMpn) return aHasMpn - bHasMpn
     const aClass = classifyLeafPartClass(a.archetypeId)
     const bClass = classifyLeafPartClass(b.archetypeId)
@@ -1572,9 +1757,20 @@ export async function runRadicalResolution(
   // ── Step 2: resolve each leaf ──────────────────────────────────────────────
 
   const annotationMap = new Map<string, ResolvedLeafAnnotation>()
+  // Track per-character_id whether resolution consulted the registry, so
+  // logs can attribute hits / misses to the registry vs the legacy path.
+  let registryHitCount = 0
+  let hardcodedFallbackCount = 0
 
   for (const { archetypeId, qty, estimatedUnitPriceGbp } of prioritised) {
     const partClass = classifyLeafPartClass(archetypeId)
+    const registryRow = useRegistry ? (registryMap.get(archetypeId) ?? null) : null
+
+    if (!annotationMap.has(archetypeId)) {
+      // Only count once per unique character_id.
+      if (registryRow) registryHitCount += 1
+      else hardcodedFallbackCount += 1
+    }
 
     // Part-class validation guard — prevents false-positive distributor lookups
     // for OEM/structural/software classes (LFP/PWC0805 bug pattern from 434d7202)
@@ -1593,9 +1789,16 @@ export async function runRadicalResolution(
         productClass,
         callsUsed,
         MAX_DISTRIBUTOR_CALLS,
+        registryRow,
       )
     } else if (partClass === 'oem_subsystem') {
-      annotation = resolveOemSubsystemLeaf(archetypeId, qty, estimatedUnitPriceGbp, productClass)
+      annotation = resolveOemSubsystemLeaf(
+        archetypeId,
+        qty,
+        estimatedUnitPriceGbp,
+        productClass,
+        registryRow,
+      )
     } else if (isDistributorResultPlausibleForClass(partClass)) {
       // electronic_cots or mechanical_cots — try distributor
       annotation = await resolveDistributorLeaf(
@@ -1606,10 +1809,17 @@ export async function runRadicalResolution(
         callsUsed,
         MAX_DISTRIBUTOR_CALLS,
         productClass,
+        registryRow,
       )
     } else {
       // Fallback for unknown partClass — should not happen given exhaustive coverage above
-      annotation = resolveOemSubsystemLeaf(archetypeId, qty, estimatedUnitPriceGbp, productClass)
+      annotation = resolveOemSubsystemLeaf(
+        archetypeId,
+        qty,
+        estimatedUnitPriceGbp,
+        productClass,
+        registryRow,
+      )
     }
 
     // Use archetypeId as the map key — multiple leaves can share the same archetypeId
@@ -1626,6 +1836,89 @@ export async function runRadicalResolution(
   }
 
   console.log(`[Phase2/resolution] ${callsUsed.count} distributor API calls made`)
+  console.log(
+    `[radical-resolution] character_registry: ${registryHitCount}/${registryHitCount + hardcodedFallbackCount} ` +
+    `leaves hit registry, ${hardcodedFallbackCount} hardcoded fallback`,
+  )
+
+  // ── Step 2b: write-back new discoveries ───────────────────────────────────
+  // For each unique character_id that (a) was NOT in the registry on entry
+  // AND (b) resolved with meaningful evidence (verified / grade_c / grade_d
+  // with a price or manufacturer), upsert a fresh row. Errors are swallowed
+  // (Promise.allSettled).
+  if (useRegistry) {
+    const writebacks: Array<Promise<void>> = []
+    for (const [archetypeId, annotation] of annotationMap.entries()) {
+      if (registryMap.has(archetypeId)) continue // already known
+      if (annotation.source === 'budget_exhausted') continue
+      if (annotation.verification_grade === 'data_gap' || annotation.verification_grade === 'stub') continue
+      const hasMeaningfulData =
+        annotation.mpn !== null ||
+        annotation.manufacturer !== null ||
+        annotation.unit_price_gbp !== null
+      if (!hasMeaningfulData) continue
+
+      const sourceGrade: CharacterRegistryRow['source_grade'] = (() => {
+        switch (annotation.verification_grade) {
+          case 'verified': return 'verified'
+          case 'grade_c': return 'canonical'
+          case 'estimated': return 'plausible'
+          case 'grade_d': return 'plausible'
+          default: return 'unverified'
+        }
+      })()
+
+      const unitPriceSource: string | null = (() => {
+        switch (annotation.source) {
+          case 'mouser':
+          case 'digikey':
+          case 'farnell':
+          case 'lcsc':
+            return 'distributor'
+          case 'vendor_catalog': return 'vendor_catalog'
+          case 'grade_d_table': return 'training_data'
+          case 'bom_estimate':
+          case 'llm_estimate': return 'plausibility_inferred'
+          default: return null
+        }
+      })()
+
+      const confidenceScore: number | null = (() => {
+        switch (annotation.verification_grade) {
+          case 'verified': return 1.0
+          case 'grade_c': return 0.75
+          case 'estimated': return 0.5
+          case 'grade_d': return 0.4
+          default: return null
+        }
+      })()
+
+      writebacks.push(
+        writeCharacterToRegistry({
+          character_id: archetypeId,
+          mpn_hints: annotation.mpn ? [annotation.mpn] : [],
+          manufacturer: annotation.manufacturer,
+          vendor_catalog_part_type: null,
+          unit_price_gbp: annotation.unit_price_gbp,
+          unit_price_source: unitPriceSource,
+          source_url: annotation.source_url,
+          source_grade: sourceGrade,
+          confidence_score: confidenceScore,
+          product_class: productClass,
+        }),
+      )
+    }
+    if (writebacks.length > 0) {
+      const results = await Promise.allSettled(writebacks)
+      const failed = results.filter(r => r.status === 'rejected').length
+      console.log(
+        `[radical-resolution] character_registry: ${writebacks.length - failed} new discoveries written back` +
+        (failed > 0 ? ` (${failed} failed)` : ''),
+      )
+    } else {
+      console.log(`[radical-resolution] character_registry: 0 new discoveries written back`)
+    }
+  }
 
   // ── Step 3: annotate the tree ──────────────────────────────────────────────
 
