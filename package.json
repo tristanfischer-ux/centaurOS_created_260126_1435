@@ -24,6 +24,8 @@
     "test:e2e:gallery": "node scripts/generate-video-gallery.mjs && open test-results/video-walkthroughs.html",
     "verify": "bash scripts/verify.sh",
     "verify:static": "bash scripts/verify.sh --static",
+    "review": "tsx scripts/precommit-review.ts",
+    "review:security": "tsx scripts/precommit-review.ts --severity medium",
     "analyze": "ANALYZE=true next build --webpack",
     "prepare": "husky",
     "postinstall": "node scripts/patch-react-pdf.js"
