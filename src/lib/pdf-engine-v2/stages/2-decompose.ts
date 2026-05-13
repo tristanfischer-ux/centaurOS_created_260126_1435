@@ -1472,7 +1472,11 @@ async function runOneModuleDecomposition(
     if (charToQty.size > 0) {
       for (const leaf of inScope) {
         const declaredQty = charToQty.get(leaf.character_id)
-        if (declaredQty !== undefined && declaredQty > leaf.multiplicity) {
+        // WS-B (2026-05-13): leaf.multiplicity is `number | null` since R-B-C1.
+        // The legacy per-module path always emits a positive integer, but tolerate
+        // null defensively so this loop still applies the topology multiplier.
+        const currentQty = leaf.multiplicity ?? 0
+        if (declaredQty !== undefined && declaredQty > currentQty) {
           leaf.multiplicity = declaredQty
           multiplicityOverrideCount += 1
         }
@@ -1592,7 +1596,21 @@ export async function runDecomposeRadicalPerModule(
       } else {
         // Sum multiplicities for duplicate (character_id, archetype_id) pairs
         // — same logical part appearing under two modules (e.g. multi-classification).
-        existing.multiplicity += leaf.multiplicity
+        // WS-B (2026-05-13): tolerate null multiplicity (R-B-C1 missing-quantity).
+        // If BOTH are null we propagate null (still missing); otherwise sum the
+        // non-null values (a known qty under one module wins over null under another).
+        if (existing.multiplicity == null && leaf.multiplicity == null) {
+          // both still missing — leave null, keep verification_status
+        } else {
+          const existingQty = existing.multiplicity ?? 0
+          const incomingQty = leaf.multiplicity ?? 0
+          existing.multiplicity = existingQty + incomingQty
+          // Once we have a real quantity for one of the duplicates, clear the
+          // missing-quantity marker so downstream renderers don't flag it.
+          if (existing.verification_status === 'missing-quantity') {
+            existing.verification_status = null
+          }
+        }
       }
     }
   }

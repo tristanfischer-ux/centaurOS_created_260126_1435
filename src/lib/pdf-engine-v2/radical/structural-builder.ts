@@ -47,8 +47,17 @@ export interface LeafRecord {
   character_id: string
   /** archetype_id if the LLM knows a specific archetype — optional */
   archetype_id?: string | null
-  /** Quantity of this leaf relative to its parent (the word/subsystem group) */
-  multiplicity: number
+  /**
+   * Quantity of this leaf relative to its parent (the word/subsystem group).
+   *
+   * WS-B (R-B-C1, 2026-05-13): when emitted via
+   * `buildTreeFromModuleDecomposition` (RADICAL_TIER4_TREE=true) this may be
+   * `null` to signal "Tier 4 produced no quantity modifier and the part is
+   * not a recognised singleton". The legacy path always emits a positive
+   * integer; downstream consumers that null-check should default to 1 ONLY
+   * for renderer display, never silently for cost rollup.
+   */
+  multiplicity: number | null
   /** Optional MPN hint from the LLM */
   mpn_hint?: string | null
   /** Optional manufacturer hint from the LLM */
@@ -57,6 +66,22 @@ export interface LeafRecord {
   estimated_unit_price_gbp?: number | null
   /** Human-readable description — used for UNKNOWN leaves */
   description?: string | null
+  /**
+   * WS-B council R-B-C1 / R-B-C2 (2026-05-13): provenance marker added by
+   * `buildTreeFromModuleDecomposition`.
+   *
+   *   'missing-quantity' — Tier 4 emitted this content character but no
+   *                        quantity modifier was present, AND the part is
+   *                        not a recognised singleton. `multiplicity` is null;
+   *                        QA must surface this in the §6 BoM with a warning
+   *                        glyph rather than silently default to qty=1.
+   *   'stub'             — sub-module had empty words[]; deterministic
+   *                        uncategorised stub injected (R-B-C2). Surfaces in
+   *                        council_notes so QA sees the gap.
+   *   null / undefined   — normal leaf (default). Legacy `buildTreeFromLeaves`
+   *                        never sets this field.
+   */
+  verification_status?: 'missing-quantity' | 'stub' | null
   /**
    * Identifier of the parent SubModuleSpec.id within the owning ModuleSpec.
    * Added as part of Piece 1A 2026-05-12 so the per-module Stage 2 LLM tags
@@ -1133,8 +1158,12 @@ export function buildTreeFromLeaves(
       for (const item of wordLeaves) {
         const existing = leafByArchetype.get(item.archetypeId)
         if (existing) {
-          // Take max quantity to avoid double-counting from LLM over-splitting
-          if (item.leaf.multiplicity > existing.leaf.multiplicity) {
+          // Take max quantity to avoid double-counting from LLM over-splitting.
+          // WS-B (2026-05-13): multiplicity is now `number | null` (R-B-C1).
+          // Null is treated as 0 for comparison (a numeric value always wins).
+          const incoming = item.leaf.multiplicity ?? 0
+          const current = existing.leaf.multiplicity ?? 0
+          if (incoming > current) {
             existing.leaf = { ...item.leaf }
           }
         } else {
@@ -1148,11 +1177,16 @@ export function buildTreeFromLeaves(
       )
 
       const leafNodes: CompositionNode[] = sortedLeafEntries.map(([archetypeId, item]) => {
-        // Apply physics-based quantity override if available for this character_id
+        // Apply physics-based quantity override if available for this character_id.
+        // WS-B (2026-05-13): when multiplicity is null (R-B-C1 missing-quantity
+        // marker from buildTreeFromModuleDecomposition), fall back to qty=1 so
+        // the renderer still shows the part. The verification_status flag is
+        // what surfaces the gap to QA — the qty=1 is a display-only fallback.
         const override = quantityOverrides?.[archetypeId]
+        const llmQty = item.leaf.multiplicity ?? 1
         const quantity = override !== undefined
           ? override
-          : Math.max(1, Math.round(item.leaf.multiplicity))
+          : Math.max(1, Math.round(llmQty))
         // Piece 1A.2 2026-05-12: propagate sub_module_id (= sentence id, in
         // worked-example terms) from LeafRecord onto the character node so
         // downstream renderers can group BoM rows under sub-module dividers

@@ -1206,8 +1206,79 @@ export async function runPipeline(
               `Wall-clock ${tel.wall_clock_ms}ms vs serial ${tel.total_llm_call_ms_serial}ms, ` +
               `cost≈£${tel.total_estimated_cost_gbp.toFixed(3)}`
             )
+
+            // ── WS-B Phase A (2026-05-13): Tier 4 tree override ───────────────
+            // When RADICAL_TIER4_TREE=true, REPLACE the per-module tree with one
+            // built directly from `state.moduleDecomposition.modules[].sub_modules
+            // [].words[]`. Bypasses the WORDS[] cap in structural-builder.ts
+            // (lines 983-988, 1056-1063), giving §6 BoM ≥200 rows for BESS.
+            //
+            // Council R-B-C1: missing quantity → multiplicity=null + verification_
+            //                 status='missing-quantity' (no silent qty=1).
+            // Council R-B-C2: empty words[] → deterministic stub, council_notes
+            //                 entry. No silent sub-module drop.
+            //
+            // Independent of RADICAL_MULTI_EMITTER — works on whatever shape
+            // Stage 1.7 populated (legacy monolith or 6-emitter ensemble).
+            try {
+              const { isTier4TreeEnabled, buildTreeFromModuleDecomposition } =
+                await import('./radical/structural-builder-from-decomposition.js')
+              if (isTier4TreeEnabled()) {
+                const productSlug = state.parsedBrief.project_id ?? productClassForRadical
+                const tier4Build = buildTreeFromModuleDecomposition(
+                  moduleDecomposition,
+                  productSlug,
+                  productClassForRadical,
+                )
+                state.radicalTree = tier4Build.tree
+                state.radicalTreeUnknowns = [] // Tier 4 path: no WORDS[] filter = no unmapped
+                console.log(
+                  `[pipeline] WS-B Phase A: RADICAL_TIER4_TREE=true — replaced per-module ` +
+                  `tree with Tier 4 build. ${tier4Build.stats.sentences} modules, ` +
+                  `${tier4Build.stats.words} sub-modules, ${tier4Build.placedLeafCount} ` +
+                  `leaves (vs ${perModuleResult.data.perModule.total_leaf_count} via legacy ` +
+                  `WORDS[] path). BoM cap inversion active.`
+                )
+              }
+            } catch (tier4Err) {
+              // Non-fatal — fall back to the legacy per-module tree.
+              console.warn(
+                `[pipeline] WS-B Phase A: Tier 4 tree build failed (non-fatal, keeping ` +
+                `legacy per-module tree): ${(tier4Err as Error).message}`
+              )
+            }
           } else {
             console.warn(`[pipeline] Radical Phase 3: per-module Stage 2 failed (non-fatal): ${perModuleResult.error}`)
+
+            // WS-B Phase A fallback (2026-05-13): if per-module Stage 2 failed
+            // but Stage 1.7 succeeded and RADICAL_TIER4_TREE=true, we can STILL
+            // produce a Tier 4 tree from `moduleDecomposition` alone — the tree
+            // shape comes from the LLM emission, not the Stage 2 leaf list.
+            try {
+              const { isTier4TreeEnabled, buildTreeFromModuleDecomposition } =
+                await import('./radical/structural-builder-from-decomposition.js')
+              if (isTier4TreeEnabled()) {
+                const productSlug = state.parsedBrief.project_id ?? productClassForRadical
+                const tier4Build = buildTreeFromModuleDecomposition(
+                  moduleDecomposition,
+                  productSlug,
+                  productClassForRadical,
+                )
+                state.radicalTree = tier4Build.tree
+                state.radicalTreeUnknowns = []
+                phase3RanSuccessfully = true
+                console.log(
+                  `[pipeline] WS-B Phase A salvage: per-module Stage 2 failed but ` +
+                  `RADICAL_TIER4_TREE=true — built tree directly from ModuleDecomposition. ` +
+                  `${tier4Build.placedLeafCount} leaves.`
+                )
+              }
+            } catch (tier4Err) {
+              console.warn(
+                `[pipeline] WS-B Phase A salvage: Tier 4 tree build also failed ` +
+                `(non-fatal): ${(tier4Err as Error).message}`
+              )
+            }
           }
         } else {
           console.warn(`[pipeline] Radical Phase 3: Stage 1.5 failed (non-fatal): ${decompositionResult.error}`)

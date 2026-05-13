@@ -137,6 +137,23 @@ export type CompositionNode = {
    * fallback paths). Renderer falls back to sub_module_id grouping.
    */
   word_id?: string | null
+
+  /**
+   * WS-B council R-B-C1 / R-B-C2 (2026-05-13) — provenance flag propagated
+   * from LeafRecord.verification_status onto the character node. Drives the
+   * §6 BoM warning glyph:
+   *
+   *   'missing-quantity' — Tier 4 emitted the part but no quantity modifier;
+   *                        renderer displays a ⚠ MISSING-QTY badge alongside
+   *                        the qty column (which falls back to 1 for display).
+   *   'stub'             — sub-module had empty words[]; deterministic stub
+   *                        injected (R-B-C2).
+   *   null / undefined   — normal leaf (default).
+   *
+   * Set only by `buildTreeFromModuleDecomposition` (RADICAL_TIER4_TREE=true).
+   * Legacy `buildTreeFromLeaves` leaves this undefined.
+   */
+  verification_status?: 'missing-quantity' | 'stub' | null
 }
 
 export type Composition = {

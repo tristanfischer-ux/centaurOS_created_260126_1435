@@ -352,6 +352,12 @@ const SOFTWARE_IP_CHARACTERS = new Set<string>([
  * so distributor lookup at least tries).
  */
 function classifyLeafPartClass(archetypeId: string): PartClass {
+  // WS-B (2026-05-13): the R-B-C2 stub character_id ('uncategorised') routes
+  // to oem_subsystem so the distributor budget isn't burned on a synthetic
+  // placeholder. The existing resolveOemSubsystemLeaf path falls back to
+  // Grade-D / data_gap, which is the right outcome for a stub leaf.
+  if (archetypeId === 'uncategorised') return 'oem_subsystem'
+
   if (ELECTRONIC_COTS_CHARACTERS.has(archetypeId)) return 'electronic_cots'
   if (MECHANICAL_COTS_CHARACTERS.has(archetypeId)) return 'mechanical_cots'
   if (OEM_SUBSYSTEM_CHARACTERS.has(archetypeId)) return 'oem_subsystem'

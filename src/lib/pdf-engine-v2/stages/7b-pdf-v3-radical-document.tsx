@@ -4245,6 +4245,11 @@ const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
     mpn: string | null
     manufacturer: string | null
     leadWeeks: number | null
+    /**
+     * WS-B (2026-05-13): provenance flag from buildTreeFromModuleDecomposition.
+     * 'missing-quantity' → render ⚠ MISSING-QTY badge; 'stub' → ⚠ STUB.
+     */
+    verificationStatus: 'missing-quantity' | 'stub' | null
   }> = []
 
   if (resolvedTree) {
@@ -4268,6 +4273,7 @@ const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
           mpn: res?.mpn ?? null,
           manufacturer: res?.manufacturer ?? null,
           leadWeeks: res?.lead_weeks ?? null,
+          verificationStatus: node.verification_status ?? null,
         })
       } else {
         // Use the top-level child's archetypeId as the subsystem label
@@ -4350,10 +4356,17 @@ const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
                       || leaf.verificationGrade === 'grade_c'
                       || leaf.verificationGrade === 'grade_d') ? BESS_AMBER
                   : BESS_RED
+                // WS-B (2026-05-13): MISSING-QTY / STUB glyph + colour cue.
+                // Council R-B-C1: when Tier 4 emitted no quantity modifier and the
+                // part isn't a recognised singleton, the qty column shows a warning.
+                const qtyMissing = leaf.verificationStatus === 'missing-quantity'
+                const isStub = leaf.verificationStatus === 'stub'
+                const qtyColour = qtyMissing ? BESS_RED : isStub ? BESS_AMBER : INK
+                const partGlyph = isStub ? ' ⚠ STUB' : ''
                 return (
                   <View key={i} style={{ flexDirection: 'row', borderBottomWidth: i === allLeaves.length - 1 ? 0 : 0.5, borderBottomColor: TABLE_BORDER, backgroundColor: i % 2 === 0 ? '#ffffff' : BG_SOFT }} wrap={false}>
                     <Text style={{ width: '28%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, fontFamily: 'Helvetica-Bold' }}>
-                      {leaf.archetypeId.replace(/_/g, ' ')}
+                      {leaf.archetypeId.replace(/_/g, ' ')}{partGlyph}
                     </Text>
                     <Text style={{ width: '16%', fontSize: 7, color: MUTED, paddingVertical: 4, paddingHorizontal: 5 }}>
                       {leaf.subsystem.replace(/_/g, ' ')}
@@ -4361,8 +4374,8 @@ const TechnicalAppendixPage = ({ state }: { state: PipelineState }) => {
                     <Text style={{ width: '10%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5 }}>
                       {dash(leaf.mpn)}
                     </Text>
-                    <Text style={{ width: '6%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
-                      {leaf.qty}
+                    <Text style={{ width: '6%', fontSize: 7, color: qtyColour, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right', fontFamily: qtyMissing ? 'Helvetica-Bold' : 'Helvetica' }}>
+                      {qtyMissing ? `${leaf.qty} ⚠` : leaf.qty}
                     </Text>
                     <Text style={{ width: '10%', fontSize: 7, color: INK, paddingVertical: 4, paddingHorizontal: 5, textAlign: 'right' }}>
                       {leaf.unitPriceGbp !== null ? fmtGbp(leaf.unitPriceGbp) : 'TBD'}
