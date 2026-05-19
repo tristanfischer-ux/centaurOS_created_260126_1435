@@ -59,6 +59,7 @@ import {
 } from '../src/lib/pdf-engine-v2/class-reference-graph'
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
 import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
+import { runBriefTargetReconciliation, type ReconciliationResult } from '../src/lib/pdf-engine-v2/stages/1.8-brief-target-reconciliation'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, recommendReplacementsForStripped, buildTechnicalSummary, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
@@ -1810,6 +1811,48 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   }
   logAction({ step: 'submodule_prose_pre_phase2', sub_modules_rewritten: proseResult.sub_modules_rewritten, total_sub_modules: proseResult.total_sub_modules })
 
+  // ── G0.5 Brief Target Reconciliation (Tristan firestorm directive 2026-05-19):
+  // catches the catastrophic class where Generator emits a design at the wrong
+  // SCALE (e.g. 1 kW design against 8 kW brief). Discovered in council review
+  // of morning chain 92cdda58. Runs post-Phase-1, pre-Phase-2 — if HALT, no
+  // amount of Phase 2 patching can rescue the scale, so we exit early rather
+  // than burn 18 iters of repair LLM calls + Engine B/C/D + render budget.
+  // Deterministic, zero LLM cost.
+  let reconciliation: ReconciliationResult | null = null
+  const tRecon = Date.now()
+  try {
+    reconciliation = runBriefTargetReconciliation(parsedResult.data, design)
+    const r = reconciliation
+    console.error(`[chain] G0.5 brief-target-reconciliation: ${r.verdict} — ${r.comparisons_made} comparisons, ${r.mismatches.length} mismatch${r.mismatches.length === 1 ? '' : 'es'}, ${r.unable_to_compare.length} unable_to_compare`)
+    for (const m of r.mismatches) console.error(`  ${m.severity === 'halt' ? '✕' : '⚠'} ${m.target_field}: ${m.note}`)
+    logAction({ step: 'brief_target_reconciliation', verdict: r.verdict, comparisons: r.comparisons_made, mismatches: r.mismatches.length, halt_count: r.mismatches.filter(m => m.severity === 'halt').length, latency_ms: Date.now() - tRecon, ok: true })
+
+    if (r.verdict === 'HALT') {
+      // Persist what we have to state.json so the partial run is auditable, then exit.
+      const haltState = {
+        projectId: 'chain-v2-' + Date.now(),
+        parsedBrief: parsedResult.data,
+        moduleDecomposition: design,
+        complianceGate: complianceGate ?? null,
+        physicsLedger,
+        physicsCritique: critique,
+        briefTargetReconciliation: r,
+        brief: briefBlock,
+        acceptanceStatus: 'not_accepted',
+        haltReason: `G0.5 brief-target-reconciliation HALT: design scale materially differs from brief — Phase 2 cannot rescue. See briefTargetReconciliation.mismatches.`,
+        savedAt: new Date().toISOString(),
+      }
+      const haltPath = resolve(outDir, 'state.json')
+      writeFileSync(haltPath, JSON.stringify(haltState, null, 2))
+      console.error(`\n[chain] === FATAL G0.5 === Brief-vs-design scale mismatch; exiting code 3. Re-submit the brief — Generator misread the target. State.json snapshot at ${haltPath}.`)
+      logAction({ step: 'fatal_g05_halt', reason: 'brief_target_reconciliation_halt', mismatches: r.mismatches })
+      process.exit(3)
+    }
+  } catch (err) {
+    console.error(`[chain] G0.5 reconciliation threw: ${(err as Error).message}; continuing without`)
+    logAction({ step: 'brief_target_reconciliation', ok: false, error: String(err).slice(0, 200) })
+  }
+
   // ── Phase 2: Translate + gates + repair loop
   console.error(`\n[chain] === PHASE 2: Translate + Gates + Repair ===`)
   // apiKey was declared in Phase D-prep above; reuse it here.
@@ -2307,6 +2350,9 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     // ANY error in that block (G2 computation, G3 computation, file write)
     // dropped complianceGate on the floor. Initial-write makes it durable.
     complianceGate: complianceGate ?? null,
+    // 2026-05-19 firestorm: G0.5 brief-target-reconciliation result. Catches
+    // generator scale-mismatch (1kW design vs 8kW brief class of failure).
+    briefTargetReconciliation: reconciliation ?? null,
     // 2026-05-19 fix M1 (audit-found): worker reads state.gatesPassed for the
     // pdf_engine_runs.state_snapshot_json column but chain never wrote it.
     // DB snapshot was always {gatesPassed: null}. Write the actual boolean.
