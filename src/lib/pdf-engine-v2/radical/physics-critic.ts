@@ -43,11 +43,19 @@ export interface CritiqueReport {
   latency_ms: number
 }
 
-// 2026-05-19: bumped from gemini-2.5-flash-lite to gemini-3.1-flash-lite to
-// match the rest of the chain (was the only stage on 2.5 — model version drift
-// caught in the 2026-05-19 audit, gap #5). 3.1 is cheaper + smarter; JSON
-// schema is identical so no other changes needed.
-const FLASH_LITE_MODEL = 'google/gemini-3.1-flash-lite'
+// 2026-05-19 v5.2: bumped to Gemini 3.5 Flash. Probe (ab-tests/probe-3.5-flash-
+// physics-critic.json) confirmed it catches planted physics errors that 3.1
+// Flash-Lite missed (claimed COP 3.5 vs actual 3.08 from 8kW/2.6kW input —
+// 3.5 Flash flagged with high confidence + showed calculation; 3.1 Flash-Lite
+// historically returned only generic "verify thermodynamic ratios" advice).
+// Cost delta: ~$0.025/critique vs ~$0.005 (5× more) but only 1 call per
+// chain run, so ~$0.02 per chain run is acceptable for sharper engineering
+// judgment. Sweet spot for reasoning-first model: ~3K prompt + structured
+// JSON output. JSON schema unchanged — drop-in.
+//
+// max_tokens MUST be ≥6000 for this model — at 2-3K it burns budget on
+// internal reasoning and returns empty content (verified A/B in ab-tests/).
+const FLASH_LITE_MODEL = 'google/gemini-3.5-flash'
 
 function compactDesign(modules: any[], brief: any, keyMetrics: any, partSummary: any, decisions: any[]): any {
   const compactModules = (modules || []).map((m: any) => ({
@@ -151,7 +159,9 @@ export async function runPhysicsCritic(opts: {
         model,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
-        max_tokens: 6000,
+        // 2026-05-19 v5.2: 3.5 Flash needs ≥6000 to break through reasoning
+        // tokens. Critique output is ~2K tokens; 6K leaves headroom.
+        max_tokens: 8000,
         temperature: 0,
       }),
     })

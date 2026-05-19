@@ -74,6 +74,13 @@ import { runPhysicsCritic, type CritiqueReport } from '../src/lib/pdf-engine-v2/
 // ─── Models ─────────────────────────────────────────────────────────────────
 const GEMINI_3_1_PRO = 'google/gemini-3.1-pro-preview'
 const FLASH_LITE = 'google/gemini-3.1-flash-lite'
+// 2026-05-19 v5.2: Gemini 3.5 Flash — reasoning-first model used for stages
+// where engineering judgment matters and the prompt is short (≤3K). Sweet
+// spot per ab-tests/README.md: structured JSON output + judgment-heavy.
+// max_tokens MUST be ≥6000 to break through reasoning tokens. Currently
+// wired into: brief plausibility critic + brief rewriter (this file) and
+// physics critic (src/lib/pdf-engine-v2/radical/physics-critic.ts:46).
+const FLASH_3_5 = 'google/gemini-3.5-flash'
 const GROK_4_3 = 'x-ai/grok-4.3'
 const GLM_5_1 = 'z-ai/glm-5.1'
 const HAIKU_4_5 = 'anthropic/claude-haiku-4.5'
@@ -850,13 +857,17 @@ Run the feasibility check. Return the JSON verdict.`
       method: 'POST',
       headers: { Authorization: `Bearer ${opts.apiKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: FLASH_LITE,
+        // 2026-05-19 v5.2 plausibility critic: swap Flash-Lite → 3.5 Flash.
+        // Better physics-floor reasoning (verified by A/B probe). max_tokens
+        // bumped 2500→8000 to clear reasoning-token budget (3.5 Flash burns
+        // ~70% of completion on internal reasoning).
+        model: FLASH_3_5,
         messages: [
           { role: 'system', content: system },
           { role: 'user', content: user },
         ],
         temperature: 0,
-        max_tokens: 2500,
+        max_tokens: 8000,
         thinking_level: 'high',
         // ⚠️ Removed google_search_grounding 2026-05-16 — verified that
         // OpenRouter silently ignores this for Gemini Flash-Lite. This call
