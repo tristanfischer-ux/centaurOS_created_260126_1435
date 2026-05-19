@@ -87,6 +87,10 @@ const KEY_CHECKS = [
     // continues without reference anchors → cover-page REF panel empty + every
     // engine_c_* field on partVerifications stays null. Surface this prominently.
     { name: 'OPENAI_API_KEY', impact: 'Engine C reference-anchor embeddings (cover page REF panel + every BoM line\'s engine_c_* fields)' },
+    // 2026-05-19 v5.1 audit fix #13 (GPT-5.5): every LLM call in the chain
+    // routes via OpenRouter. Missing key was NOT surfaced — chain would run
+    // until the first LLM call and crash with an opaque error. Now warned.
+    { name: 'OPENROUTER_API_KEY', impact: 'every LLM call in chain (brief parse, generator, R1-R4 reviewers, physics critic, repair, Engine B classifier, Engine D supplier scoring, design decisions explainer)' },
 ]
 // Worker tells the chain it is running in production context. Used by the
 // chain to set RENDER_NO_OPEN=1 on the renderer subprocess (LaunchAgent has
@@ -361,29 +365,46 @@ async function processJob(job) {
     const stateStoragePath = `${job.user_id}/${job.id}.state.json`
     const actionsStoragePath = `${job.user_id}/${job.id}.actions.jsonl`
     const actionsPath = resolve(jobDir, 'actions.jsonl')
+    // 2026-05-19 v5.1 audit fix #6 (GPT-5.5): previously the await pattern
+    // here did NOT inspect the returned {error} field — Supabase Storage can
+    // reject the upload (RLS, quota, network) but the worker would still log
+    // "uploaded" and stamp state_storage_path on the DB row, advertising a
+    // path to a non-existent object. Now we check and log honestly.
+    let stateUploaded = false
+    let actionsUploaded = false
     try {
         if (existsSync(statePath)) {
             const stateBuf = readFileSync(statePath)
-            await supabase.storage.from('pdf-engine-pdfs').upload(stateStoragePath, stateBuf, {
+            const { error: stateUploadErr } = await supabase.storage.from('pdf-engine-pdfs').upload(stateStoragePath, stateBuf, {
                 contentType: 'application/json',
                 upsert: true,
             })
-            log(`uploaded state.json (${(stateBuf.length / 1024).toFixed(1)} KB) → ${stateStoragePath}`)
+            if (stateUploadErr) {
+                log(`state.json upload REJECTED by Supabase: ${stateUploadErr.message}`)
+            } else {
+                log(`uploaded state.json (${(stateBuf.length / 1024).toFixed(1)} KB) → ${stateStoragePath}`)
+                stateUploaded = true
+            }
         }
     } catch (err) {
-        log(`state.json upload failed (non-fatal): ${err instanceof Error ? err.message : err}`)
+        log(`state.json upload threw (non-fatal): ${err instanceof Error ? err.message : err}`)
     }
     try {
         if (existsSync(actionsPath)) {
             const actionsBuf = readFileSync(actionsPath)
-            await supabase.storage.from('pdf-engine-pdfs').upload(actionsStoragePath, actionsBuf, {
+            const { error: actionsUploadErr } = await supabase.storage.from('pdf-engine-pdfs').upload(actionsStoragePath, actionsBuf, {
                 contentType: 'application/x-ndjson',
                 upsert: true,
             })
-            log(`uploaded actions.jsonl (${(actionsBuf.length / 1024).toFixed(1)} KB) → ${actionsStoragePath}`)
+            if (actionsUploadErr) {
+                log(`actions.jsonl upload REJECTED by Supabase: ${actionsUploadErr.message}`)
+            } else {
+                log(`uploaded actions.jsonl (${(actionsBuf.length / 1024).toFixed(1)} KB) → ${actionsStoragePath}`)
+                actionsUploaded = true
+            }
         }
     } catch (err) {
-        log(`actions.jsonl upload failed (non-fatal): ${err instanceof Error ? err.message : err}`)
+        log(`actions.jsonl upload threw (non-fatal): ${err instanceof Error ? err.message : err}`)
     }
 
     // Compact state snapshot for the DB column (full state lives in Storage above).
@@ -407,8 +428,9 @@ async function processJob(job) {
                 g3_gap_count: Array.isArray(parsed.g3_review_gaps) ? parsed.g3_review_gaps.length : 0,
                 g5_unverified_count: Array.isArray(parsed.g5UnverifiedParts) ? parsed.g5UnverifiedParts.length : 0,
                 supplier_archetype_count: Array.isArray(parsed.suppliers) ? parsed.suppliers.length : 0,
-                state_storage_path: stateStoragePath,
-                actions_storage_path: actionsStoragePath,
+                // 2026-05-19 v5.1 fix #6: only record the path if upload actually succeeded.
+                state_storage_path: stateUploaded ? stateStoragePath : null,
+                actions_storage_path: actionsUploaded ? actionsStoragePath : null,
                 savedAt: parsed.savedAt ?? null,
             }
         }

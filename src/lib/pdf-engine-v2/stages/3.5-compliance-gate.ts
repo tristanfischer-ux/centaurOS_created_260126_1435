@@ -110,8 +110,14 @@ function detectDeclaredStandards(parsedBrief: any, briefText: string): Set<strin
   if (Array.isArray(r)) for (const s of r) if (typeof s === 'string') out.add(s.toUpperCase().trim())
   const s2 = parsedBrief?.standards
   if (Array.isArray(s2)) for (const s of s2) if (typeof s === 'string') out.add(s.toUpperCase().trim())
-  // Regex catch-all: IEC NNNN, UL NNNN, ISO NNNNN, BS EN NNNN, EN NNNN, NFPA NNN, DO-NNNX, FCC Part NN, RoHS, REACH, GDPR, HACCP, GMP, MCS, G99
-  const codeRegex = /\b(IEC|UL|ISO|BS\s*EN|EN|NFPA|FCC|UN|G\d{2,3}|MCS|RoHS|REACH|GDPR|HACCP|GMP|HIPAA|DO-?\d{3}\w?|ASIL|CE)\s*[-]?\s*(\d{2,5}\w?(?:[-/]\d{1,4})?)?/gi
+  // Regex catch-all: IEC NNNN, UL NNNN, ISO NNNNN, BS EN NNNN, EN NNNN, NFPA NNN,
+  // DO-NNNX, FCC Part NN, RoHS, REACH, GDPR, HACCP, GMP, MCS, G99, EU NNNN/YYYY,
+  // PED NNNN/NN/EU, MD NNNN/NN/EC, ErP NNNN/NNN/EC, IEEE NNN, ANSI NNNN.
+  // 2026-05-19 v5 audit fix #6: previously missed EU regulation codes, PED, MD,
+  // ErP, IEEE, ANSI — caused false-positive "missing" flags on standards that
+  // were explicitly cited in the brief (live chain output showed EU 517/2014
+  // and PED 2014/68/EU flagged as missing despite being declared verbatim).
+  const codeRegex = /\b(IEC|UL|ISO|BS\s*EN|EN|NFPA|FCC|UN|G\d{2,3}|MCS|RoHS|REACH|GDPR|HACCP|GMP|HIPAA|DO-?\d{3}\w?|ASIL|CE|EU|PED|MD|ErP|IEEE|ANSI|F[- ]gas)\s*[-]?\s*(\d{2,5}\w?(?:[-/]\d{1,4})?(?:\/[A-Z]{2})?)?/gi
   const matches = briefText.matchAll(codeRegex)
   for (const m of matches) {
     const code = (m[0] || '').trim().replace(/\s+/g, ' ').toUpperCase()
@@ -148,9 +154,16 @@ export function runComplianceGate(
   briefText: string,
 ): ComplianceGateResult {
   const cls = getClassStandards(productClass)
-  const jurisdictions = detectJurisdictions(parsedBrief, briefText)
+  let jurisdictions = detectJurisdictions(parsedBrief, briefText)
   const declared = detectDeclaredStandards(parsedBrief, briefText)
   const ts = new Date().toISOString()
+  // 2026-05-19 v5 audit fix #17 (GPT-5.5): if no jurisdiction detected, default
+  // to UK + EU + US so mandatory standards from those major markets still gate
+  // the brief. Previously an empty-jurisdiction brief would only check
+  // global/IEC/ISO/industry — undercounting regional mandatories.
+  if (jurisdictions.length === 0) {
+    jurisdictions = ['UK', 'EU', 'US']
+  }
 
   // If no class-standards data, fail open with a soft WARN.
   if (!cls || !Array.isArray(cls.standards) || cls.standards.length === 0) {

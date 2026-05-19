@@ -1100,9 +1100,16 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
   // state.physicsCritique with scores + issues; before v5 the renderer
   // dropped this on the floor. Fire when the critic flagged any high-
   // severity findings (medium/low surface in appendix only).
+  // 2026-05-19 v5.1 audit fix #10 (GPT-5.5): normalise severity to lowercase
+  // before comparing. Different critic models emit different cases ('HIGH',
+  // 'High', 'high'); strict === 'high' missed 'HIGH'/'High'/'critical'/'halt'.
   const pcr = state?.physicsCritique
   if (pcr && Array.isArray(pcr.issues)) {
-    const highIssues = pcr.issues.filter((i: any) => i.severity === 'high')
+    const sevHigh = (s: any): boolean => {
+      const t = String(s ?? '').toLowerCase().trim()
+      return t === 'high' || t === 'critical' || t === 'halt' || t === 'severe'
+    }
+    const highIssues = pcr.issues.filter((i: any) => sevHigh(i.severity))
     if (highIssues.length > 0) {
       const lines = highIssues.slice(0, 10).map((i: any) =>
         `[${i.severity}/${i.confidence}] ${i.dimension} @ ${i.where}: ${i.issue}${i.suggested_check ? `\n  Suggested check: ${i.suggested_check}` : ''}`)

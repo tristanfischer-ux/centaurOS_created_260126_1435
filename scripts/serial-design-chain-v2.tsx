@@ -2244,9 +2244,22 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   // not_accepted           — fallback: Phase 2 bailed AND no decisions exist
   //                          (would only happen if a gate fails that has no
   //                          template entry in STRUCTURAL_GATE_EXPLANATIONS)
-  const acceptanceStatus = allPassed
+  // 2026-05-19 v5.1 audit fix #5 (GPT-5.5): acceptanceStatus was computed
+  // only from Phase 2 gates + designDecisions. v5 added G1b/G4/G5/physics-
+  // critic gates that should influence the final verdict. Now:
+  // - allPassed AND no v5 gate flags AND no designDecisions → accepted_clean
+  // - any flags / decisions → accepted_with_decisions (still ships, but
+  //   surfaces flags to the founder via badges + appendix)
+  // - Phase 2 bailed AND no decisions → not_accepted (only edge case where
+  //   a gate fails with no template entry in STRUCTURAL_GATE_EXPLANATIONS)
+  const v5GateFlagged =
+    (complianceGate?.verdict === 'WARN' || complianceGate?.verdict === 'HALT') ||
+    g5ManualReview ||
+    !!(design as any)?.g4ManualReview ||
+    (critique?.issues?.some(i => i.severity === 'high') ?? false)
+  const acceptanceStatus = (allPassed && !v5GateFlagged && designDecisions.length === 0)
     ? 'accepted_clean'
-    : (designDecisions.length > 0 ? 'accepted_with_decisions' : 'not_accepted')
+    : (designDecisions.length > 0 || v5GateFlagged ? 'accepted_with_decisions' : 'not_accepted')
 
   // ── Save final state, build NL layer, render PDF
   const nl = buildNaturalLanguageLayer((design.modules ?? []) as any)
@@ -2277,6 +2290,12 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     },
     physicsCritique: critique,
     physicsLedger,
+    // 2026-05-19 v5.1 audit fix #1 (Grok + GPT-5.5): persist complianceGate
+    // in the INITIAL state object, not just the post-engines re-stamp block.
+    // Previously it would only land on disk if the re-stamp block succeeded;
+    // ANY error in that block (G2 computation, G3 computation, file write)
+    // dropped complianceGate on the floor. Initial-write makes it durable.
+    complianceGate: complianceGate ?? null,
     // 2026-05-19 fix M1 (audit-found): worker reads state.gatesPassed for the
     // pdf_engine_runs.state_snapshot_json column but chain never wrote it.
     // DB snapshot was always {gatesPassed: null}. Write the actual boolean.
