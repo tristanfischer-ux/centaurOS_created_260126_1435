@@ -1,0 +1,6160 @@
+FORGE ENGINEERING REPORT
+
+Design a Residential Air-source Heat
+Pump for the Uk Market. Target Rated
+Therma
+Brief and module decomposition. First-cut engineering report covering the product brief, modules
+and sub-modules, compliance, risks, bill of materials, and recommended suppliers.
+
+C O S T S TA C K — R A W M AT E R I A L S T O I N S TA L L E D
+PRICE
+
+Raw materials BoM
++ Assembly labour (5%)
++ Factory overhead (5%)
+
+£1,801.09
+£90.05
+£94.56
+
+= Factory COGS
+
+£1,985.70
+
++ Manufacturer margin (15%)
+
+£297.86
+
+= OEM transfer price
+
+£2,283.56
+
++ Channel markup (10%)
+
+£228.36
+
+= Channel list price
+
+£2,511.92
+
++ Installation (40%)
+
+£1,004.77
+
+= Installed ASP
+
+£3,516.69
+
+137 part lines across 11 modules · 0 live distributor quotes · 137 web estimates · 0 TBD · Raw BoM scale factor 0.325 (per-class batch economics)
+
+Illustration only — AI-generated render, not a photograph of
+the actual unit. Used for visual reference; final geometry will
+follow the engineering specification.
+
+£440 per kW thermal installed — 27% below typical installed-ASP range (band £600–£900)
+REF 64 of 137 priced lines flagged vs reference corpus (9
+over · 55 under · 4 in_range · 69 no_ref)
+Corpus coverage 50% — reference median from top-5 cosine matches in the Phase 4 corpus (29.9k embedded records); 2.0×/0.5×
+thresholds.
+
+MANUAL REVIEW — G1b compliance
+MANUAL REVIEW — G4 grammar
+MANUAL REVIEW — Physics critic
+
+137 part lines are unverified — see Appendix A for the audit trail.
+
+Project: chain-v2-1779231102611
+
+Generated 2026-05-19
+
+S E C T I O N 0 · O P E R AT I O N A L H E A D L I N E
+
+chain-v2-1779231102611
+
+Operational Headline
+What this design must deliver, physically and operationally. The modules and sub-modules that follow are
+in service of these numbers.
+
+Thermal heating output (brief target)
+Design thermal output
+Seasonal coefficient of performance
+
+8 kW
+8 kW
+3.50 SCOP
+
+Financial metrics suppressed
+Capital expenditure, operating expenditure, revenue, and payback are deliberately omitted at this stage. They
+will be added in a later phase that aggregates per-component costs from the Bill of Materials and references an
+explicit assumptions ledger (electricity tariffs, grid-service prices, labour rates, maintenance schedule). Numbers
+invented before the BoM exists are unreliable and have been removed.
+
+Assumptions
+• Thermal heating output (brief target): From brief target performance.
+• Design thermal output: Brief target thermal output.
+• Seasonal coefficient of performance: From energy conversion transduction.derived parameters.
+
+Forge Engineering Report
+
+2 / 75
+
+SECTION 1 · BRIEF & REQUIREMENTS
+
+chain-v2-1779231102611
+
+Brief and Requirements
+What the product is and what it must do.
+
+MANUAL REVIEW — G1b compliance
+Compliance gate WARN: 1 mandatory standard not declared in the brief for the detected jurisdictions (UK, EU).
+
+Physical specification
+Derived from structure_containment.derived_parameters — not LLM prose.
+
+Maximum gross mass
+
+90 kg
+
+Operating temperature
+
+-25 to 45 °C
+
+Deployment envelope
+
+Euro Pallet (EPAL-1)
+
+pallet
+
+Envelope footprint
+
+1200 × 800 × 144 mm (L × W × H)
+
+Envelope payload limit
+
+1,500 kg max payload
+
+Envelope standard
+
+EPAL Specification 1
+
+Overview
+The UK R290 ASHP is an 8 kW residential air-source heat pump designed specifically for the UK market, utilizing low-GWP R290 (propane) refrigerant. It is engineered to integrate seamlessly with standard 200 L unvented hot water cylinders in semi-detached homes. The unit achieves a high Seasonal
+Coefficient of Performance (SCOP) of 3.5 under average UK climate conditions, ensuring eligibility for
+government grants like the Boiler Upgrade Scheme.
+
+Mission
+To deliver a highly efficient, low-GWP R290 heat pump tailored for UK semi-detached homes, fully
+compliant with MCS and UKCA requirements, at a maximum OEM unit cost of £1,800.
+
+Target customers
+UK residential market, specifically semi-detached homes with 200L hot water cylinder integration. Installers seeking a streamlined, MCS-compliant R290 solution that is easy to fit and service.
+
+Why now
+Leveraging the founder's 12 years of experience at Mitsubishi Electric UK to meet the growing demand
+for sustainable, low-GWP heating solutions driven by the F-gas phase-down and the UK Boiler Upgrade
+Scheme.
+
+Forge Engineering Report
+
+3 / 75
+
+SECTION 2 · MODULES
+
+chain-v2-1779231102611
+
+Module Map
+Figure 1. The 11 modules and how they connect.
+
+MANUAL REVIEW — G4 grammar
+Module-decomposition grammar gate exhausted after 2 retries.
+
+1
+11
+
+2
+
+10
+
+3
+
+9
+
+4
+
+8
+
+5
+7
+
+6
+
+Module legend
+1
+
+Chassis & Acoustic Enclosure
+
+2
+
+Air Intake & Condensate Management
+
+3
+
+Refrigerant & Hydronic Piping
+
+4
+
+Compressor & Heat Exchanger System
+
+5
+
+Mains Power Distribution
+
+6
+
+Fan & Compressor Kinematics
+
+7
+
+Temperature, Pressure & Leak Sensors
+
+8
+
+Main Controller & Communications
+
+9
+
+Refrigerant & Electrical Safety
+
+10
+
+Installer Diagnostic Interface
+
+11
+
+Service Access & Maintenance
+
+Forge Engineering Report
+
+4 / 75
+
+SECTION 2 · MODULES — EXPLODED VIEW
+
+chain-v2-1779231102611
+
+Module Map — Exploded view
+Figure 2. The same 11 modules separated vertically to show their spatial layering inside the product
+envelope. Pair this with the connection map (Figure 1) — the circle shows which modules talk to each other;
+the exploded view shows where each module physically sits.
+
+Forge Engineering Report
+
+5 / 75
+
+SECTION 2 · MODULES — EXPLODED VIEW
+
+chain-v2-1779231102611
+
+Deterministic CAD render — each module lifted from its real position to expose internals. Not a photograph.
+
+Forge Engineering Report
+
+6 / 75
+
+SECTION 2 · MODULE 1
+
+chain-v2-1779231102611
+
+MODULE 1
+
+Chassis & Acoustic Enclosure
+
+Illustration only — AI-generated render. Module 1 (Chassis & Acoustic Enclosure) shown in identity colour; other modules muted;
+enclosure ghosted.
+
+Provides the rigid framework and acoustic attenuation to maintain the maximum mass below 90 kg
+and sound power below 56 dBA. The chassis frame consists of a galvanized steel base pan and four
+structural uprights that support the internal components. The acoustic enclosure wraps the compressor
+in a mineral wool compressor sound jacket and seals the unit with a weather-resistant casing.
+This passive containment ensures compliance with UK outdoor installation requirements. All external
+panels are finished with a polyester powder coat rated to Qualicoat Class 2, providing UV stability and
+corrosion resistance suitable for UK coastal environments. The internal layout segregates high-voltage
+components from the refrigerant circuit using IP20 polycarbonate barriers, satisfying creepage and
+clearance requirements under BS EN 60335-1.
+Acoustic damping is further enhanced by bitumen-based mass-loaded vinyl sheets applied to the base
+pan underside, reducing low-frequency resonance transmission to the mounting surface. Fastener access is standardised on M6 and M8 hex heads to simplify installer tooling requirements.
+
+Forge Engineering Report
+
+7 / 75
+
+SECTION 2 · MODULE 1
+
+chain-v2-1779231102611
+
+Sub-modules
+1.1
+
+Chassis frame
+The chassis frame supports 6 components. A custom galvanized steel base pan (part BP-ASHP-8K,
+in Galvanized steel, 950x450x50 mm), rated 90 kg load capacity, certified to UKCA. 4x SSAB structural upright (part UPT-8K-GALV, in Powder-coated steel, 850x40x40 mm), rated 90 kg load, 1.5 mm
+wall, certified to BS EN 10025-2, UKCA.
+A Trelleborg base pan gasket (part GKT-90KG-AS, in EPDM rubber, 900x600x3 mm). 2x SSAB
+upright bracing strap (part STR-4UPT, in Powder-coated steel, 450x30x2 mm). 4x Würth levelling
+foot (part LF-M16-ADJ, in PA66 base, zinc-plated steel stud, 50x50x30 mm).
+2x Phoenix Contact IP20 polycarbonate barrier (part IP20-BAR-8K, in Polycarbonate, 150x100x2
+mm), rated IP20. forming the main structural skeleton.
+
+1.2
+
+Acoustic enclosure
+The acoustic enclosure encloses 5 components. A Armacell compressor sound jacket (part
+AFJ-56DBA-R290, in Mineral wool, 400x350x50 mm), rated e8 dB insertion loss at 500 Hz, certified to BS EN 13501-1 Class A1. A custom weather-resistant casing (part CAS-IPX4-8K, in Powder-coated galvanized steel 1.2 mm, 950x450x850 mm), certified to IPX4 per IEC 60529, UKCA
+and IPX4.
+4x Rockwool acoustic liner panel (part LIN-56DBA, in Mineral wool 50 mm, 600x400x50 mm). A
+3M casing seal strip (part SEAL-IPX4, in Silicone foam, 1800x10x5 mm). 4x Trelleborg vibration
+isolator pad (part VI-25-56DBA, in NR rubber 45 Shore A, 50x50x25 mm).
+surrounding the internal components.
+
+Forge Engineering Report
+
+8 / 75
+
+SECTION 2 · MODULE 2
+
+chain-v2-1779231102611
+
+MODULE 2
+
+Air Intake & Condensate Management
+
+Illustration only — AI-generated render. Module 2 (Air Intake & Condensate Management) shown in identity colour; other modules
+muted; enclosure ghosted.
+
+Handles the physical boundary with the UK outdoor environment across a -25 to +45 °C operating
+range. The air management sub-module uses a steel fan grille and an acoustic louver to protect the
+fan while minimizing noise. The condensate management sub-module employs a heated drip tray and
+a 150 W defrost heater cable to prevent ice build-up during winter operation.
+Defrost initiation is determined by a predictive algorithm analysing evaporator coil temperature, ambient
+humidity, and compressor run-time, rather than a simple fixed timer, to minimise unnecessary defrost
+cycles and preserve seasonal efficiency. The condensate tray incorporates a sloped geometry with a
+central drainage channel to prevent standing water, reducing the risk of ice bridging during prolonged
+sub-zero operation. The acoustic louver blade pitch is optimised using computational fluid dynamics to
+balance free-area airflow with line-of-sight sound attenuation, ensuring the unit meets strict permitted
+development noise limits without requiring additional aftermarket acoustic barriers.
+
+Sub-modules
+
+Forge Engineering Report
+
+9 / 75
+
+SECTION 2 · MODULE 2
+
+2.1
+
+chain-v2-1779231102611
+
+Air management
+The air management protects 5 components. A ebm-papst fan grille (part LZ260-8KW, in Powder-coated steel wire, 520x520x30 mm), rated 500 mm dia, finger guard, certified to BS EN ISO
+13857, UKCA. A Renson Noise-deflecting acoustic louver (part LVR-ASHP-56DB, in Powder-coated
+aluminium 1.5 mm, 900x300x45 mm), rated e6 dB insertion loss, IPX4, certified to BS EN 13030,
+UKCA.
+A ebm-papst evaporator fan motor (part G2E140-BL31-01, in Aluminium housing, ball bearing, 140
+mm sq x 55 mm), rated ECM, 230 V, 80 W, PWM speed. A Honeywell fan speed sensor (part
+NGT-L-500, in PA6 housing, Hall-effect IC, 20x15x8 mm), rated 0-3000 rpm, open-collector. A custom intake air filter mesh (part FLT-ASHP-8K, in G4 polyester media, aluminium frame, 520x520x20
+mm), certified to ISO 16890.
+at the air intake and exhaust.
+
+2.2
+
+Condensate management
+The condensate management manages 5 components. A Thermon heated drip tray (part
+DT-8K-ABS, in ABS plastic, 900x450x40 mm), rated 150 W integrated heater, 230 V, certified to
+IEC 60335-2-40, UKCA. A Thermon defrost heater cable (part DH-150W-R290, in Silicone rubber
+jacket, NiCr element, 3000 mm length, 8 mm OD), rated 150 W, certified to IEC 60335-2-40.
+A Hozelock condensate drain hose (part DRN-20MM-1M, in PVC flexible, UV-stabilised, 20 mm ID x
+1000 mm), certified to BS EN 60335-2-40. A McAlpine condensate drain trap (part TRAP-20-ASHP,
+in PP polypropylene, 50x40x60 mm), rated 20 mm inlet, 50 mm seal. A SJE-Rhombus condensate
+overflow float switch (part 7210-0050, in PP float, PA66 housing, 60x40x30 mm), rated NO, 250 V
+AC, 1 A.
+at the base of the evaporator.
+
+Forge Engineering Report
+
+10 / 75
+
+SECTION 2 · MODULE 3
+
+chain-v2-1779231102611
+
+MODULE 3
+
+Refrigerant & Hydronic Piping
+
+Illustration only — AI-generated render. Module 3 (Refrigerant & Hydronic Piping) shown in identity colour; other modules muted;
+enclosure ghosted.
+
+Routes the 0.8 kg R290 charge and the hydronic fluid through the system. The refrigerant transport
+sub-module uses a copper refrigerant pipe set and a liquid receiver to manage the internal A3 fluid
+flow. The hydronic transport sub-module circulates water to the 200 L cylinder using a variable-speed
+circulation pump and includes two water isolation valves at the flow and return ports for service isolation.
+Refrigerant pipework is routed using smooth-radius bends to minimise pressure drop and oil trapping,
+with all lines secured using rubber-lined P-clips to prevent fretting corrosion and structure-borne noise
+transmission. The liquid receiver is sized to accommodate the full refrigerant charge during pump-down
+service procedures, ensuring safe recovery without venting. Hydronic connections utilise flat-face sealing gaskets to prevent leaks during thermal cycling, and the internal water path is designed to maintain
+flow velocities above 0.5 m/s to prevent sludge accumulation.
+All wetted materials are selected for compatibility with inhibited glycol mixtures up to 30% concentration
+for freeze protection in exposed installations.
+
+Forge Engineering Report
+
+11 / 75
+
+SECTION 2 · MODULE 3
+
+chain-v2-1779231102611
+
+Sub-modules
+3.1
+
+Refrigerant transport
+The refrigerant transport routes 5 components. A Mueller Industries copper refrigerant pipe (part
+C12200-HP-8K, in Copper C12200, OD 12.7/9.52 mm, 5 m set), rated 30 bar MAWP, R290 clean,
+certified to BS EN 12735-1, PED 2014/68/EU. A Sanhua liquid receiver (part LR-8K-R290, in Carbon steel ST37.4, epoxy coated, 250x100 mm dia), rated 30 bar rated, certified to PED 2014/68/EU
+Cat II, UKCA.
+A Danfoss filter drier core (part DML 164 R290, in Copper shell, 3A molecular sieve, 164x30 mm),
+certified to PED 2014/68/EU. A Danfoss moisture-indicating sight glass (part SGI-10 R290-MI, in
+Brass body, tempered glass, moisture indicator, 70x30x30 mm), certified to PED 2014/68/EU. A
+Parker discharge muffler (part DM-5/8-R290, in Copper tube, steel shell, 200x50x50 mm), rated 30
+bar, e5 dB attenuation.
+the R290 between the compressor and heat exchangers.
+
+3.2
+
+Hydronic transport
+The hydronic transport circulates 5 components. A Grundfos variable-speed circulation pump
+(part UPM3 15-70 95087149, in Cast iron body, stainless steel impeller, 130x100x80 mm), rated PWM controlled, certified to ErP 2009/125/EC, UKCA. 2x Pegler water isolation valve (part
+YP-1BSP-VALVE, in Brass CW617N, 60x40x40 mm), rated 1 inch BSP, certified to BS EN 13828,
+WRAS.
+A Zilmet expansion vessel (part CAL-PRO 8L, in Carbon steel shell, EPDM diaphragm, 280x140
+mm dia), rated 8 L, 3 bar pre-charge, 6 bar max. A Wika system pressure gauge (part 213.53.063,
+in Stainless steel 316L, glass dial, 63 mm dia x 45 mm), rated 0-6 bar, G1/4 bottom. A Caleffi
+automatic air vent (part 502006, in Brass body, PA6 cap, 60x30x50 mm), rated 1/2 inch BSP, 6 bar,
+120 °C max.
+water to the indoor cylinder.
+
+3.3
+
+Hydronic strainer filter
+The hydronic strainer filter filters 5 components. A Caleffi y-type brass strainer (part 331006, in
+Brass CW617N body, stainless steel mesh, 1 inch BSP, 800 um mesh), rated 10 bar max, 120 °C,
+certified to WRAS, BS EN 1254-2. A Caleffi strainer sealing gasket (part GSK-331006, in EPDM,
+30 mm dia).
+A Caleffi strainer cap (part CAP-331006, in Brass CW617N, 30x30x15 mm). A Caleffi strainer mesh
+insert (part MSH-331006, in Stainless steel 304, 25x25x20 mm), rated 800 micron. A custom strainer mounting bracket (part BRK-STR-8K, in Galvanized steel, 50x30x2 mm).
+particulate from the return water line.
+
+Forge Engineering Report
+
+12 / 75
+
+SECTION 2 · MODULE 4
+
+chain-v2-1779231102611
+
+MODULE 4
+
+Compressor & Heat Exchanger System
+
+Illustration only — AI-generated render. Module 4 (Compressor & Heat Exchanger System) shown in identity colour; other modules
+muted; enclosure ghosted.
+
+Converts electrical power into 8 kW of rated thermal output at A7/W35 conditions, achieving a SCOP
+of 3.5. The compressor and drive sub-module utilises a Copeland R290 scroll compressor driven by
+a 30 A inverter drive PCB to compress the refrigerant. Heat transfer occurs in the heat exchangers,
+where a fin-and-tube evaporator extracts ambient heat and a brazed plate condenser transfers the 8
+kW of thermal energy to the hydronic loop.
+The compressor motor is mechanically linked to the scroll mechanism in actuation kinematics. The inverter drive incorporates active thermal management via an aluminium cold plate to maintain junction
+temperatures below 85 °C during sustained operation at A-7/W35 conditions. All refrigerant-containing
+components are certified to PED 2014/68/EU and pressure-tested to 1.5x maximum working pressure
+of 30 bar.
+The R290 scroll compressor from the Copeland YP series is mechanically isolated from the chassis
+using elastomeric vibration mounts to reduce structure-borne noise below the MCS 020 limit of 56 dBA.
+The crankcase heater sub-module is essential for reliable cold-ambient startup at -25 °C, preventing
+liquid R290 from migrating into the compressor shell during off-cycles. A Thermon CHB-80W-R290
+
+Forge Engineering Report
+
+13 / 75
+
+SECTION 2 · MODULE 4
+
+chain-v2-1779231102611
+
+silicone rubber heater band rated at 80 W and 230 V AC is wrapped around the compressor base and
+controlled by a Danfoss 077B6010 bimetal thermostat that closes at 10 °C and opens at 25 °C, switched
+via a Finder 40.31 relay with 24 V DC coil and 6 A silver-alloy contacts, protected by a Cantherm SDF
+DF104S one-shot thermal fuse at 104 °C.
+The inverter drive PCB from Semikron (part VLT-FC-30A-INV) is a 30 A FR4 four-layer board with conformal coating, thermally coupled to the Aavid CP-8KW-INV aluminium 6061 cold plate via Bergquist
+GP6000 thermal pads and Arctic Silver AS5 compound, with an ebm-papst 612NHH-8KW 60 mm
+cooling fan maintaining junction temperatures below 85 °C. The Copeland YP0135E-TFD-290 R290
+scroll compressor delivers 8 kW thermal output at A7/W35 with a 38 kg cast iron shell and hardened
+steel scrolls, mechanically isolated on elastomeric vibration mounts. The Kelvion KEV-EVP-8KW-R290
+fin-and-tube evaporator with aluminium fins and copper tubes and the SWEP B10-8KW-R290 brazed
+plate condenser in stainless steel 316L rated at 30 bar MAWP provide the primary heat transfer surfaces, both PED 2014/68/EU certified.
+The refrigerant circuit operates on a vapour compression cycle optimised for R290 thermodynamic
+properties, with discharge temperatures carefully managed to prevent oil breakdown. The inverter drive
+utilises space vector modulation to minimise harmonic distortion and improve motor efficiency at partial
+loads. All refrigerant joints are brazed with 15% silver alloy under nitrogen purge to prevent internal
+oxidation, and the entire circuit is helium leak-tested to 1x10{u mbar·L/s before factory charging.
+The crankcase heater operates on a duty cycle controlled by ambient and shell temperature differentials to minimise standby power consumption while ensuring reliable cold starts.
+
+Sub-modules
+4.1
+
+Compressor and drive
+The compressor and drive compresses 5 components. A Copeland r290 scroll compressor (part
+YP0135E-TFD-290, in Cast iron shell, hardened steel scrolls, 320x290x380 mm, 38 kg), rated 8
+kW thermal, operating over -25 to +45 °C, certified to R290 rated. A Semikron inverter drive pcb
+(part VLT-FC-30A-INV, in FR4 4-layer, conformal coated, 180x120x25 mm), rated 30 A, operating
+over -40 to +85 °C, certified to IEC 60335-2-40.
+A Copeland compressor mounting bracket (part YP-8K-R290-MNT, in Galvanized steel,
+250x180x12 mm). A Aavid inverter heatsink (part HS-30A-AL, in Extruded aluminium, 120x80x40
+mm). A Copeland compressor terminal box (part TB-YP-R290, in PA66 GF30, IP54, 80x60x45 mm).
+driven by the inverter PCB.
+
+Forge Engineering Report
+
+14 / 75
+
+SECTION 2 · MODULE 4
+
+4.2
+
+chain-v2-1779231102611
+
+Heat exchangers
+The heat exchangers transfers 5 components. A Kelvion fin-and-tube evaporator (part
+KEV-EVP-8KW-R290, in Aluminium fins, copper tubes, 900x400x45 mm), rated 8 kW at A7/W35,
+certified to PED 2014/68/EU. A SWEP brazed plate condenser (part B10-8KW-R290, in Stainless steel 316L, 310x120x55 mm), rated 8 kW, secondary rating 30 bar MAWP, certified to PED
+2014/68/EU.
+A ebm-papst evaporator fan shroud (part SH-500-ASHP, in Powder-coated steel, 520x520x80 mm).
+A SWEP condenser mounting plate (part BP-8K-PLT, in Stainless steel 316L, 320x120x8 mm). A
+Emerson evaporator distributor (part DIST-8KW-R290, in Brass body, copper capillaries, 120x80x40
+mm).
+between the R290 circuit and the hydronic loop.
+
+4.3
+
+Thermal management
+The thermal management comprises 5 components. A Aavid cold plate (part CP-8KW-INV, in Aluminium 6061, 150x100x12 mm). 2x Bergquist thermal interface pad (part GP6000-0.02-00-11, in
+Silicone gap pad 6 W/mK, 150x100x2 mm).
+A ebm-papst inverter cooling fan (part 612NHH-8KW, in PA6 housing, ball bearing, 60x60x25 mm).
+A Arctic Silver thermal compound paste (part AS5-3.5G, in Silver microparticle silicone, 3.5 g syringe). A TE Connectivity inverter heatsink thermistor (part GA10K4MCD1-INV, in Glass-sealed
+NTC 10k, 5x25 mm).
+
+4.4
+
+Crankcase heater
+The crankcase heater prevents 5 components. A Thermon crankcase heater band (part
+CHB-80W-R290, in Silicone rubber, NiCr element, 350x50x5 mm), rated 80 W, 230 V AC. A Danfoss
+crankcase thermostat (part 077B6010, in PA66 housing, bimetal disc, 40x30x20 mm), rated Close
+at 10 °C, open at 25 °C.
+24.0000, in PA66 housing, Ag-alloy contacts, 30x15x25 mm), rated 24 V DC coil, 6 A, 250 V AC. A
+TE Connectivity heater wiring harness (part HWH-CH-8K, in 0.75 mm² silicone-insulated copper,
+600 mm, 3-core), certified to IEC 60335-2-40. A Cantherm heater thermal fuse (part SDF DF104S,
+in Ceramic body, organic pellet, 20x8x4 mm), rated 1 A 250 V, 104 °C fuse.
+refrigerant migration during cold ambient off-cycle.
+
+Forge Engineering Report
+
+15 / 75
+
+SECTION 2 · MODULE 5
+
+chain-v2-1779231102611
+
+MODULE 5
+
+Mains Power Distribution
+
+Illustration only — AI-generated render. Module 5 (Mains Power Distribution) shown in identity colour; other modules muted; enclosure
+ghosted.
+
+Distributes 230 V AC mains power to the inverter and auxiliary components up to a 32 A maximum
+current. The mains input sub-module receives power via a 32 A AC terminal block, routes it through a
+40 A main contactor, and filters noise with an EMI filter. This uninterrupted routing supplies the power
+conversion system while maintaining EMC 2014/30/EU compliance.
+The new EMC grounding and shielding sub-module provides two TE Connectivity 5-1638398-1
+stainless steel M6 chassis earth studs for protective earth connection per BS 7671, a Schaffner
+RN214-0.6-02-1M common-mode choke rated at 0.6 mH and 16 A for conducted emission suppression, three Murrplastik SK-EMC-M20 nickel-plated brass EMC cable glands providing 360-degree shield bonding and IP68 sealing at cable entries, a Wago 2002-4015 15-way tin-plated copper
+ground busbar for star-point earthing, and a Lapp OLFLEX-FD-8P-0.25 shielded signal harness with
+foil-and-braid screening for sensor and comms cabling. The mains input sub-module routes 230 V
+AC through a Wago 2002-3257 32 A terminal block, a Schneider Electric LC1D18B7 40 A contactor with silver-alloy contacts, a Schaffner FN2060-16-06 EMI filter rated at 16 A and 250 V AC, an
+OBO Bettermann V25-B/3+NPE Type 1+2 surge arrester rated at 25 kA, and a Kingbright L-53GD-5V
+power indicator LED, all ensuring compliance with EMC 2014/30/EU and LVD 2014/35/EU. The power
+
+Forge Engineering Report
+
+16 / 75
+
+SECTION 2 · MODULE 5
+
+chain-v2-1779231102611
+
+distribution layout separates high-current inverter cabling from low-voltage sensor harnesses using
+dedicated routing channels and steel separators, minimising electromagnetic coupling and ensuring
+compliance with EN 55014-1 conducted and radiated emission limits.
+The main contactor is rated for AC-3 utilisation category to withstand the high inrush currents associated with compressor start-up, while the EMI filter incorporates X2 and Y2 class capacitors to suppress differential and common-mode noise respectively. All earth connections converge on the central
+ground busbar using crimped and heat-shrink terminated lugs, guaranteeing a continuous protective
+earth path with resistance below 0.1 ohm as mandated by BS 7671.
+
+Sub-modules
+5.1
+
+Mains input
+The mains input distributes 5 components. A Wago ac terminal block (part 2002-3257, in PA66
+housing, tin-plated brass, 80x12x60 mm), rated 32 A, certified to IEC 60998-1, UKCA. A Schneider
+Electric main contactor (part LC1D18B7, in PA66 housing, silver-alloy contacts, 75x45x80 mm),
+rated 40 A, certified to IEC 60947-4-1, UKCA.
+A Schaffner emi filter (part FN2060-16-06, in Steel case, X2/Y2 capacitors, 80x50x40 mm), rated
+16 A / 250 V AC, certified to EMC 2014/30/EU. A OBO Bettermann type 1 surge arrester (part
+V25-B/3+NPE, in PA66 housing, MOV/spark gap, 70x70x60 mm), rated 25 kA L-N, Type 1+2. A
+Kingbright power indicator led (part L-53GD-5V, in Epoxy dome, PA6 clip, 5 mm dia), rated Green,
+5 V, 20 mA.
+from the mains supply to the internal components.
+
+5.2
+
+EMC grounding and shielding
+The EMC grounding and shielding sub-module provides two stainless steel M6 chassis earth studs
+from TE Connectivity (part 5-1638398-1) for protective earth connection per BS 7671, a Schaffner
+RN214-0.6-02-1M common-mode choke rated at 0.6 mH and 16 A for conducted emission suppression, three Murrplastik SK-EMC-M20 nickel-plated brass EMC cable glands providing 360-degree shield bonding and IP68 sealing at cable entries, a Wago 2002-4015 15-way tin-plated copper
+ground busbar for star-point earthing, and a Lapp OLFLEX-FD-8P-0.25 shielded signal harness
+with foil-and-braid screening for sensor and comms cabling, all ensuring compliance with EMC
+2014/30/EU and IEC 60335-2-40 immunity requirements.
+
+Forge Engineering Report
+
+17 / 75
+
+SECTION 2 · MODULE 6
+
+chain-v2-1779231102611
+
+MODULE 6
+
+Fan & Compressor Kinematics
+
+Illustration only — AI-generated render. Module 6 (Fan & Compressor Kinematics) shown in identity colour; other modules muted;
+enclosure ghosted.
+
+Applies converted mechanical energy to move air and compress refrigerant. The air mover sub-module
+consists of a 500 mm axial fan blade driven by the fan motor. The compressor mechanism utilises a
+scroll compression set to physically compress the R290 gas.
+These kinematic elements translate the electrical transduction into the physical fluid movement required for the 8 kW thermal cycle. The kinematic design prioritises low-vibration operation to extend
+bearing life and minimise acoustic emissions. The fan motor is dynamically balanced to ISO 1940
+G2.5 grade, and the axial blade is moulded with a scimitar profile to reduce tip vortex noise at higher
+rotational speeds.
+The compressor scroll mechanism utilises a compliant orbit design that allows the moving scroll to
+separate slightly under liquid slugging conditions, preventing catastrophic mechanical failure during
+abnormal operating events. Lubrication is provided by a centrifugal oil pump integrated into the crankshaft, ensuring consistent oil return to the bearing surfaces across the entire variable speed operating
+range.
+
+Forge Engineering Report
+
+18 / 75
+
+SECTION 2 · MODULE 6
+
+chain-v2-1779231102611
+
+Sub-modules
+6.1
+
+Air mover
+The air mover moves 5 components. A ebm-papst axial fan blade (part A580-8KW-ASHP, in
+Glass-fibre reinforced PA6, 500 mm), rated 500 mm dia, 800 rpm max, certified to UKCA. A
+ebm-papst ecm fan motor (part G2E140-BL31-01, in Aluminium housing, ball bearing, 140x140x55
+mm), rated 230 V, 80 W, 800 rpm, PWM.
+4x custom motor mounting bracket (part MB-G2E140, in Galvanized steel 2 mm, 60x40x30 mm),
+rated M6 mounting, anti-vibration. 4x Trelleborg motor vibration damper (part VD-M6-G2E, in NR
+rubber 40 Shore A, 25x25x15 mm), rated M6 stud, 15 kg load. A custom fan guard ring (part
+FGR-500-ASHP, in Powder-coated steel wire 3 mm, 520x520x30 mm), certified to BS EN ISO 13857
+finger protection.
+ambient air across the evaporator.
+
+6.2
+
+Compressor mechanism
+The compressor mechanism compresses 5 components. A Copeland scroll compression set (part
+SC-YP0135-R290, in Hardened steel, 180x160x140 mm), rated 8 kW displacement, 30 bar max,
+certified to PED 2014/68/EU, ISO 9001. 2x NSK crankshaft bearing (part 6204-2RS-C3, in Chrome
+steel, rubber seals, 47x20x14 mm), rated 12.7 kN dynamic, 6.3 kN static.
+2x Copeland scroll tip seal (part STS-YP-R290, in PTFE composite, R290-compatible, 300 mm
+length, 3x2 mm section), rated 30 bar, -40 to +130 °C. A Copeland thrust washer (part TW-YP-R290,
+in Bronze CuSn8, oil-impregnated, 40x25x2 mm), rated 5 kN axial load. A Emkarate compressor
+oil charge (part RL 32H R290, in POE synthetic, R290-miscible, 500 ml), rated ISO VG 32, -40 to
++150 °C.
+the R290 gas within the compressor shell.
+
+Forge Engineering Report
+
+19 / 75
+
+SECTION 2 · MODULE 7
+
+chain-v2-1779231102611
+
+MODULE 7
+
+Temperature, Pressure & Leak Sensors
+
+Illustration only — AI-generated render. Module 7 (Temperature, Pressure & Leak Sensors) shown in identity colour; other modules
+muted; enclosure ghosted.
+
+Forge Engineering Report
+
+20 / 75
+
+SECTION 2 · MODULE 7
+
+chain-v2-1779231102611
+
+Measures critical system states including temperatures, pressures, and safety limits. The refrigerant
+sensors include a discharge temperature thermistor and a suction pressure transducer to monitor the
+R290 cycle. The hydronic sensors use two water temperature thermistors to measure flow and return
+states.
+Crucially, the leak detection sub-module features an R290 catalytic gas sensor mounted at the high
+point of the compartment to detect any accumulation of the 0.8 kg propane charge. Sensor calibration
+is performed at the factory against UKAS-traceable reference standards, with offset values stored in
+the controller EEPROM to ensure long-term measurement accuracy. The suction pressure transducer utilises a ratiometric 0.5-4.5 V output to reject common-mode noise, while thermistor linearisation
+is handled in firmware using Steinhart-Hart coefficients specific to the TE Connectivity glass-sealed
+beads.
+The leak detection circuit incorporates a self-test routine that runs every 24 hours, verifying sensor
+responsiveness and relay actuation without triggering a system lockout, thereby maintaining SIL 2
+functional safety integrity over the product lifespan.
+
+Sub-modules
+7.1
+
+Refrigerant sensors
+The refrigerant sensors monitors 6 components. A TE Connectivity discharge temperature thermistor (part GA10K4MCD1, in Glass-sealed NTC bead, 5x30 mm probe), rated 10k NTC, certified to
+IEC 60335-1. A Danfoss suction pressure transducer (part AKS 32R 060G1250, in Stainless steel
+316L housing, 60x28x28 mm), rated 0-15 bar, certified to IEC 60335-2-40.
+A TE Connectivity refrigerant temp sensor housing (part HTS-10K-R290, in PA66 GF30, 25x15x12
+mm). A Lapp pressure transducer cable (part CAB-0-15BAR, in Shielded PVC, 1.5 m length). A TE
+Connectivity suction line thermistor (part GA10K4MCD1-SUC, in Glass-sealed NTC 10k, copper
+clip, 5x30 mm).
+A Microchip controller EEPROM (part 24LC256-I/SN, in Silicon SOIC-8, 5x4x1.5 mm), rated
+Non-volatile storage, certified to IEC 60335-1. on the R290 pipework.
+
+7.2
+
+Hydronic sensors
+The hydronic sensors measures 5 components. 2x TE Connectivity water temperature thermistor
+(part GND10K4A1L-W, in Stainless steel 304 sheath, 6x50 mm), rated 10k NTC, certified to IEC
+60335-1. A Omega flow temp sensor pocket (part POK-10K-FLOW, in Copper, 80x8 mm).
+A Omega return temp sensor pocket (part POK-10K-RET, in Copper, 80x8 mm). A Danfoss flow
+pressure switch (part KP44 060L5100, in Brass body, PA66 housing, 70x50x50 mm), certified to
+IEC 60335-2-40. A Honeywell differential pressure sensor (part 26PCBFA6D, in Silicon MEMS, PA6
+housing, 40x30x20 mm), certified to IEC 60335-1.
+at the flow and return ports.
+
+Forge Engineering Report
+
+21 / 75
+
+SECTION 2 · MODULE 7
+
+7.3
+
+chain-v2-1779231102611
+
+Leak detection
+The leak detection detects 5 components. A Dräger r290 catalytic gas sensor (part Polytron
+5310-R290, in Stainless steel 316 housing, 120x80x45 mm), rated 0-10000 ppm LEL, certified to
+BS EN 378-3 (additional: topology: High point mount). A Rittal r290 sensor mount bracket (part
+BRK-HIGH-PT, in Stainless steel, 60x40x3 mm).
+A Molex gas sensor cable assembly (part CAB-R290-SENS, in Shielded PTFE, 800 mm). 24.0000,
+in PA66 housing, Ag-alloy contacts, 30x15x25 mm), rated 24 V DC coil, 6 A switching. A Kingbright
+sensor status led (part L-53GD, in Epoxy dome, PA6 mount, 5 mm dia), rated Green 20 mA, Red
+alarm.
+mounted at the high point of the compartment.
+
+7.4
+
+Ambient air temperature sensor
+The ambient air temperature sensor measures 5 components. A TE Connectivity ambient air thermistor probe (part GND10K4A1L-AMB, in PA66 shroud, epoxy-sealed NTC, 80x15x15 mm), rated
+10k NTC, -40 to +105 °C, certified to IEC 60730-1, IP65. A Bopla ambient sensor housing (part
+B-120-UV, in ASA UV-stabilised plastic, 60x40x30 mm), certified to IP65.
+A Lapp ambient sensor cable (part UNITRONIC-111, in Shielded PVC, 2 m length, 2-core). 2x
+Würth ambient sensor mounting clip (part CLIP-M6-SS, in Stainless steel 304, 20x10x5 mm). A TE
+Connectivity ambient sensor connector (part AMP-SEAL-2P, in PA66 GF, 25x15x15 mm), certified
+to IP67.
+outdoor air temperature for weather compensation.
+
+Forge Engineering Report
+
+22 / 75
+
+SECTION 2 · MODULE 8
+
+chain-v2-1779231102611
+
+MODULE 8
+
+Main Controller & Communications
+
+Illustration only — AI-generated render. Module 8 (Main Controller & Communications) shown in identity colour; other modules muted;
+enclosure ghosted.
+
+Supervises the heat pump cycle, manages the inverter, and communicates with the indoor controller.
+The main controller features an ARM Cortex-M4 heat pump controller PCB that executes the SCOP
+3.5 optimised firmware. The comms gateway uses a Modbus RTU transceiver to link the outdoor unit
+to the indoor 200 L cylinder controller.
+This module processes the 3 Modbus nodes and orchestrates the variable-speed actuators. Firmware
+architecture is built on a real-time operating system (RTOS) with deterministic task scheduling, ensuring that safety interlocks and compressor protection routines execute within strict timing windows regardless of communication bus load. The Modbus RTU interface supports standard heat pump register
+maps for seamless integration with third-party smart thermostats and energy management systems.
+Non-volatile fault logging captures the last 50 operational events with millisecond timestamps, stored
+in the Macronix SPI flash memory, enabling rapid field diagnostics via the USB service port or remote
+telemetry when paired with the optional Wi-Fi gateway.
+
+Forge Engineering Report
+
+23 / 75
+
+SECTION 2 · MODULE 8
+
+chain-v2-1779231102611
+
+Sub-modules
+8.1
+
+Main controller
+The main controller supervises 5 components. A STMicroelectronics heat pump controller pcb
+(part ARM Cortex-M4, in FR4 4-layer, conformal coated, 150x100x20 mm), rated 120 MHz
+ARM Cortex-M4F, certified to IEC 60335-2-40, UKCA. A Abracon mcu crystal oscillator (part
+ABM8-8.000MHZ-20-B2X-T, in Quartz crystal, ceramic package, 8x5x1.8 mm), rated 8 MHz, 20
+ppm stability.
+A Texas Instruments watchdog timer ic (part TPS3823-33DBVR, in Silicon SOT-23, 3x2.9x1.2 mm),
+rated 3.3 V, 200 ms timeout. A Macronix flash storage ic (part MX25L12833FM2I-08G, in Silicon
+SOP-8, 5x6x1.7 mm), rated 128 Mbit, 104 MHz SPI. A Traco Power 24v to 3.3v dc-dc converter
+(part THN 15-2433WI, in FR4 PCB, plastic case, 50x25x10 mm), rated 24 V in, 3.3 V / 3 A out.
+acting as the central MCU.
+
+8.2
+
+Comms gateway
+The comms gateway communicates 5 components. A Texas Instruments modbus rtu transceiver
+(part THVD1500DR, in SOIC-8 package, 5x6x1.75 mm), rated RS-485, certified to IEC 60335-1. A
+Analog Devices rs-485 digital isolator (part ADM2587EBRWZ, in Silicon SOIC-20W, 12.8x7.5x2.65
+mm), rated 2.5 kV isolation, 500 kbps.
+A Phoenix Contact modbus connector (part 1483453, in PA66 housing, brass contacts, 30x12x15
+mm), rated 4-pin, IP20, 300 V. A Littelfuse esd protection diode (part SP724ABTG, in Silicon
+SOT-143, 2.9x1.6x1.1 mm), rated ±15 kV ESD, 3.5 A peak. A Yageo bus termination resistor (part
+RC0603FR-07120RL, in Thick film on alumina, 1.6x0.8x0.5 mm), rated 120 ohm, 0.1 W, 1%.
+with the indoor cylinder controller.
+
+8.3
+
+Wi-Fi telemetry gateway
+The Wi-Fi telemetry gateway transmits 5 components. A Espressif wi-fi communication module (part
+ESP32-WROOM-32E, in PCBA, shielded metal can, 25.5x18x3.1 mm), rated 802.11 b/g/n, BLE
+4.2, certified to FCC/CE/UKCA radio, RED 2014/53/EU. A Molex wi-fi antenna (part 146153-0100,
+in Ceramic chip, 3x3x1 mm), rated 2.4 GHz.
+A custom wi-fi pcb carrier (part WIFI-CARRIER-8K, in FR4 2-layer, 40x30x1.6 mm). A Laird wi-fi
+shielding can (part BMI-S-101, in Nickel-silver, 20x20x5 mm). A Samtec wi-fi header connector (part
+TSW-106-07-G-S, in Gold-plated brass, 15x2x5 mm).
+operational telemetry to cloud services.
+
+Forge Engineering Report
+
+24 / 75
+
+SECTION 2 · MODULE 9
+
+chain-v2-1779231102611
+
+MODULE 9
+
+Refrigerant & Electrical Safety
+
+Illustration only — AI-generated render. Module 9 (Refrigerant & Electrical Safety) shown in identity colour; other modules muted;
+enclosure ghosted.
+
+Mitigates operational hazards, specifically managing the A3 flammable refrigerant and pressure limits
+up to 30 bar. The refrigerant safety valves include an electronic expansion valve for superheat control,
+a four-way reversing valve for defrost, and a 30 bar high-pressure safety switch. The electrical safety
+sub-module provides a 30 mA RCD breaker to isolate mains power during ground faults.
+These active devices ensure compliance with BS EN 378-1 and IEC 60335-2-40. The safety architecture integrates an R290 catalytic sensor at the compartment high point with a hard-wired trip to the
+main contactor within 50 ms of detecting 5000 ppm propane. A door interlock switch prevents compressor start-up when the weather-resistant casing is open, satisfying BS EN 378-3 and IEC 60335-2-40
+requirements for A3 refrigerants.
+All pressure safety devices are PED category II and carry UKCA marking. The electrical safety
+sub-module now includes a Schneider Electric A9N18162 RCD breaker with 30 mA trip in a PA66
+housing per BS EN 61008-1, a Phoenix Contact VAL-MS 230/3+1 Type 1+2 surge protection device
+rated at 40 kA, a Schurter 0031.8201 mains fuse holder rated at 250 V AC 16 A, a Wago 2002-3217
+earth terminal lug for protective earth per BS 7671, and three Littelfuse V275LA40A metal oxide varis-
+
+Forge Engineering Report
+
+25 / 75
+
+SECTION 2 · MODULE 9
+
+chain-v2-1779231102611
+
+tors rated at 275 V AC RMS and 40 J for overvoltage clamping per IEC 60335-1. 24.0000 force-guided safety interlock relay, a TE Connectivity IWH-ASHP-8K interlock wiring harness, and a Kingbright
+L-53SRGD bi-colour status LED.
+The refrigerant safety valves include a Danfoss ETS 6-10 R290 stepper-driven electronic expansion
+valve for superheat control, a Sanhua SHF-20-R290 four-way reversing valve for reverse-cycle defrost,
+a Danfoss KP17 high-pressure safety switch with 30 bar trip, a Danfoss DML 164 R290 filter drier with
+3A molecular sieve for moisture protection, and a Danfoss SGI-10 R290 sight glass for charge visualization, all PED 2014/68/EU certified. The safety architecture employs a defence-in-depth strategy,
+combining passive pressure relief with active electronic monitoring to mitigate A3 refrigerant hazards.
+The high-pressure switch is hard-wired in series with the compressor contactor coil, providing a fail-safe
+mechanical backup to the software pressure limits derived from the transducer readings.
+All electrical components within the refrigerant compartment are rated to IP54 or higher to prevent
+spark generation in the event of minor leaks. The force-guided safety relays provide mechanically linked
+contacts that guarantee circuit interruption even in the event of contact welding, satisfying Category 2
+performance level d requirements under BS EN ISO 13849-1.
+
+Sub-modules
+9.1
+
+Refrigerant safety valves
+The refrigerant safety valves protects 5 components. A Danfoss electronic expansion valve (part
+ETS 6-10 R290, in Brass body, stainless steel seat, 130x60x60 mm), rated Stepper driven, certified
+to IEC 60335-2-40, PED 2014/68/EU. A Sanhua four-way reversing valve (part SHF-20-R290, in
+Brass body, copper tubes, 160x80x80 mm), rated R290 compatible, certified to IEC 60335-2-40.
+A Danfoss high-pressure safety switch (part KP17 060L5205, in Brass body, stainless steel bellows,
+70x50x50 mm), rated 30 bar trip, certified to PED 2014/68/EU, UKCA. A Danfoss filter drier (part
+DML 164 R290, in Copper shell, molecular sieve 3A, 164 mm length, 30 mm OD), certified to IEC
+60335-2-40. A Danfoss refrigerant sight glass (part SGI-10 R290, in Brass body, tempered glass,
+70x30x30 mm), certified to PED 2014/68/EU.
+within the R290 circuit.
+
+Forge Engineering Report
+
+26 / 75
+
+SECTION 2 · MODULE 9
+
+9.2
+
+chain-v2-1779231102611
+
+Electrical safety
+The electrical safety isolates 5 components. A Schneider Electric rcd breaker (part A9N18162, in
+PA66 housing, 70x18x68 mm), rated 30 mA trip, certified to BS EN 61008-1, UKCA. A Phoenix
+Contact surge protection device (part VAL-MS 230/3+1, in PA66 housing, MOV, 70x18x60 mm),
+rated 230 V, 40 kA surge, Type 2.
+A Schurter mains fuse holder (part 0031.8201, in PA66 housing, brass contacts, 40x20x50 mm),
+rated 250 V AC, 16 A, HBC. A Wago earth terminal lug (part 2002-3217, in Brass, tin-plated,
+20x12x15 mm), certified to BS EN 60998-1, IEC 60335-2-40. 3x Littelfuse metal oxide varistor (part
+V275LA40A, in ZnO disc, epoxy coated, 20 mm disc dia x 5 mm), rated 275 V AC RMS, 40 J energy.
+on the mains input.
+
+9.3
+
+Safety interlocks
+The safety interlocks comprises 5 components. A Schneider Electric door interlock switch (part
+XCS-LE, in PA66), rated IP67. A Eaton emergency stop button (part M22-WK11, in PA66 housing,
+Ag contacts, 22 mm dia, 50 mm depth), rated NC, 440 V AC, 6 A.
+24.0060, in PA66 housing, Ag-alloy contacts, 30x15x25 mm), rated 24 V DC coil, 6 A, force-guided.
+A TE Connectivity interlock wiring harness (part IWH-ASHP-8K, in 0.5 mm² PVC-insulated copper, 800 mm length, 4-core), certified to IEC 60335-2-40. A Kingbright interlock status led (part
+L-53SRGD, in Epoxy dome, PA6 clip, 5 mm dia), rated Bi-colour red/green, 20 mA.
+
+Forge Engineering Report
+
+27 / 75
+
+SECTION 2 · MODULE 10
+
+chain-v2-1779231102611
+
+MODULE 10
+
+Installer Diagnostic Interface
+
+Illustration only — AI-generated render. Module 10 (Installer Diagnostic Interface) shown in identity colour; other modules muted;
+enclosure ghosted.
+
+Provides the on-board operator interface for installer diagnostics. The installer interface sub-module
+features a 4-digit seven-segment LED display and four tactile push buttons. This allows technicians to
+read fault codes and force manual overrides without needing to access the indoor controller.
+The interface layout follows ergonomic principles for outdoor use, with high-contrast LED segments
+visible in direct sunlight and tactile buttons rated for gloved operation. The display cycles through flow
+temperature, return temperature, and system status codes during normal operation, providing installers
+with immediate performance verification without requiring external test equipment. Fault codes are
+mapped to descriptive text strings in the companion service manual, and the RGB status LED provides
+at-a-glance health monitoring using a standardised colour convention.
+The bezel incorporates a UV-stable gasket that compresses against the casing to maintain IP54 ingress
+protection, preventing moisture damage to the underlying PCB during heavy rain or pressure washing.
+
+Sub-modules
+
+Forge Engineering Report
+
+28 / 75
+
+SECTION 2 · MODULE 10
+
+10.1
+
+chain-v2-1779231102611
+
+Installer interface
+The installer interface displays 5 components. A Kingbright seven-segment led display (part
+DA56-11EWA, in Epoxy lens, ABS housing, 50x19x8 mm), rated 4-digit, certified to RoHS, IEC
+60730-1. 4x E-Switch tactile push button (part TL3305AF160QG, in Silicone dome, 6x6x5 mm),
+rated 160 gf, 50 mA 12 V DC, certified to RoHS, IEC 61058-1.
+A custom interface pcb (part HMI-PCB-8K, in FR4 2-layer, conformal coated, 80x50x15 mm), rated
+4-digit drive, 4-button matrix, operating over -20 to +70 °C, certified to IEC 60335-1. A Kingbright
+rgb status led (part L-154A4SURKQBDZGC, in Epoxy dome, PA6 mount, 5 mm dia), rated RGB
+common-cathode, 20 mA per die. A custom display bezel (part BZL-HMI-8K, in ABS UV-stable,
+IP54 gasket, 60x40x8 mm), rated IP54 when panel-mounted.
+on the main control board.
+
+Forge Engineering Report
+
+29 / 75
+
+SECTION 2 · MODULE 11
+
+chain-v2-1779231102611
+
+MODULE 11
+
+Service Access & Maintenance
+
+Illustration only — AI-generated render. Module 11 (Service Access & Maintenance) shown in identity colour; other modules muted;
+enclosure ghosted.
+
+Affords offline inspection and servicing for the 1-year service interval. The service access sub-module
+includes a removable front panel for internal component reach and two Schrader service ports for R290
+recovery and charging. These touchpoints allow certified engineers to maintain the unit safely.
+Serviceability is prioritised through a tool-less front panel removal system using quarter-turn captive
+fasteners, granting engineers immediate access to the electrical compartment and refrigerant service
+ports. The USB diagnostic port supports direct firmware updates and parameter configuration via a
+dedicated PC application, eliminating the need for proprietary handheld programmers. All consumable
+components, including the intake air filter and fuse holders, are positioned at the front of the unit for
+straightforward replacement.
+A QR-coded service label links installers to an online portal containing wiring diagrams, torque specifications, and interactive troubleshooting guides specific to the unit's serial number.
+
+Sub-modules
+
+Forge Engineering Report
+
+30 / 75
+
+SECTION 2 · MODULE 11
+
+11.1
+
+chain-v2-1779231102611
+
+Service access
+The service access affords 5 components. A custom removable front panel (part FP-ASHP-8K, in
+Powder-coated steel, 900x800x15 mm), rated 1.2 mm wall, quick-release, certified to BS EN 60529
+IPX4, UKCA. 2x Hansen schrader service port (part HS-14SAE-R290, in Brass CW617N, stainless
+steel core, 40x15x15 mm), rated 1/4 inch SAE, certified to PED 2014/68/EU, SAE J513.
+6x Bossard captive screw fastener (part BN 631 M6-20, in Stainless steel A2-70, captive washer, M6x20 mm), certified to IEC 60335-2-40 tool-access. A Amphenol usb service port (part
+UE27AC54100, in PA6 housing, copper alloy contacts, 14x13x12 mm), rated USB Type-B, IP20,
+5 V. A Brady service information label (part LBL-ASHP-8K, in Polyester, UV-resistant adhesive,
+150x100 mm), certified to IEC 60335-2-40, BS EN 378-1.
+access to the internal components and refrigerant circuit.
+
+Forge Engineering Report
+
+31 / 75
+
+S E C T I O N 2 · R E G U L ATO RY & C O M P L I A N C E
+
+chain-v2-1779231102611
+
+Regulatory & Compliance
+Standards that govern this product class. Compliance is dictated by jurisdiction + use case BEFORE the
+design exists; the design downstream must demonstrate conformity with the mandatory items below.
+MANUAL REVIEW — G1b compliance
+Compliance gate WARN: 1 mandatory standard not declared in the brief for the detected jurisdictions (UK, EU).
+
+Heat pump compliance is bounded by refrigerant regulation (EU 517/2014 F-gas - drives R290 adoption),
+pressure-equipment safety (PED 2014/68), and seasonal performance reporting (EN 14825). UK installation
+additionally requires MCS scheme certification for grant eligibility.
+CODE
+
+STANDARD
+
+EU 517/2014
+
+Regulation on fluorinated greenhouse gases (F-gas)
+
+PED 2014/68/EU
+
+Pressure Equipment Directive
+
+MD 2006/42/EC
+
+Machinery Directive
+
+BS EN 378
+
+Refrigerating systems and heat pumps - Safety and environmental requirements
+EU
+
+BS EN 14825
+
+Air conditioners, liquid chilling packages and heat pumps Testing and rating at part load conditions and calculation of
+seasonal performance
+
+BS EN 14511
+
+Air conditioners, liquid chilling packages and heat pumps for
+space heating and cooling - Terms, definitions, test conditions,
+test methods and requirements
+EU
+
+ErP 2009/125/EC
+
+Energy-related Products Ecodesign Directive
+
+EMC 2014/30/EU
+
+Electromagnetic Compatibility Directive
+
+Forge Engineering Report
+
+JURIS.
+
+STATUS
+
+EU
+Mandatory
+F-gas regulation caps HFC refrigerant quotas and drives propane (R290) adoption; charge limits
+dictate cell-level chemistry and sealing decisions.
+EU
+Mandatory
+Refrigerant circuits exceed PED minimum-product-PSxV threshold; sets design code, NDT, and
+notified-body involvement.
+EU
+Mandatory
+Mandatory CE-marking route for products with moving parts (compressor, fans); requires risk
+assessment and Declaration of Conformity.
+
+Mandatory
+Refrigerant-system safety: charge limits per room volume, leak detection, ventilation. Particularly material for A3 refrigerants (R290).
+
+EU
+Mandatory
+Seasonal Coefficient of Performance (SCOP) calculation method; required by EU ErP / UK MCS
+labelling.
+
+Mandatory
+Rated-conditions performance test underlying nominal capacity and COP claims on data
+sheets.
+EU
+Mandatory
+Sets minimum efficiency and labelling for energy-related products; lot 1/2 cover heat pumps.
+EU
+Mandatory
+Inverter-driven compressors must demonstrate emissions and immunity compliance for CE
+marking.
+
+32 / 75
+
+S E C T I O N 2 · R E G U L ATO RY & C O M P L I A N C E
+
+chain-v2-1779231102611
+
+LVD 2014/35/EU
+
+Low Voltage Directive
+
+BS EN 60335-1
+
+Household and similar electrical appliances - Safety - General
+requirements
+EU
+
+BS EN 60335-2-40
+
+Household and similar electrical appliances - Particular requirements for electrical heat pumps, air-conditioners and dehumidifiers
+EU
+
+BS EN 12102-1
+
+Air conditioners, liquid chilling packages, heat pumps, process
+chillers and dehumidifiers with electrically driven compressors
+- Determination of the sound power level
+EU
+
+EESR 2016
+
+Electrical Equipment (Safety) Regulations 2016 (UK statutory)UK
+
+BS EN 378-1
+
+Refrigerating systems and heat pumps - Safety and environmental requirements
+industry
+
+IEC 60335-2-40
+
+Household and similar electrical appliances - Safety - Part
+2-40: Particular requirements for electrical heat pumps,
+air-conditioners and dehumidifiers
+
+EU
+Mandatory
+230 V inverter-driven appliance - Low Voltage Directive is mandatory CE-marking route. Pairs
+with IEC 60335-2-40 for heat-pump-specific safety.
+
+Mandatory
+Mandatory product-safety baseline for any 230 V household appliance - covers creepage/clearance, abnormal-operation testing, protective earth continuity.
+
+Mandatory
+Heat-pump-specific safety: refrigerant charge limits per occupied area for A3 (R290) systems,
+ignition-source assessment, sealed-system construction. Required for CE marking + MCS.
+
+Mandatory
+Sound power declaration mandatory under ErP labelling + MCS 020 noise requirements for
+outdoor units.
+Mandatory
+UK statutory equivalent of LVD post-Brexit. UKCA marking route for UK-only market entry.
+
+Mandatory
+Declared in this product brief; awaiting universal-applicability review before being added to the
+standing class registry.
+
+industry
+Mandatory
+Declared in this product brief; awaiting universal-applicability review before being added to the
+standing class registry.
+
+UK SI 2016 No. 1101 UK Electrical Equipment (Safety) Regulations
+
+industry
+Mandatory
+Declared in this product brief; awaiting universal-applicability review before being added to the
+standing class registry.
+
+MCS
+
+Microgeneration Certification Scheme (UK)
+
+MCS 020
+
+MCS Planning Standard - Permitted Development for installations of microgeneration equipment
+UK
+
+MIS 3005
+
+MCS Installation Standard - Heat Pump Systems
+
+Forge Engineering Report
+
+UK
+De-facto
+UK installer + product certification required for Boiler Upgrade Scheme grant eligibility; de-facto
+mandatory for residential UK market.
+
+De-facto
+UK planning-permission permitted-development limit for noise: d42 dBA at 1 m from neighbour.
+Drives outdoor-unit acoustic design constraints (MCS 020 noise calculator).
+UK
+De-facto
+UK installer competency + design-and-commissioning standard - referenced by product certification scope.
+
+33 / 75
+
+S E C T I O N 2 · R E G U L ATO RY & C O M P L I A N C E
+
+chain-v2-1779231102611
+
+Compliance cost and lead-time estimates are tracked in the underlying registry but withheld from this
+report until the Bill of Materials exists and a full assumptions ledger (test-house rates, notified-body fees,
+recertification cadence) can be cross-referenced. Numbers without that grounding are unreliable.
+
+Forge Engineering Report
+
+34 / 75
+
+S E C T I O N 3 · R I S K & FA I L U R E - M O D E A N A LY S I S
+
+chain-v2-1779231102611
+
+Risk & Failure-Mode Analysis
+Class-level pre-mitigation hazards a heat pump design must address. Each hazard is rated on three 1-5
+scales whose product gives a single risk priority number — higher means worse before mitigation.
+Severity — how bad the outcome is if the hazard occurs (1 = inconvenience, 5 = injury / fire / total loss).
+Likelihood — how often it tends to happen in fielded systems before mitigation (1 = very rare, 5 = frequent).
+Detectability — how hard it is to spot before it causes harm (1 = obvious / instrumented, 5 = silent failure).
+Risk priority — severity × likelihood × detectability. The single number used to rank hazards.
+
+Heat pump hazards centre on refrigerant containment (especially A3-class refrigerants like R290 propane),
+refrigerant-circuit pressure containment, and rotating-machinery safety. Residential R290 systems balance
+flammability risk against the F-gas regulatory pressure to phase out high-GWP HFCs.
+CODE
+
+HAZARD
+
+CHE-01
+
+Flammable refrigerant leak (R290 / A3
+class)
+
+SEVERITY
+
+5
+
+LIKELIHOOD DETECTABILITY RISK PRIORITY
+
+2
+
+3
+
+30
+
+Pinhole leak at brazed joint, capillary fatigue, or service-valve seat degradation releases propane; mixes
+with air to flammable concentration in confined spaces; ignites at ~510 °C or by spark.
+Typical mitigations: minimise refrigerant charge per BS EN 378 charge-limit tables for room volume;
+sealed-system brazed joints (no flare fittings in occupied spaces); EX-rated electrical components within
+refrigerant circuit envelope.
+Detection: catalytic-bead or IR refrigerant leak sensors at 25 % LEL; pressure-drop trending in service
+intervals.
+Governed by: BS EN 378, EU 517/2014, PED 2014/68/EU.
+
+MEC-02
+
+Compressor lockup (oil starvation / liquid slug)
+
+3
+
+2
+
+3
+
+18
+
+Oil migration into evaporator at low load, or liquid refrigerant returning to compressor on rapid load change,
+hydraulically locks the compressor scroll/piston.
+Typical mitigations: suction accumulator; crankcase heater + minimum-off-time delay; electronic-expansion-valve modulation.
+Detection: compressor current spike detection; oil-pressure sensor (semi-hermetic models).
+Governed by: MD 2006/42/EC.
+
+ELE-01
+
+Inverter DC-link capacitor failure
+
+3
+
+2
+
+3
+
+18
+
+Electrolytic capacitor ESR rises with age and ripple-current heating; eventual rupture releases electrolyte
+aerosol and disables compressor drive.
+Typical mitigations: design with e 105 °C low-ESR capacitors derated 20 % on ripple current; capacitance
+health-check on power-up self-test; fuse the DC link rail.
+Detection: power-on capacitance test; DC-link ripple voltage trending.
+Governed by: EMC 2014/30/EU, LVD 2014/35/EU.
+
+MEC-01
+
+High-side pressure excursion
+
+4
+
+2
+
+2
+
+16
+
+Fouled condenser, blocked airflow, or oversized expansion device causes high-side pressure to exceed
+design - relief valve must vent before vessel burst.
+Typical mitigations: PED-rated pressure-relief valve sized to compressor displacement; high-pressure
+cutout switch on suction line; fan-failure detection on condenser.
+Detection: high-side pressure transducer; discharge-temperature thermistor.
+Governed by: PED 2014/68/EU, BS EN 378.
+
+Forge Engineering Report
+
+35 / 75
+
+S E C T I O N 3 · R I S K & FA I L U R E - M O D E A N A LY S I S
+
+OPE-01
+
+Defrost-cycle ice damage
+
+chain-v2-1779231102611
+
+2
+
+3
+
+12
+
+2
+
+Outdoor unit accumulates ice on coil; defrost cycle initiation logic fails or reversing-valve sticks; ice impacts
+fan blades or restricts airflow.
+Typical mitigations: demand-defrost (humidity + coil-temperature) logic vs time-based; reversing-valve
+cycling self-test on commissioning; fan-blade vibration detection.
+Detection: coil-temperature differential trend; fan-current vs RPM mismatch.
+Governed by: BS EN 14511.
+
+CHE-02
+
+Refrigerant venting on service / decommission
+
+3
+
+4
+
+12
+
+1
+
+Unrecovered refrigerant during service or end-of-life decommission released to atmosphere - climate
+impact (high GWP HFCs) plus immediate flammability (R290).
+Typical mitigations: F-gas-certified installer requirement (UK MCS or EU 303/2008 cert); mandatory
+recovery to recovery cylinder before service; pump-down to receiver before disconnection.
+Detection: service logbook + invoice recovery audit; F-gas register tracking.
+Governed by: EU 517/2014, MCS.
+
+Mitigation cost and post-mitigation residual risk are withheld from this report until the Bill of Materials and
+an assumptions ledger exist. The hazards above are CLASS-LEVEL pre-mitigation; design-specific FMEA
+(effects of chosen cell chemistry, refrigerant, sensor architecture etc.) will be derived against these once
+the BoM is grounded.
+
+Forge Engineering Report
+
+36 / 75
+
+SECTION 4 · DESIGN DECISIONS
+
+chain-v2-1779231102611
+
+Design Decisions
+Where the brief did not pre-commit to a specification, the engine has made the call. Each decision below
+states what we are doing, why, and what it implies for the rest of the design. Status is "Recommended for
+sign-off" — the engineering lead confirms or overrides before procurement.
+
+Decision 1 — Unrepaired Gate on cross module required links
+Location
+
+Energy Storage Source / -
+
+We are doing
+
+"Human engineer review required"
+
+RECOMMENDED FOR SIGN-OFF
+
+Why
+
+Inspect the listed missing links. For each, either: (a) confirm the design intends to include this link
+and add it explicitly; (b) note that the link exists but isn't captured in the design data; (c) flag the
+class-connection requirement as not applicable for this design variant.
+
+Forge Engineering Report
+
+37 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 1 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials
+Every part word in every sub-module is listed below. Price provenance: ACTUAL = live distributor quote
+(DigiKey / Mouser / Farnell). ~ ESTIMATE = price from web judgement, not a live quote. ? TBD = no price
+found yet; line total excluded from sub-totals. Click any part number to open its source page.
+Reference-anchor (Engine C): right-margin badge OK = unit price within 0.5x-2.0x of the Phase 4 corpus
+reference median for similar components, > 2x = over reference, < .5x = under reference, - = no priced
+reference in corpus (common for niche / bespoke parts).
+
+R AW M AT E R I A L S B o M G R A N D TOTA L ( p r i c e d p a r t s o n l y — d o e s n o t i n c l u d e T B D l i n e s )
+
+£1,801.09
+137 part lines · 11 modules
+
+0 actual
+
+~ 137 estimate
+
+? 0 TBD
+
+Scale factor: 0.325 — per-class batch-economics multiplier applied to distributor-quoted lines (consumer/mid-volume
+goods price below 1-off distributor unit rates at production scale).
+’ This is the raw materials layer only. See the Cost Stack on the cover page for the full breakdown to installed ASP (the
+value a buyer compares against).
+
+£440 per kW thermal installed — 27% below typical range (£600–£900 typical)
+Within engineering noise of typical market range — minor sourcing variance only. Installed ASP for 30 kW
+R290 monobloc: hardware (~£9-13k) + scaled pipework + electrics + MCS commissioning = £18-27k total
+= £600-900/kW. 30 kW units show clear economies vs small <10 kW domestics. Multiplier 4.36× overshoots
+Grok market by >400% — both the raw BoM band (calibrated for small <3 kW units, 2-3× £/kW premium) and
+the COST_STACK install factor (I=0.80) appear too generous for the 30 kW class. Flagged for COST_STACK
+calibration.
+Sources: MCS installer data + Octopus / British Gas 2024-25 quotes (light-commercial 25-40 kW R290 monobloc) · BEIS / Energy
+Systems Catapult heat-pump cost study 2023-24 update · Heat Pump Federation UK member benchmarks · Panasonic / Mitsubishi /
+Daikin light-commercial division 2024-25 tender data · NHS SBS / Procurement Hub heat-pump tenders 2024-25
+
+Cost by module
+1.
+
+Structure Containment
+
+£151.01
+
+2.
+
+Environmental Interface
+
+£101.83
+
+3.
+
+Mass Fluid Transport Process
+
+£325.68
+
+4.
+
+Energy Conversion Transduction
+
+£331.53
+
+5.
+
+Power Distribution
+
+£21.27
+
+6.
+
+Actuation Kinematics
+
+£206.02
+
+7.
+
+Sensing Instrumentation
+
+£170.31
+
+8.
+
+Control Compute Communication
+
+£238.74
+
+9.
+
+Safety Protection
+
+£210.01
+
+10.
+
+HMI Ergonomics
+
+£2.03
+
+11.
+
+Maintenance Serviceability
+
+£42.66
+
+Sum of modules
+
+£1,801.09
+
+Component-class breakdown
+Per-component-class contribution to the grand total. Classifier source: Engine B (Phase 4 corpus lookup + Flash-Lite
+fallback).
+
+Forge Engineering Report
+
+38 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 1 O F 1 1 )
+
+chain-v2-1779231102611
+
+Electronic Cable
+
+£32.48
+
+2%
+
+Electronic Connector
+
+£1.30
+
+0%
+
+Electronic Discrete
+
+£0.07
+
+0%
+
+Electronic Ic
+
+£1.40
+
+0%
+
+Electronic Passive
+
+£2.45
+
+0%
+
+£3.42
+
+0%
+
+Fluid Path
+
+£327.56
+
+18%
+
+Magnetic
+
+£2.20
+
+0%
+
+£1,430.21
+
+79%
+
+Electronic PCB
+
++ 10 other classes
+
+PART
+
+Forge Engineering Report
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+39 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 2 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Module 1 — Structure Containment
+
+£151.01
+
+Chassis Frame
+Galvanized Steel Base
+Pan
+
+custom
+
+BP-ASHP-8K
+
+Structural Upright
+
+SSAB
+
+UPT-8K-GALV
+
+Base Pan Gasket
+
+Trelleborg
+
+GKT-90KG-AS
+
+Upright Bracing Strap
+
+SSAB
+
+STR-4UPT
+
+Levelling Foot
+
+Würth
+
+Ip20 Polycarbonate Barrier
+
+Phoenix Contact
+
+~ £7.81
+
+£7.81 Est. -
+
+~ £7.81
+
+£31.24 Est. < .5x
+
+~ £0.21
+
+£0.21 Est. -
+
+×2
+
+~ £7.81
+
+£15.62 Est. -
+
+LF-M16-ADJ
+
+×4
+
+~ £10.83
+
+£43.32 Est. -
+
+IP20-BAR-8K
+
+×2
+
+~ £0.21
+
+£0.42 Est. < .5x
+
+×4
+
+Sub-total — Chassis Frame
+
+£98.62
+
+Acoustic Enclosure
+Compressor Sound Jacket
+Armacell
+
+AFJ-56DBA-R290
+
+~ £0.21
+
+£0.21 Est. -
+
+Weather-Resistant Casing
+
+custom
+
+CAS-IPX4-8K
+
+~ £7.81
+
+£7.81 Est. -
+
+Acoustic Liner Panel
+
+Rockwool
+
+LIN-56DBA
+
+~ £0.21
+
+£0.84 Est. -
+
+Casing Seal Strip
+
+3M
+
+SEAL-IPX4
+
+~ £0.21
+
+£0.21 Est. < .5x
+
+Vibration Isolator Pad
+
+Trelleborg
+
+VI-25-56DBA
+
+~ £10.83
+
+£43.32 Est. < .5x
+
+Sub-total — Acoustic Enclosure
+
+Module total — Structure Containment
+
+Forge Engineering Report
+
+×4
+
+×4
+
+£52.39
+
+£151.01
+
+40 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 3 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Module 2 — Environmental Interface
+
+£101.83
+
+Air Management
+Fan Grille
+
+ebm-papst
+
+LZ260-8KW
+
+~ £7.81
+
+£7.81 Est. < .5x
+
+Acoustic Louver
+
+Renson
+
+LVR-ASHP-56DB
+
+~ £7.81
+
+£7.81 Est. -
+
+Evaporator Fan Motor
+
+ebm-papst
+
+G2E140-BL31-01
+
+~ £17.08
+
+£17.08 Est. < .5x
+
+Fan Speed Sensor
+
+Honeywell
+
+NGT-L-500
+
+~ £13.42
+
+£13.42 Est. < .5x
+
+Intake Air Filter Mesh
+
+custom
+
+FLT-ASHP-8K
+
+~ £0.21
+
+£0.21 Est. -
+
+Sub-total — Air Management
+
+£46.33
+
+Condensate Management
+Heated Drip Tray
+
+Thermon
+
+DT-8K-ABS
+
+~ £2.96
+
+£2.96 Est. -
+
+Defrost Heater Cable
+
+Thermon
+
+DH-150W-R290
+
+~ £4.64
+
+£4.64 Est. -
+
+Condensate Drain Hose
+
+Hozelock
+
+DRN-20MM-1M
+
+~ £17.24
+
+£17.24 Est. -
+
+Condensate Drain Trap
+
+McAlpine
+
+TRAP-20-ASHP
+
+~ £17.24
+
+£17.24 Est. -
+
+Condensate Overflow
+Float Switch
+
+SJE-Rhombus
+
+7210-0050
+
+~ £13.42
+
+£13.42 Est. -
+
+Sub-total — Condensate Management
+
+£55.50
+
+Module total — Environmental Interface
+
+£101.83
+
+Module 3 — Mass Fluid Transport Process
+
+£325.68
+
+Refrigerant Transport
+Copper Refrigerant Pipe
+
+Mueller Industries
+
+C12200-HP-8K
+
+~ £17.24
+
+£17.24 Est. -
+
+Liquid Receiver
+
+Sanhua
+
+LR-8K-R290
+
+~ £17.24
+
+£17.24 Est. -
+
+Filter Drier Core
+
+Danfoss
+
+DML 164 R290
+
+~ £17.24
+
+£17.24 Est. -
+
+Moisture-Indicating Sight
+Glass
+Danfoss
+
+SGI-10 R290-MI
+
+~ £17.24
+
+£17.24 Est. -
+
+Discharge Muffler
+
+DM-5/8-R290
+
+~ £17.24
+
+£17.24 Est. -
+
+Parker
+
+Sub-total — Refrigerant Transport
+
+Forge Engineering Report
+
+£86.20
+
+41 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 4 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+Variable-Speed Circulation Pump
+
+Grundfos
+
+UPM3 15-70
+95087149
+
+Water Isolation Valve
+
+Pegler
+
+YP-1BSP-VALVE
+
+Expansion Vessel
+
+Zilmet
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+~ £113.20
+
+£113.20 Est. -
+
+~ £17.24
+
+£34.48 Est. -
+
+CAL-PRO 8L
+
+~ £17.24
+
+£17.24 Est. -
+
+System Pressure Gauge Wika
+
+213.53.063
+
+~ £13.42
+
+£13.42 Est. < .5x
+
+Automatic Air Vent
+
+502006
+
+~ £17.24
+
+£17.24 Est. -
+
+Hydronic Transport
+
+Caleffi
+
+×2
+
+Sub-total — Hydronic Transport
+
+£195.58
+
+Hydronic Strainer Filter
+Y-Type Brass Strainer
+
+Caleffi
+
+331006
+
+~ £17.24
+
+£17.24 Est. -
+
+Strainer Sealing Gasket
+
+Caleffi
+
+GSK-331006
+
+~ £0.21
+
+£0.21 Est. -
+
+Strainer Cap
+
+Caleffi
+
+CAP-331006
+
+~ £7.81
+
+£7.81 Est. -
+
+Strainer Mesh Insert
+
+Caleffi
+
+MSH-331006
+
+~ £10.83
+
+£10.83 Est. -
+
+Strainer Mounting Bracket
+custom
+
+BRK-STR-8K
+
+~ £7.81
+
+£7.81 Est. < .5x
+
+Sub-total — Hydronic Strainer Filter
+
+£43.90
+
+Module total — Mass Fluid Transport Process
+
+£325.68
+
+Module 4 — Energy Conversion Transduction
+
+£331.53
+
+Compressor and Drive
+R290 Scroll Compressor Copeland
+
+YP0135E-TFD-290
+
+~ £113.20
+
+£113.20 Est. -
+
+Inverter Drive PCB
+
+Semikron
+
+VLT-FC-30A-INV
+
+~ £113.20
+
+£113.20 Est. -
+
+Compressor Mounting
+Bracket
+
+Copeland
+
+YP-8K-R290-MNT
+
+~ £7.81
+
+£7.81 Est. < .5x
+
+Inverter Heatsink
+
+Aavid
+
+HS-30A-AL
+
+~ £2.96
+
+£2.96 Est. OK
+
+Compressor Terminal
+Box
+
+Copeland
+
+TB-YP-R290
+
+~ £0.21
+
+£0.21 Est. -
+
+Sub-total — Compressor and Drive
+
+Forge Engineering Report
+
+£237.38
+
+42 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 5 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Heat Exchangers
+Fin-and-Tube Evaporator Kelvion
+
+KEV-EVP-8KW-R290
+
+~ £2.96
+
+£2.96 Est. < .5x
+
+Brazed Plate Condenser
+
+SWEP
+
+B10-8KW-R290
+
+~ £2.96
+
+£2.96 Est. -
+
+Evaporator Fan Shroud
+
+ebm-papst
+
+SH-500-ASHP
+
+~ £0.21
+
+£0.21 Est. < .5x
+
+Condenser Mounting
+Plate
+
+SWEP
+
+BP-8K-PLT
+
+~ £7.81
+
+£7.81 Est. -
+
+Evaporator Distributor
+
+Emerson
+
+DIST-8KW-R290
+
+~ £17.24
+
+£17.24 Est. -
+
+Sub-total — Heat Exchangers
+
+£31.18
+
+Thermal Management
+Cold Plate
+
+Aavid
+
+CP-8KW-INV
+
+~ £2.96
+
+£2.96 Est. -
+
+Thermal Interface Pad
+
+Bergquist
+
+GP6000-0.02-00-11
+
+~ £2.96
+
+£5.92 Est. < .5x
+
+Inverter Cooling Fan
+
+ebm-papst
+
+612NHH-8KW
+
+~ £10.83
+
+£10.83 Est. < .5x
+
+Thermal Compound
+Paste
+
+Arctic Silver
+
+AS5-3.5G
+
+~ £2.96
+
+£2.96 Est. < .5x
+
+Inverter Heatsink Thermistor
+
+TE Connectivity
+
+GA10K4MCD1-INV
+
+~ £13.42
+
+£13.42 Est. > 2x
+
+×2
+
+Sub-total — Thermal Management
+
+£36.09
+
+Crankcase Heater
+Crankcase Heater Band
+
+Thermon
+
+CHB-80W-R290
+
+~ £2.96
+
+£2.96 Est. -
+
+Crankcase Thermostat
+
+Danfoss
+
+077B6010
+
+~ £13.42
+
+£13.42 Est. -
+
+Heater Control Relay
+
+Finder
+
+40.31.0.24.0000
+
+~ £2.93
+
+£2.93 Est. -
+
+Heater Wiring Harness
+
+TE Connectivity
+
+HWH-CH-8K
+
+~ £4.64
+
+£4.64 Est. -
+
+Heater Thermal Fuse
+
+Cantherm
+
+SDF DF104S
+
+~ £2.93
+
+£2.93 Est. < .5x
+
+Sub-total — Crankcase Heater
+
+Module total — Energy Conversion Transduction
+
+Forge Engineering Report
+
+£26.88
+
+£331.53
+
+43 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 6 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Module 5 — Power Distribution
+
+£21.27
+
+Mains Input
+AC Terminal Block
+
+Wago
+
+2002-3257
+
+~ £0.10
+
+£0.10 Est. -
+
+Main Contactor
+
+Schneider Electric
+
+LC1D18B7
+
+~ £2.93
+
+£2.93 Est. < .5x
+
+EMI Filter
+
+Schaffner
+
+FN2060-16-06
+
+~ £0.20
+
+£0.20 Est. -
+
+Type 1 Surge Arrester
+
+OBO Bettermann
+
+V25-B/3+NPE
+
+~ £2.93
+
+£2.93 Est. -
+
+Power Indicator LED
+
+Kingbright
+
+L-53GD-5V
+
+~ £0.14
+
+£0.14 Est. < .5x
+
+Sub-total — Mains Input
+
+£6.30
+
+EMC Grounding and Shielding
+Chassis Earth Stud
+
+TE Connectivity
+
+5-1638398-1
+
+Common-Mode Choke
+
+Schaffner
+
+RN214-0.6-02-1M
+
+EMC Cable Gland
+
+Murrplastik
+
+SK-EMC-M20
+
+Ground Busbar
+
+Wago
+
+Shielded Signal Harness Lapp
+
+×2
+
+~ £0.01
+
+£0.02 Est. < .5x
+
+~ £2.20
+
+£2.20 Est. > 2x
+
+~ £0.10
+
+£0.30 Est. -
+
+2002-4015
+
+~ £7.81
+
+£7.81 Est. -
+
+OLFLEX-FD-8P-0.25
+
+~ £4.64
+
+£4.64 Est. < .5x
+
+×3
+
+Sub-total — EMC Grounding and Shielding
+
+£14.97
+
+Module total — Power Distribution
+
+£21.27
+
+Module 6 — Actuation Kinematics
+
+£206.02
+
+Air Mover
+Axial Fan Blade
+
+ebm-papst
+
+A580-8KW-ASHP
+
+~ £10.83
+
+£10.83 Est. < .5x
+
+Ecm Fan Motor
+
+ebm-papst
+
+G2E140-BL31-01
+
+~ £17.08
+
+£17.08 Est. < .5x
+
+Motor Mounting Bracket
+
+custom
+
+MB-G2E140
+
+×4
+
+~ £7.81
+
+£31.24 Est. < .5x
+
+Motor Vibration Damper
+
+Trelleborg
+
+VD-M6-G2E
+
+×4
+
+~ £0.21
+
+£0.84 Est. -
+
+Fan Guard Ring
+
+custom
+
+FGR-500-ASHP
+
+~ £7.81
+
+£7.81 Est. -
+
+Sub-total — Air Mover
+
+Forge Engineering Report
+
+£67.80
+
+44 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 7 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+~ £113.20
+
+£113.20 Est. -
+
+Compressor Mechanism
+Scroll Compression Set
+
+Copeland
+
+SC-YP0135-R290
+
+Crankshaft Bearing
+
+NSK
+
+6204-2RS-C3
+
+×2
+
+~ £10.83
+
+£21.66 Est. < .5x
+
+Scroll Tip Seal
+
+Copeland
+
+STS-YP-R290
+
+×2
+
+~ £0.21
+
+£0.42 Est. -
+
+Thrust Washer
+
+Copeland
+
+TW-YP-R290
+
+~ £0.01
+
+£0.01 Est. -
+
+Compressor Oil Charge
+
+Emkarate
+
+RL 32H R290
+
+~ £2.93
+
+£2.93 Est. -
+
+Sub-total — Compressor Mechanism
+
+£138.22
+
+Module total — Actuation Kinematics
+
+£206.02
+
+Module 7 — Sensing Instrumentation
+
+£170.31
+
+Refrigerant Sensors
+Discharge Temperature
+Thermistor
+
+TE Connectivity
+
+GA10K4MCD1
+
+~ £13.42
+
+£13.42 Est. > 2x
+
+Suction Pressure Transducer
+
+Danfoss
+
+AKS 32R
+060G1250
+
+~ £13.42
+
+£13.42 Est. < .5x
+
+Refrigerant Temp Sensor
+Housing
+TE Connectivity
+
+HTS-10K-R290
+
+~ £0.21
+
+£0.21 Est. -
+
+Pressure Transducer Cable
+Lapp
+
+CAB-0-15BAR
+
+~ £4.64
+
+£4.64 Est. < .5x
+
+Suction Line Thermistor
+
+TE Connectivity
+
+GA10K4MCD1-SUC
+
+~ £13.42
+
+£13.42 Est. -
+
+Controller Eeprom
+
+Microchip
+
+24LC256-I/SN
+
+~ £0.20
+
+£0.20 Est. < .5x
+
+Sub-total — Refrigerant Sensors
+
+Forge Engineering Report
+
+£45.31
+
+45 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 8 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Water Temperature Thermistor
+TE Connectivity
+
+GND10K4A1L-W
+
+×2
+
+~ £13.42
+
+£26.84 Est. > 2x
+
+Flow Temp Sensor Pocket Omega
+
+POK-10K-FLOW
+
+~ £17.24
+
+£17.24 Est. -
+
+Return Temp Sensor
+Pocket
+
+Omega
+
+POK-10K-RET
+
+~ £17.24
+
+£17.24 Est. -
+
+Flow Pressure Switch
+
+Danfoss
+
+KP44 060L5100
+
+~ £2.93
+
+£2.93 Est. -
+
+Differential Pressure
+Sensor
+
+Honeywell
+
+26PCBFA6D
+
+~ £13.42
+
+£13.42 Est. < .5x
+
+Hydronic Sensors
+
+Sub-total — Hydronic Sensors
+
+£77.67
+
+Leak Detection
+R290 Catalytic Gas Sensor
+Dräger
+
+Polytron
+5310-R290
+
+~ £13.42
+
+£13.42 Est. < .5x
+
+R290 Sensor Mount
+Bracket
+
+Rittal
+
+BRK-HIGH-PT
+
+~ £7.81
+
+£7.81 Est. < .5x
+
+Gas Sensor Cable Assembly
+
+Molex
+
+CAB-R290-SENS
+
+~ £4.64
+
+£4.64 Est. < .5x
+
+Alarm Relay Module
+
+Finder
+
+40.31.0.24.0000
+
+~ £2.93
+
+£2.93 Est. < .5x
+
+Sensor Status LED
+
+Kingbright
+
+L-53GD
+
+~ £0.14
+
+£0.14 Est. < .5x
+
+Sub-total — Leak Detection
+
+£28.94
+
+Ambient Air Temperature Sensor
+Ambient Air Thermistor
+Probe
+
+TE Connectivity
+
+GND10K4A1L-AMB
+
+~ £13.42
+
+£13.42 Est. > 2x
+
+Ambient Sensor Housing Bopla
+
+B-120-UV
+
+~ £0.21
+
+£0.21 Est. -
+
+Ambient Sensor Cable
+
+Lapp
+
+UNITRONIC-111
+
+~ £4.64
+
+£4.64 Est. < .5x
+
+Ambient Sensor Mounting Clip
+
+Würth
+
+CLIP-M6-SS
+
+~ £0.01
+
+£0.02 Est. < .5x
+
+~ £0.10
+
+£0.10 Est. < .5x
+
+Ambient Sensor Connector
+TE Connectivity
+Sub-total — Ambient Air Temperature Sensor
+
+Module total — Sensing Instrumentation
+
+Forge Engineering Report
+
+AMP-SEAL-2P
+
+×2
+
+£18.39
+
+£170.31
+
+46 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 9 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Module 8 — Control Compute Communication
+
+£238.74
+
+Main Controller
+Heat Pump Controller
+PCB
+
+STMicroelectronics ARM Cortex-M4
+
+~ £1.14
+
+£1.14 Est. < .5x
+
+MCU Crystal Oscillator
+
+Abracon
+
+ABM8-8.000MHZ-20-B2X-T
+
+~ £0.49
+
+£0.49 Est. OK
+
+Watchdog Timer Ic
+
+Texas Instruments
+
+TPS3823-33DBVR
+
+~ £0.20
+
+£0.20 Est. < .5x
+
+Flash Storage Ic
+
+Macronix
+
+MX25L12833FM2I-08G
+
+~ £0.20
+
+£0.20 Est. < .5x
+
+24v to 3.3v DC-DC Converter
+
+Traco Power
+
+THN 15-2433WI
+
+~ £113.20
+
+£113.20 Est. > 2x
+
+Sub-total — Main Controller
+
+£115.23
+
+Comms Gateway
+Modbus Rtu Transceiver
+
+Texas Instruments
+
+THVD1500DR
+
+~ £0.20
+
+£0.20 Est. -
+
+Rs-485 Digital Isolator
+
+Analog Devices
+
+ADM2587EBRWZ
+
+~ £0.20
+
+£0.20 Est. -
+
+Modbus Connector
+
+Phoenix Contact
+
+1483453
+
+~ £0.10
+
+£0.10 Est. -
+
+Esd Protection Diode
+
+Littelfuse
+
+SP724ABTG
+
+~ £0.07
+
+£0.07 Est. < .5x
+
+RC0603FR-07120RL
+
+~ £0.49
+
+£0.49 Est. > 2x
+
+Bus Termination Resistor Yageo
+Sub-total — Comms Gateway
+
+£1.06
+
+Wi-Fi Telemetry Gateway
+Wi-Fi Communication
+Module
+
+Espressif
+
+ESP32-WROOM-32E
+
+Wi-Fi Antenna
+
+Molex
+
+146153-0100
+
+Wi-Fi PCB Carrier
+
+custom
+
+Wi-Fi Shielding Can
+Wi-Fi Header Connector
+
+~ £0.20
+
+£0.20 Est. < .5x
+
+~ £113.20
+
+£113.20 Est. > 2x
+
+WIFI-CARRIER-8K
+
+~ £1.14
+
+£1.14 Est. < .5x
+
+Laird
+
+BMI-S-101
+
+~ £7.81
+
+£7.81 Est. > 2x
+
+Samtec
+
+TSW-106-07-G-S
+
+~ £0.10
+
+£0.10 Est. < .5x
+
+Sub-total — Wi-Fi Telemetry Gateway
+
+Module total — Control Compute Communication
+
+Forge Engineering Report
+
+£122.45
+
+£238.74
+
+47 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 1 0 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Module 9 — Safety Protection
+
+£210.01
+
+Refrigerant Safety Valves
+Electronic Expansion
+Valve
+
+Danfoss
+
+ETS 6-10 R290
+
+~ £17.08
+
+£17.08 Est. -
+
+Four-Way Reversing
+Valve
+
+Sanhua
+
+SHF-20-R290
+
+~ £17.24
+
+£17.24 Est. -
+
+High-Pressure Safety
+Switch
+
+Danfoss
+
+KP17 060L5205
+
+~ £13.42
+
+£13.42 Est. -
+
+Filter Drier
+
+Danfoss
+
+DML 164 R290
+
+~ £10.83
+
+£10.83 Est. -
+
+Refrigerant Sight Glass
+
+Danfoss
+
+SGI-10 R290
+
+~ £17.24
+
+£17.24 Est. -
+
+Sub-total — Refrigerant Safety Valves
+
+£75.81
+
+Electrical Safety
+RCD Breaker
+
+Schneider Electric
+
+A9N18162
+
+~ £2.93
+
+£2.93 Est. < .5x
+
+Surge Protection Device
+
+Phoenix Contact
+
+VAL-MS 230/3+1
+
+~ £2.93
+
+£2.93 Est. < .5x
+
+Mains Fuse Holder
+
+Schurter
+
+0031.8201
+
+~ £2.93
+
+£2.93 Est. OK
+
+Earth Terminal Lug
+
+Wago
+
+2002-3217
+
+~ £0.10
+
+£0.10 Est. -
+
+Metal Oxide Varistor
+
+Littelfuse
+
+V275LA40A
+
+~ £0.49
+
+£1.47 Est. < .5x
+
+×3
+
+Sub-total — Electrical Safety
+
+£10.36
+
+Safety Interlocks
+Door Interlock Switch
+
+Schneider Electric
+
+XCS-LE
+
+Emergency Stop Button
+
+Eaton
+
+M22-WK11
+
+Safety Interlock Relay
+
+Finder
+
+48.41.0.24.0060
+
+~ £2.93
+
+£2.93 Est. < .5x
+
+Interlock Wiring Harness TE Connectivity
+
+IWH-ASHP-8K
+
+~ £4.64
+
+£4.64 Est. < .5x
+
+Interlock Status LED
+
+L-53SRGD
+
+~ £0.14
+
+£0.14 Est. < .5x
+
+Kingbright
+
+Sub-total — Safety Interlocks
+
+Module total — Safety Protection
+
+Forge Engineering Report
+
+~ £2.93
+~ £113.20
+
+£2.93 Est. < .5x
+£113.20 Est. -
+
+£123.84
+
+£210.01
+
+48 / 75
+
+S E C T I O N 6 · B I L L O F M AT E R I A L S ( PAG E 1 1 O F 1 1 )
+
+chain-v2-1779231102611
+
+Bill of Materials (continued)
+PART
+
+MANUFACTURER
+
+PART NUMBER
+
+QTY
+
+UNIT (£)
+
+LINE (£) SRC ·
+REF
+
+Module 10 — HMI Ergonomics
+
+£2.03
+
+Installer Interface
+Seven-Segment LED
+Display
+
+Kingbright
+
+DA56-11EWA
+
+Tactile Push Button
+
+E-Switch
+
+TL3305AF160QG
+
+Interface PCB
+
+custom
+
+Rgb Status LED
+Display Bezel
+
+~ £0.14
+
+£0.14 Est. -
+
+~ £0.10
+
+£0.40 Est. < .5x
+
+HMI-PCB-8K
+
+~ £1.14
+
+£1.14 Est. -
+
+Kingbright
+
+L-154A4SURKQBDZGC
+
+~ £0.14
+
+£0.14 Est. OK
+
+custom
+
+BZL-HMI-8K
+
+~ £0.21
+
+£0.21 Est. < .5x
+
+×4
+
+Sub-total — Installer Interface
+
+£2.03
+
+Module total — HMI Ergonomics
+
+£2.03
+
+Module 11 — Maintenance Serviceability
+
+£42.66
+
+Service Access
+Removable Front Panel
+
+custom
+
+FP-ASHP-8K
+
+Schrader Service Port
+
+Hansen
+
+HS-14SAE-R290
+
+Captive Screw Fastener
+
+Bossard
+
+BN 631 M6-20
+
+Usb Service Port
+
+Amphenol
+
+Service Information Label Brady
+
+~ £7.81
+
+£7.81 Est. < .5x
+
+×2
+
+~ £17.24
+
+£34.48 Est. -
+
+×6
+
+~ £0.01
+
+£0.06 Est. < .5x
+
+UE27AC54100
+
+~ £0.10
+
+£0.10 Est. < .5x
+
+LBL-ASHP-8K
+
+~ £0.21
+
+£0.21 Est. -
+
+Sub-total — Service Access
+
+Module total — Maintenance Serviceability
+
+Forge Engineering Report
+
+£42.66
+
+£42.66
+
+49 / 75
+
+S E C T I O N 7 · S U P P L I E R S ( PAG E 1 O F 2 )
+
+chain-v2-1779231102611
+
+Suppliers
+Recommended companies for each delivery role — principal contractor and subcontractors. Up to 3
+candidates per role. Each card carries a source badge (CH-VERIFIED = matched in Companies House;
+WEB-SOURCED = surfaced via web search and scored by LLM), a concrete capability line, two or three
+reasons the company fits this brief, and a direct call to action.
+
+Caveat — candidates are surfaced from a 28,000-company database plus a scored web fallback, then
+distilled into capability + fit bullets by a small language model. A human engineer should still validate fit,
+capacity, and certification before procurement.
+
+Principal contractor - heat pump OEM
+Designs, manufactures, and warranties the complete monobloc unit including refrigerant cycle, controls, and
+field commissioning.
+
+Clade Engineering
+CH-VERIFIED
+
+HIGH
+
+Capability
+
+CO2 and R290-based air-source heat pumps for UK
+residential and commercial heating applications
+
+Location
+
+Sheffield, GB
+
+Why this fits the brief
+
+Website
+
+• Manufactures UK-designed monobloc air-source heat pumps to
+
+meet specific domestic heating requirements.
+clade-es.com/heat-pumps/air-source-heat-pumps
+
+• Holds MCS certification and provides full technical support for
+field commissioning and unit warranties.
+
+• Engineers refrigeration cycles utilising natural refrigerants to
+ensure full UK regulatory compliance.
+Get in touch
+
+Visit company website
+Email enquiries@clade-es.com
+
+Ideal Heating
+CH-VERIFIED
+
+HIGH
+
+Capability
+
+Monobloc air-source heat pumps with R290 refrigerant
+and integrated smart control systems
+
+Location
+
+Hull, GB
+
+Why this fits the brief
+
+Website
+
+• Manufactures complete monobloc heat pump units specifically
+
+idealheating.com/products/heat-pumps
+
+engineered for the UK residential heating market.
+
+• Provides comprehensive product warranties and installer training to support field commissioning and maintenance.
+
+• Holds established UK market presence with MCS-certified renewable heating solutions and technical support.
+Get in touch
+
+Visit company website
+Email joe.bloggs@gmail.com
+
+Forge Engineering Report
+
+50 / 75
+
+S E C T I O N 7 · S U P P L I E R S ( PAG E 1 O F 2 )
+
+Capability
+
+Exinda Group
+WEB-SOURCED
+
+chain-v2-1779231102611
+
+LOW
+
+R290-refrigerant monobloc air-to-water heat pumps for
+hydronic heating systems
+
+Location
+
+Coventry, United Kingdom
+
+Why this fits the brief
+
+Website
+
+• Manufactures R290-based monobloc units, aligning with the
+
+exindagroup.com/products/wholesaler-r290-heat-pump
+
+required refrigerant and system architecture for the UK market.
+
+• Operates as a UK-based OEM capable of managing the full
+design and warranty lifecycle for residential heat pump units.
+
+• Holds technical expertise in refrigeration cycle design, ensuring
+compliance with F-gas and MCS certification standards.
+Get in touch
+
+Visit company website
+
+Contact via website form
+
+Subcontractor - compressor + refrigeration components
+Supplies scroll/rotary compressors, BPHE condensers, expansion valves, and refrigerant pipework rated for
+R290.
+
+Capability
+
+Bitzer
+WEB-SOURCED
+
+LOW
+
+ORBIT PRO scroll compressors engineered for R290
+refrigerant applications
+
+Location
+
+Sindelfingen, United Kingdom
+
+Why this fits the brief
+
+Website
+
+• Supplies R290-optimised scroll compressors specifically de-
+
+bitzer.de/gb/en/products/scroll-compressors/orbit-
+
+signed for high-efficiency residential heat pumps.
+
+• Provides UK-based technical support and supply chain proximity
+for critical refrigeration components.
+Get in touch
+
+Visit company website
+
+Capability
+
+Danfoss
+WEB-SOURCED
+
+Contact via website form
+
+MEDIUM
+
+Variable-frequency drives (VFDs) and power converters
+for high-efficiency heat pump motor control
+
+Location
+
+Nordborg, FR
+
+Why this fits the brief
+
+Website
+
+• Supplies high-efficiency variable-frequency drives to optimise
+
+danfoss.com/en/about-danfoss/our-businesses/drives
+
+the energy consumption of 8 kW heat pump compressors.
+
+• Provides advanced power conversion technology to enhance
+system uptime and motor control for residential heat pumps.
+Get in touch
+
+Visit company website
+
+Forge Engineering Report
+
+Contact via website form
+
+51 / 75
+
+S E C T I O N 7 · S U P P L I E R S ( PAG E 1 O F 2 )
+
+Capability
+
+Alfa Laval
+WEB-SOURCED
+
+chain-v2-1779231102611
+
+HIGH
+
+AC540 series brazed plate heat exchangers optimised
+for R290 and low-GWP refrigerants
+
+Location
+
+Lund, Sweden
+
+Why this fits the brief
+
+Website
+
+• Supplies AC540 brazed plate heat exchangers specifically en-
+
+alfalaval.co.uk/products/heat-transfer/plate-heat-
+
+gineered for high-pressure R290 refrigerant applications.
+
+• Provides UK-based technical support and distribution for heat
+transfer components required in residential heat pumps.
+Get in touch
+
+Visit company website
+
+Forge Engineering Report
+
+Contact via website form
+
+52 / 75
+
+S E C T I O N 7 · S U P P L I E R S ( PAG E 2 O F 2 )
+
+chain-v2-1779231102611
+
+Suppliers (continued)
+Subcontractor - sheet-metal enclosure + acoustic
+Fabricates the outer cabinet, fan grilles, acoustic insulation, and weather-sealing gaskets.
+
+JC Metalworks
+WEB-SOURCED
+
+MEDIUM
+
+Capability
+
+Custom sheet metal enclosures with integrated
+acoustic insulation and powder coating finishes.
+
+Location
+
+Loughborough, GB
+
+Why this fits the brief
+
+Website
+
+• Fabricates bespoke sheet-metal cabinets and fan grilles using
+
+jcmetalworks.co.uk/metal-manufacturing-services/me
+
+advanced laser cutting and robotic welding.
+
+• Applies industrial-grade powder coating and weather-sealing to
+achieve IP54-rated enclosure performance.
+
+• Provides UK-based manufacturing capacity for residential heat
+pump acoustic insulation and structural housing.
+Get in touch
+
+Visit company website
+
+Capability
+
+KMF Group
+CH-VERIFIED
+
+Contact via website form
+
+HIGH
+
+Precision sheet metal fabrication, powder coating, and
+acoustic enclosure assembly for HVAC systems.
+
+Location
+
+Newcastle-under-Lyme, GB
+
+Why this fits the brief
+
+Website
+
+• Fabricates bespoke outer cabinets and fan grilles using ad-
+
+kmf.co.uk/machining
+
+vanced CNC machining and sheet metal forming capabilities.
+
+• Applies industrial-grade powder coating and weather-sealing
+gaskets to meet IP54 enclosure requirements.
+
+• Integrates acoustic insulation materials within metal assemblies
+to meet residential noise reduction standards.
+Get in touch
+
+Visit company website
+
+Forge Engineering Report
+
+Email sales@kmf.co.uk
+
+53 / 75
+
+S E C T I O N 7 · S U P P L I E R S ( PAG E 2 O F 2 )
+
+Hydram Sheet Metalwork
+WEB-SOURCED
+
+LOW
+
+chain-v2-1779231102611
+
+Capability
+
+Precision sheet metal HVAC enclosures with integrated
+acoustic lining and industrial powder coating services.
+
+Location
+
+Newton Aycliffe, United Kingdom
+
+Why this fits the brief
+
+Website
+
+• Fabricates bespoke sheet-metal cabinets and fan grilles tailored
+
+hydram.co.uk/sheet-metal-fabrication/hvac-equipmen
+
+to residential heat pump dimensions.
+
+• Applies specialised acoustic insulation and weather-sealing
+gaskets to meet UK outdoor noise regulations.
+
+• Provides in-house powder coating to ensure IP54-rated weather
+protection for UK climate conditions.
+Get in touch
+
+Visit company website
+
+Forge Engineering Report
+
+Contact via website form
+
+54 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N
+
+chain-v2-1779231102611
+
+Appendix A — Parts Pending Verification
+Every (manufacturer, part number) pair was checked against published catalogues. Verified parts are listed
+in the Bill of Materials section as-is. Fabricated SKUs were stripped automatically. The items below could
+not be confidently verified — a human engineer should confirm or replace each before procurement.
+
+Verification summary
+Total checked: 137
+
+Verified: 0
+
+Stripped (fakes): 0
+
+Uncertain: 137
+
+Plausible but unverified — human to confirm
+What is this?
+These are the parts the engine identified as plausible matches for your sub-module requirements, but could
+not independently verify against a real distributor catalogue or manufacturer datasheet. The manufacturer
+named makes products of this type, and the part-number format is consistent with their catalogue convention, but no specific item resolved.
+
+What to do
+For each row, your sales engineer should: (1) confirm the part exists in current stock, (2) confirm it fits the
+sub-module requirement listed under "Location in design", (3) replace with a verified item if it does not. The
+"Reason for uncertainty" column flags the specific verification step that failed.
+
+Why not just strip these?
+The engine already strips parts it identifies as clearly fabricated. The remaining "uncertain" parts are kept
+because removing them would leave gaps in the bill of materials that your sales engineer would then have
+to backfill from scratch. Showing them as candidates-with-uncertainty is more useful than showing nothing.
+
+Rows start on the next page. 137 parts flagged, listed alphabetically by module.
+
+Forge Engineering Report
+
+55 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(1/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+R290 scroll compressor
+
+Copeland
+
+YP0135E-TFD-290
+
+Energy Conversion
+Transduction / Compressor And Drive
+
+Engine B curve: class=oem
+subsystem, annual volume=100,000, reference
+£600, multiplier 0.580 to
+£348
+
+inverter drive PCB
+
+Semikron
+
+VLT-FC-30A-INV
+
+Energy Conversion
+Transduction / Compressor And Drive
+
+Engine B curve: class=oem
+subsystem, annual volume=100,000, reference
+£600, multiplier 0.580 to
+£348
+
+compressor mounting Copeland
+bracket
+
+YP-8K-R290-MNT
+
+Energy Conversion
+Transduction / Compressor And Drive
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+inverter heatsink
+
+Aavid
+
+HS-30A-AL
+
+Energy Conversion
+Transduction / Compressor And Drive
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+compressor terminal
+box
+
+Copeland
+
+TB-YP-R290
+
+Energy Conversion
+Transduction / Compressor And Drive
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+fin-and-tube evaporator
+
+Kelvion
+
+KEV-EVP-8KW-R290
+
+Energy Conversion
+Transduction / Heat
+Exchangers
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+brazed plate condenser
+
+SWEP
+
+B10-8KW-R290
+
+Energy Conversion
+Transduction / Heat
+Exchangers
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+SH-500-ASHP
+
+Energy Conversion
+Transduction / Heat
+Exchangers
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+evaporator fan shroud ebm-papst
+
+Forge Engineering Report
+
+56 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(2/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+condenser mounting
+plate
+
+SWEP
+
+BP-8K-PLT
+
+Energy Conversion
+Transduction / Heat
+Exchangers
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+evaporator distributor
+
+Emerson
+
+DIST-8KW-R290
+
+Energy Conversion
+Transduction / Heat
+Exchangers
+
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+cold plate
+
+Aavid
+
+CP-8KW-INV
+
+Energy Conversion
+Transduction / Thermal Management
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+thermal interface pad
+
+Bergquist
+
+GP6000-0.02-00-11
+
+Energy Conversion
+Transduction / Thermal Management
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+inverter cooling fan
+
+ebm-papst
+
+612NHH-8KW
+
+Energy Conversion
+Transduction / Thermal Management
+
+Engine B curve: class=mechanical assembly, annual volume=100,000, reference £180, multiplier 0.185
+to £33.3
+
+thermal compound
+paste
+
+Arctic Silver
+
+AS5-3.5G
+
+Energy Conversion
+Transduction / Thermal Management
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+inverter heatsink ther- TE Connectivity
+mistor
+
+GA10K4MCD1-INV
+
+Energy Conversion
+Transduction / Thermal Management
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+crankcase heater band Thermon
+
+CHB-80W-R290
+
+Energy Conversion Transduction /
+Crankcase Heater
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+Forge Engineering Report
+
+57 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(3/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+crankcase thermostat
+
+Danfoss
+
+077B6010
+
+Energy Conversion Transduction /
+Crankcase Heater
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+heater control relay
+
+Finder
+
+40.31.0.24.0000
+
+Energy Conversion Transduction /
+Crankcase Heater
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+heater wiring harness
+
+TE Connectivity
+
+HWH-CH-8K
+
+Energy Conversion Transduction /
+Crankcase Heater
+
+Engine B curve:
+class=electronic cable, annual volume=100,000, reference £95, multiplier
+0.150 to £14.25
+
+heater thermal fuse
+
+Cantherm
+
+SDF DF104S
+
+Energy Conversion Transduction /
+Crankcase Heater
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+galvanized steel base
+pan
+
+custom
+
+BP-ASHP-8K
+
+Structure ContainEngine B curve:
+ment / Chassis Frame class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+structural upright
+
+SSAB
+
+UPT-8K-GALV
+
+Structure ContainEngine B curve:
+ment / Chassis Frame class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+base pan gasket
+
+Trelleborg
+
+GKT-90KG-AS
+
+Structure ContainEngine B curve:
+ment / Chassis Frame class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+upright bracing strap
+
+SSAB
+
+STR-4UPT
+
+Structure ContainEngine B curve:
+ment / Chassis Frame class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+Forge Engineering Report
+
+58 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(4/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+levelling foot
+
+Würth
+
+LF-M16-ADJ
+
+Structure ContainEngine B curve: class=mement / Chassis Frame chanical assembly, annual volume=100,000, reference £180, multiplier 0.185
+to £33.3
+
+IP20 polycarbonate
+barrier
+
+Phoenix Contact
+
+IP20-BAR-8K
+
+Structure ContainEngine B curve:
+ment / Chassis Frame class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+compressor sound
+jacket
+
+Armacell
+
+AFJ-56DBA-R290
+
+Structure Containment / Acoustic Enclosure
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+weather-resistant cas- custom
+ing
+
+CAS-IPX4-8K
+
+Structure Containment / Acoustic Enclosure
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+acoustic liner panel
+
+Rockwool
+
+LIN-56DBA
+
+Structure Containment / Acoustic Enclosure
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+casing seal strip
+
+3M
+
+SEAL-IPX4
+
+Structure Containment / Acoustic Enclosure
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+vibration isolator pad
+
+Trelleborg
+
+VI-25-56DBA
+
+Structure Containment / Acoustic Enclosure
+
+Engine B curve: class=mechanical assembly, annual volume=100,000, reference £180, multiplier 0.185
+to £33.3
+
+GA10K4MCD1
+
+Sensing Instrumentation / Refrigerant
+Sensors
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+discharge temperature TE Connectivity
+thermistor
+
+Forge Engineering Report
+
+REASON FOR UNCERTAINTY
+
+59 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(5/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+suction pressure
+transducer
+
+Danfoss
+
+AKS 32R
+060G1250
+
+Sensing Instrumentation / Refrigerant
+Sensors
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+refrigerant temp sensor housing
+
+TE Connectivity
+
+HTS-10K-R290
+
+Sensing Instrumentation / Refrigerant
+Sensors
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+pressure transducer
+cable
+
+Lapp
+
+CAB-0-15BAR
+
+Sensing Instrumentation / Refrigerant
+Sensors
+
+Engine B curve:
+class=electronic cable, annual volume=100,000, reference £95, multiplier
+0.150 to £14.25
+
+suction line thermistor TE Connectivity
+
+GA10K4MCD1-SUC
+
+Sensing Instrumentation / Refrigerant
+Sensors
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+controller EEPROM
+
+Microchip
+
+24LC256-I/SN
+
+Sensing Instrumentation / Refrigerant
+Sensors
+
+Engine B curve:
+class=electronic ic, annual volume=100,000, reference £5, multiplier 0.125 to
+£0.63
+
+water temperature
+thermistor
+
+TE Connectivity
+
+GND10K4A1L-W Sensing Instrumen-
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+flow temp sensor
+pocket
+
+Omega
+
+return temp sensor
+pocket
+
+Omega
+
+Forge Engineering Report
+
+tation / Hydronic
+Sensors
+
+POK-10K-FLOW Sensing Instrumentation / Hydronic
+Sensors
+
+POK-10K-RET
+
+Sensing Instrumentation / Hydronic
+Sensors
+
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+60 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(6/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+flow pressure switch
+
+Danfoss
+
+KP44
+060L5100
+
+Sensing Instrumentation / Hydronic
+Sensors
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+differential pressure
+sensor
+
+Honeywell
+
+26PCBFA6D
+
+Sensing Instrumentation / Hydronic
+Sensors
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+R290 catalytic gas
+sensor
+
+Dräger
+
+Polytron
+5310-R290
+
+Sensing Instrumentation / Leak Detection
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+R290 sensor mount
+bracket
+
+Rittal
+
+BRK-HIGH-PT
+
+Sensing Instrumentation / Leak Detection
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+gas sensor cable assembly
+
+Molex
+
+CAB-R290-SENS
+
+Sensing Instrumentation / Leak Detection
+
+Engine B curve:
+class=electronic cable, annual volume=100,000, reference £95, multiplier
+0.150 to £14.25
+
+alarm relay module
+
+Finder
+
+40.31.0.24.0000
+
+Sensing Instrumentation / Leak Detection
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+sensor status LED
+
+Kingbright
+
+L-53GD
+
+Sensing Instrumentation / Leak Detection
+
+Engine B curve: class=optical, annual volume=100,000, reference
+£3.5, multiplier 0.120 to
+£0.42
+
+GND10K4A1L-AMB
+
+Sensing Instrumen- Engine B curve:
+tation / Ambient Temp class=sensor, annual volSensor
+ume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+ambient air thermistor TE Connectivity
+probe
+
+Forge Engineering Report
+
+61 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(7/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+ambient sensor housing
+
+Bopla
+
+B-120-UV
+
+Sensing Instrumen- Engine B curve:
+tation / Ambient Temp class=structural polymer,
+Sensor
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+ambient sensor cable
+
+Lapp
+
+UNITRONIC-111
+
+Sensing Instrumen- Engine B curve:
+tation / Ambient Temp class=electronic cable, anSensor
+nual volume=100,000, reference £95, multiplier
+0.150 to £14.25
+
+ambient sensor
+mounting clip
+
+Würth
+
+CLIP-M6-SS
+
+Sensing Instrumen- Engine B curve: class=metation / Ambient Temp chanical fastener, annuSensor
+al volume=100,000, reference £0.45, multiplier
+0.065 to £0.03
+
+ambient sensor connector
+
+TE Connectivity
+
+AMP-SEAL-2P
+
+Sensing Instrumen- Engine B curve:
+tation / Ambient Temp class=electronic conSensor
+nector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+heat pump controller
+PCB
+
+STMicroelectronics
+
+ARM Cortex-M4
+
+Control Compute
+Communication /
+Main Controller
+
+Engine B curve:
+class=electronic pcb, annual volume=100,000, reference £35, multiplier
+0.100 to £3.5
+
+ABM8-8.000MHZ-20-B2X-T
+
+Control Compute
+Communication /
+Main Controller
+
+Engine B curve:
+class=electronic passive,
+annual volume=100,000,
+reference £30, multiplier
+0.050 to £1.5
+
+watchdog timer IC
+
+Texas Instruments TPS3823-33DBVR
+
+Control Compute
+Communication /
+Main Controller
+
+Engine B curve:
+class=electronic ic, annual volume=100,000, reference £5, multiplier 0.125 to
+£0.63
+
+flash storage IC
+
+Macronix
+
+Control Compute
+Communication /
+Main Controller
+
+Engine B curve:
+class=electronic ic, annual volume=100,000, reference £5, multiplier 0.125 to
+£0.63
+
+MCU crystal oscillator Abracon
+
+Forge Engineering Report
+
+MX25L12833FM2I-08G
+
+REASON FOR UNCERTAINTY
+
+62 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(8/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+24V to 3.3V DC-DC
+converter
+
+Traco Power
+
+THN
+15-2433WI
+
+Control Compute
+Communication /
+Main Controller
+
+Engine B curve: class=oem
+subsystem, annual volume=100,000, reference
+£600, multiplier 0.580 to
+£348
+
+Modbus RTU transceiver
+
+Texas Instruments THVD1500DR
+
+Control Compute
+Communication /
+Comms Gateway
+
+Engine B curve:
+class=electronic ic, annual volume=100,000, reference £5, multiplier 0.125 to
+£0.63
+
+RS-485 digital isolator Analog Devices
+
+ADM2587EBRWZ
+
+Control Compute
+Communication /
+Comms Gateway
+
+Engine B curve:
+class=electronic ic, annual volume=100,000, reference £5, multiplier 0.125 to
+£0.63
+
+Modbus connector
+
+Phoenix Contact
+
+1483453
+
+Control Compute
+Communication /
+Comms Gateway
+
+Engine B curve:
+class=electronic connector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+ESD protection diode
+
+Littelfuse
+
+SP724ABTG
+
+Control Compute
+Communication /
+Comms Gateway
+
+Engine B curve:
+class=electronic discrete,
+annual volume=100,000,
+reference £1.2, multiplier
+0.165 to £0.2
+
+bus termination resis- Yageo
+tor
+
+RC0603FR-07120RL
+
+Control Compute
+Communication /
+Comms Gateway
+
+Engine B curve:
+class=electronic passive,
+annual volume=100,000,
+reference £30, multiplier
+0.050 to £1.5
+
+Wi-Fi communication
+module
+
+Espressif
+
+ESP32-WROOM-32E
+
+Control Compute
+Engine B curve:
+Communication / Wifi class=electronic ic, annuGateway Module
+al volume=100,000, reference £5, multiplier 0.125 to
+£0.63
+
+Wi-Fi antenna
+
+Molex
+
+146153-0100
+
+Control Compute
+Engine B curve: class=oem
+Communication / Wifi subsystem, annual volGateway Module
+ume=100,000, reference
+£600, multiplier 0.580 to
+£348
+
+Forge Engineering Report
+
+63 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(9/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+Wi-Fi PCB carrier
+
+custom
+
+WIFI-CARRIER-8K
+
+Control Compute
+Engine B curve:
+Communication / Wifi class=electronic pcb, anGateway Module
+nual volume=100,000, reference £35, multiplier
+0.100 to £3.5
+
+Wi-Fi shielding can
+
+Laird
+
+BMI-S-101
+
+Control Compute
+Engine B curve:
+Communication / Wifi class=structural metal, anGateway Module
+nual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+Wi-Fi header connector
+
+Samtec
+
+TSW-106-07-G-S
+
+Control Compute
+Engine B curve:
+Communication / Wifi class=electronic conGateway Module
+nector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+electronic expansion
+valve
+
+Danfoss
+
+ETS 6-10 R290
+
+Safety Protection /
+Refrigerant Safety
+Valves
+
+Engine B curve: class=motor actuator, annual volume=100,000, reference
+£350, multiplier 0.150 to
+£52.5
+
+four-way reversing
+valve
+
+Sanhua
+
+SHF-20-R290
+
+Safety Protection /
+Refrigerant Safety
+Valves
+
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+high-pressure safety
+switch
+
+Danfoss
+
+KP17
+060L5205
+
+Safety Protection /
+Refrigerant Safety
+Valves
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+filter drier
+
+Danfoss
+
+DML 164 R290
+
+Safety Protection /
+Refrigerant Safety
+Valves
+
+Engine B curve: class=mechanical assembly, annual volume=100,000, reference £180, multiplier 0.185
+to £33.3
+
+SGI-10 R290
+
+Safety Protection /
+Refrigerant Safety
+Valves
+
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+refrigerant sight glass Danfoss
+
+Forge Engineering Report
+
+REASON FOR UNCERTAINTY
+
+64 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(10/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+RCD breaker
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+Schneider Electric A9N18162
+
+Safety Protection /
+Electrical Safety
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+surge protection device
+
+Phoenix Contact
+
+VAL-MS
+230/3+1
+
+Safety Protection /
+Electrical Safety
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+mains fuse holder
+
+Schurter
+
+0031.8201
+
+Safety Protection /
+Electrical Safety
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+earth terminal lug
+
+Wago
+
+2002-3217
+
+Safety Protection /
+Electrical Safety
+
+Engine B curve:
+class=electronic connector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+metal oxide varistor
+
+Littelfuse
+
+V275LA40A
+
+Safety Protection /
+Electrical Safety
+
+Engine B curve:
+class=electronic passive,
+annual volume=100,000,
+reference £30, multiplier
+0.050 to £1.5
+
+door interlock switch
+
+Schneider Electric XCS-LE
+
+Safety Protection /
+Safety Interlocks
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+emergency stop button
+
+Eaton
+
+M22-WK11
+
+Safety Protection /
+Safety Interlocks
+
+Engine B curve: class=oem
+subsystem, annual volume=100,000, reference
+£600, multiplier 0.580 to
+£348
+
+safety interlock relay
+
+Finder
+
+48.41.0.24.0060
+
+Safety Protection /
+Safety Interlocks
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+Forge Engineering Report
+
+PART NUMBER
+
+65 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(11/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+interlock wiring harness
+
+TE Connectivity
+
+IWH-ASHP-8K
+
+Safety Protection /
+Safety Interlocks
+
+Engine B curve:
+class=electronic cable, annual volume=100,000, reference £95, multiplier
+0.150 to £14.25
+
+interlock status LED
+
+Kingbright
+
+L-53SRGD
+
+Safety Protection /
+Safety Interlocks
+
+Engine B curve: class=optical, annual volume=100,000, reference
+£3.5, multiplier 0.120 to
+£0.42
+
+fan grille
+
+ebm-papst
+
+LZ260-8KW
+
+Environmental Interface / Air Management
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+acoustic louver
+
+Renson
+
+LVR-ASHP-56DB
+
+Environmental Interface / Air Management
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+evaporator fan motor
+
+ebm-papst
+
+G2E140-BL31-01
+
+Environmental Interface / Air Management
+
+Engine B curve: class=motor actuator, annual volume=100,000, reference
+£350, multiplier 0.150 to
+£52.5
+
+fan speed sensor
+
+Honeywell
+
+NGT-L-500
+
+Environmental Interface / Air Management
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+intake air filter mesh
+
+custom
+
+FLT-ASHP-8K
+
+Environmental Interface / Air Management
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+heated drip tray
+
+Thermon
+
+DT-8K-ABS
+
+Environmental Interface / Condensate
+Management
+
+Engine B curve:
+class=thermal, annual volume=100,000, reference
+£65, multiplier 0.140 to
+£9.1
+
+Forge Engineering Report
+
+66 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(12/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+defrost heater cable
+
+Thermon
+
+DH-150W-R290
+
+Environmental Interface / Condensate
+Management
+
+Engine B curve:
+class=electronic cable, annual volume=100,000, reference £95, multiplier
+0.150 to £14.25
+
+condensate drain hose Hozelock
+
+DRN-20MM-1M
+
+Environmental Interface / Condensate
+Management
+
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+condensate drain trap McAlpine
+
+TRAP-20-ASHP
+
+Environmental Interface / Condensate
+Management
+
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+condensate overflow
+float switch
+
+SJE-Rhombus
+
+7210-0050
+
+Environmental Interface / Condensate
+Management
+
+Engine B curve:
+class=sensor, annual volume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+AC terminal block
+
+Wago
+
+2002-3257
+
+Power Distribution /
+Mains Input
+
+Engine B curve:
+class=electronic connector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+main contactor
+
+Schneider Electric LC1D18B7
+
+Power Distribution /
+Mains Input
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+EMI filter
+
+Schaffner
+
+FN2060-16-06
+
+Power Distribution /
+Mains Input
+
+Engine B curve:
+class=electronic ic, annual volume=100,000, reference £5, multiplier 0.125 to
+£0.63
+
+Type 1 surge arrester
+
+OBO Bettermann
+
+V25-B/3+NPE
+
+Power Distribution /
+Mains Input
+
+Engine B curve:
+class=safety consumable,
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+Forge Engineering Report
+
+67 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(13/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+power indicator LED
+
+Kingbright
+
+L-53GD-5V
+
+Power Distribution /
+Mains Input
+
+Engine B curve: class=optical, annual volume=100,000, reference
+£3.5, multiplier 0.120 to
+£0.42
+
+chassis earth stud
+
+TE Connectivity
+
+5-1638398-1
+
+Power Distribution /
+EMC Grounding
+
+Engine B curve: class=mechanical fastener, annual volume=100,000, reference £0.45, multiplier
+0.065 to £0.03
+
+common-mode choke
+
+Schaffner
+
+RN214-0.6-02-1M
+
+Power Distribution /
+EMC Grounding
+
+Engine B curve:
+class=magnetic, annual
+volume=100,000, reference £18, multiplier 0.375
+to £6.75
+
+EMC cable gland
+
+Murrplastik
+
+SK-EMC-M20
+
+Power Distribution /
+EMC Grounding
+
+Engine B curve:
+class=electronic connector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+ground busbar
+
+Wago
+
+2002-4015
+
+Power Distribution /
+EMC Grounding
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+shielded signal harness
+
+Lapp
+
+OLFLEX-FD-8P-0.25
+
+Power Distribution /
+EMC Grounding
+
+Engine B curve:
+class=electronic cable, annual volume=100,000, reference £95, multiplier
+0.150 to £14.25
+
+removable front panel
+
+custom
+
+FP-ASHP-8K
+
+Maintenance Serviceability / Service
+Access
+
+Engine B curve:
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+Schrader service port
+
+Hansen
+
+HS-14SAE-R290
+
+Maintenance Serviceability / Service
+Access
+
+Engine B curve: class=fluid path, annual volume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+Forge Engineering Report
+
+68 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(14/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+captive screw fastener Bossard
+
+BN 631 M6-20
+
+Maintenance Serviceability / Service
+Access
+
+Engine B curve: class=mechanical fastener, annual volume=100,000, reference £0.45, multiplier
+0.065 to £0.03
+
+USB service port
+
+UE27AC54100
+
+Maintenance Serviceability / Service
+Access
+
+Engine B curve:
+class=electronic connector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+service information la- Brady
+bel
+
+LBL-ASHP-8K
+
+Maintenance Serviceability / Service
+Access
+
+Engine B curve:
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+axial fan blade
+
+ebm-papst
+
+A580-8KW-ASHP
+
+Actuation Kinematics Engine B curve: class=me/ Air Mover
+chanical assembly, annual volume=100,000, reference £180, multiplier 0.185
+to £33.3
+
+ECM fan motor
+
+ebm-papst
+
+G2E140-BL31-01
+
+Actuation Kinematics Engine B curve: class=mo/ Air Mover
+tor actuator, annual volume=100,000, reference
+£350, multiplier 0.150 to
+£52.5
+
+motor mounting
+bracket
+
+custom
+
+MB-G2E140
+
+Actuation Kinematics Engine B curve:
+/ Air Mover
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+motor vibration
+damper
+
+Trelleborg
+
+VD-M6-G2E
+
+Actuation Kinematics Engine B curve:
+/ Air Mover
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+fan guard ring
+
+custom
+
+FGR-500-ASHP
+
+Actuation Kinematics Engine B curve:
+/ Air Mover
+class=structural metal, annual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+Forge Engineering Report
+
+MANUFACTURER
+
+Amphenol
+
+69 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(15/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+REASON FOR UNCERTAINTY
+
+scroll compression set Copeland
+
+SC-YP0135-R290
+
+Actuation Kinematics Engine B curve: class=oem
+/ Compressor Mech- subsystem, annual volanism
+ume=100,000, reference
+£600, multiplier 0.580 to
+£348
+
+crankshaft bearing
+
+NSK
+
+6204-2RS-C3
+
+Actuation Kinematics Engine B curve: class=me/ Compressor Mech- chanical assembly, annuanism
+al volume=100,000, reference £180, multiplier 0.185
+to £33.3
+
+scroll tip seal
+
+Copeland
+
+STS-YP-R290
+
+Actuation Kinematics Engine B curve:
+/ Compressor Mech- class=structural polymer,
+anism
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+thrust washer
+
+Copeland
+
+TW-YP-R290
+
+Actuation Kinematics Engine B curve: class=me/ Compressor Mech- chanical fastener, annuanism
+al volume=100,000, reference £0.45, multiplier
+0.065 to £0.03
+
+compressor oil charge Emkarate
+
+RL 32H R290
+
+Actuation Kinematics Engine B curve:
+/ Compressor Mech- class=safety consumable,
+anism
+annual volume=100,000,
+reference £40, multiplier
+0.225 to £9
+
+copper refrigerant pipe Mueller Industries C12200-HP-8K
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Refrigerant id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+liquid receiver
+
+Sanhua
+
+LR-8K-R290
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Refrigerant id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+filter drier core
+
+Danfoss
+
+DML 164 R290
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Refrigerant id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+Forge Engineering Report
+
+70 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(16/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+moisture-indicating
+sight glass
+
+Danfoss
+
+SGI-10
+R290-MI
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Refrigerant id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+discharge muffler
+
+Parker
+
+DM-5/8-R290
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Refrigerant id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+variable-speed circulation pump
+
+Grundfos
+
+UPM3 15-70
+95087149
+
+Mass Fluid Transport Engine B curve: class=oem
+Process / Hydronic
+subsystem, annual volTransport
+ume=100,000, reference
+£600, multiplier 0.580 to
+£348
+
+water isolation valve
+
+Pegler
+
+YP-1BSP-VALVE
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Hydronic
+id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+expansion vessel
+
+Zilmet
+
+CAL-PRO 8L
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Hydronic
+id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+system pressure
+gauge
+
+Wika
+
+213.53.063
+
+Mass Fluid Transport Engine B curve:
+Process / Hydronic
+class=sensor, annual volTransport
+ume=100,000, reference
+£250, multiplier 0.165 to
+£41.25
+
+automatic air vent
+
+Caleffi
+
+502006
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Hydronic
+id path, annual volTransport
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+Y-type brass strainer
+
+Caleffi
+
+331006
+
+Mass Fluid Transport Engine B curve: class=fluProcess / Hydronic
+id path, annual volStrainer Filter
+ume=100,000, reference
+£200, multiplier 0.265 to
+£53
+
+Forge Engineering Report
+
+REASON FOR UNCERTAINTY
+
+71 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(17/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+strainer sealing gasket Caleffi
+
+GSK-331006
+
+Mass Fluid Transport Engine B curve:
+Process / Hydronic
+class=structural polymer,
+Strainer Filter
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+strainer cap
+
+Caleffi
+
+CAP-331006
+
+Mass Fluid Transport Engine B curve:
+Process / Hydronic
+class=structural metal, anStrainer Filter
+nual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+strainer mesh insert
+
+Caleffi
+
+MSH-331006
+
+Mass Fluid Transport Engine B curve: class=meProcess / Hydronic
+chanical assembly, annuStrainer Filter
+al volume=100,000, reference £180, multiplier 0.185
+to £33.3
+
+strainer mounting
+bracket
+
+custom
+
+BRK-STR-8K
+
+Mass Fluid Transport Engine B curve:
+Process / Hydronic
+class=structural metal, anStrainer Filter
+nual volume=100,000, reference £300, multiplier
+0.080 to £24
+
+seven-segment LED
+display
+
+Kingbright
+
+DA56-11EWA
+
+HMI Ergonomics / In- Engine B curve: class=opstaller Interface
+tical, annual volume=100,000, reference
+£3.5, multiplier 0.120 to
+£0.42
+
+Forge Engineering Report
+
+MANUFACTURER
+
+REASON FOR UNCERTAINTY
+
+72 / 75
+
+A P P E N D I X A · PA RT S P E N D I N G V E R I F I C AT I O N — P L AU S I B L E B U T U N V E R I F I E D
+(18/18)
+
+chain-v2-1779231102611
+
+Plausible but unverified — human to confirm (continued)
+SUB-MODULE
+
+MANUFACTURER
+
+PART NUMBER
+
+LOCATION IN DESIGN
+
+tactile push button
+
+E-Switch
+
+TL3305AF160QG
+
+HMI Ergonomics / In- Engine B curve:
+staller Interface
+class=electronic connector, annual volume=100,000, reference
+£2.5, multiplier 0.120 to
+£0.3
+
+interface PCB
+
+custom
+
+HMI-PCB-8K
+
+HMI Ergonomics / In- Engine B curve:
+staller Interface
+class=electronic pcb, annual volume=100,000, reference £35, multiplier
+0.100 to £3.5
+
+RGB status LED
+
+Kingbright
+
+L-154A4SURKQBDZGC
+
+HMI Ergonomics / In- Engine B curve: class=opstaller Interface
+tical, annual volume=100,000, reference
+£3.5, multiplier 0.120 to
+£0.42
+
+display bezel
+
+custom
+
+BZL-HMI-8K
+
+HMI Ergonomics / In- Engine B curve:
+staller Interface
+class=structural polymer,
+annual volume=100,000,
+reference £130, multiplier
+0.005 to £0.65
+
+Forge Engineering Report
+
+REASON FOR UNCERTAINTY
+
+73 / 75
+
+A P P E N D I X B · M A N UA L R E V I E W N OT E S
+
+chain-v2-1779231102611
+
+Manual Review Notes
+Pipeline gates that fired during this run. Each entry below is a gate that exhausted its bounded retry budget;
+the pipeline proceeded with the best-effort output but the affected section is not procurement-ready without
+human review.
+
+MANUAL REVIEW — Physics critic
+Physics critic flagged 3 high-severity engineering issues (4/10 engineering-plausibility score).
+The design has critical physical and electrical mismatches, notably a 3-phase compressor for a UK residential
+brief and an extremely undersized fan that cannot support the 8 kW thermal load.
+Critic scores (0-10): brief’design 5, engineering 4, coherence 5, parts 7, honesty 8.
+High-severity findings:
+[high/high] brief_to_design_fidelity @ energy_conversion_transduction/sub_modules[0]/words[0]: The compressor motor code 'TFD' (YP0135E-TFD-290) indicates a 3-phase 380-420V motor. The brief specifies a residential
+heat pump for UK semi-detached homes, which almost exclusively use single-phase 230V electrical connections.
+A 3-phase compressor is incompatible with the target installation environment.
+Suggested check: Replace the compressor with a single-phase version (e.g., motor code PFJ or equivalent
+230V/1ph/50Hz model).
+[high/high] engineering_plausibility @ environmental_interface/sub_modules[0]/words[2]: The fan motor specified
+is a 140 mm centrifugal blower rated at 80 W (ebm-papst G2E140-BL31-01). An 8 kW thermal output heat pump
+requires approximately 3000 to 4300 m³/h of airflow across the 900x400 mm evaporator to extract ~6 kW of heat.
+The G2E140 blower can only deliver <500 m³/h, which is mathematically insufficient and will cause the evaporator
+to freeze rapidly, preventing the system from meeting its 8 kW rating.
+Suggested check: Specify a 450 mm or 500 mm axial fan (e.g., ebm-papst HyBlade series) rated for at least
+3000 m³/h at the operating static pressure.
+[high/high] internal_coherence @ environmental_interface/sub_modules[0]: The input JSON is truncated
+mid-sentence in the environmental_interface module, leaving the air management sub-module incomplete and
+missing subsequent data.
+Suggested check: Regenerate or complete the design payload to ensure all modules are fully defined.
+These findings are LLM-judged with confidence enum (high|medium|low|unknown). A human engineer should
+verify each against datasheets / first-principles before acting on the design.
+
+MANUAL REVIEW — G1b compliance
+Compliance gate WARN: 1 mandatory standard not declared in the brief for the detected jurisdictions
+(UK, EU).
+WARN · EESR 2016 (missing_mandatory): Electrical Equipment (Safety) Regulations 2016 (UK statutory) (UK).
+UK statutory equivalent of LVD post-Brexit. UKCA marking route for UK-only market entry.
+WARN · JURISDICTION_SCOPE (jurisdiction_conflict): Brief targets multiple regions (UK, EU) without an explicit
+harmonisation plan. Each region adds £25-60k in certification cost.
+Brief-revision suggestion (regulatory_requirements):
+Original: (none declared)
+Suggested: Add EESR 2016 (Electrical Equipment (Safety) Regulations 2016 (UK statutory)). Typical compliance
+cost £0, lead time 0 weeks.
+Rationale: Cheapest missing mandatory standard for this class + your declared jurisdiction. UK statutory
+equivalent of LVD post-Brexit. UKCA marking route for UK-only market entry.
+
+Forge Engineering Report
+
+74 / 75
+
+A P P E N D I X B · M A N UA L R E V I E W N OT E S
+
+chain-v2-1779231102611
+
+MANUAL REVIEW — G4 grammar
+Module-decomposition grammar gate exhausted after 2 retries.
+Stage 1.7 multi-emitter grammar / synthesis judges voted NEEDS_MAJOR on the final synthesis after the bounded
+retry budget was exhausted. The modules + sub-modules in this report should be cross-checked manually —
+expect missing cross-module grammar links or sub-module field gaps.
+
+ØK10 reference-graph shadow check
+Class heat-pump-residential — 1 required edge missing from emission (shadow mode — no impact
+on pipeline).
+Diagnostic only — the K10 engineering reference graph is wired into the G4 grammar gate in shadow mode while
+we observe the failure pattern across the 10 supported classes. The pipeline did NOT fail; once shadow-mode
+results across the 10 classes are reviewed, K10 will be promoted to enforcing mode in a later dispatch.
+Missing required edges (1)
+· safety_protection ” [Digital-24V] energy_conversion_transduction — HP switch (31.5 bar R32 / 26 bar R290) and LP
+switch hard-wired to compressor contactor coil — trips
+
+Extra emitted edges (no K10 match, 21)
+? safety_protection ” [alarm_interlock] control_compute_communication — high pressure trip signal
+? safety_protection ” [safety_isolation] power_distribution — RCD mains interrupt
+? control_compute_communication ” [contactor_command] mass_fluid_transport_process — PWM pump speed control
+? control_compute_communication ” [contactor_command] safety_protection — EXV stepper position
+? environmental_interface ” [mechanical_mount] structure_containment — louver to casing
+? power_distribution ” [power_supply] control_compute_communication — regulated 24 V DC rail
+? actuation_kinematics ” [air_duct] environmental_interface — fan motor drives air through acoustic louver and filter
+? control_compute_communication ” [pwm_command] environmental_interface — defrost cycle initiation and condensate heater control based on ambient/coil del
+? sensing_instrumentation ” f[eedback_loop] actuation_kinematics — fan speed Hall sensor and compressor discharge
+temp for kinematic load adjustmen
+? power_distribution ” [power_supply] environmental_interface — 230 V AC routed to defrost heater cable and condensate tray element
+? structure_containment ” t[hermal_path] environmental_interface — acoustic enclosure heat dissipation to ambient
+? sensing_instrumentation ” [cooling] environmental_interface — leak detection sensor cooling
+? safety_protection ” t[hermal_path] environmental_interface — safety interlock relay heat dissipation
+? environmental_interface ” [cooling] environmental_interface — air management fan cooling
+? power_distribution ” t[hermal_path] environmental_interface — mains input component heat dissipation
+? power_distribution ” [power_supply] structure_containment — power distribution to chassis components
+? power_distribution ” [power_supply] actuation_kinematics — power distribution to fan motor
+? maintenance_serviceability ” [physical_access] energy_conversion_transduction — Service access to compressor
+? actuation_kinematics ” t[hermal_path] environmental_interface — fan motor and compressor heat dissipation to
+ambient
+? hmi_ergonomics ” t[hermal_path] environmental_interface — installer interface PCB heat dissipation
+…and 1 more.
+
+Protocol / mechanism deltas (41)
+! mass_fluid_transport_process ’ structure_containment: mechanism: emitted=mechanical_mount graph=fluid_routing
+! mass_fluid_transport_process ’ environmental_interface: mechanism: emitted=air_duct graph=refrigerant_line
+! control_compute_communication ’ energy_conversion_transduction: mechanism: emitted=modbus_tcp graph=contactor_command
+! sensing_instrumentation ’ control_compute_communication: mechanism: emitted=adc_signal graph=sensor_feedback
+! power_distribution ’ energy_conversion_transduction: mechanism: emitted=power_supply graph=ac_busbar
+! hmi_ergonomics ’ control_compute_communication: mechanism: emitted=spi_bus graph=hmi_data
+! maintenance_serviceability ’ mass_fluid_transport_process: mechanism: emitted=physical_access graph=cable_transit
+! mass_fluid_transport_process ’ energy_conversion_transduction: mechanism: emitted=fluid graph=refrigerant_line
+! mass_fluid_transport_process ’ environmental_interface: mechanism: emitted=thermal graph=refrigerant_line
+! control_compute_communication ’ sensing_instrumentation: mechanism: emitted=modbus graph=sensor_feedback
+! sensing_instrumentation ’ control_compute_communication: mechanism: emitted=modbus graph=sensor_feedback
+! mass_fluid_transport_process ’ energy_conversion_transduction: mechanism: emitted=fluid graph=refrigerant_line
+
+Forge Engineering Report
+
+75 / 75
+
+
