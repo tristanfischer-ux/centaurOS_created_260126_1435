@@ -22,7 +22,6 @@ import { format } from "date-fns"
 import {
     ArrowLeft,
     Calendar,
-    Users,
     GitBranch,
     MessageSquare,
     Clock,
@@ -33,46 +32,28 @@ import {
     Link2,
     Check,
     FileDown,
-    AudioLines,
-    ImageIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Markdown } from "@/components/ui/markdown"
-import { Skeleton } from "@/components/ui/skeleton"
 import { toast } from "sonner"
 import { cn } from "@/lib/utils"
 import { COUNCIL_POSITION_LABELS } from "@/lib/agents/council"
 import { getSpecialistById } from "@/lib/agents/specialists-config"
-import { appendMeetingEntries, branchMeetingThread, refreshSessionAssetUrls } from "@/actions/meeting-threads"
+import { appendMeetingEntries, branchMeetingThread } from "@/actions/meeting-threads"
 import { generateMeetingThreadPdf } from "@/actions/meeting-thread-pdf"
-import { generateSessionInfographic } from "@/actions/brainstorm-cover"
-import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import type { MeetingThreadDetail, MeetingEntryRow } from "@/actions/meeting-threads"
 import type { SubscriptionTier } from "@/lib/billing/plans"
 import { getPrimaryTargetForTier } from "@/lib/agents/failover"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface MeetingAudioClip {
-    specialistId: string
-    voice: string
-    url: string
-    durationMs: number | null
-}
-
 interface MeetingThreadViewProps {
     thread: MeetingThreadDetail
     currentUserId: string
     userTier: SubscriptionTier
-    /** F2: signed cover-image URL (null if not yet ready) */
-    coverImageUrl?: string | null
-    /** F3 (new, 2026-04-28+): single combined audio URL — one file, one player */
-    audioUrl?: string | null
-    /** F3 (legacy): signed per-clip audio URLs in council order — old sessions only */
-    audioClips?: MeetingAudioClip[]
 }
 
 // ─── Council tier display labels ──────────────────────────────────────────────
@@ -493,39 +474,13 @@ export function MeetingThreadView({
     thread,
     currentUserId,
     userTier,
-    coverImageUrl,
-    audioUrl,
-    audioClips,
 }: MeetingThreadViewProps) {
+    void userTier
     const router = useRouter()
     const [entries, setEntries] = useState<MeetingEntryRow[]>(thread.entries)
     const [branchingEntryId, setBranchingEntryId] = useState<string | null>(null)
     const [copied, setCopied] = useState(false)
     const [pdfState, setPdfState] = useState<"idle" | "generating" | "done" | "error">("idle")
-    // F3 legacy playlist controls (used only when audioUrl is absent)
-    const [activeClipIdx, setActiveClipIdx] = useState(0)
-    const audioRef = useRef<HTMLAudioElement | null>(null)
-    const [coverGenState, setCoverGenState] = useState<"idle" | "running" | "done" | "error">("idle")
-    const [audioGenState, setAudioGenState] = useState<"idle" | "running" | "done" | "error">("idle")
-    const [liveCoverUrl, setLiveCoverUrl] = useState<string | null>(coverImageUrl ?? null)
-    const [liveAudioUrl, setLiveAudioUrl] = useState<string | null>(audioUrl ?? null)
-    const hasLegacyClips = !liveAudioUrl && Array.isArray(audioClips) && audioClips.length > 0
-    const activeClip = hasLegacyClips ? audioClips![activeClipIdx] ?? null : null
-
-    const handleClipEnded = useCallback(() => {
-        if (!hasLegacyClips) return
-        const next = activeClipIdx + 1
-        if (next < audioClips!.length) {
-            setActiveClipIdx(next)
-            // Autoplay the next clip after it loads
-            setTimeout(() => audioRef.current?.play().catch(() => {}), 50)
-        }
-    }, [hasLegacyClips, audioClips, activeClipIdx])
-
-    const handleSelectClip = useCallback((idx: number) => {
-        setActiveClipIdx(idx)
-        setTimeout(() => audioRef.current?.play().catch(() => {}), 50)
-    }, [])
 
     const isAuthor = thread.authorUserId === currentUserId
 
@@ -623,271 +578,123 @@ export function MeetingThreadView({
                 </Link>
             </div>
 
-            {/* F2: Generated cover image or generate button */}
-            {liveCoverUrl ? (
-                <Card className="overflow-hidden border">
-                    <div className="relative w-full bg-muted/20 aspect-[16/9] max-h-[420px]">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                            src={liveCoverUrl}
-                            alt={`Generated cover for: ${thread.topic}`}
-                            className="absolute inset-0 h-full w-full object-cover"
-                        />
-                        <span className="absolute bottom-2 right-2 inline-flex items-center gap-1 rounded-full bg-background/90 px-2.5 py-1 text-[10px] font-medium text-muted-foreground shadow-sm">
-                            Generated cover
+            {/* Branch provenance — sits above the hero when this thread is a branch */}
+            {thread.parentThreadId && thread.parentTopic && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <GitBranch className="h-3.5 w-3.5" />
+                    <span>Branched from</span>
+                    <Link
+                        href={`/agents/m/${thread.parentThreadId}`}
+                        className="text-electric-blue hover:underline truncate max-w-[300px]"
+                    >
+                        {thread.parentTopic}
+                    </Link>
+                    {thread.parentCreatedAt && (
+                        <span>
+                            on {format(new Date(thread.parentCreatedAt), "MMM d, yyyy")}
+                        </span>
+                    )}
+                </div>
+            )}
+
+            {/* Editorial hero — tier, question, brief, specialists, actions.
+                Replaces the previous AI-generated cover image with structured
+                editorial content that surfaces both the founder's question and
+                Cal's framing of it as the saved-summary header. */}
+            <Card className="border bg-gradient-to-br from-electric-blue/5 via-international-orange/[0.04] to-electric-blue/5">
+                <CardContent className="pt-8 pb-7 space-y-5">
+                    <div className="flex items-center justify-between gap-3">
+                        <Badge variant="secondary" className="text-[10px] uppercase tracking-wider px-2 py-0.5">
+                            {tierLabel}
+                        </Badge>
+                        <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+                            <Calendar className="h-3 w-3" />
+                            {format(new Date(thread.createdAt), "MMMM d, yyyy 'at' h:mm a")}
                         </span>
                     </div>
-                </Card>
-            ) : isAuthor ? (
-                <Card className="border">
-                    <CardContent className="pt-5 pb-5 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-muted">
-                                <ImageIcon className="h-4 w-4 text-muted-foreground" />
-                            </span>
-                            <div>
-                                <p className="text-sm font-medium text-foreground">Cover image</p>
-                                <p className="text-[11px] text-muted-foreground">Generate an illustration for this session</p>
+                    <h1 className="text-2xl md:text-3xl font-display font-semibold text-foreground leading-tight">
+                        {thread.topic}
+                    </h1>
+                    {thread.framing && (
+                        <div className="border-l-2 border-international-orange/40 pl-4 py-1">
+                            <p className="text-[10px] font-mono uppercase tracking-widest text-muted-foreground mb-1.5">
+                                The brief
+                            </p>
+                            <p className="text-sm text-foreground/85 leading-relaxed italic">
+                                {thread.framing}
+                            </p>
+                        </div>
+                    )}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                        <div className="flex items-center gap-3 min-w-0">
+                            <div className="flex -space-x-2 flex-shrink-0">
+                                {thread.specialistIds.slice(0, 6).map((id) => {
+                                    const s = getSpecialistById(id)
+                                    if (!s?.avatarImage) return null
+                                    return (
+                                        // eslint-disable-next-line @next/next/no-img-element
+                                        <img
+                                            key={id}
+                                            src={s.avatarImage}
+                                            alt={s.name}
+                                            title={`${s.name}${s.title ? ` — ${s.title}` : ""}`}
+                                            className="h-7 w-7 rounded-full object-cover border-2 border-background"
+                                        />
+                                    )
+                                })}
                             </div>
-                        </div>
-                        <Button
-                            size="sm"
-                            variant={coverGenState === "error" ? "destructive" : "default"}
-                            disabled={coverGenState === "running"}
-                            onClick={async () => {
-                                setCoverGenState("running")
-                                try {
-                                    const result = await generateSessionInfographic(thread.id)
-                                    if (result.ok) {
-                                        const urls = await refreshSessionAssetUrls(thread.id)
-                                        if (urls.coverUrl) setLiveCoverUrl(urls.coverUrl)
-                                        setCoverGenState("done")
-                                    } else {
-                                        setCoverGenState("error")
-                                    }
-                                } catch {
-                                    setCoverGenState("error")
-                                }
-                            }}
-                        >
-                            {coverGenState === "running" ? (
-                                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generating…</>
-                            ) : coverGenState === "error" ? "Retry" : "Generate cover"}
-                        </Button>
-                    </CardContent>
-                </Card>
-            ) : null}
-
-            {/* F3: Audio player — single combined file for new sessions (2026-04-28+);
-                legacy per-clip playlist for old sessions; generate button if absent. */}
-            {liveAudioUrl ? (
-                <Card className="border">
-                    <CardContent className="pt-5 space-y-3">
-                        <div className="flex items-center gap-2">
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-electric-blue/10 text-electric-blue">
-                                <BookOpen className="h-3.5 w-3.5" />
-                            </span>
-                            <h3 className="text-sm font-semibold text-foreground">Listen to the full council discussion</h3>
-                        </div>
-                        {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-                        <audio
-                            src={liveAudioUrl}
-                            controls
-                            preload="metadata"
-                            className="w-full"
-                        />
-                        <p className="text-[10px] text-muted-foreground">
-                            Each specialist is introduced by name. Works well on the go.
-                        </p>
-                    </CardContent>
-                </Card>
-            ) : hasLegacyClips && activeClip ? (
-                <Card className="border">
-                    <CardContent className="pt-5 space-y-4">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="flex items-center gap-2">
-                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-electric-blue/10 text-electric-blue">
-                                    <BookOpen className="h-3.5 w-3.5" />
-                                </span>
-                                <h3 className="text-sm font-semibold text-foreground">Listen to this session</h3>
-                                <Badge variant="secondary" className="text-[10px]">
-                                    {audioClips!.length} {audioClips!.length === 1 ? "clip" : "clips"}
-                                </Badge>
-                            </div>
-                            <span className="text-[10px] text-muted-foreground">
-                                Now playing: clip {activeClipIdx + 1} of {audioClips!.length}
-                            </span>
-                        </div>
-
-                        <audio
-                            ref={audioRef}
-                            key={activeClip.url}
-                            src={activeClip.url}
-                            controls
-                            preload="metadata"
-                            onEnded={handleClipEnded}
-                            className="w-full"
-                        />
-
-                        <div className="flex flex-wrap gap-1.5">
-                            {audioClips!.map((clip, idx) => {
-                                const specialist = clip.specialistId ? getSpecialistById(clip.specialistId) : null
-                                const label = specialist?.name ?? clip.specialistId ?? `Clip ${idx + 1}`
-                                const isActive = idx === activeClipIdx
-                                return (
-                                    <button
-                                        key={`${clip.url}-${idx}`}
-                                        type="button"
-                                        onClick={() => handleSelectClip(idx)}
-                                        className={cn(
-                                            "px-2.5 py-1 rounded-full border text-[11px] transition-colors",
-                                            isActive
-                                                ? "bg-electric-blue text-background border-electric-blue"
-                                                : "border-border text-muted-foreground hover:border-electric-blue/50 hover:text-foreground",
-                                        )}
-                                        aria-current={isActive}
-                                    >
-                                        {label}
-                                    </button>
-                                )
-                            })}
-                        </div>
-
-                        <p className="text-[10px] text-muted-foreground">
-                            Each specialist is voiced distinctly. Tap a name to skip to their take.
-                        </p>
-                    </CardContent>
-                </Card>
-            ) : isAuthor ? (
-                <Card className="border">
-                    <CardContent className="pt-5 pb-5 flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                            <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-electric-blue/10 text-electric-blue">
-                                <AudioLines className="h-4 w-4" />
-                            </span>
-                            <div>
-                                <p className="text-sm font-medium text-foreground">Audio transcript</p>
-                                <p className="text-[11px] text-muted-foreground">Generate an audio version of this discussion</p>
-                            </div>
-                        </div>
-                        <Button
-                            size="sm"
-                            variant={audioGenState === "error" ? "destructive" : "default"}
-                            disabled={audioGenState === "running"}
-                            onClick={async () => {
-                                setAudioGenState("running")
-                                try {
-                                    const result = await generateSessionAudio(thread.id)
-                                    if (result.ok) {
-                                        const urls = await refreshSessionAssetUrls(thread.id)
-                                        if (urls.audioUrl) setLiveAudioUrl(urls.audioUrl)
-                                        setAudioGenState("done")
-                                    } else {
-                                        setAudioGenState("error")
-                                    }
-                                } catch {
-                                    setAudioGenState("error")
-                                }
-                            }}
-                        >
-                            {audioGenState === "running" ? (
-                                <><Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />Generating…</>
-                            ) : audioGenState === "error" ? "Retry" : "Create audio transcript"}
-                        </Button>
-                    </CardContent>
-                </Card>
-            ) : null}
-
-            {/* Header */}
-            <div className="space-y-3">
-                {/* Branch provenance */}
-                {thread.parentThreadId && thread.parentTopic && (
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <GitBranch className="h-3.5 w-3.5" />
-                        <span>Branched from</span>
-                        <Link
-                            href={`/agents/m/${thread.parentThreadId}`}
-                            className="text-electric-blue hover:underline truncate max-w-[300px]"
-                        >
-                            {thread.parentTopic}
-                        </Link>
-                        {thread.parentCreatedAt && (
-                            <span>
-                                on {format(new Date(thread.parentCreatedAt), "MMM d, yyyy")}
-                            </span>
-                        )}
-                    </div>
-                )}
-
-                <div className="flex items-start justify-between gap-4">
-                    <div className="space-y-2 flex-1">
-                        <h1 className="text-xl font-display font-semibold text-foreground leading-snug">
-                            {thread.topic}
-                        </h1>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                                <Calendar className="h-3.5 w-3.5" />
-                                {format(new Date(thread.createdAt), "MMM d, yyyy 'at' h:mm a")}
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <Users className="h-3.5 w-3.5" />
+                            <span className="text-[11px] text-muted-foreground inline-flex items-center gap-1.5">
+                                <MessageSquare className="h-3 w-3" />
                                 {thread.specialistIds.length} specialist{thread.specialistIds.length !== 1 ? "s" : ""}
-                            </span>
-                            <span className="flex items-center gap-1">
-                                <MessageSquare className="h-3.5 w-3.5" />
+                                {" · "}
                                 {entries.length} response{entries.length !== 1 ? "s" : ""}
                             </span>
-                            <Badge variant="secondary" className="text-[10px]">
-                                {tierLabel}
-                            </Badge>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-xs"
+                                onClick={handleCopyLink}
+                            >
+                                {copied ? (
+                                    <>
+                                        <Check className="h-3.5 w-3.5 text-success" />
+                                        Copied
+                                    </>
+                                ) : (
+                                    <>
+                                        <Link2 className="h-3.5 w-3.5" />
+                                        Copy link
+                                    </>
+                                )}
+                            </Button>
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1.5 text-xs"
+                                onClick={handleDownloadPdf}
+                                disabled={pdfState === "generating"}
+                                title="Download transcript as PDF"
+                                aria-label="Download transcript as PDF"
+                            >
+                                {pdfState === "generating" ? (
+                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                ) : (
+                                    <FileDown className="h-3.5 w-3.5" />
+                                )}
+                                {pdfState === "generating"
+                                    ? "Generating PDF…"
+                                    : pdfState === "done"
+                                        ? "Open PDF"
+                                        : pdfState === "error"
+                                            ? "Failed — retry"
+                                            : "Download PDF"}
+                            </Button>
                         </div>
                     </div>
-
-                    {/* Header actions — Copy link + Download PDF */}
-                    <div className="flex-shrink-0 flex items-center gap-1">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1.5 text-xs"
-                            onClick={handleCopyLink}
-                        >
-                            {copied ? (
-                                <>
-                                    <Check className="h-3.5 w-3.5 text-success" />
-                                    Copied
-                                </>
-                            ) : (
-                                <>
-                                    <Link2 className="h-3.5 w-3.5" />
-                                    Copy link
-                                </>
-                            )}
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="gap-1.5 text-xs"
-                            onClick={handleDownloadPdf}
-                            disabled={pdfState === "generating"}
-                            title="Download transcript as PDF"
-                            aria-label="Download transcript as PDF"
-                        >
-                            {pdfState === "generating" ? (
-                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                            ) : (
-                                <FileDown className="h-3.5 w-3.5" />
-                            )}
-                            {pdfState === "generating"
-                                ? "Generating PDF…"
-                                : pdfState === "done"
-                                    ? "Open PDF"
-                                    : pdfState === "error"
-                                        ? "Failed — retry"
-                                        : "Download PDF"}
-                        </Button>
-                    </div>
-                </div>
-            </div>
+                </CardContent>
+            </Card>
 
             {/* Summary panel (from outputs) */}
             {outputs?.notes?.summary && (
@@ -903,23 +710,37 @@ export function MeetingThreadView({
             <div className="flex gap-6 items-start">
                 {/* Transcript */}
                 <div className="flex-1 min-w-0">
-                    {entries.length === 0 ? (
-                        <div className="text-center py-12 text-sm text-muted-foreground">
-                            No responses recorded for this session yet.
-                        </div>
-                    ) : (
-                        <div>
-                            {entries.map((entry) => (
-                                <EntryBlock
-                                    key={entry.id}
-                                    entry={entry}
-                                    onBranch={handleBranch}
-                                    isBranching={branchingEntryId !== null}
-                                    isBranchTarget={branchingEntryId === entry.id}
-                                />
-                            ))}
-                        </div>
-                    )}
+                    {(() => {
+                        // Cal's opener is now rendered as "The brief" inside the
+                        // editorial hero above. Drop it from the conversation
+                        // stream so it isn't shown twice. Match on round 1 only
+                        // so any future opener on a branched / follow-up round
+                        // still renders.
+                        const transcriptEntries = entries.filter(
+                            (e) => !(
+                                e.specialistId === "chief-of-staff"
+                                && e.councilPosition === "opener"
+                                && e.roundNumber === 1
+                            ),
+                        )
+                        return transcriptEntries.length === 0 ? (
+                            <div className="text-center py-12 text-sm text-muted-foreground">
+                                No responses recorded for this session yet.
+                            </div>
+                        ) : (
+                            <div>
+                                {transcriptEntries.map((entry) => (
+                                    <EntryBlock
+                                        key={entry.id}
+                                        entry={entry}
+                                        onBranch={handleBranch}
+                                        isBranching={branchingEntryId !== null}
+                                        isBranchTarget={branchingEntryId === entry.id}
+                                    />
+                                ))}
+                            </div>
+                        )
+                    })()}
 
                     {/* Branch continuation nudge — only for branched threads
                         where the author hasn't yet added new entries beyond

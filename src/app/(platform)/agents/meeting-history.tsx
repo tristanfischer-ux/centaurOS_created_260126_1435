@@ -46,10 +46,7 @@ import {
     Pin,
     PinOff,
     Trash2,
-    AudioLines,
-    ImageIcon,
     Sparkles,
-    RotateCcw,
     FileDown,
     Loader2,
 } from "lucide-react"
@@ -59,11 +56,7 @@ import {
     listMeetingThreads,
     deleteMeetingThread,
     togglePinMeetingThread,
-    resetAudioForRetry,
-    resetCoverForRetry,
 } from "@/actions/meeting-threads"
-import { generateSessionInfographic } from "@/actions/brainstorm-cover"
-import { generateSessionAudio } from "@/actions/brainstorm-audio"
 import { generateMeetingThreadPdf } from "@/actions/meeting-thread-pdf"
 import { getMeetingHistory } from "@/actions/agent-artifacts"
 import type { MeetingThreadSummary } from "@/actions/meeting-threads"
@@ -100,6 +93,9 @@ function legacyToSummary(item: MeetingHistoryItem): MeetingThreadSummary {
         topic: item.topic || item.title,
         councilTier: (item.metadata.councilTier as string) ?? "quick",
         specialistIds: item.attendees,
+        // Legacy artifacts have no structured framing — use the summary as a
+        // best-effort stand-in so the "Brief" block on the card stays populated.
+        framing: item.summary ?? null,
         snippet: item.summary?.slice(0, 200) ?? "",
         entryCount: item.roundCount,
         parentThreadId: null,
@@ -176,46 +172,7 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
     const hasPermalink = !meeting.id.startsWith("legacy-")
     const tierLabel = TIER_LABELS[meeting.councilTier] ?? meeting.councilTier
     const canMutate = hasPermalink
-    const [isRetryingCover, setIsRetryingCover] = useState(false)
-    const [isRetryingAudio, setIsRetryingAudio] = useState(false)
     const [pdfState, setPdfState] = useState<"idle" | "generating" | "done" | "error">("idle")
-
-    // W36 / FIX A: retry cover image generation.
-    // Resets cover_status to 'pending' first so the atomic claim in
-    // generateSessionInfographic can fire (it only claims 'pending'|'failed').
-    // Sessions stuck in 'generating' (Vercel container killed) need the reset.
-    async function handleRetryCover(e: React.MouseEvent) {
-        e.preventDefault()
-        e.stopPropagation()
-        if (isRetryingCover) return
-        setIsRetryingCover(true)
-        try {
-            await resetCoverForRetry(meeting.id)
-            await generateSessionInfographic(meeting.id)
-        } finally {
-            setIsRetryingCover(false)
-        }
-    }
-
-    // W35 / FIX A: retry audio generation.
-    // Resets audio_status to 'pending' AND clears audio_url + audio_clips
-    // before re-invoking generateSessionAudio so the Gemini TTS path
-    // (shipped 2026-04-28 in commit 11e55d7c) can claim the slot. Sessions
-    // created before 17:30 that never got successful audio land here with
-    // status='generating' (container killed) or status='failed' — both
-    // need the reset so the atomic claim gate opens.
-    async function handleRetryAudio(e: React.MouseEvent) {
-        e.preventDefault()
-        e.stopPropagation()
-        if (isRetryingAudio) return
-        setIsRetryingAudio(true)
-        try {
-            await resetAudioForRetry(meeting.id)
-            await generateSessionAudio(meeting.id)
-        } finally {
-            setIsRetryingAudio(false)
-        }
-    }
 
     // Download session transcript as a PDF.
     async function handleDownloadPdf(e: React.MouseEvent) {
@@ -255,97 +212,56 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
     // their clicks do NOT bubble up to the wrapping Link when it is present.
     const innerContent = (
         <>
-            {/* Cover image / placeholder strip — F2 thumbnail surface */}
-            <div className="relative h-32 w-full bg-gradient-to-br from-electric-blue/5 via-international-orange/5 to-electric-blue/5 border-b border-border">
-                {meeting.coverImageUrl && meeting.coverStatus === "ready" ? (
-                    // Use a plain <img> for signed Supabase URLs — next/image
-                    // requires the host in remotePatterns, and signed URLs
-                    // include query params next/image rejects without config.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                        src={meeting.coverImageUrl}
-                        alt={`Cover for: ${meeting.topic}`}
-                        className="absolute inset-0 h-full w-full object-cover"
-                        loading="lazy"
-                    />
-                ) : meeting.coverStatus === "generating" || meeting.coverStatus === "pending" || meeting.coverStatus === "failed" ? (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-                        <Sparkles className={cn("h-5 w-5 text-electric-blue/60", meeting.coverStatus !== "failed" && "animate-pulse")} />
-                        <span className="text-[10px] text-muted-foreground">
-                            {meeting.coverStatus === "generating"
-                                ? "Generating cover image…"
-                                : meeting.coverStatus === "failed"
-                                    ? "Cover generation failed"
-                                    : "Cover image queued"}
-                        </span>
-                        {/* FIX A: show Retry for any non-ready cover state (including failed) */}
-                        {canMutate && (
-                            <button
+            {/* Typographic header — replaces the previous AI cover thumbnail.
+                Keeps the gradient identity but leans on type for the editorial
+                feel, since the generated image was producing gibberish text. */}
+            <div className="relative px-4 pt-4 pb-2 bg-gradient-to-br from-electric-blue/5 via-international-orange/[0.04] to-electric-blue/5 border-b border-border">
+                <div className="flex items-start justify-between gap-2">
+                    <Badge variant="secondary" className="text-[9px] uppercase tracking-wider px-1.5 py-0">
+                        {tierLabel}
+                    </Badge>
+                    {/* Pin / delete affordances — keyboard-accessible, surfaced on hover */}
+                    {canMutate && (
+                        <div className="flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                            <Button
                                 type="button"
-                                onClick={handleRetryCover}
-                                disabled={isRetryingCover}
-                                className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
-                                title="Retry cover generation"
+                                variant="secondary"
+                                size="icon"
+                                className="h-7 w-7 bg-background/95 hover:bg-background shadow-sm"
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    onPinToggle(meeting.id, !meeting.isPinned)
+                                }}
+                                disabled={isMutating}
+                                aria-label={meeting.isPinned ? "Unpin session" : "Pin session"}
+                                title={meeting.isPinned ? "Unpin" : "Pin to top"}
                             >
-                                <RotateCcw className={cn("h-3 w-3", isRetryingCover && "animate-spin")} />
-                                Retry
-                            </button>
-                        )}
-                    </div>
-                ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5">
-                        <ImageIcon className="h-5 w-5 text-muted-foreground/40" />
-                        <span className="text-[10px] text-muted-foreground/60">
-                            No cover image
-                        </span>
-                    </div>
-                )}
-
-                {/* Pin / delete affordances — surfaced on hover, always accessible via keyboard.
-                    W34/W37: z-10 ensures these buttons are above the absolute-inset-0 cover
-                    image / placeholder divs that share the same stacking context. type="button"
-                    prevents accidental form submission if the component is ever inside a form. */}
-                {canMutate && (
-                    <div className="absolute top-2 right-2 z-10 flex gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            size="icon"
-                            className="h-7 w-7 bg-background/95 hover:bg-background shadow-sm"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                onPinToggle(meeting.id, !meeting.isPinned)
-                            }}
-                            disabled={isMutating}
-                            aria-label={meeting.isPinned ? "Unpin session" : "Pin session"}
-                            title={meeting.isPinned ? "Unpin" : "Pin to top"}
-                        >
-                            {meeting.isPinned ? (
-                                <PinOff className="h-3.5 w-3.5 text-international-orange" />
-                            ) : (
-                                <Pin className="h-3.5 w-3.5" />
-                            )}
-                        </Button>
-                        <Button
-                            type="button"
-                            variant="secondary"
-                            size="icon"
-                            className="h-7 w-7 bg-background/95 hover:bg-destructive hover:text-destructive-foreground shadow-sm"
-                            onClick={(e) => {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                onRequestDelete(meeting)
-                            }}
-                            disabled={isMutating}
-                            aria-label="Delete session"
-                            title="Delete session"
-                        >
-                            <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                    </div>
-                )}
-
+                                {meeting.isPinned ? (
+                                    <PinOff className="h-3.5 w-3.5 text-international-orange" />
+                                ) : (
+                                    <Pin className="h-3.5 w-3.5" />
+                                )}
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="icon"
+                                className="h-7 w-7 bg-background/95 hover:bg-destructive hover:text-destructive-foreground shadow-sm"
+                                onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                    onRequestDelete(meeting)
+                                }}
+                                disabled={isMutating}
+                                aria-label="Delete session"
+                                title="Delete session"
+                            >
+                                <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                        </div>
+                    )}
+                </div>
                 {meeting.isPinned && (
                     <Badge
                         variant="default"
@@ -358,17 +274,21 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
             </div>
 
             <CardContent className="pt-4 space-y-3">
-                {/* Topic */}
+                {/* Topic — the question, full text, two lines max */}
                 <h4 className="text-sm font-semibold text-foreground line-clamp-2 leading-snug">
                     {meeting.topic}
                 </h4>
 
-                {/* Snippet */}
-                {meeting.snippet && (
-                    <p className="text-xs text-muted-foreground line-clamp-2">
-                        {meeting.snippet}
-                        {meeting.snippet.length >= 200 ? "..." : ""}
-                    </p>
+                {/* Brief — Cal's framing of the question, explicitly labelled */}
+                {meeting.framing && (
+                    <div>
+                        <p className="text-[9px] font-mono uppercase tracking-widest text-muted-foreground mb-1">
+                            Brief
+                        </p>
+                        <p className="text-xs text-muted-foreground line-clamp-3 leading-relaxed italic">
+                            {meeting.framing}
+                        </p>
+                    </div>
                 )}
 
                 {/* Meta row */}
@@ -389,39 +309,6 @@ function MeetingCard({ meeting, onPinToggle, onRequestDelete, isMutating }: Meet
                             Branch
                         </span>
                     )}
-                    {/* Show Audio badge for ready sessions — covers both new sessions
-                        (audio_url set, audioClipsCount=0) and legacy sessions (clips
-                        array, audioClipsCount>0). audioClipsCount>0 check is removed
-                        because the new Gemini TTS path writes audio_url directly and
-                        never populates audio_clips. */}
-                    {meeting.audioStatus === "ready" && (
-                        <span className="flex items-center gap-1 text-electric-blue">
-                            <AudioLines className="h-3 w-3" />
-                            Audio
-                        </span>
-                    )}
-                    {(meeting.audioStatus === "generating" || meeting.audioStatus === "failed" || meeting.audioStatus === "pending") && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                            <AudioLines className={cn("h-3 w-3", meeting.audioStatus === "generating" && "animate-pulse")} />
-                            {meeting.audioStatus === "generating" ? "Generating audio…" : meeting.audioStatus === "failed" ? "Audio failed" : "Audio queued"}
-                            {/* FIX A: show Retry for any non-ready, non-refused audio state */}
-                            {canMutate && (
-                                <button
-                                    type="button"
-                                    onClick={handleRetryAudio}
-                                    disabled={isRetryingAudio}
-                                    className="ml-1 flex items-center gap-0.5 text-[10px] hover:text-foreground transition-colors disabled:opacity-50"
-                                    title="Retry audio generation"
-                                >
-                                    <RotateCcw className={cn("h-2.5 w-2.5", isRetryingAudio && "animate-spin")} />
-                                    Retry
-                                </button>
-                            )}
-                        </span>
-                    )}
-                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0">
-                        {tierLabel}
-                    </Badge>
                 </div>
 
                 {/* CTA row — view meeting link + download PDF button */}
@@ -531,8 +418,7 @@ function DeleteSessionDialog({ meeting, onConfirm, onCancel, isDeleting }: Delet
                         Delete brainstorming session?
                     </DialogTitle>
                     <DialogDescription>
-                        This will permanently remove the session, every specialist response,
-                        the cover image, and any audio clips. This cannot be undone.
+                        This will permanently remove the session and every specialist response. This cannot be undone.
                     </DialogDescription>
                 </DialogHeader>
 
@@ -542,7 +428,6 @@ function DeleteSessionDialog({ meeting, onConfirm, onCancel, isDeleting }: Delet
                         <p className="text-xs text-muted-foreground">
                             {format(new Date(meeting.createdAt), "MMMM d, yyyy")}
                             {meeting.entryCount > 0 && ` · ${meeting.entryCount} responses`}
-                            {meeting.audioClipsCount > 0 && ` · ${meeting.audioClipsCount} audio clips`}
                         </p>
                     </div>
                 )}
@@ -673,33 +558,9 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [refreshKey])
 
-    // W72 fix: poll every 5 s while any card has cover_status or audio_status
-    // pending/generating. revalidatePath('/agents') silently no-ops when called
-    // from a Vercel after() block, so cards stay stuck until the user reloads.
-    // FIX A/B: also polls so signed cover URLs appear as soon as generation
-    // completes, and so audio status updates surface without a manual refresh.
-    useEffect(() => {
-        const hasPendingCover = meetings.some(
-            (m) => m.coverStatus === 'pending' || m.coverStatus === 'generating',
-        )
-        const hasPendingAudio = meetings.some(
-            (m) => m.audioStatus === 'pending' || m.audioStatus === 'generating',
-        )
-        if (!hasPendingCover && !hasPendingAudio) return
-
-        const intervalId = setInterval(async () => {
-            try {
-                const result = await listMeetingThreads({ limit: 50 })
-                if (!result.error && result.data.length > 0) {
-                    setMeetings(result.data)
-                }
-            } catch {
-                // Non-critical — next tick will retry.
-            }
-        }, 5_000)
-
-        return () => clearInterval(intervalId)
-    }, [meetings])
+    // Cover image + audio polling removed 2026-05-19 — both features are paused
+    // on the client, so there is no longer any status that needs refreshing
+    // outside the explicit refreshKey trigger from BrainstormingCouncilView.
 
     // Re-fetch when filters change (uses the server-side filter)
     useEffect(() => {
@@ -816,7 +677,7 @@ export function MeetingHistory({ initialLimit = 3, refreshKey = 0 }: MeetingHist
                                 Your saved brainstorms show up here
                             </p>
                             <p className="text-xs text-muted-foreground max-w-md mx-auto">
-                                Run a Quick or Full Council session above. Each session is saved automatically with a generated cover image and audio recording.
+                                Run a Quick or Full Council session above. Each session is saved automatically with a transcript you can re-open, branch from, or download as a PDF.
                             </p>
                         </div>
                     )}

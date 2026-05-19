@@ -17,7 +17,7 @@
  * - src/app/(platform)/agents/team-meeting-dialog.tsx — Meeting runner
  */
 
-import { after } from 'next/server'
+// import { after } from 'next/server' // PAUSED 2026-05-19 — re-enable when cover/audio reinstated
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getFoundryIdCached } from '@/lib/supabase/foundry-context'
@@ -83,6 +83,9 @@ export interface MeetingEntryRow {
 
 export interface MeetingThreadDetail extends MeetingThreadRow {
   entries: MeetingEntryRow[]
+  /** Cal's framing of the question — the first specialist entry from
+   *  chief-of-staff with council_position='opener'. Null when absent. */
+  framing: string | null
   /** Present when this thread is a branch */
   parentTopic?: string
   parentCreatedAt?: string
@@ -256,27 +259,28 @@ export async function completeMeetingThread(
 
   console.info('[MeetingThreads] Session completed:', { threadId })
 
-  // Schedule cover image + audio generation (same pattern as createMeetingThread).
-  after(async () => {
-    try {
-      const [{ generateSessionInfographic }, { generateSessionAudio }] = await Promise.all([
-        import('./brainstorm-cover'),
-        import('./brainstorm-audio'),
-      ])
-      const [coverResult, audioResult] = await Promise.allSettled([
-        generateSessionInfographic(threadId),
-        generateSessionAudio(threadId),
-      ])
-      if (coverResult.status === 'rejected') {
-        console.error('[MeetingThreads] cover after() failed:', coverResult.reason)
-      }
-      if (audioResult.status === 'rejected') {
-        console.error('[MeetingThreads] audio after() failed:', audioResult.reason)
-      }
-    } catch (err) {
-      console.error('[MeetingThreads] after() block crashed:', err)
-    }
-  })
+  // PAUSED 2026-05-19 — cover image + audio parked; re-enable when reinstated.
+  // To reinstate: uncomment the after() block below.
+  // after(async () => {
+  //   try {
+  //     const [{ generateSessionInfographic }, { generateSessionAudio }] = await Promise.all([
+  //       import('./brainstorm-cover'),
+  //       import('./brainstorm-audio'),
+  //     ])
+  //     const [coverResult, audioResult] = await Promise.allSettled([
+  //       generateSessionInfographic(threadId),
+  //       generateSessionAudio(threadId),
+  //     ])
+  //     if (coverResult.status === 'rejected') {
+  //       console.error('[MeetingThreads] cover after() failed:', coverResult.reason)
+  //     }
+  //     if (audioResult.status === 'rejected') {
+  //       console.error('[MeetingThreads] audio after() failed:', audioResult.reason)
+  //     }
+  //   } catch (err) {
+  //     console.error('[MeetingThreads] after() block crashed:', err)
+  //   }
+  // })
 
   return { ok: true, error: null }
 }
@@ -467,38 +471,30 @@ export async function createMeetingThread(
     foundryId,
   })
 
-  // F2 + F3: schedule cover-image and audio generation in the background.
-  // Per CLAUDE.md "Vercel after(fetch) silently drops on short-lived
-  // handlers" gotcha, we use after() here because createMeetingThread
-  // returns from a longer-lived server-action context (the wrap-up
-  // upstream waits on its result before navigating). The two jobs are
-  // independent and run in parallel inside the after-block — no awaits
-  // between them.
-  after(async () => {
-    try {
-      // Dynamic imports keep the action module's cold-start lean and
-      // avoid pulling the OpenAI client into every server-action bundle.
-      const [{ generateSessionInfographic }, { generateSessionAudio }] = await Promise.all([
-        import('./brainstorm-cover'),
-        import('./brainstorm-audio'),
-      ])
-
-      // Fire both, await both with allSettled — neither blocks the other.
-      const [coverResult, audioResult] = await Promise.allSettled([
-        generateSessionInfographic(threadId),
-        generateSessionAudio(threadId),
-      ])
-
-      if (coverResult.status === 'rejected') {
-        console.error('[MeetingThreads] cover after() failed:', coverResult.reason)
-      }
-      if (audioResult.status === 'rejected') {
-        console.error('[MeetingThreads] audio after() failed:', audioResult.reason)
-      }
-    } catch (err) {
-      console.error('[MeetingThreads] after() block crashed:', err)
-    }
-  })
+  // PAUSED 2026-05-19 — cover image + audio parked; re-enable when reinstated.
+  // The generateSessionInfographic / generateSessionAudio actions stay intact
+  // in src/actions/brainstorm-cover.ts and src/actions/brainstorm-audio.ts.
+  // To reinstate: uncomment the import + after() block.
+  // after(async () => {
+  //   try {
+  //     const [{ generateSessionInfographic }, { generateSessionAudio }] = await Promise.all([
+  //       import('./brainstorm-cover'),
+  //       import('./brainstorm-audio'),
+  //     ])
+  //     const [coverResult, audioResult] = await Promise.allSettled([
+  //       generateSessionInfographic(threadId),
+  //       generateSessionAudio(threadId),
+  //     ])
+  //     if (coverResult.status === 'rejected') {
+  //       console.error('[MeetingThreads] cover after() failed:', coverResult.reason)
+  //     }
+  //     if (audioResult.status === 'rejected') {
+  //       console.error('[MeetingThreads] audio after() failed:', audioResult.reason)
+  //     }
+  //   } catch (err) {
+  //     console.error('[MeetingThreads] after() block crashed:', err)
+  //   }
+  // })
 
   return { threadId, error: null }
 }
@@ -563,6 +559,12 @@ export async function getMeetingThread(
     rowToEntryRow(r as Record<string, unknown>),
   )
 
+  // Derive Cal's framing (the "brief") from the chief-of-staff opener entry.
+  // Entries are ordered by created_at ASC so the first match is the opener.
+  const framing = entries.find(
+    (e) => e.specialistId === 'chief-of-staff' && e.councilPosition === 'opener',
+  )?.content ?? null
+
   // Optionally fetch parent topic for branch provenance UI
   let parentTopic: string | undefined
   let parentCreatedAt: string | undefined
@@ -581,7 +583,7 @@ export async function getMeetingThread(
   }
 
   return {
-    data: { ...thread, entries, parentTopic, parentCreatedAt },
+    data: { ...thread, entries, framing, parentTopic, parentCreatedAt },
     error: null,
   }
 }
@@ -595,7 +597,11 @@ export interface MeetingThreadSummary {
   topic: string
   councilTier: string
   specialistIds: string[]
-  /** First 200 chars of the first entry's content — used in search results */
+  /** Cal's framing of the question — the brief shown beneath the topic on
+   *  the saved-sessions card. Sourced from the chief-of-staff opener entry. */
+  framing: string | null
+  /** First 200 chars of the first entry's content — used in search results.
+   *  Kept for backwards compatibility with consumers that still read it. */
   snippet: string
   entryCount: number
   parentThreadId: string | null
@@ -715,27 +721,40 @@ export async function listMeetingThreads(
     return { data: [], total: count ?? 0, error: null }
   }
 
-  // Fetch first entry snippet for each thread in one query
+  // Fetch entry data for each thread in one query. We need:
+  //  - framing: Cal's opener content (specialist_id='chief-of-staff', council_position='opener')
+  //  - snippet: first specialist entry's content (back-compat for any consumer)
+  //  - count:   number of specialist entries per thread
   const threadIds = threads.map((t) => (t as Record<string, unknown>).id as string)
 
   const { data: snippetRows } = await supabase
     .from('meeting_entries')
-    .select('thread_id, content, round_number, role')
+    .select('thread_id, content, council_position, specialist_id, role')
     .in('thread_id', threadIds)
     .eq('role', 'specialist')
     .order('created_at', { ascending: true })
 
-  // Group snippets by thread_id, take first
+  const framingMap = new Map<string, string>()
   const snippetMap = new Map<string, string>()
   const countMap = new Map<string, number>()
 
   for (const row of snippetRows ?? []) {
     const r = row as Record<string, unknown>
     const tid = r.thread_id as string
+    const content = (r.content as string) ?? ''
+
     if (!snippetMap.has(tid)) {
-      const content = (r.content as string) ?? ''
       snippetMap.set(tid, content.slice(0, 200))
     }
+
+    if (
+      !framingMap.has(tid) &&
+      r.specialist_id === 'chief-of-staff' &&
+      r.council_position === 'opener'
+    ) {
+      framingMap.set(tid, content)
+    }
+
     countMap.set(tid, (countMap.get(tid) ?? 0) + 1)
   }
 
@@ -776,6 +795,7 @@ export async function listMeetingThreads(
       topic: row.topic as string,
       councilTier: row.council_tier as string,
       specialistIds: (row.specialist_ids as string[]) ?? [],
+      framing: framingMap.get(id) ?? null,
       snippet: snippetMap.get(id) ?? '',
       entryCount: countMap.get(id) ?? 0,
       parentThreadId: (row.parent_thread_id as string) ?? null,
