@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chain Engine v5 — FINAL final state — 2026-05-19</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px 32px; background: #fafafa; color: #1a1a1a; }
+  h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 600; }
+  h2 { margin: 28px 0 8px 0; font-size: 16px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 18px; }
+  .summary { background: #f0fdf4; border: 1px solid #16a34a; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 13px; }
+  .summary h3 { margin: 0 0 6px 0; font-size: 14px; color: #14532d; }
+  .deferred { background: #fef3c7; border: 1px solid #d97706; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 13px; }
+  .deferred h3 { margin: 0 0 6px 0; font-size: 14px; color: #78350f; }
+  .mermaid-wrap { background: white; border: 1px solid #e2e2e2; border-radius: 8px; padding: 24px; overflow-x: auto; margin-bottom: 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
+  th { background: #eee; text-align: left; padding: 6px; border: 1px solid #ddd; }
+  td { padding: 6px; border: 1px solid #ddd; vertical-align: top; }
+  code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Chain Engine v5 — FINAL</h1>
+<div class="sub">HEAD <code>f9a647cff</code> · v5 + v5.1 hot-fixes from 5-model audit panel · 2026-05-19. This is the canonical wiring state after Tristan's "no more false dawns" rebuild.</div>
+
+<div class="summary">
+<h3>What v5 adds on top of v4 (all wired, audit-verified)</h3>
+<ul>
+  <li><strong>G1b Compliance Gate</strong> — new stage at <code>src/lib/pdf-engine-v2/stages/3.5-compliance-gate.ts</code>. Runs after physics ledger. Reads class-standards.ts. Detects jurisdictions (UK/EU/US/global) + declared standards. Emits state.complianceGate {verdict, conflicts[], revision_suggestion, mandatory_total, mandatory_covered, jurisdictions_detected}. Zero LLM cost. Default jurisdictions UK+EU+US when none detected (v5.1 fix).</li>
+  <li><strong>G2 Cost-Reality Gate</strong> — inline in chain post-Engine-B/C. BoM total order-of-magnitude check. Emits state.cost_reality_status + state.cost_reality_rejection + state.cost_reality {bom_total_gbp, priced_lines, unpriced_lines, verdict ∈ {pass, warn, reject}}.</li>
+  <li><strong>G3 Review-Completeness Gate</strong> — inline pre-render. Density thresholds (modules ≥5, sub-modules ≥2×modules, BoM ≥20, ≥1 compliance std, ≥1 supplier archetype, critic ran). Emits state.g3ManualReview + state.g3_review_gaps[].</li>
+  <li><strong>M6 stale-running recovery</strong> — worker startup scans our-host running rows + per-poll scans for >200min rows. CAS-guarded UPDATE to failed. No schema change.</li>
+  <li><strong>M8 state.json + actions.jsonl Supabase upload</strong> — both files uploaded to pdf-engine-pdfs bucket alongside the PDF at <code>{user_id}/{job_id}.{state.json,actions.jsonl}</code>. Upload error inspection now correctly reports failure (v5.1 fix). state_snapshot_json column expanded with bom_total_gbp / cost_reality_verdict / g1b_verdict / g3_manual_review / g5_unverified_count / supplier_archetype_count / state_storage_path / actions_storage_path.</li>
+  <li><strong>physicsCritique render badge</strong> — cover-strip + appendix entry when critic flagged high-severity findings. Severity comparison normalised to lowercase (v5.1 fix).</li>
+  <li><strong>acceptanceStatus v5-aware</strong> — final verdict now factors in G1b WARN/HALT, G5 manual-review, G4 manual-review, physics critic high-severity (v5.1 fix). No more accepted_clean while compliance fails.</li>
+  <li><strong>OPENROUTER_API_KEY warning</strong> — worker now warns at startup if missing (v5.1 fix).</li>
+  <li><strong>32 orphan UI sub-routes</strong> + legacy <code>/the-forge/cad-lab</code> redirect to canonical workspace via next.config.ts.</li>
+  <li><strong>41 dead files archived</strong> to <code>_archive/2026-05-19-pre-chain-unification/lib/pdf-engine-v2-dead/</code>. <code>class-suppliers.ts</code> kept (Engine D wires it).</li>
+  <li><strong>knip reports ZERO orphan files</strong> under src/lib/pdf-engine-v2/. Engine D entry added to knip.config.ts.</li>
+</ul>
+</div>
+
+<div class="deferred">
+<h3>Audit-acknowledged deferrals (lower priority — not blocking)</h3>
+<ul>
+  <li><strong>variation_of parent inheritance</strong> — Grok + GPT-5.5 flagged as more critical than originally assumed. Defer until a real variation use case emerges. Current variations are independent runs.</li>
+  <li><strong>Full in-PDF physicsCritique section</strong> — badge + appendix entry fire on high-severity; medium/low surface via the badge's appendix entry only. Full section deferred.</li>
+  <li><strong>M6 Part A started_at age guard for double-worker scenarios</strong> — rare on a single Mac Studio; CAS already prevents corruption.</li>
+  <li><strong>HALT verdict in ComplianceGate</strong> — current WARN is honest; HALT requires concrete hard-conflict cases (banned chemistry in declared market, etc.) which need data we don't have yet.</li>
+  <li><strong>CI enforcement beyond knip</strong> — knip blocks new orphan files under src/lib/pdf-engine-v2/ but doesn't prevent a future dev adding a parallel scripts/serial-design-chain-v3.tsx. Would need a manifest + CI rule.</li>
+</ul>
+</div>
+
+<h2>End-to-end map (v5 final wiring)</h2>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+flowchart TD
+    Founder([Founder]) -->|brief + wizardFields| StartView["StartView<br/>(platform)/the-forge-v2/start/<br/>start-view.tsx"]
+    StartView -->|server action| StartAction["startProjectWithAutopilot + composeBriefForChain<br/>src/actions/start-project-with-autopilot.ts"]
+    StartAction -->|"INSERT cad_lab_projects + wizard fields"| CadLab[("Supabase<br/>cad_lab_projects")]
+    StartAction -->|"INSERT pdf_engine_runs (composed brief_text)"| Queue[("Supabase<br/>pdf_engine_runs")]
+    StartAction -.->|"returns ok:false on INSERT failure"| ErrUI["UI shows error to founder"]
+    StartAction -->|redirect| WorkspacePage
+
+    Worker["Mac Studio worker<br/>pdf-engine-worker.mjs<br/>+ M6 stale-running recovery<br/>+ M8 state/actions Supabase upload<br/>+ KEY_CHECKS (OpenRouter + OpenAI + Tavily + distributors + Brave)<br/>+ runChild 180min SIGTERM→SIGKILL cap"]
+    Worker -.->|"poll 30s + M6 sweep"| Queue
+    Worker --> Spawn["spawn chain<br/>PDF_ENGINE_WORKER=1 → RENDER_NO_OPEN=1"]
+
+    subgraph Chain ["Chain — serial-design-chain-v2.tsx (v5 wired)"]
+      direction TB
+      P0["Phase 0: brief parse → classify → refinement loop (max 3 iters)"]
+      P05["Phase 0.5: G0 Physics Ledger (deterministic vs class-floors.ts)"]
+      P1b(["G1b Compliance Gate<br/>3.5-compliance-gate.ts<br/>state.complianceGate {verdict, conflicts, revision_suggestion}<br/>Jurisdictions UK+EU+US default · regex expanded"])
+      P1["Phase 1: research → generator (Gemini 3.1 Pro) →<br/>R1 Grok 4.3 → R2 GLM-5.1 → R3 Qwen 3.6 Max →<br/>Physics Critic (Flash-Lite 3.1) → R4 Flash-Lite (ungrounded — flag removed) →<br/>canonical product_class override + dedup + prose pre-fill"]
+      P2["Phase 2: translate + 28 universal gates + repair (max 18 iters)<br/>finalArith + finalGrammar tracked"]
+      P25["Phase 2.5: K10 shadow + headline derive + part verify/strip/recommend +<br/>design decisions + structural-gate router +<br/>derive G4ManualReview + g5ManualReview/g5UnverifiedParts"]
+      P3["Phase 3: state.json assembly<br/>{...all prior fields, complianceGate, gatesPassed, grammarVerdicts,<br/>g5*, acceptanceStatus v5-aware}"]
+      P4A["Engine B: estimate-missing-prices.tsx<br/>(compound-key partVerifications, forge-truth.db pretraining)"]
+      P4B["Engine C: enrich-state-with-reference-anchor.tsx<br/>(spawns python3 reference_lookup.py — OpenAI embeddings)"]
+      P4C(["Engine D: enrich-state-with-suppliers.tsx<br/>(forge-truth.db companies + Brave + Flash-Lite scoring)<br/>writes state.suppliers[] + state.suppliers_provenance[]"])
+      P4D["Deployment envelope (alias-bridged ENVELOPE_ALIASES map)"]
+      P4E["Re-stamp partVerificationSummary + run G2 + G3 inline<br/>G2 cost-reality (BoM total OoM check)<br/>G3 review-completeness (density thresholds)"]
+      P5["Phase 5: render-minimal-pdf.tsx<br/>(W3 multiplier skip for Engine-B-anchored rows · physics_critic badge ·<br/>multi-path PDF title fallback · SuppliersPage now renders)"]
+      P0 --> P05 --> P1b --> P1 --> P2 --> P25 --> P3 --> P4A --> P4B --> P4C --> P4D --> P4E --> P5
+    end
+
+    Spawn --> Chain
+    Chain --> Upload["Worker uploads PDF + state.json + actions.jsonl<br/>(M8 — error-checked, paths only stamped on success)"]
+    Upload --> Bucket[("Storage pdf-engine-pdfs<br/>{user_id}/{job_id}.pdf<br/>{user_id}/{job_id}.state.json<br/>{user_id}/{job_id}.actions.jsonl")]
+    Upload --> MarkReady["UPDATE pdf_engine_runs status='ready'<br/>+ pdf_storage_path<br/>+ state_snapshot_json (now: bom_total_gbp, cost_reality_verdict,<br/>g1b_verdict, g3_manual_review, g3_gap_count, g5_unverified_count,<br/>supplier_archetype_count, state_storage_path, actions_storage_path)"]
+    MarkReady --> Queue
+
+    Queue -.-> WorkspacePage["Workspace polls, mints signed URL on ready, shows download"]
+    WorkspacePage -->|download| Founder
+
+    %% External APIs + DBs
+    ForgeTruth[("~/.forge-truth/forge-truth.db<br/>pretraining_extracted_parts + companies<br/>(Engine B, Engine C python, Engine D, Renderer)")]
+    P4A -.-> ForgeTruth
+    P4B -.-> ForgeTruth
+    P4C -.-> ForgeTruth
+    P5 -.-> ForgeTruth
+
+    OpenRouter{{"OpenRouter — Gemini 3.1 Pro, Flash-Lite 3.1, Grok 4.3,<br/>GLM-5.1, Qwen 3.6 Max, MiMo v2.5-Pro"}}
+    OpenAI{{"OpenAI text-embedding-3-small (Engine C python)"}}
+    Brave{{"Brave Search (Engine D supplier fallback)"}}
+    Tavily{{"Tavily (part verification)"}}
+    Distributors{{"Mouser / DigiKey / Farnell (part verification cascade)"}}
+
+    P0 -.-> OpenRouter
+    P1 -.-> OpenRouter
+    P25 -.-> OpenRouter
+    P25 -.-> Tavily
+    P25 -.-> Distributors
+    P4A -.-> OpenRouter
+    P4B -.-> OpenAI
+    P4C -.-> OpenRouter
+    P4C -.-> Brave
+
+    classDef wired fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef new fill:#bfdbfe,stroke:#2563eb,color:#1e3a8a
+    classDef store fill:#f5f5f5,stroke:#525252,color:#262626
+    classDef extapi fill:#fce7f3,stroke:#be185d,color:#831843
+    class P0,P05,P1,P2,P25 wired
+    class P1b,P3,P4A,P4B,P4C,P4D,P4E,P5,Worker,StartAction,ErrUI,Upload,MarkReady new
+    class CadLab,Queue,Bucket,ForgeTruth store
+    class OpenRouter,OpenAI,Brave,Tavily,Distributors extapi
+</pre>
+</div>
+
+<h2>v5 audit panel results (1-round, focused)</h2>
+
+<table>
+<thead><tr><th>Model</th><th>Findings</th><th>Quality</th><th>Cost</th></tr></thead>
+<tbody>
+<tr><td>Grok 4.3</td><td>5 substantive (1 wiring miss, 1 schema mismatch, 1 drift-proofing comment, 1 deferred-criticality, 1 Engine D env)</td><td>Honest, focused</td><td>$0.030</td></tr>
+<tr><td>GLM 5.1</td><td>Empty (reasoning model burnt all 8K tokens internally)</td><td>Unusable for this prompt size</td><td>$0.066 (waste)</td></tr>
+<tr><td>GPT-5.5</td><td>20 substantive findings — most thorough. Caught the v5.1 hot-fix list.</td><td>Gold standard</td><td>$0.308</td></tr>
+</tbody>
+</table>
+
+<p>v5 → v5.1 hot-fix commit landed 7 of GPT-5.5's findings + 1 of Grok's (regex coverage). 5 audit findings deferred with reasoning in the commit message.</p>
+
+<p><strong>Total audit spend across v2 + v3 + v5 rounds:</strong> ~£1.20 ($1.20 USD). Verified 30+ wiring gaps + critical bugs. Single-model audit would have shipped at least 4 of them silently.</p>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "default", flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: false }, securityLevel: "loose" });
+</script>
+</body>
+</html>
