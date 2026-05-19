@@ -7,3 +7,16 @@ npm run lint -- --quiet || {
   echo "❌ Lint errors found. Fix before committing."
   exit 1
 }
+
+# Drift gate (2026-05-19): block engine work landing in dead code paths.
+# Background: forgeos_decisions/481e056e8dbfcd65 — weeks of K10 + Engine A
+# work landed in src/lib/pdf-engine-v2/stages/* and never reached production
+# PDFs because the chain (scripts/serial-design-chain-v2.tsx) didn't import
+# those files. This gate rejects new staged work that knip flags as
+# unreachable from the production entry points.
+if [ -x scripts/pre-commit-drift-gate.sh ]; then
+  scripts/pre-commit-drift-gate.sh || {
+    echo "❌ Drift gate failed. See message above; bypass with --no-verify if deliberate."
+    exit 1
+  }
+fi

@@ -497,24 +497,15 @@ export async function createCadLabProject(
     const capturedUserId = user.id
     const capturedProjectId = data.id
 
-    const chaseInit = (async () => {
-      const { runChaseResearchBackground } = await import(
-        "@/actions/specialists/run-chase-research"
-      )
-      // Fire without awaiting full research — the dynamic import + initial
-      // call keeps the container alive long enough for Vercel to hand off.
-      runChaseResearchBackground(
-        capturedProjectId,
-        capturedFoundryId,
-        capturedUserId,
-        "auto.project-create",
-      ).catch((err) => {
-        console.error("[createCadLabProject] Chase auto-trigger failed:", {
-          projectId: capturedProjectId,
-          error: err instanceof Error ? err.message : String(err),
-        })
-      })
-    })()
+    // 2026-05-19 (Tristan unification directive): Chase auto-fire DISABLED.
+    // Chase research was the first stage of the retired "autopilot specialists"
+    // pipeline. The canonical engine (scripts/serial-design-chain-v2.tsx via
+    // pdf_engine_runs) does its own research-synthesis stage internally, so
+    // pre-firing Chase here would just burn LLM tokens on a parallel path that
+    // never reaches the PDF. Kept the variable bindings + Promise.race shape
+    // below for diff minimality; the inner fire is now a no-op.
+    void capturedFoundryId; void capturedUserId; void capturedProjectId;
+    const chaseInit = Promise.resolve()
 
     // Wait up to 3s for the import to resolve and call to start.
     // This is the critical fix: by awaiting here, we keep the container

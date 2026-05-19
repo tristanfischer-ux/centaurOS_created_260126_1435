@@ -61,7 +61,11 @@ apps/web/tsconfig.tsbuildinfo
 *.sql.skip
 
 # Local test artifacts
-_archive/
+_archive/*
+# ...but DO commit the 2026-05-19 chain-unification archive (Tristan directive:
+# preserved as reference for retired engines until the chain is proven).
+!_archive/2026-05-19-pre-chain-unification/
+!_archive/2026-05-19-pre-chain-unification/**
 e2e-results/
 *-screenshots/
 mobile-verification/

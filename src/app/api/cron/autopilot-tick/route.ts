@@ -123,17 +123,42 @@ interface TickResult {
     details: TickDetail[]
 }
 
-/** GET /api/cron/autopilot-tick — Bearer CRON_SECRET. Vercel cron-injected. */
+/** GET /api/cron/autopilot-tick — Bearer CRON_SECRET. Vercel cron-injected.
+ *
+ * 2026-05-19 (Tristan unification directive): RETIRED. The autopilot
+ * state-machine pipeline (Chase/Max/Fang/Finn/Auggie specialists) has been
+ * replaced by the canonical chain engine (scripts/serial-design-chain-v2.tsx
+ * on Mac Studio worker). This handler now returns 200 OK without doing any
+ * work so the Vercel cron schedule doesn't keep failing — but it never
+ * advances autopilot_state, never fires specialists, never insert
+ * pipeline_runs. See [[forgeos_decisions_d43cbc3af134f902]] (four-pipeline
+ * drift) and the 2026-05-19 unification commit.
+ *
+ * To re-enable for debugging, restore the original implementation from git
+ * history at commit ac86794f0 or earlier.
+ */
 export async function GET(request: Request): Promise<NextResponse> {
     const authFailure = verifyCronSecret(request)
     if (authFailure) return authFailure
+    // Tickless no-op — see header comment.
+    return NextResponse.json(
+        { ok: true, retired: "autopilot-tick", canonical_engine: "chain" },
+        { status: 200 },
+    )
 
+    // ─── ORIGINAL BODY KEPT BELOW (UNREACHABLE) FOR REFERENCE ──────────────────
+    // tickOnce() and STAGE_CONFIG references retained so the helper types
+    // compile. Remove during the follow-up _archive/ move.
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _unreached = async (): Promise<NextResponse> => {
     const result = await tickOnce(request)
     console.info(
         `[autopilot-tick] advanced=${result.advanced} fired=${result.fired} ` +
             `skipped=${result.skipped} failed=${result.failed}`,
     )
     return NextResponse.json({ ok: true, pass: result }, { status: 200 })
+    }
+    void _unreached
 }
 
 async function tickOnce(request: Request): Promise<TickResult> {
