@@ -396,6 +396,37 @@ export const CLASS_SUPPLIERS: Record<string, ClassSuppliers> = {
   },
 }
 
+// 2026-05-19 firestorm iter-1 fix: classifier emits "thermal_system" for heat
+// pumps but CLASS_SUPPLIERS is keyed by "heatpump". Engine D logged
+// "no archetypes defined for product class 'thermal_system'" → §7 empty.
+// Council confirmed (Opus + GPT-5.5 + Grok). Alias map at lookup time so
+// any classifier slug variation resolves to the canonical supplier registry.
+// Future iterations will rationalise the slug space (single canonical name).
+const SUPPLIER_CLASS_ALIASES: Record<string, string> = {
+  thermal_system: 'heatpump',
+  heat_pump: 'heatpump',
+  'heat-pump': 'heatpump',
+  'heat-pump-residential': 'heatpump',
+  mini_split_heatpump: 'heatpump',
+  battery_energy_storage: 'bess',
+  energy_storage: 'bess',
+  'bess-utility-scale': 'bess',
+  residential_ess: 'bess',
+  'ev-charger': 'ev_charger',
+  dc_fast_ev_charger: 'ev_charger',
+  drone: 'consumer_cinematography_drone',
+  consumer_drone: 'consumer_cinematography_drone',
+  industrial_inspection_drone: 'consumer_cinematography_drone',
+  edge_ai_server: 'edge_ai',
+  'auv-subsea': 'auv',
+  auv_subsea: 'auv',
+}
+
 export function getClassSuppliers(productClass: string): ClassSuppliers | null {
-  return CLASS_SUPPLIERS[productClass] ?? null
+  if (!productClass) return null
+  const direct = CLASS_SUPPLIERS[productClass]
+  if (direct) return direct
+  const aliased = SUPPLIER_CLASS_ALIASES[productClass.toLowerCase()]
+  if (aliased && CLASS_SUPPLIERS[aliased]) return CLASS_SUPPLIERS[aliased]
+  return null
 }

@@ -375,8 +375,13 @@ async function processJob(job) {
     try {
         if (existsSync(statePath)) {
             const stateBuf = readFileSync(statePath)
+            // 2026-05-19 firestorm iter-1 fix: pdf-engine-pdfs bucket policy
+            // rejects application/json + application/x-ndjson mime types
+            // (Supabase Storage bucket allowed_mime_types restricts to a few
+            // formats including application/pdf + application/octet-stream).
+            // Upload as octet-stream — recipient code reads as JSON regardless.
             const { error: stateUploadErr } = await supabase.storage.from('pdf-engine-pdfs').upload(stateStoragePath, stateBuf, {
-                contentType: 'application/json',
+                contentType: 'application/octet-stream',
                 upsert: true,
             })
             if (stateUploadErr) {
@@ -392,8 +397,9 @@ async function processJob(job) {
     try {
         if (existsSync(actionsPath)) {
             const actionsBuf = readFileSync(actionsPath)
+            // Same fix as state.json upload — bucket rejects application/x-ndjson.
             const { error: actionsUploadErr } = await supabase.storage.from('pdf-engine-pdfs').upload(actionsStoragePath, actionsBuf, {
-                contentType: 'application/x-ndjson',
+                contentType: 'application/octet-stream',
                 upsert: true,
             })
             if (actionsUploadErr) {

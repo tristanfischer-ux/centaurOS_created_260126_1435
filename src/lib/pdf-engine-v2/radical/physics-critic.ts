@@ -159,9 +159,12 @@ export async function runPhysicsCritic(opts: {
         model,
         messages: [{ role: 'user', content: prompt }],
         response_format: { type: 'json_object' },
-        // 2026-05-19 v5.2: 3.5 Flash needs ≥6000 to break through reasoning
-        // tokens. Critique output is ~2K tokens; 6K leaves headroom.
-        max_tokens: 8000,
+        // 2026-05-19 firestorm iter-1 fix: 8K wasn't enough for 3.5 Flash on
+        // the physics critic prompt — chain log "[chain] G3 review: ⚠
+        // physics_critic: Physics critic did not return a structured critique"
+        // (council G3 finding). Bumped to 16K. 3.5 Flash burns ~70% on
+        // reasoning so output content is ~5K — fits at this budget.
+        max_tokens: 16000,
         temperature: 0,
       }),
     })

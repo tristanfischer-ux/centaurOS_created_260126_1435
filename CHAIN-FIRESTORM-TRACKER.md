@@ -52,25 +52,39 @@ MiMo (`xiaomi/mimo-v2.5-pro`): SKIP — saved drawer `meta/gotchas/2273c16c80d24
 
 ## Iteration 1
 
-**State:** `RUNNING`
+**State:** `COMMITTED` — moving to iter-2 next
 **Brief ID:** `c9ef076f-6412-46ca-9929-3a8a6cfb56ae`
 **Started:** 2026-05-19 21:00:01 UTC
-**Worker PID:** 25879 (chain code at HEAD `048a04428` — includes G0.5 + v5.2 Gemini 3.5 Flash swap)
+**Chain completed:** 21:34:42 UTC (34.5 min) — status=`ready`, accepted_with_decisions, 11 modules, BoM £4086
 
-### Pre-iter code state
-- HEAD `048a04428` (firestorm G0.5 commit)
-- Active gates: G0 physics ledger, G1b compliance, G0.5 brief-target-reconciliation (new), Phase 2 28 universal gates, G2 cost-reality, G3 review-completeness, G4 grammar, G5 parts
-- v5.2 Gemini 3.5 Flash on: physics critic, plausibility critic
-- Engine D suppliers wired
-- 41 dead files archived
-- knip clean
+### Council results
+3 successful (£1.18 total): Grok 4.3 (6 findings), Opus 4.7 (10 findings), GPT-5.5 (30 findings).
+5 unusable: Gemini 3.5 Flash + GLM 5.1 (reasoning-token burn, truncated), Kimi K2.6 + Qwen 3.6 Max + DeepSeek V4-Pro (4KB SSE-keepalive timeouts on retry too).
 
-### Awaiting
-- Chain completion (~22:00-22:30 UTC estimated based on prior heatpump run timings)
-- Then trigger COUNCIL state
+Total unique findings: ~35. Top themes: Engine B price-realism crisis (£2.96 heat exchangers, £0.14 thermostats), 100K-unit pricing despite 5K-unit brief, 67 fabricated SKUs still in priced BoM, missing UK statutory standards (LVD, BS EN 60335-1/-2-40, MIS 3005, MCS 020), R290-vs-F-gas confusion, hydronic mass-flow physics impossibility, K10 left in shadow despite required-edge failures, generator decomposing COTS pumps into fantasy subcomponents.
 
-### History (filled as iteration progresses)
-- (pending)
+### Code fixes landed (iter-1 commit)
+- F1: getClassSuppliers alias `thermal_system` → `heatpump` (closes Engine D empty §7)
+- F2: Worker MIME `application/octet-stream` (closes Supabase Storage rejection of state.json + actions.jsonl)
+- F3: Physics critic max_tokens 8K → 16K (closes G3 "no structured critique" finding)
+- F4: class-standards.ts heat pump: added LVD 2014/35/EU, BS EN 60335-1, BS EN 60335-2-40, BS EN 12102-1, MCS 020, MIS 3005, EESR 2016 (closes Grok #4, GPT-5.5 #13/#14/#15)
+
+### Deferred to iter-2+
+- Engine B class-floor prices (component minimums): compressor £400+, evaporator/condenser £80+, thermostat £20+
+- G2 hard-fail on brief.unit_cost_ceiling_gbp + class-floor major-spend reject
+- Engine B production_volume input from brief (not 100K default)
+- Generator COTS-assembly decomposition rule (pumps/compressors stay whole)
+- G5 HALT on fabricated core parts (compressor, evaporator, condenser, EXV)
+- G0 hydronic mass-flow physics check
+- G0 acoustic sanity check (SCOP-Carnot, fan+compressor sound power)
+- K10 enforcing-mode promotion for heat pump safety-critical edges
+- R290 risk template (DSEAR/fire-safety vs F-gas)
+- Component-level MD/LVD/EMC certification claims (Generator scope)
+
+### Quality metric
+| HIGH | MED | LOW |
+|------|-----|-----|
+| ~25 | ~7 | ~3 |
 
 ---
 
