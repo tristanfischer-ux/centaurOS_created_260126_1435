@@ -777,7 +777,8 @@ export interface PipelineState {
    * Strictly additive — does NOT replace state.modules or state.bomLines.
    * Phase 5 renderer will eventually consume this; Phase 7 cuts over.
    */
-  resolvedRadicalTree?: import('./stages/4b-radical-resolution.js').ResolvedRadicalTree
+  // 2026-05-19: was import('./stages/4b-radical-resolution.js').ResolvedRadicalTree — stage archived, type widened to unknown; chain code path does not consume this field.
+  resolvedRadicalTree?: unknown
   /**
    * Phase 3 — Radical Cost Summary.
    * Populated when RADICAL_PHASE_3_COSTROLLUP=true AND resolvedRadicalTree exists.
@@ -788,7 +789,8 @@ export interface PipelineState {
    * Phase 7 cutover will make this the canonical SoT.
    * Renderer (Phase 5) reads radicalCostSummary when RADICAL_PHASE_3_COSTROLLUP=true.
    */
-  radicalCostSummary?: import('./stages/4c-radical-cost-rollup.js').RadicalCostSummary
+  // 2026-05-19: was import('./stages/4c-radical-cost-rollup.js').RadicalCostSummary — stage archived, type widened to unknown; chain code path does not consume this field.
+  radicalCostSummary?: unknown
   /**
    * Iter 3 — Stage 1.5 module decomposition output.
    * Populated when RADICAL_PHASE_3_PER_MODULE=true and Stage 1.5 succeeded.
@@ -838,7 +840,8 @@ export interface PipelineState {
    * Phase 5 renderer reads grammarVerdicts to render inline WARN/BLOCK callouts.
    * Phase 7 cutover integrates grammar into the feasibility gate proper.
    */
-  grammarVerdicts?: import('./stages/4d-radical-grammar.js').GrammarPassState
+  // 2026-05-19: was import('./stages/4d-radical-grammar.js').GrammarPassState — stage archived, type widened to unknown; chain code path does not consume this field.
+  grammarVerdicts?: unknown
   pipelineError?: {
     stage: string
     message: string
