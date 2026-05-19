@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chain Engine v2 — TRUTH (what is actually wired) — 2026-05-19</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px 32px; background: #fafafa; color: #1a1a1a; }
+  h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 600; }
+  h2 { margin: 28px 0 8px 0; font-size: 16px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 18px; }
+  .legend { font-size: 12px; color: #555; margin: 8px 0 14px 0; }
+  .mermaid-wrap { background: white; border: 1px solid #e2e2e2; border-radius: 8px; padding: 24px; overflow-x: auto; margin-bottom: 16px; }
+  .mermaid { font-family: -apple-system, sans-serif; }
+  .key { display: flex; flex-wrap: wrap; gap: 8px; font-size: 12px; margin-bottom: 16px; }
+  .key span { padding: 2px 6px; border-radius: 3px; border: 1px solid #ccc; }
+  .footer { margin-top: 18px; font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+
+<h1>Chain Engine v2 — TRUTH</h1>
+<div class="sub">HEAD <code>67c3e719d</code> · audited 2026-05-19 by reading every file in the chain wiring · this is what is actually connected, end-to-end.</div>
+
+<div class="key">
+  <span style="background:#fff7e6">LLM call</span>
+  <span style="background:#eef2ff">deterministic</span>
+  <span style="background:#f0fdf4">decision/gate</span>
+  <span style="background:#fef2f2">fail path</span>
+  <span style="background:#f5f5f5">data store</span>
+  <span style="background:#fce7f3">external API</span>
+  <span style="background:#ecfeff">state file on disk</span>
+</div>
+
+<h2>End-to-end map (full wiring)</h2>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+flowchart TD
+    %% =====================================================================
+    %% Intake — founder writes brief → server inserts pdf_engine_runs row
+    %% =====================================================================
+    Founder([Founder]) -->|writes brief, clicks Start| StartView["StartView<br/>(platform)/the-forge-v2/start/<br/>start-view.tsx"]
+    StartView -->|server action| StartAction["startProjectWithAutopilot<br/>src/actions/start-project-with-autopilot.ts:86"]
+    StartAction -->|"INSERT (foundry_id, created_by, name, subject,<br/>model_id='pdf-engine-v2', stage='design',<br/>status='draft', founder_raw_brief)"| CadLabRow[("Supabase<br/>cad_lab_projects")]
+    StartAction -->|"auth.getUser() resolves user_id"| AuthCheck{user_id<br/>resolvable?}
+    AuthCheck -->|no| RetErr["return error<br/>NO_AUTH_USER"]
+    AuthCheck -->|yes| Insert["INSERT pdf_engine_runs<br/>(project_id, user_id, brief_text, status='pending')<br/>via createAdminClient"]
+    Insert --> Queue[("Supabase<br/>pdf_engine_runs<br/>status='pending'")]
+    StartAction --->|"redirect{ projectId }"| WorkspacePage
+
+    %% Alternate intake — JSON API
+    ApiClient([API client]) -->|"POST /api/pdf-engine-v2/submit<br/>brief_text + optional variations"| ApiRoute["api/pdf-engine-v2/submit/route.ts:65<br/>withUser + zod validate"]
+    ApiRoute -->|"INSERT parent + N child variation rows"| Queue
+
+    %% =====================================================================
+    %% Worker poll + claim + atomic guards
+    %% =====================================================================
+    Worker["Mac Studio worker<br/>scripts/pdf-engine-worker.mjs<br/>LaunchAgent · KeepAlive · poll 30s<br/>PID 2428"]
+    Worker -.->|"every 30s:<br/>SELECT oldest status='pending'"| Queue
+    Worker -->|"claim-time guard<br/>worker.mjs:124-138"| G_A{user_id<br/>present?}
+    G_A -->|no| FailFast["UPDATE pdf_engine_runs<br/>status='failed', error_log,<br/>ready_at<br/>(rejection in 9s, no chain spawn)"]
+    G_A -->|yes| Claim["UPDATE status='pending'→'running'<br/>set worker_id, started_at<br/>atomic .eq('status','pending')"]
+    Claim -->|"writes brief.md + worker-stdio.log"| JobDir[("~/.pdf-engine-worker/runs/{job_id}/<br/>brief.md<br/>worker-stdio.log")]
+    Claim --> Spawn["spawn: npx tsx<br/>serial-design-chain-v2.tsx<br/>briefPath jobDir"]
+
+    %% =====================================================================
+    %% CHAIN — Phase 0 (Brief intake + refinement)
+    %% =====================================================================
+    Spawn --> ChainLog["attachActionLogger<br/>writes actions.jsonl"]
+    ChainLog --> P0_Save["save 0-original-brief.md<br/>chain :1377"]
+    P0_Save --> P0_Parse(["runBriefParsing<br/>Gemini 3.1 Pro<br/>via OpenRouter<br/>stages/0-brief-generation.ts:285"])
+    P0_Parse -->|"→ 1-parsed-brief-original.json"| F_Parse[(state files)]
+    P0_Parse --> P0_Classify["classifyProduct<br/>regex taxonomy<br/>product-classifier.ts:10<br/>HAPS/AUV/drone/EV/bioreactor/<br/>edge_ai/wearable_medical/PCB/<br/>energy_storage/vertical_farm/<br/>heatpump/thermal_system/..."]
+
+    P0_Classify --> P0_Loop{"Phase 0 refinement loop<br/>iter < 3 AND hard contradictions?"}
+    P0_Loop -->|"yes"| P0_Plaus(["generateBriefPlausibilityCritic<br/>Flash-Lite<br/>chain :745"])
+    P0_Plaus -->|"→ 2-brief-plausibility-iterN.json"| F_Plaus[(state files)]
+    P0_Plaus --> P0_Hard{">5× ratio<br/>contradictions?"}
+    P0_Hard -->|"no"| P0_End
+    P0_Hard -->|"yes"| P0_Pick["pickRevisionByPriority<br/>deterministic priority table<br/>chain :938"]
+    P0_Pick --> P0_Rewrite(["rewriteBriefWithRevision<br/>Flash-Lite<br/>chain :985"])
+    P0_Rewrite -->|"→ 0-revised-brief-iterN.md"| F_Rewrite[(state files)]
+    P0_Rewrite --> P0_Parse2(["re-runBriefParsing<br/>Gemini 3.1 Pro"])
+    P0_Parse2 --> P0_Loop
+
+    P0_Loop -->|"no"| P0_End[/"P0 converged<br/>save 2-brief-block.json"/]
+    P0_End -->|"final exhausted +<br/>hard contradictions remain"| FATAL["FATAL exit 2"]
+
+    %% =====================================================================
+    %% Phase 0.5 — Physics ledger (deterministic)
+    %% =====================================================================
+    P0_End --> P05["runPhysicsLedger G0<br/>stages/0.1-physics-ledger.ts<br/>deterministic, zero LLM cost"]
+    P05 -->|reads| Floors[("class-floors.ts<br/>(in-memory const table)<br/>energy/mass/cost/Wh-per-kg floors<br/>per product class")]
+    P05 -->|"writes state.physicsLedger:<br/>{verdict, violations[]}"| State_Building[(state being built<br/>in memory)]
+
+    %% =====================================================================
+    %% Phase 1 — Research, Generator, Reviewers, Critic
+    %% =====================================================================
+    State_Building --> P1_Research(["runResearchSynthesis<br/>MiMo v2.5-Pro (xiaomi/mimo-v2.5-pro)<br/>stages/1-research.ts:223"])
+    P1_Research -->|"→ 3-research.json"| F_Research[(state files)]
+    P1_Research --> P1_Gen(["STEP 4 — Generator<br/>Gemini 3.1 Pro<br/>maxTokens 150K · system: generatorSystem()<br/>chain :1619"])
+    P1_Gen -->|"→ 4-generator.raw.txt<br/>→ 4-generator.json"| F_Gen[(state files)]
+    P1_Gen --> P1_Propagate["propagateBriefConstraintsToDesign<br/>deterministic — copies brief's<br/>unit_cost_ceiling_gbp / max_mass_kg /<br/>target_performance / temp range<br/>into design.modules[].derived_parameters<br/>chain :1209"]
+
+    P1_Propagate --> P1_R1(["STEP 5 — R1<br/>Grok 4.3 (x-ai/grok-4.3)<br/>runReviewerStep template<br/>chain :1659"])
+    P1_R1 -->|"→ 5-r1-grok.{raw.txt,json}"| F_R1[(state files)]
+    P1_R1 --> P1_R2(["STEP 6 — R2<br/>GLM-5.1 (z-ai/glm-5.1)<br/>maxTokens 60K (provider-side cap)<br/>chain :1663"])
+    P1_R2 -->|"→ 6-r2-glm.{raw.txt,json}"| F_R2[(state files)]
+    P1_R2 --> P1_R3(["STEP 7 — R3<br/>Qwen 3.6 Max (qwen/qwen3.6-max-preview)<br/>maxTokens 32K · 1M context<br/>chain :1667"])
+    P1_R3 -->|"→ 7-r3-haiku.{raw.txt,json}<br/>(filename legacy from Haiku era)"| F_R3[(state files)]
+    P1_R3 --> P1_Critic(["STEP 7.5 — Physics Critic<br/>Gemini 2.5 Flash-Lite (note: not 3.1)<br/>radical/physics-critic.ts<br/>scores 5 dims · confidence enum<br/>chain :1683"])
+    P1_Critic -->|"→ 7-5-physics-critique.json"| F_Critic[(state files)]
+    P1_Critic --> P1_R4(["STEP 8 — R4<br/>Flash-Lite + thinking:high<br/>+ groundWithGoogleSearch:true<br/>+ critic findings appended<br/>chain :1719"])
+    P1_R4 -->|"calls Google Search<br/>via OpenRouter grounding flag"| GoogleSearch{{"Google Search<br/>grounding"}}
+    P1_R4 -->|"→ 8-r4-flashlite.{raw.txt,json}"| F_R4[(state files)]
+
+    P1_R4 --> P1_Canon["Canonical product_class override<br/>deterministic — preserves LLM string<br/>as productClassDescription<br/>chain :1746"]
+    P1_Canon --> P1_Norm["dedupAllModifiers +<br/>ensureSubmoduleProseCoversWords<br/>radical/sentence-generator.ts<br/>radical/universal-repair.ts<br/>deterministic normalisation<br/>chain :1761,1771"]
+
+    %% =====================================================================
+    %% Phase 2 — Translate + Gates + Repair (max 18 iters)
+    %% =====================================================================
+    P1_Norm --> P2_Translate["translate<br/>radical/universal-translator.ts<br/>field-synonym normalisation,<br/>sub_module → module index<br/>deterministic"]
+    P2_Translate --> P2_Gates["runArithmeticGates<br/>14 universal gates:<br/>cells_ah_voltage_capacity, module_cell_count,<br/>series_stack_voltage, usable_energy_closure,<br/>cop_thermal_electrical, refrigerant_mass_flow,<br/>led_ppfd_area, irrigation_flow,<br/>dc_bus_voltage_consistency, current_rating_headroom,<br/>cooling_power, cost_ceiling, mass_budget,<br/>cell_discharge_rate<br/>+ runGrammarGates 14 gates:<br/>no_orphan_sub_modules, no_dangling_references,<br/>sensor_has_receiver, controller_has_actuator,<br/>thermal_path_closes, power_topology_closes,<br/>sub_module_word_density, word_modifier_richness,<br/>declared_links_unique, module_prose_subset_of_sub_modules,<br/>sub_module_prose_covers_words, modifier_consistency,<br/>spatial_position_complete, cross_module_required_links"]
+    P2_Gates --> P2_Pass{"all<br/>gates pass?"}
+    P2_Pass -->|"yes"| P25_Norm
+    P2_Pass -->|"no, iter < 18"| P2_Repair(["repair<br/>radical/universal-repair.ts<br/>LLM patches via Flash-Lite<br/>chain :1810"])
+    P2_Repair --> P2_Apply["applyPatches<br/>deterministic — applies op_type<br/>(add_sub_module, add_grammar_link,<br/>edit_field, append_to_overview, ...)"]
+    P2_Apply --> P2_Changed{"state<br/>changed?"}
+    P2_Changed -->|"yes"| P2_Translate
+    P2_Changed -->|"no, bail"| P25_Norm
+
+    %% =====================================================================
+    %% Phase 2.5 — Post-Phase-2 finalisation
+    %% =====================================================================
+    P25_Norm["post-Phase-2:<br/>ensureSubmoduleProseCoversWords<br/>+ dedupAllModifiers<br/>chain :1847,1851"]
+    P25_Norm --> P25_K10["K10 shadow validation<br/>chain :1870<br/>+ alias map for product_class slug"]
+    P25_K10 -->|"reads"| K10Graph[("class-reference-graph.ts<br/>ensureGraphsRegistered() +<br/>getClassReferenceGraph(slug)<br/>baked-in TypeScript const tables<br/>(graphs hand-curated from<br/>~/.forge-truth/forge-truth.db<br/>datasheets — but loaded at<br/>build time, not runtime)")]
+    P25_K10 -->|"writes state.moduleDecomposition<br/>.k10ShadowResult"| State_Building
+
+    P25_K10 --> P25_Headline["deriveHeadlineFromModules<br/>headline-deriver.ts:673<br/>DETERMINISTIC<br/>computes headline_output,<br/>headline_constraint, utilisation<br/>from design components + brief"]
+    P25_Headline -->|"→ 9-headline-derived.json"| F_Headline[(state files)]
+
+    P25_Headline --> P25_VerifyAll(["verifyAllParts<br/>radical/part-verification.ts:938<br/>batchSize=10 · Flash-Lite +<br/>distributor cascade per part"])
+    P25_VerifyAll -->|"per-part calls"| TavilyAPI{{"Tavily Search API<br/>~/.claude/secrets/tavily.env"}}
+    P25_VerifyAll -.->|"distributor cascade<br/>(some classes)"| MouserAPI{{"Mouser API<br/>distributor-apis.env"}}
+    P25_VerifyAll -.->|"distributor cascade"| DigiKeyAPI{{"DigiKey API<br/>distributor-apis.env"}}
+    P25_VerifyAll -.->|"distributor cascade"| FarnellAPI{{"Farnell API<br/>distributor-apis.env"}}
+
+    P25_VerifyAll --> P25_Strip["stripUnverifiedParts<br/>part-verification.ts:983<br/>deterministic — removes<br/>high-confidence-fake part_numbers"]
+    P25_Strip --> P25_Recommend(["recommendReplacementsForStripped<br/>part-verification.ts<br/>Flash-Lite per stripped part<br/>(honesty rule: 'uncertain' if unknown)"])
+    P25_Recommend -->|"→ 10-part-verifications.json"| F_PartVerif[(state files)]
+
+    P25_Recommend --> P25_Decisions(["resolveDesignDecisions<br/>radical/design-decisions.ts:191<br/>Flash-Lite explainer per<br/>modifier_consistency conflict<br/>(EXPLANATION+WHY_MATTERS+RECOMMENDATION)"])
+    P25_Decisions -->|"→ 10-design-decisions.json"| F_Decisions[(state files)]
+
+    P25_Decisions --> P25_StructRouter["Structural-gate router<br/>chain :2074<br/>routes unrepaired structural gates<br/>(thermal_path_closes, cross_module_required_links,<br/>spatial_position_complete, sub_module_word_density,<br/>word_modifier_richness, declared_links_unique,<br/>sub_module_prose_covers_words,<br/>module_prose_subset_of_sub_modules,<br/>power_topology_closes, cell_discharge_rate_within_nameplate)<br/>→ design decisions"]
+    P25_StructRouter --> P25_Status{"acceptanceStatus<br/>= clean | with_decisions |<br/>not_accepted"}
+
+    %% =====================================================================
+    %% Phase 3 — State assembly
+    %% =====================================================================
+    P25_Status --> P3_NL["buildNaturalLanguageLayer<br/>radical/sentence-generator.ts<br/>deterministic NL synthesis<br/>per module + per sub_module"]
+    P3_NL --> P3_State["assemble final state object<br/>{projectId, parsedBrief, moduleDecomposition,<br/>naturalLanguageLayer, briefOverviewProse,<br/>keyMetrics, grammarVerdicts, brief, designDecisions,<br/>partVerifications, partRecommendations,<br/>partVerificationSummary, physicsCritique,<br/>physicsLedger, acceptanceStatus, savedAt}"]
+    P3_State -->|"writeFileSync(statePath, ...)"| FinalState[(state.json)]
+
+    %% =====================================================================
+    %% Phase 4 — Sub-process enrichment (Engine B, Engine C, deployment envelope)
+    %% =====================================================================
+    FinalState --> P4_EngineB["spawn npx tsx<br/>estimate-missing-prices.tsx<br/>{statePath} --write<br/>chain :2220<br/>(skip if CHAIN_SKIP_ENGINE_B=1)"]
+    P4_EngineB --> EngineB_Inside
+
+    subgraph EngineB_Inside ["Engine B — inside estimate-missing-prices.tsx"]
+      direction TB
+      EB1["resolveAnnualVolume<br/>(brief value → class default)"]
+      EB2["CorpusClassifier<br/>line 158: better-sqlite3 read"]
+      EB2 -->|"SELECT component_class FROM<br/>pretraining_extracted_parts<br/>WHERE LOWER(part_name) LIKE ?"| ForgeTruth[("~/.forge-truth/forge-truth.db<br/>readonly<br/>(pretraining corpus,<br/>29,899 records)")]
+      EB3(["classifyOnTheFly (Flash-Lite)<br/>batchSize 20, concurrency 8<br/>google/gemini-3.1-flash-lite-preview"])
+      EB4["curveEstimateFor (deterministic)<br/>reads COMPONENT_CURVES +<br/>PRODUCT_CLASS_REFERENCE_OVERRIDES<br/>from component-classes.ts"]
+      EB5(["estimatePriceForUnknown (Flash-Lite)<br/>volume-aware OEM cost prompt<br/>fallback when class='unknown'"])
+      EB6["writes engine_b_* fields onto<br/>state.partVerifications:<br/>price_estimate_gbp, low/high,<br/>component_class, curve_multiplier,<br/>reference_unit_cost_gbp,<br/>annual_volume, classification_source,<br/>estimate_source"]
+      EB1 --> EB2 --> EB3 --> EB4 --> EB5 --> EB6
+    end
+    EngineB_Inside --> FinalState2[(state.json<br/>w/ engine_b_*)]
+
+    FinalState2 --> P4_EngineC["spawn npx tsx<br/>enrich-state-with-reference-anchor.tsx<br/>{statePath}<br/>chain :2243<br/>(skip if CHAIN_SKIP_ENGINE_C=1)"]
+    P4_EngineC --> EngineC_Inside
+
+    subgraph EngineC_Inside ["Engine C — inside enrich-state-with-reference-anchor.tsx"]
+      direction TB
+      EC1["resolveCorpusClassHint<br/>maps state.product_class →<br/>corpus slug (bess-utility-scale, etc.)"]
+      EC2["build query per BoM word<br/>(name + content_character +<br/>manufacturer + part_number + rating)"]
+      EC3["copyFileSync(state.json,<br/>state.json.bak)"]
+      EC4["spawn python3<br/>scripts/rag/reference_lookup.py<br/>--batch --k 5"]
+      EC5(["python: embed query via<br/>OpenAI text-embedding-3-small<br/>1536d"])
+      EC6["python: cosine similarity<br/>across forge-truth.db"]
+      EC7["python: return top-k hits +<br/>median/p25/p75 GBP prices<br/>via NDJSON over stdout"]
+      EC8["compute engine_c_flag per line:<br/>over (ratio>2.0), under (<0.5),<br/>in_range, no_reference"]
+      EC9["write engine_c_* fields onto<br/>state.partVerifications +<br/>state.engine_c_summary aggregate"]
+      EC1 --> EC2 --> EC3 --> EC4 --> EC5 --> EC6 --> EC7 --> EC8 --> EC9
+    end
+    EC5 -.->|"calls"| OpenAIAPI{{"OpenAI API<br/>text-embedding-3-small"}}
+    EC6 -.->|"reads"| ForgeTruth
+    EngineC_Inside --> FinalState3[(state.json<br/>w/ engine_c_*<br/>+ state.json.bak)]
+
+    FinalState3 --> P4_Envelope["Deployment envelope lookup<br/>deployment-envelopes.ts<br/>defaultEnvelopeForClass +<br/>suggestEnvelope (mass+volume aware)<br/>deterministic<br/>chain :2262"]
+    P4_Envelope -->|"writes state.deploymentEnvelope:<br/>{id, category, dims, mass}"| FinalState4[(state.json<br/>w/ deploymentEnvelope)]
+
+    %% =====================================================================
+    %% Phase 5 — Render
+    %% =====================================================================
+    FinalState4 --> P5_Render["spawn npx tsx<br/>render-minimal-pdf.tsx<br/>{statePath} {pdfPath}<br/>chain :2307"]
+    P5_Render --> Renderer_Inside
+
+    subgraph Renderer_Inside ["Renderer — inside render-minimal-pdf.tsx (4575 lines)"]
+      direction TB
+      R1["read state.json"]
+      R2["@react-pdf/renderer pdf()"]
+      R3["import getClassStandards →<br/>class-standards.ts (Regulatory pages)"]
+      R4["import getClassHazards +<br/>computeHazardRPN →<br/>class-hazards.ts (FMEA / Risk)"]
+      R5["import resolvePriceBand →<br/>class-price-bands.ts (Cost panel)"]
+      R6["import resolveCostStack +<br/>computeCostStack →<br/>class-cost-structure.ts (Cost waterfall)"]
+      R7["RenderEngineBClassifier<br/>(fallback for legacy state files)<br/>line 475-486 better-sqlite3 read"]
+      R7 -.->|"SELECT component_class FROM<br/>pretraining_extracted_parts<br/>WHERE LOWER(part_name) LIKE ?"| ForgeTruth
+      R8["SuppliersPage line 4049<br/>reads state.suppliers<br/>(empty → returns null)"]
+      R9["generateSubmoduleParagraph →<br/>sentence-generator.ts"]
+      R10["writeFileSync chain-v2.pdf"]
+      R1 --> R2 --> R3 --> R4 --> R5 --> R6 --> R7 --> R8 --> R9 --> R10
+    end
+    Renderer_Inside --> PdfFile[("jobDir/chain-v2.pdf<br/>~6 MB · 100+ pages")]
+    Renderer_Inside --> ActionsJSONL[("jobDir/actions.jsonl<br/>append-only timeline of<br/>every step + LLM call + gate")]
+
+    %% =====================================================================
+    %% Worker upload + UI rendering
+    %% =====================================================================
+    PdfFile --> G_B{user_id<br/>still present?}
+    G_B -->|"no"| FailUpload["failJob<br/>worker.mjs:245-254<br/>UPDATE status='failed', error_log"]
+    G_B -->|"yes"| Upload["supabase.storage<br/>.from('pdf-engine-pdfs')<br/>.upload(`{user_id}/{job_id}.pdf`, ...)"]
+    Upload --> Bucket[("Supabase Storage<br/>bucket: pdf-engine-pdfs<br/>path: {user_id}/{job_id}.pdf<br/>RLS: foldername[1]=auth.uid()")]
+    Upload --> MarkReady["UPDATE pdf_engine_runs<br/>status='ready',<br/>pdf_storage_path,<br/>state_snapshot_json<br/>(small JSON: acceptanceStatus,<br/>gatesPassed, moduleCount, savedAt),<br/>error_log=NULL"]
+    MarkReady --> Queue
+
+    Queue -.->|"server component SELECT<br/>latest by project_id"| WorkspacePage["Workspace page<br/>(platform)/the-forge-v2/projects/[id]/<br/>page.tsx"]
+    WorkspacePage -->|"if status=ready: createSignedUrl<br/>(30 min TTL, admin client)"| Bucket
+    WorkspacePage --> ChainView["ChainWorkspaceView (client)<br/>polls every 30s · router.refresh<br/>until status terminal"]
+    ChainView -->|"Download PDF →"| Founder
+
+    %% =====================================================================
+    %% Styling
+    %% =====================================================================
+    classDef llm fill:#fff7e6,stroke:#d97706,color:#7c2d12
+    classDef det fill:#eef2ff,stroke:#4f46e5,color:#1e1b4b
+    classDef gate fill:#f0fdf4,stroke:#16a34a,color:#14532d
+    classDef fail fill:#fef2f2,stroke:#dc2626,color:#7f1d1d
+    classDef store fill:#f5f5f5,stroke:#525252,color:#262626
+    classDef extapi fill:#fce7f3,stroke:#be185d,color:#831843
+    classDef statefile fill:#ecfeff,stroke:#0891b2,color:#164e63
+
+    class P0_Parse,P0_Plaus,P0_Rewrite,P0_Parse2,P1_Research,P1_Gen,P1_R1,P1_R2,P1_R3,P1_Critic,P1_R4,P2_Repair,P25_VerifyAll,P25_Recommend,P25_Decisions,EB3,EB5,EC5 llm
+    class P0_Save,P0_Classify,P0_Pick,P0_End,P05,P1_Propagate,P1_Canon,P1_Norm,P2_Translate,P2_Gates,P2_Apply,P25_Norm,P25_K10,P25_Headline,P25_Strip,P25_StructRouter,P3_NL,P3_State,P4_Envelope,EB1,EB2,EB4,EB6,EC1,EC2,EC3,EC4,EC6,EC7,EC8,EC9,R1,R2,R3,R4,R5,R6,R8,R9,R10 det
+    class AuthCheck,G_A,P0_Loop,P0_Hard,P2_Pass,P2_Changed,P25_Status,G_B,R7 gate
+    class RetErr,FATAL,FailFast,FailUpload fail
+    class Queue,CadLabRow,Bucket,Floors,K10Graph,ForgeTruth,FinalState,FinalState2,FinalState3,FinalState4,PdfFile,ActionsJSONL,F_Parse,F_Plaus,F_Rewrite,F_Research,F_Gen,F_R1,F_R2,F_R3,F_Critic,F_R4,F_Headline,F_PartVerif,F_Decisions,State_Building,JobDir statefile
+    class OpenAIAPI,TavilyAPI,MouserAPI,DigiKeyAPI,FarnellAPI,GoogleSearch extapi
+</pre>
+</div>
+
+<h2>External services / databases / files (full inventory)</h2>
+
+<table style="font-size:12px;border-collapse:collapse;width:100%">
+<thead>
+<tr style="background:#eee">
+  <th style="text-align:left;padding:6px;border:1px solid #ddd">Resource</th>
+  <th style="text-align:left;padding:6px;border:1px solid #ddd">Type</th>
+  <th style="text-align:left;padding:6px;border:1px solid #ddd">Caller</th>
+  <th style="text-align:left;padding:6px;border:1px solid #ddd">Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>pdf_engine_runs</code></td><td style="padding:6px;border:1px solid #ddd">Supabase table</td><td style="padding:6px;border:1px solid #ddd">server action, worker, workspace page</td><td style="padding:6px;border:1px solid #ddd">Job queue + lifecycle</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>cad_lab_projects</code></td><td style="padding:6px;border:1px solid #ddd">Supabase table</td><td style="padding:6px;border:1px solid #ddd">server action, workspace page</td><td style="padding:6px;border:1px solid #ddd">Project records</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>pdf-engine-pdfs</code> bucket</td><td style="padding:6px;border:1px solid #ddd">Supabase Storage</td><td style="padding:6px;border:1px solid #ddd">worker upload, workspace signedUrl</td><td style="padding:6px;border:1px solid #ddd">Final PDF artefacts at <code>{user_id}/{job_id}.pdf</code></td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>~/.forge-truth/forge-truth.db</code></td><td style="padding:6px;border:1px solid #ddd">Local SQLite</td><td style="padding:6px;border:1px solid #ddd">Engine B (better-sqlite3), Engine C (python via reference_lookup.py), Renderer (better-sqlite3)</td><td style="padding:6px;border:1px solid #ddd">Pretraining corpus: <code>pretraining_extracted_parts</code> table (29,899 records). Class lookup + price reference.</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">OpenRouter</td><td style="padding:6px;border:1px solid #ddd">External API</td><td style="padding:6px;border:1px solid #ddd">all LLM calls in chain</td><td style="padding:6px;border:1px solid #ddd">Brief parse, plausibility critic, rewriter, research, generator, R1-R4 reviewers, physics critic, repair, part-verification judge, design-decisions explainer, Engine B classifier/fallback</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">OpenAI <code>text-embedding-3-small</code></td><td style="padding:6px;border:1px solid #ddd">External API</td><td style="padding:6px;border:1px solid #ddd">Engine C (via python)</td><td style="padding:6px;border:1px solid #ddd">Embed BoM query for nearest-neighbour lookup vs corpus</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">Google Search grounding</td><td style="padding:6px;border:1px solid #ddd">via OpenRouter flag</td><td style="padding:6px;border:1px solid #ddd">R4 reviewer (Step 8)</td><td style="padding:6px;border:1px solid #ddd">Grounded fact-check on parts + claims</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">Tavily Search API</td><td style="padding:6px;border:1px solid #ddd">External API</td><td style="padding:6px;border:1px solid #ddd">Part verification</td><td style="padding:6px;border:1px solid #ddd">Web search for (mfg, part_number) pairs</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">Mouser API</td><td style="padding:6px;border:1px solid #ddd">External API</td><td style="padding:6px;border:1px solid #ddd">Part verification (distributor cascade)</td><td style="padding:6px;border:1px solid #ddd">Distributor SKU + price lookup</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">DigiKey API</td><td style="padding:6px;border:1px solid #ddd">External API</td><td style="padding:6px;border:1px solid #ddd">Part verification (distributor cascade)</td><td style="padding:6px;border:1px solid #ddd">Distributor SKU + price lookup</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">Farnell API</td><td style="padding:6px;border:1px solid #ddd">External API</td><td style="padding:6px;border:1px solid #ddd">Part verification (distributor cascade)</td><td style="padding:6px;border:1px solid #ddd">Distributor SKU + price lookup</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>class-floors.ts</code></td><td style="padding:6px;border:1px solid #ddd">TypeScript const table</td><td style="padding:6px;border:1px solid #ddd">Physics ledger (G0)</td><td style="padding:6px;border:1px solid #ddd">Per-class physics + cost floors</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>class-reference-graph.ts</code> + 20 class files</td><td style="padding:6px;border:1px solid #ddd">TypeScript const tables</td><td style="padding:6px;border:1px solid #ddd">K10 shadow validation</td><td style="padding:6px;border:1px solid #ddd">Class-typed engineering reference graph (datasheet-derived, baked at build time)</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>class-standards.ts</code></td><td style="padding:6px;border:1px solid #ddd">TypeScript const table</td><td style="padding:6px;border:1px solid #ddd">Renderer Regulatory page</td><td style="padding:6px;border:1px solid #ddd">Per-class regulatory standards</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>class-hazards.ts</code></td><td style="padding:6px;border:1px solid #ddd">TypeScript const table</td><td style="padding:6px;border:1px solid #ddd">Renderer FMEA / Risk Register</td><td style="padding:6px;border:1px solid #ddd">Per-class FMEA hazards + RPN</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>class-price-bands.ts</code></td><td style="padding:6px;border:1px solid #ddd">TypeScript const table</td><td style="padding:6px;border:1px solid #ddd">Renderer Cost panel</td><td style="padding:6px;border:1px solid #ddd">Per-class installed ASP bands</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>class-cost-structure.ts</code></td><td style="padding:6px;border:1px solid #ddd">TypeScript const table</td><td style="padding:6px;border:1px solid #ddd">Renderer Cost waterfall</td><td style="padding:6px;border:1px solid #ddd">Per-class markup layers (BOM → factory → distributor → MSRP)</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>deployment-envelopes.ts</code></td><td style="padding:6px;border:1px solid #ddd">TypeScript const table</td><td style="padding:6px;border:1px solid #ddd">Chain (Phase 4 envelope lookup)</td><td style="padding:6px;border:1px solid #ddd">Shipping/installation envelope per product class</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>component-classes.ts</code></td><td style="padding:6px;border:1px solid #ddd">TypeScript const table</td><td style="padding:6px;border:1px solid #ddd">Engine B</td><td style="padding:6px;border:1px solid #ddd">COMPONENT_CURVES (volume curves), PRODUCT_CLASS_REFERENCE_OVERRIDES</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">jobDir <code>state.json</code></td><td style="padding:6px;border:1px solid #ddd">Filesystem</td><td style="padding:6px;border:1px solid #ddd">Chain (write), Engine B/C (read+write), Renderer (read), Worker (read for snapshot)</td><td style="padding:6px;border:1px solid #ddd">Canonical pipeline state</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">jobDir <code>0..10-*.json/md/txt</code></td><td style="padding:6px;border:1px solid #ddd">Filesystem</td><td style="padding:6px;border:1px solid #ddd">Chain (write only)</td><td style="padding:6px;border:1px solid #ddd">Per-stage artefacts for debugging</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd">jobDir <code>actions.jsonl</code></td><td style="padding:6px;border:1px solid #ddd">Filesystem</td><td style="padding:6px;border:1px solid #ddd">Chain (append)</td><td style="padding:6px;border:1px solid #ddd">Append-only timeline of every step + LLM call + gate</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>jobDir/state.json.bak</code></td><td style="padding:6px;border:1px solid #ddd">Filesystem</td><td style="padding:6px;border:1px solid #ddd">Engine C (write before mutating)</td><td style="padding:6px;border:1px solid #ddd">Backup before reference anchor enrichment</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>/tmp/engine-b-cost.log</code></td><td style="padding:6px;border:1px solid #ddd">Filesystem</td><td style="padding:6px;border:1px solid #ddd">Engine B (append)</td><td style="padding:6px;border:1px solid #ddd">Cost tracking</td></tr>
+<tr><td style="padding:6px;border:1px solid #ddd"><code>~/.pdf-engine-worker/worker.log + worker.stdout.log + worker.stderr.log</code></td><td style="padding:6px;border:1px solid #ddd">Filesystem (LaunchAgent)</td><td style="padding:6px;border:1px solid #ddd">Worker</td><td style="padding:6px;border:1px solid #ddd">Worker lifecycle logs</td></tr>
+</tbody>
+</table>
+
+<div class="footer">File: <code>CHAIN-ENGINE-DIAGRAM-V2-TRUTH.html</code> · companion to v3 (gaps) and v4 (final)</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "default", flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: false }, securityLevel: "loose" });
+</script>
+</body>
+</html>

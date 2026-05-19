@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chain Engine — End-to-End Diagram (2026-05-19)</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    margin: 0;
+    padding: 24px 32px;
+    background: #fafafa;
+    color: #1a1a1a;
+  }
+  h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 600; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 24px; }
+  .legend { font-size: 12px; color: #555; margin: 12px 0 18px 0; }
+  .legend code {
+    background: #eee; padding: 1px 6px; border-radius: 3px;
+    font-family: ui-monospace, "SF Mono", monospace;
+  }
+  .mermaid-wrap {
+    background: white;
+    border: 1px solid #e2e2e2;
+    border-radius: 8px;
+    padding: 24px;
+    overflow-x: auto;
+  }
+  .mermaid { font-family: -apple-system, sans-serif; }
+  .footer { margin-top: 18px; font-size: 12px; color: #888; }
+</style>
+</head>
+<body>
+
+<h1>Chain Engine — End-to-End</h1>
+<div class="sub">
+  HEAD <code>67c3e719d</code> · audited 2026-05-19 · 35 stages, 5 phases, one engine
+</div>
+
+<div class="legend">
+  Rounded rectangles = LLM stages · square brackets = deterministic stages · diamonds = decision points · subgraph = inside the chain script.
+</div>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+flowchart TD
+    Founder([Founder]) -->|writes brief, clicks Start| StartView["StartView<br/>start-view.tsx"]
+    StartView -->|server action| StartAction["startProjectWithAutopilot<br/>start-project-with-autopilot.ts:86"]
+    StartAction -->|"INSERT cad_lab_projects"| ProjectRow[("cad_lab_projects row")]
+    StartAction -->|"INSERT pdf_engine_runs<br/>(user_id, project_id, brief_text, status=pending)"| Queue[("pdf_engine_runs<br/>Supabase")]
+    StartAction -->|"redirect"| WorkspacePage
+
+    Worker["Mac Studio worker<br/>pdf-engine-worker.mjs<br/>LaunchAgent · polls 30s"]
+    Worker -.->|"poll + atomic claim"| Queue
+    Worker -->|"claim-time guard<br/>worker.mjs:124-138"| GuardA{user_id<br/>present?}
+    GuardA -->|no| FailFast["status=failed<br/>9s rejection · no chain spawn"]
+    GuardA -->|yes| SpawnChain["spawn npx tsx<br/>serial-design-chain-v2.tsx"]
+    SpawnChain --> Chain
+
+    subgraph Chain ["Chain — serial-design-chain-v2.tsx (35 stages)"]
+      direction TB
+
+      subgraph P0 ["Phase 0 — Brief intake & refinement"]
+        direction TB
+        S1["1. Save 0-original-brief.md"]
+        S2(["2. runBriefParsing — Gemini 3.1 Pro<br/>→ 1-parsed-brief-original.json"])
+        S3["3. classifyProduct — deterministic"]
+        S4(["4. Refinement loop max 3 iters:<br/>plausibility critic · pick revision · rewrite · re-parse"])
+        S5["5. Save 2-brief-block.json"]
+        S6{">5× hard<br/>contradiction<br/>unresolved?"}
+        FATAL["FATAL · exit 2"]
+        S1 --> S2 --> S3 --> S4 --> S5 --> S6
+        S6 -->|yes| FATAL
+      end
+
+      subgraph P05 ["Phase 0.5 — Pre-design gate"]
+        S7(["6. runPhysicsLedger G0<br/>deterministic conservation checks<br/>vs class-floors.ts"])
+      end
+      S6 -->|no| S7
+
+      subgraph P1 ["Phase 1 — Generator + Reviewers"]
+        direction TB
+        S8(["7. runResearchSynthesis — MiMo v2.5-Pro<br/>→ 3-research.json"])
+        S9(["8. STEP 4 — Generator — Gemini 3.1 Pro<br/>→ 4-generator.json"])
+        S10["9. propagateBriefConstraintsToDesign — deterministic"]
+        S11(["10. STEP 5 — R1 Reviewer — Grok 4.3"])
+        S12(["11. STEP 6 — R2 Reviewer — GLM-5.1"])
+        S13(["12. STEP 7 — R3 Reviewer — Qwen 3.6 Max"])
+        S14(["13. STEP 7.5 — runPhysicsCritic<br/>→ 7-5-physics-critique.json"])
+        S15(["14. STEP 8 — R4 Reviewer — Flash-Lite<br/>+ critic findings appended"])
+        S16["15. Canonical product_class override — deterministic"]
+        S17["16. dedupAllModifiers + ensureSubmoduleProseCoversWords"]
+        S8 --> S9 --> S10 --> S11 --> S12 --> S13 --> S14 --> S15 --> S16 --> S17
+      end
+      S7 --> S8
+
+      subgraph P2 ["Phase 2 — Translate + gates + repair (max 18 iters)"]
+        direction TB
+        S18["17. translate — deterministic"]
+        S19["18. runArithmeticGates + runGrammarGates — deterministic"]
+        S20{"all<br/>pass?"}
+        S21(["19. repair LLM patches → applyPatches"])
+        S22{"state<br/>changed?"}
+        S18 --> S19 --> S20
+        S20 -->|"no, iter<18"| S21 --> S22
+        S22 -->|yes| S18
+      end
+      S17 --> S18
+
+      subgraph P25 ["Phase 2.5 — Post-Phase-2 finalisation"]
+        direction TB
+        S23["20. Post-Phase-2 normalisation passes"]
+        S24["21. K10 shadow validation — graph reference + alias map"]
+        S25["22. deriveHeadlineFromModules — deterministic<br/>→ 9-headline-derived.json"]
+        S26(["23. verifyAllParts — Flash-Lite · batchSize=10"])
+        S27["24. stripUnverifiedParts — deterministic"]
+        S28(["25. recommendReplacementsForStripped — Flash-Lite"])
+        S29(["26. resolveDesignDecisions — LLM<br/>→ 10-design-decisions.json"])
+        S30["27. Structural-gate router"]
+        S31["28. acceptanceStatus = clean | with_decisions | not_accepted"]
+        S23 --> S24 --> S25 --> S26 --> S27 --> S28 --> S29 --> S30 --> S31
+      end
+      S20 -->|yes| S23
+      S22 -->|"no, bail"| S23
+
+      subgraph P3 ["Phase 3 — State assembly"]
+        S32["29. buildNaturalLanguageLayer"]
+        S33[("30. Save state.json")]
+        S32 --> S33
+      end
+      S31 --> S32
+
+      subgraph P4 ["Phase 4 — Post-state enrichment (sub-processes)"]
+        direction TB
+        S34(["31. Engine B — estimate-missing-prices.tsx<br/>backfills price + engine_b_component_class"])
+        S35(["32. Engine C — enrich-state-with-reference-anchor.tsx<br/>reference anchor vs forge-truth.db"])
+        S36["33. Deployment envelope — deterministic"]
+        S34 --> S35 --> S36
+      end
+      S33 --> S34
+
+      subgraph P5 ["Phase 5 — Render"]
+        S37(["34. render-minimal-pdf.tsx<br/>→ chain-v2.pdf"])
+        S38["35. FINAL log: status · gates_passed · decision_count"]
+        S37 --> S38
+      end
+      S36 --> S37
+    end
+
+    Chain -->|"exit 0 + chain-v2.pdf on disk"| GuardB{user_id<br/>still present?}
+    GuardB -->|no| FailUpload["status=failed<br/>upload-time guard · worker.mjs:245-254"]
+    GuardB -->|yes| Upload[("Upload to Supabase Storage<br/>bucket: pdf-engine-pdfs<br/>path: ⟨user_id⟩/⟨job_id⟩.pdf")]
+    Upload --> MarkReady["UPDATE pdf_engine_runs<br/>status=ready · pdf_storage_path · state_snapshot_json"]
+
+    MarkReady --> WorkspacePage["Workspace page<br/>the-forge-v2/projects/[id]/page.tsx"]
+    WorkspacePage -->|"SELECT latest run by project_id"| Queue
+    WorkspacePage -->|"if ready: createSignedUrl 30min TTL"| SignedUrl[("signed URL")]
+    WorkspacePage --> ChainView["ChainWorkspaceView · client<br/>polls every 30s · router.refresh"]
+    ChainView -->|"Download PDF →"| Founder
+
+    classDef llm fill:#fff7e6,stroke:#d97706,stroke-width:1px,color:#7c2d12
+    classDef det fill:#eef2ff,stroke:#4f46e5,stroke-width:1px,color:#1e1b4b
+    classDef gate fill:#f0fdf4,stroke:#16a34a,stroke-width:1px,color:#14532d
+    classDef fail fill:#fef2f2,stroke:#dc2626,stroke-width:1px,color:#7f1d1d
+    classDef store fill:#f5f5f5,stroke:#525252,stroke-width:1px,color:#262626
+
+    class S2,S4,S8,S9,S11,S12,S13,S14,S15,S21,S26,S28,S29 llm
+    class S1,S3,S5,S7,S10,S16,S17,S18,S19,S23,S24,S25,S27,S30,S31,S32,S36,S38 det
+    class S6,S20,S22,GuardA,GuardB gate
+    class FATAL,FailFast,FailUpload fail
+    class Queue,ProjectRow,S33,SignedUrl,Upload store
+</pre>
+</div>
+
+<div class="footer">
+  File: <code>CHAIN-ENGINE-DIAGRAM.html</code> · companion to <code>CHAIN-ENGINE-AUDIT-2026-05-19.md</code><br/>
+  Coloured nodes: <span style="background:#fff7e6;border:1px solid #d97706;padding:1px 5px;border-radius:3px">LLM</span>
+  <span style="background:#eef2ff;border:1px solid #4f46e5;padding:1px 5px;border-radius:3px">deterministic</span>
+  <span style="background:#f0fdf4;border:1px solid #16a34a;padding:1px 5px;border-radius:3px">gate / decision</span>
+  <span style="background:#fef2f2;border:1px solid #dc2626;padding:1px 5px;border-radius:3px">fail path</span>
+  <span style="background:#f5f5f5;border:1px solid #525252;padding:1px 5px;border-radius:3px">storage</span>
+</div>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: "default",
+    flowchart: {
+      curve: "basis",
+      htmlLabels: true,
+      useMaxWidth: false,
+    },
+    securityLevel: "loose",
+  });
+</script>
+</body>
+</html>

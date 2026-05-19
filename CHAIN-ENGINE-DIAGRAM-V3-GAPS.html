@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chain Engine v3 — GAPS (what should be wired but isn't) — 2026-05-19</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px 32px; background: #fafafa; color: #1a1a1a; }
+  h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 600; }
+  h2 { margin: 28px 0 8px 0; font-size: 16px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 18px; }
+  .gap-summary { background: #fef2f2; border: 1px solid #fca5a5; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 13px; }
+  .gap-summary h3 { margin: 0 0 6px 0; font-size: 14px; color: #7f1d1d; }
+  .mermaid-wrap { background: white; border: 1px solid #e2e2e2; border-radius: 8px; padding: 24px; overflow-x: auto; margin-bottom: 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
+  th { background: #eee; text-align: left; padding: 6px; border: 1px solid #ddd; }
+  td { padding: 6px; border: 1px solid #ddd; vertical-align: top; }
+</style>
+</head>
+<body>
+
+<h1>Chain Engine v3 — GAPS</h1>
+<div class="sub">HEAD <code>67c3e719d</code> · auditing 2026-05-19 · what is <em>supposed</em> to be wired (per renderer expectations + advertised features) but isn't.</div>
+
+<div class="gap-summary">
+<h3>Headline gaps</h3>
+<ul>
+  <li><strong>6 PDF features advertise data that the chain never produces.</strong> Renderer has UI for §7 Suppliers + 5 Manual-Review badges (G1b/G2/G3/G4/G5). Only G0 (physics ledger) actually fires.</li>
+  <li><strong>42 TypeScript files under <code>src/lib/pdf-engine-v2/</code> are knip-confirmed unreachable</strong> from the 4 chain entry points — dead-from-chain but still on disk. Some are legitimately retired alternatives; some are forgotten-but-useful (suppliers, retrieve-references).</li>
+  <li><strong>32 orphan UI sub-routes</strong> under <code>/the-forge-v2/projects/[id]/</code> are still URL-reachable but render empty because they read from the retired autopilot's JSONB columns.</li>
+  <li><strong>Physics critic uses <code>gemini-2.5-flash-lite</code></strong> when every other Flash-Lite call in the chain uses <code>gemini-3.1-flash-lite</code>. Model version drift.</li>
+</ul>
+</div>
+
+<h2>Gap map — what's missing, where it should plug in</h2>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+flowchart TD
+
+    %% =====================================================================
+    %% GAP CLUSTER 1 — Suppliers (the headline gap)
+    %% =====================================================================
+    subgraph G_Suppliers ["GAP 1 — §7 Suppliers section (renderer expects, chain never produces)"]
+      direction LR
+      S_Chain["serial-design-chain-v2.tsx<br/>Phase 4 (current: B + C + envelope)"]
+      S_Should["should also spawn:<br/>scripts/enrich-state-with-suppliers.tsx<br/>(2,550 lines, EXISTS but never spawned)"]
+      S_Chain -.->|"MISSING SPAWN"| S_Should
+      S_Should -->|"would write"| S_Fields[("state.suppliers[]<br/>state.suppliers_provenance")]
+      S_Fields -->|"render-minimal-pdf.tsx:4049<br/>SuppliersPage reads this<br/>(currently empty → returns null)"| S_PDF["PDF §7 Suppliers<br/>(currently NOT rendered at all)"]
+      S_DB[("~/.forge-truth/forge-truth.db<br/>companies table<br/>~28k companies — Companies House<br/>verified + web-sourced")]
+      S_DB -.->|"should be queried via class-suppliers.ts<br/>(currently knip-dead)"| S_Should
+    end
+
+    %% =====================================================================
+    %% GAP CLUSTER 2 — Manual Review Badges (5 of 6 dead)
+    %% =====================================================================
+    subgraph G_Badges ["GAP 2 — Manual Review Badges (5 of 6 dead — chain doesn't write the fields)"]
+      direction TB
+      MR_Chain["serial-design-chain-v2.tsx writes:<br/>state.physicsLedger ✓ (G0 wired)"]
+      MR_Compliance(["MISSING: G1b compliance gate<br/>renderer reads state.complianceGate +<br/>state.g1bManualReview<br/>(comment refs index.ts:893 — PA only)"])
+      MR_CostReality(["MISSING: G2 cost-reality<br/>renderer reads state.cost_reality_rejection +<br/>state.cost_reality_status<br/>(Engine A retry budget concept, never built)"])
+      MR_G3(["MISSING: G3 review completeness<br/>renderer reads state.g3ManualReview<br/>(Stage 6 Review concept — PA-only)"])
+      MR_G4(["MISSING: G4 grammar manual-review<br/>renderer reads state.moduleDecomposition.g4ManualReview<br/>(chain runs Phase 2 grammar gates +<br/>structural-gate router but doesn't set this field)"])
+      MR_G5(["MISSING: G5 parts manual-review<br/>renderer reads state.g5ManualReview +<br/>state.g5UnverifiedParts[]<br/>(chain has state.partVerifications with<br/>'unverified' status — wrong field name)"])
+      MR_K10["state.moduleDecomposition.k10ShadowResult ✓<br/>(shadow mode renders Appendix B, not badge —<br/>correct behaviour)"]
+      MR_Chain --> MR_Compliance
+      MR_Chain --> MR_CostReality
+      MR_Chain --> MR_G3
+      MR_Chain --> MR_G4
+      MR_Chain --> MR_G5
+      MR_Chain --> MR_K10
+      MR_Renderer["render-minimal-pdf.tsx:954<br/>collectManualReviewBadges()<br/>(only G0 + K10 ever fire)"]
+      MR_Compliance -.-> MR_Renderer
+      MR_CostReality -.-> MR_Renderer
+      MR_G3 -.-> MR_Renderer
+      MR_G4 -.-> MR_Renderer
+      MR_G5 -.-> MR_Renderer
+    end
+
+    %% =====================================================================
+    %% GAP CLUSTER 3 — Dead code in src/lib/pdf-engine-v2/ (42 files)
+    %% =====================================================================
+    subgraph G_DeadLib ["GAP 3 — 42 files knip-dead under src/lib/pdf-engine-v2/ (still on disk)"]
+      direction TB
+      D_PA["PA orchestrator + helpers (10):<br/>run.ts, supabase-client.ts, db-queries.ts,<br/>models.ts, env.ts, source-grading.ts,<br/>universal-scorer.ts, benchmarks.ts,<br/>lib/models.ts, lib/types.ts<br/><br/>(retired pipeline — should archive)"]
+      D_Suppliers["Suppliers infrastructure (1):<br/>class-suppliers.ts<br/><br/>(SHOULD be re-wired via enrich-state-with-suppliers.tsx<br/>OR archived if we keep suppliers-as-script-only)"]
+      D_Pretraining["Pretraining wrappers (1):<br/>retrieve-references.ts<br/><br/>(Engine B/C/Renderer hit DB directly;<br/>wrapper is the orphan)"]
+      D_Lib["Lib internals (11):<br/>lib/{calculators, character-registry,<br/>cost-constraints, fmea-validator,<br/>industry-domain, live-benchmark-search,<br/>local-corpus, module-assignment-validator,<br/>page-chunks, product-adapters,<br/>r290-safety, search-client}.ts<br/><br/>(alt impls / pre-radical era)"]
+      D_PartsCat["parts-catalogue/* (4):<br/>brave-search, cascade, db, rate-limit<br/><br/>(part-verification.ts uses Tavily +<br/>distributor cascade directly)"]
+      D_Radical["radical/ alt-paths (12):<br/>class-arithmetic-gates, council-synthesis,<br/>demo/* (6), first-light-test,<br/>module-paragraph-llm,<br/>module-to-sentence-mapping,<br/>phase-0-slice/* (2),<br/>structural-builder-from-decomposition<br/><br/>(experiments that lost the council race)"]
+    end
+
+    %% =====================================================================
+    %% GAP CLUSTER 4 — Orphan UI surface
+    %% =====================================================================
+    subgraph G_OrphanUI ["GAP 4 — Orphan UI surface (URL-reachable, empty data)"]
+      direction TB
+      O_Subroutes["32 sub-routes under<br/>/the-forge-v2/projects/[id]/<br/>brief / cost / modules / bom / suppliers /<br/>risks / readiness / review / revisions /<br/>regulatory / specialists / geometry /<br/>operations / outputs / archive / approve /<br/>ask / assumption-test / brief-lock /<br/>compose / export / fork / launch /<br/>launch-plan / plan / promote / request /<br/>schedule<br/><br/>(read from loadCadLabProject's JSONB columns,<br/>which autopilot specialists populated —<br/>chain doesn't, so empty UI)"]
+      O_Legacy["/the-forge/cad-lab/ (legacy V1 workbench)<br/>still reachable, calls retired() stubs<br/>with try/catch fallback chain"]
+      O_Props["3 view components with stale prop types:<br/>brief-view.tsx (runChaseAction)<br/>cost-view.tsx (runFinnAction)<br/>module-detail-view.tsx (runFangAction)<br/>(parent page.tsx no longer passes the props)"]
+      O_Doc["Stale docstring:<br/>/the-forge-v2/start/page.tsx<br/>describes pre-unification flow<br/>(Chase → Max → Fang → Finn)"]
+    end
+
+    %% =====================================================================
+    %% GAP CLUSTER 5 — Model drift
+    %% =====================================================================
+    subgraph G_Models ["GAP 5 — Model version drift"]
+      direction LR
+      M_Critic["radical/physics-critic.ts:46<br/>const FLASH_LITE_MODEL =<br/>'google/gemini-2.5-flash-lite'"]
+      M_Chain["Every other Flash-Lite caller uses:<br/>'google/gemini-3.1-flash-lite'<br/>or<br/>'google/gemini-3.1-flash-lite-preview'"]
+      M_Critic -.->|"VERSION DRIFT<br/>(2.5 vs 3.1)"| M_Chain
+    end
+
+    %% =====================================================================
+    %% Styling
+    %% =====================================================================
+    classDef wired fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef missing fill:#fee2e2,stroke:#dc2626,color:#7f1d1d
+    classDef store fill:#f5f5f5,stroke:#525252,color:#262626
+    classDef pdf fill:#fff7e6,stroke:#d97706,color:#7c2d12
+    classDef dead fill:#fef3c7,stroke:#d97706,color:#78350f
+
+    class S_Chain wired
+    class S_Should,MR_Compliance,MR_CostReality,MR_G3,MR_G4,MR_G5,O_Subroutes,O_Legacy,O_Props,O_Doc,M_Critic missing
+    class S_DB,S_Fields,MR_Chain,MR_K10 store
+    class S_PDF,MR_Renderer pdf
+    class D_PA,D_Suppliers,D_Pretraining,D_Lib,D_PartsCat,D_Radical dead
+    class M_Chain wired
+</pre>
+</div>
+
+<h2>Gap table — exact remediation plan</h2>
+
+<table>
+<thead>
+<tr><th>#</th><th>Gap</th><th>Action</th><th>Rationale</th></tr>
+</thead>
+<tbody>
+<tr>
+  <td>1</td>
+  <td><strong>Suppliers section empty</strong>: <code>scripts/enrich-state-with-suppliers.tsx</code> (2,550 lines) exists but chain doesn't spawn it</td>
+  <td>WIRE: chain spawns enrich-state-with-suppliers after Engine C, before render. Verify script works against current state.json shape first.</td>
+  <td>Renderer's <code>SuppliersPage</code> at line 4049 reads <code>state.suppliers</code> and renders nothing when empty. Wiring this restores §7.</td>
+</tr>
+<tr>
+  <td>2a</td>
+  <td><strong>G1b compliance manual-review</strong>: <code>state.complianceGate</code> never written</td>
+  <td>OPEN QUESTION: was G1b a PA-orchestrator-only stage that never got ported? Decide: (a) build a compliance gate stage in the chain, or (b) remove G1b from the renderer's badge list.</td>
+  <td>Comment at render-minimal-pdf.tsx:931 references <code>stages/3.5-compliance-gate.ts</code> which would need to exist. Currently doesn't.</td>
+</tr>
+<tr>
+  <td>2b</td>
+  <td><strong>G2 cost-reality manual-review</strong>: <code>state.cost_reality_*</code> never written</td>
+  <td>OPEN QUESTION: G2 was Engine A retry-budget concept. Decide: (a) implement an Engine A cost-reality stage, or (b) remove G2 from renderer badges.</td>
+  <td>Engine A was the "scale-of-one trade pricing" approach replaced by Engine B's curve anchoring (per estimate-missing-prices.tsx header).</td>
+</tr>
+<tr>
+  <td>2c</td>
+  <td><strong>G3 review completeness</strong>: <code>state.g3ManualReview</code> never written</td>
+  <td>OPEN QUESTION: was a "Stage 6 Review" gate from PA orchestrator. Decide: (a) build it, or (b) remove from renderer.</td>
+  <td>Same provenance as G1b.</td>
+</tr>
+<tr>
+  <td>2d</td>
+  <td><strong>G4 grammar manual-review</strong>: <code>state.moduleDecomposition.g4ManualReview</code> never written</td>
+  <td>WIRE: chain's Phase 2 already detects grammar failures via <code>runGrammarGates</code> + structural-gate router. Add: when Phase 2 grammar gates fail after 18 iters with no progress, set <code>state.moduleDecomposition.g4ManualReview = true</code>.</td>
+  <td>Cheap fix — chain has the data, just doesn't write the badge-trigger field.</td>
+</tr>
+<tr>
+  <td>2e</td>
+  <td><strong>G5 parts manual-review</strong>: <code>state.g5ManualReview</code> + <code>state.g5UnverifiedParts</code> never written</td>
+  <td>WIRE: chain has <code>state.partVerifications</code> with <code>status='unverified'</code> entries. Add: after <code>verifyAllParts</code>, derive <code>g5UnverifiedParts</code> (filter <code>status='unverified'</code>) and <code>g5ManualReview = g5UnverifiedParts.length &gt; 0</code>.</td>
+  <td>Cheapest fix — data exists, just rename/derive.</td>
+</tr>
+<tr>
+  <td>3</td>
+  <td><strong>42 dead files</strong> in <code>src/lib/pdf-engine-v2/</code></td>
+  <td>ARCHIVE: move all 42 to <code>_archive/2026-05-19-pre-chain-unification/lib/pdf-engine-v2-dead/</code>. Tristan can re-pull anything if needed.</td>
+  <td>Keeping dead code on disk causes accidental imports (the recurring problem). Archive solves it.</td>
+</tr>
+<tr>
+  <td>4a</td>
+  <td><strong>32 orphan UI sub-routes</strong></td>
+  <td>REDIRECT: add <code>next.config.js</code> redirects from each orphan path to <code>/the-forge-v2/projects/:id</code>. Optionally also <code>git mv</code> the page.tsx files to <code>_archive/</code>.</td>
+  <td>Cheapest fix is just the redirects (matches behaviour Tristan wants — can't reach orphan UIs). Archive is optional housekeeping.</td>
+</tr>
+<tr>
+  <td>4b</td>
+  <td><strong>Legacy <code>/the-forge/cad-lab</code></strong> workbench reachable</td>
+  <td>REDIRECT: send <code>/the-forge/cad-lab/*</code> to <code>/the-forge-v2/start</code>.</td>
+  <td>Same justification.</td>
+</tr>
+<tr>
+  <td>4c</td>
+  <td><strong>Stale view-component prop types</strong> in brief/cost/module-detail views</td>
+  <td>Subsumed by 4a — if orphan sub-routes are redirected, the views aren't rendered. Optional: remove the props from the type definitions.</td>
+  <td>—</td>
+</tr>
+<tr>
+  <td>4d</td>
+  <td><strong>Stale docstring</strong> at <code>/the-forge-v2/start/page.tsx</code></td>
+  <td>EDIT: rewrite header doc to describe the chain flow.</td>
+  <td>5-minute fix.</td>
+</tr>
+<tr>
+  <td>5</td>
+  <td><strong>Physics critic model drift</strong>: uses <code>gemini-2.5-flash-lite</code></td>
+  <td>EDIT: update <code>radical/physics-critic.ts:46</code> to <code>'google/gemini-3.1-flash-lite'</code>. Sanity-check the JSON-format compatibility (should be identical).</td>
+  <td>Brings critic in line with rest of chain. Cheaper + smarter model.</td>
+</tr>
+</tbody>
+</table>
+
+<h2>Decisions for Tristan (judgment calls, not mechanical)</h2>
+
+<ol style="font-size:13px">
+  <li><strong>For G1b / G2 / G3 (PA-only badges):</strong> implement them in the chain, OR remove the renderer badges? Cheapest is remove. Build is bigger scope but adds real engineering review depth. (G4 + G5 I can wire cheaply with what the chain already produces.)</li>
+  <li><strong>For dead-code archive:</strong> archive all 42 files in one commit, or be selective? I'll archive in one commit but flag the 2 that COULD be re-wired (<code>class-suppliers.ts</code>, <code>retrieve-references.ts</code>) so Tristan can decide later.</li>
+  <li><strong>For supplier enrichment script:</strong> assume it works against the current state shape — if it doesn't, fix or rewrite. I'll verify before wiring.</li>
+</ol>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "default", flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: false }, securityLevel: "loose" });
+</script>
+</body>
+</html>

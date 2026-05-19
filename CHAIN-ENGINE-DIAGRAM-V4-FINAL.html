@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Chain Engine v4 — FINAL state (after gap closure) — 2026-05-19</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; margin: 0; padding: 24px 32px; background: #fafafa; color: #1a1a1a; }
+  h1 { margin: 0 0 4px 0; font-size: 22px; font-weight: 600; }
+  h2 { margin: 28px 0 8px 0; font-size: 16px; }
+  .sub { color: #666; font-size: 13px; margin-bottom: 18px; }
+  .summary { background: #f0fdf4; border: 1px solid #16a34a; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 13px; }
+  .summary h3 { margin: 0 0 6px 0; font-size: 14px; color: #14532d; }
+  .deferred { background: #fef3c7; border: 1px solid #d97706; border-radius: 6px; padding: 12px 16px; margin: 16px 0; font-size: 13px; }
+  .deferred h3 { margin: 0 0 6px 0; font-size: 14px; color: #78350f; }
+  .mermaid-wrap { background: white; border: 1px solid #e2e2e2; border-radius: 8px; padding: 24px; overflow-x: auto; margin-bottom: 16px; }
+  table { border-collapse: collapse; width: 100%; font-size: 12px; margin: 8px 0; }
+  th { background: #eee; text-align: left; padding: 6px; border: 1px solid #ddd; }
+  td { padding: 6px; border: 1px solid #ddd; vertical-align: top; }
+  code { background: #eee; padding: 1px 4px; border-radius: 3px; font-size: 11px; }
+</style>
+</head>
+<body>
+
+<h1>Chain Engine v4 — FINAL</h1>
+<div class="sub">After Step 3 gap closure · 2026-05-19 · this is the wiring state after fixing every CRITICAL + reachable MEDIUM gap from the 5-model audit panel.</div>
+
+<div class="summary">
+<h3>What changed from v2 → v4 (gaps closed)</h3>
+<ul>
+  <li><strong>Engine D wired</strong> — chain now spawns <code>enrich-state-with-suppliers.tsx</code>, §7 Suppliers section will populate</li>
+  <li><strong>C1 collision fixed</strong> — Engine B + C use compound key <code>{module}::{sub_module}::{word_id}</code>, no more cross-module price/ref overwrites</li>
+  <li><strong>C2 fail-mode closed</strong> — chain <code>execFileSync('open')</code> wrapped in try/catch + worker sets <code>PDF_ENGINE_WORKER=1</code> → renderer auto-sets <code>RENDER_NO_OPEN=1</code></li>
+  <li><strong>C3 wizard intake</strong> — structured fields (targetScale, marketSegment, geography, startupStage, additionalContext) now composed into brief_text before chain runs</li>
+  <li><strong>C4 silent failure removed</strong> — pdf_engine_runs INSERT failure now returns <code>ok: false</code> with error message</li>
+  <li><strong>C5 OPENAI key</strong> — worker now loads ~/.claude/secrets/openai.env + warns at startup if OPENAI_API_KEY missing</li>
+  <li><strong>C6 W3 double-counting fixed</strong> — renderer's <code>applyBatchEconomics</code> skips W3 scale for rows already volume-anchored by Engine B</li>
+  <li><strong>C7 PDF title</strong> — multi-path fallback (parsed_revised.subject → parsed_original.subject → parsedBrief.subject → projectName → first line of brief → class name)</li>
+  <li><strong>M1 + M2</strong> — state now has real <code>gatesPassed</code> boolean and full <code>grammarVerdicts</code> (arith + grammar results per gate)</li>
+  <li><strong>M3 stale summary</strong> — chain re-stamps partVerificationSummary AFTER Engine B/C mutate partVerifications, now includes Engine B/C attribution counts</li>
+  <li><strong>M4 envelope alias bridge</strong> — chain normalises product class via ENVELOPE_ALIASES before deployment-envelopes lookup</li>
+  <li><strong>M5 Engine C class hints</strong> — added ~15 missing aliases (mini_split_heatpump, battery_energy_storage, residential_ess, vfd, drone, agv, amr, auv, etc.)</li>
+  <li><strong>M7 worker timeout</strong> — runChild now has 180-min hard cap with SIGTERM→SIGKILL escalation</li>
+  <li><strong>G4 + G5 manual-review badges</strong> — chain writes <code>state.moduleDecomposition.g4ManualReview</code> + <code>state.g5ManualReview</code> + <code>state.g5UnverifiedParts[]</code></li>
+  <li><strong>Physics critic model</strong> — bumped from gemini-2.5-flash-lite to gemini-3.1-flash-lite (matches rest of chain)</li>
+  <li><strong>R4 misleading grounding flag</strong> — removed (OpenRouter ignores it for Flash-Lite, comment in callLlm makes it a no-op stub)</li>
+  <li><strong>Stale docstring</strong> — /the-forge-v2/start/page.tsx now describes chain flow, not retired autopilot</li>
+  <li><strong>Worker env-file warnings</strong> — startup KEY_CHECKS surface any missing API key + which downstream stage will silently fail without it</li>
+</ul>
+</div>
+
+<div class="deferred">
+<h3>Deferred (needs your decision or bigger scope)</h3>
+<ul>
+  <li><strong>G1b / G2 / G3 manual-review badges</strong> — these were PA-orchestrator-only features. Decide: build them in the chain (new stages) OR remove the badges from the renderer.</li>
+  <li><strong>M6 stale-running recovery</strong> — needs DB schema change (heartbeat or lease_expires_at column on pdf_engine_runs) or background sweeper.</li>
+  <li><strong>M8 state.json + actions.jsonl Supabase persistence</strong> — diagnostic data still local-only on Mac Studio. Needs storage column or separate bucket.</li>
+  <li><strong>32 orphan UI sub-routes</strong> + legacy <code>/the-forge/cad-lab</code> — needs next.config.js redirects (small) or _archive move (bigger).</li>
+  <li><strong>42 knip-dead files</strong> under src/lib/pdf-engine-v2/ — needs archival commit (verifying class-suppliers.ts isn't re-needed now that Engine D is wired).</li>
+  <li><strong>physicsCritique render section</strong> — chain writes critic findings but renderer drops them. Would need a new badge or appendix section.</li>
+  <li><strong>variation_of parent inheritance</strong> — child variation runs are fully independent. Design decision pending.</li>
+  <li><strong>Various silent-failure improvements</strong> — better-sqlite3 startup check, forge-truth.db existence check, ensureGraphsRegistered guard.</li>
+</ul>
+</div>
+
+<h2>End-to-end flow (final wired state)</h2>
+
+<div class="mermaid-wrap">
+<pre class="mermaid">
+flowchart TD
+    Founder([Founder]) -->|brief + wizard fields| StartView["StartView<br/>(platform)/the-forge-v2/start/<br/>start-view.tsx"]
+    StartView -->|server action with wizardFields| StartAction["startProjectWithAutopilot<br/>+ composeBriefForChain v2026-05-19"]
+    StartAction -->|"INSERT cad_lab_projects + persist wizard fields"| CadLab[("Supabase<br/>cad_lab_projects")]
+    StartAction -->|"INSERT pdf_engine_runs<br/>brief_text = composed (subject + structured wizard fields)"| Queue[("Supabase<br/>pdf_engine_runs")]
+    StartAction -.->|"NEW: returns ok:false on INSERT failure (was silent)"| ErrorPath["UI shows error to founder"]
+    StartAction -->|redirect| WorkspacePage
+
+    Worker["Mac Studio worker<br/>pdf-engine-worker.mjs<br/>+ PDF_ENGINE_WORKER=1 flag<br/>+ KEY_CHECKS at startup<br/>+ runChild 180min timeout SIGTERM→SIGKILL"]
+    Worker -.->|polls 30s| Queue
+    Worker --> Spawn["spawn chain<br/>serial-design-chain-v2.tsx<br/>(now inherits PDF_ENGINE_WORKER=1)"]
+
+    subgraph Chain ["Chain — serial-design-chain-v2.tsx (final wiring)"]
+      direction TB
+      P0["Phase 0: brief parse + refinement<br/>(no change)"]
+      P05["Phase 0.5: physics ledger G0<br/>state.physicsLedger ✓ wired"]
+      P1["Phase 1: research → generator → R1/R2/R3 → critic → R4<br/>(R4 ungrounded flag removed; critic on gemini-3.1-flash-lite)"]
+      P2["Phase 2: translate + 28 gates + repair (max 18 iters)<br/>NEW: tracks finalArith + finalGrammar"]
+      P25["Phase 2.5: K10 + headline + verifyAllParts + strip + recommend<br/>+ resolveDesignDecisions + structural router<br/>NEW: derive g4ManualReview from finalFailedGates<br/>NEW: derive g5ManualReview + g5UnverifiedParts from partVerifications"]
+      P3["Phase 3: state.json assembly<br/>NEW fields: gatesPassed, grammarVerdicts (arith+grammar detail),<br/>g5ManualReview, g5UnverifiedParts<br/>(g4ManualReview lives on moduleDecomposition)"]
+      P4A["Phase 4a: Engine B<br/>estimate-missing-prices.tsx<br/>NEW: compound key {module}::{sub_module}::{word_id}<br/>(C1 collision fixed)"]
+      P4B["Phase 4b: Engine C<br/>enrich-state-with-reference-anchor.tsx<br/>NEW: compound key + expanded class-hint aliases<br/>(C1 + M5 fixed)"]
+      P4C(["Phase 4c: Engine D (NEW WIRE)<br/>enrich-state-with-suppliers.tsx<br/>(scripts/supplier-enrichment/persist-web-fallback.ts +<br/>class-suppliers.ts + Brave Search + Flash-Lite scoring)<br/>writes state.suppliers[] + state.suppliers_provenance[]"])
+      P4D["Phase 4d: deployment envelope<br/>NEW: ENVELOPE_ALIASES map for non-canonical slugs<br/>(M4 fixed)"]
+      P4E["Phase 4e (NEW): re-stamp partVerificationSummary<br/>after Engines mutated partVerifications<br/>(M3 fixed — now includes Engine B/C attribution counts)"]
+      P5["Phase 5: render-minimal-pdf.tsx<br/>NEW: PDF title multi-path fallback (C7 fixed)<br/>NEW: applyBatchEconomics skips W3 for Engine B rows (C6 fixed)<br/>NEW: chain's local 'open' guarded by try/catch + PDF_ENGINE_WORKER (C2 fixed)"]
+      P0 --> P05 --> P1 --> P2 --> P25 --> P3 --> P4A --> P4B --> P4C --> P4D --> P4E --> P5
+    end
+
+    Spawn --> Chain
+    Chain --> Upload["Worker uploads PDF to<br/>Supabase Storage<br/>(bucket: pdf-engine-pdfs)"]
+    Upload --> Bucket[("Storage<br/>{user_id}/{job_id}.pdf")]
+    Upload --> MarkReady["UPDATE pdf_engine_runs<br/>status='ready', pdf_storage_path,<br/>state_snapshot_json (NOW with real gatesPassed)"]
+    MarkReady --> Queue
+
+    Queue -.-> WorkspacePage["Workspace page polls,<br/>mints signed URL on ready,<br/>shows download"]
+    WorkspacePage -->|download| Founder
+
+    %% External APIs + DBs (unchanged)
+    ForgeTruth[("~/.forge-truth/forge-truth.db<br/>pretraining_extracted_parts + companies tables<br/>read by Engine B, Engine C python, Renderer, Engine D")]
+    P4A -.-> ForgeTruth
+    P4B -.-> ForgeTruth
+    P4C -.-> ForgeTruth
+    P5 -.-> ForgeTruth
+
+    OpenRouter{{"OpenRouter<br/>(Gemini 3.1 Pro, Flash-Lite, Grok 4.3,<br/>GLM-5.1, Qwen 3.6 Max, MiMo, OpenAI*)"}}
+    OpenAI{{"OpenAI<br/>text-embedding-3-small<br/>(Engine C via python)"}}
+    Brave{{"Brave Search<br/>(Engine D supplier fallback)"}}
+    Tavily{{"Tavily<br/>(part verification)"}}
+    Distributors{{"Mouser / DigiKey / Farnell<br/>(part verification cascade)"}}
+
+    P1 -.-> OpenRouter
+    P25 -.-> OpenRouter
+    P25 -.-> Tavily
+    P25 -.-> Distributors
+    P4A -.-> OpenRouter
+    P4B -.-> OpenAI
+    P4C -.-> OpenRouter
+    P4C -.-> Brave
+
+    classDef wired fill:#dcfce7,stroke:#16a34a,color:#14532d
+    classDef new fill:#bfdbfe,stroke:#2563eb,color:#1e3a8a
+    classDef store fill:#f5f5f5,stroke:#525252,color:#262626
+    classDef extapi fill:#fce7f3,stroke:#be185d,color:#831843
+    class P0,P05,P1,P2,P5 wired
+    class P25,P3,P4A,P4B,P4C,P4D,P4E,Worker,StartAction,ErrorPath new
+    class CadLab,Queue,Bucket,ForgeTruth store
+    class OpenRouter,OpenAI,Brave,Tavily,Distributors extapi
+</pre>
+</div>
+
+<h2>Verification — tsc clean on every edited file</h2>
+
+<table>
+<thead><tr><th>File</th><th>Edits</th><th>tsc</th></tr></thead>
+<tbody>
+<tr><td><code>scripts/serial-design-chain-v2.tsx</code></td><td>Engine D wire, G4/G5 badges, C2 open guard, M1 gatesPassed, M2 grammarVerdicts, M3 summary re-stamp, M4 envelope alias, R4 flag removed</td><td>✓ clean</td></tr>
+<tr><td><code>scripts/estimate-missing-prices.tsx</code></td><td>C1 compound key</td><td>✓ clean</td></tr>
+<tr><td><code>scripts/enrich-state-with-reference-anchor.tsx</code></td><td>C1 compound key, M5 expanded aliases</td><td>✓ clean</td></tr>
+<tr><td><code>scripts/render-minimal-pdf.tsx</code></td><td>C7 title fallback, C6 W3 conditional skip</td><td>✓ clean</td></tr>
+<tr><td><code>scripts/pdf-engine-worker.mjs</code></td><td>C5 OPENAI key load + check, C2 PDF_ENGINE_WORKER flag, M7 runChild timeout</td><td>✓ node --check OK</td></tr>
+<tr><td><code>src/lib/pdf-engine-v2/radical/physics-critic.ts</code></td><td>Model bumped 2.5→3.1</td><td>✓ clean</td></tr>
+<tr><td><code>src/app/(platform)/the-forge-v2/start/page.tsx</code></td><td>Docstring fixed</td><td>✓ clean</td></tr>
+<tr><td><code>src/actions/start-project-with-autopilot.ts</code></td><td>C3 composeBriefForChain, C4 silent failure removed</td><td>✓ clean</td></tr>
+</tbody>
+</table>
+
+<h2>Audit cost trail</h2>
+
+<p>Total audit spend across 4 rounds + retries: <strong>~£0.76</strong> ($0.76 USD). 5 useful audit voices: Flash-Lite 3.1, Grok 4.3, GLM 5.1, Gemini 3.1 Pro (partial), GPT-5.5. MiMo + DeepSeek + Kimi unusable (reasoning models consume all output budget as reasoning tokens, return empty content). All audit responses persisted in repo: <code>CHAIN-ENGINE-AUDIT-V{2,3}-{FLASHLITE,GROK,GLM,GEMINIPRO,GPT55}.json</code>.</p>
+
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "default", flowchart: { curve: "basis", htmlLabels: true, useMaxWidth: false }, securityLevel: "loose" });
+</script>
+</body>
+</html>
