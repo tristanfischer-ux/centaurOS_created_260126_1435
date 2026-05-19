@@ -58,6 +58,7 @@ import {
   validateConnectionsAgainstGraph,
 } from '../src/lib/pdf-engine-v2/class-reference-graph'
 import { runPhysicsLedger } from '../src/lib/pdf-engine-v2/stages/0.1-physics-ledger'
+import { runComplianceGate, type ComplianceGateResult } from '../src/lib/pdf-engine-v2/stages/3.5-compliance-gate'
 import { deriveHeadlineFromModules } from '../src/lib/pdf-engine-v2/headline-deriver'
 import { resolveDesignDecisions, type DesignDecision } from '../src/lib/pdf-engine-v2/radical/design-decisions'
 import { verifyAllParts, stripUnverifiedParts, recommendReplacementsForStripped, buildTechnicalSummary, type PartVerification, type PartRecommendation } from '../src/lib/pdf-engine-v2/radical/part-verification'
@@ -1598,6 +1599,26 @@ async function main() {
     logAction({ step: 'physics_ledger', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tLedger })
   }
 
+  // ── G1b Compliance Gate (Tristan v5 directive 2026-05-19): regulatory
+  // standards check vs class-standards.ts. Catches missing-mandatory + multi-
+  // jurisdiction-scope conflicts. Deterministic, zero LLM cost. Writes
+  // state.complianceGate which the renderer's manual-review badge collector
+  // reads.
+  let complianceGate: ComplianceGateResult | null = null
+  const tCompliance = Date.now()
+  try {
+    complianceGate = runComplianceGate(parsedResult.data, productClass, currentBriefText)
+    const cg = complianceGate
+    console.error(`[chain] G1b compliance: ${cg.verdict} — ${cg.mandatory_covered}/${cg.mandatory_total} mandatory covered for ${cg.jurisdictions_detected.join('+') || '(no jurisdiction detected)'}`)
+    if (cg.conflicts.length > 0) {
+      for (const c of cg.conflicts.slice(0, 5)) console.error(`  ⚠ ${c.standard_code} (${c.conflict_type}): ${c.reason.slice(0, 120)}`)
+    }
+    logAction({ step: 'compliance_gate', verdict: cg.verdict, mandatory_total: cg.mandatory_total, mandatory_covered: cg.mandatory_covered, conflict_count: cg.conflicts.length, latency_ms: Date.now() - tCompliance, ok: true })
+  } catch (err) {
+    console.error(`[chain] G1b compliance gate threw: ${(err as Error).message}; continuing without`)
+    logAction({ step: 'compliance_gate', ok: false, error: String(err).slice(0, 200), latency_ms: Date.now() - tCompliance })
+  }
+
   const t1 = Date.now()
   const researchResult = await runResearchSynthesis(parsedResult.data, productClass)
   const research = researchResult.ok ? researchResult.data : null
@@ -2450,10 +2471,9 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   }
 
   // 2026-05-19 fix M3 (audit-found): re-stamp partVerificationSummary after
-  // Engine B + Engine C have mutated state.partVerifications. The summary
-  // was computed at state-assembly time BEFORE Engine B added price-estimate
-  // rows + Engine C added engine_c_* fields, so the counts were stale on
-  // disk. Re-read, recompute, write back. Synchronous, no LLM. Fail-soft.
+  // Engine B + Engine C have mutated state.partVerifications. ALSO run G2
+  // cost-reality gate + G3 review-completeness gate inline here so they have
+  // the freshest data.
   try {
     const liveState = JSON.parse(readFileSync(statePath, 'utf-8'))
     const pv = Array.isArray(liveState.partVerifications) ? liveState.partVerifications : []
@@ -2474,10 +2494,116 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
       with_engine_c_flag: pv.filter((v: any) => v.engine_c_flag != null).length,
       engine_c_out_of_range: pv.filter((v: any) => v.engine_c_flag === 'over' || v.engine_c_flag === 'under').length,
     }
+    // ── G2 Cost-Reality Gate (Tristan v5 directive 2026-05-19): deterministic
+    // BoM-total sanity check vs implausibility threshold. Engine C already
+    // checks per-line ratio against corpus median (engine_c_flag);
+    // G2 is the WHOLE-BoM sanity at-a-glance: is the total even in the right
+    // order of magnitude for the product class? If <£10 or >£10M, the design
+    // is almost certainly off (wrong scale, wrong class, or corrupt data).
+    // Renderer reads state.cost_reality_status + state.cost_reality_rejection.
+    const tCostReality = Date.now()
+    try {
+      let bomTotalGbp = 0
+      let bomPricedLines = 0
+      let bomUnpricedLines = 0
+      for (const v of pv) {
+        const unit = Number(v.distributor_price_gbp) > 0
+          ? Number(v.distributor_price_gbp)
+          : (Number(v.price_estimate_gbp) > 0 ? Number(v.price_estimate_gbp) : 0)
+        if (unit > 0) {
+          // Try to recover quantity from the matching word; default 1.
+          const qty = 1  // Conservative; engine_b_* already attributes per-unit
+          bomTotalGbp += unit * qty
+          bomPricedLines += 1
+        } else {
+          bomUnpricedLines += 1
+        }
+      }
+      const orderOfMag = bomTotalGbp > 0 ? Math.log10(bomTotalGbp) : 0
+      // Plausible BoM range: £100 (consumer wearable) to £10M (utility BESS, HAPS).
+      // Outside this, flag for manual review.
+      let cost_reality_status: string = 'pass'
+      let cost_reality_rejection: any = null
+      let cost_reality_verdict: 'pass' | 'warn' | 'reject' = 'pass'
+      if (bomTotalGbp > 0 && (orderOfMag < 2 || orderOfMag > 7)) {
+        cost_reality_verdict = 'reject'
+        cost_reality_status = 'manual_review_required'
+        cost_reality_rejection = {
+          reason: orderOfMag < 2
+            ? `BoM total £${bomTotalGbp.toFixed(0)} is implausibly low (<£100). Likely cause: missing prices, wrong unit, or corrupted state. Check Engine B / Engine C logs.`
+            : `BoM total £${bomTotalGbp.toFixed(0)} is implausibly high (>£10M). Likely cause: quantities multiplied wrong, wrong currency, or Engine B failed to volume-anchor.`,
+          bom_total_gbp: Math.round(bomTotalGbp),
+          priced_lines: bomPricedLines,
+          unpriced_lines: bomUnpricedLines,
+          order_of_magnitude: Math.round(orderOfMag * 10) / 10,
+        }
+      } else if (bomTotalGbp > 0 && bomPricedLines < pv.length * 0.5) {
+        // Soft warn: less than 50% of BoM lines have prices.
+        cost_reality_verdict = 'warn'
+        cost_reality_rejection = {
+          reason: `Only ${bomPricedLines}/${pv.length} BoM lines have unit prices (${((bomPricedLines / pv.length) * 100).toFixed(0)}%). Engine B or distributor cascade fell short — total may be substantially understated.`,
+          bom_total_gbp: Math.round(bomTotalGbp),
+          priced_lines: bomPricedLines,
+          unpriced_lines: bomUnpricedLines,
+          order_of_magnitude: Math.round(orderOfMag * 10) / 10,
+        }
+      }
+      liveState.cost_reality_status = cost_reality_status
+      liveState.cost_reality_verdict = cost_reality_verdict
+      liveState.cost_reality_rejection = cost_reality_rejection
+      liveState.cost_reality = {
+        bom_total_gbp: Math.round(bomTotalGbp),
+        priced_lines: bomPricedLines,
+        unpriced_lines: bomUnpricedLines,
+        order_of_magnitude: Math.round(orderOfMag * 10) / 10,
+        verdict: cost_reality_verdict,
+      }
+      console.error(`[chain] G2 cost-reality: ${cost_reality_verdict.toUpperCase()} — BoM £${Math.round(bomTotalGbp)} across ${bomPricedLines} priced lines (${bomUnpricedLines} unpriced)`)
+      logAction({ step: 'cost_reality_gate', verdict: cost_reality_verdict, bom_total_gbp: Math.round(bomTotalGbp), priced_lines: bomPricedLines, latency_ms: Date.now() - tCostReality, ok: true })
+    } catch (err) {
+      console.error(`[chain] G2 cost-reality threw: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'cost_reality_gate', ok: false, error: String(err).slice(0, 200) })
+    }
+
+    // ── G3 Review-Completeness Gate (Tristan v5 directive 2026-05-19): final
+    // density check before render. Catches "engine emitted a PDF with empty
+    // sections" silently. Pure deterministic; no LLM. Sets g3ManualReview +
+    // g3_review_gaps[] for the renderer's manual-review badge.
+    const tG3 = Date.now()
+    try {
+      const modules = Array.isArray(liveState.moduleDecomposition?.modules) ? liveState.moduleDecomposition.modules : []
+      const submoduleCount = modules.reduce((acc: number, m: any) => acc + (Array.isArray(m.sub_modules) ? m.sub_modules.length : 0), 0)
+      const bomLines = pv.length
+      const compliance = liveState.complianceGate
+      const suppliers = Array.isArray(liveState.suppliers) ? liveState.suppliers : []
+      const supplierArchetypes = suppliers.length
+      const critique = liveState.physicsCritique
+      const gaps: Array<{ section: string; reason: string }> = []
+      if (modules.length < 5) gaps.push({ section: 'modules', reason: `Only ${modules.length} modules (expected ≥5 for engineered systems)` })
+      if (submoduleCount < modules.length * 2) gaps.push({ section: 'sub_modules', reason: `${submoduleCount} sub-modules across ${modules.length} modules — expected ≥${modules.length * 2}` })
+      if (bomLines < 20) gaps.push({ section: 'bom', reason: `${bomLines} BoM lines (expected ≥20 for engineered systems)` })
+      if (!compliance || !compliance.mandatory_total) gaps.push({ section: 'compliance', reason: 'Compliance gate did not register any mandatory standards' })
+      if (supplierArchetypes === 0) gaps.push({ section: 'suppliers', reason: 'No supplier archetypes populated (Engine D may have failed or class has no supplier coverage)' })
+      if (!critique || !critique.scores) gaps.push({ section: 'physics_critic', reason: 'Physics critic did not return a structured critique' })
+      const g3ManualReview = gaps.length > 0
+      liveState.g3ManualReview = g3ManualReview
+      liveState.g3_review_gaps = gaps
+      console.error(`[chain] G3 review-completeness: ${g3ManualReview ? `WARN — ${gaps.length} gap${gaps.length === 1 ? '' : 's'}` : 'PASS'}`)
+      for (const g of gaps) console.error(`  ⚠ ${g.section}: ${g.reason}`)
+      logAction({ step: 'review_completeness_gate', g3ManualReview, gap_count: gaps.length, gaps, latency_ms: Date.now() - tG3, ok: true })
+    } catch (err) {
+      console.error(`[chain] G3 review-completeness threw: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'review_completeness_gate', ok: false, error: String(err).slice(0, 200) })
+    }
+
+    // ── Persist complianceGate from earlier (needs to land on state.json so
+    // renderer can read it for the G1b badge).
+    if (complianceGate) liveState.complianceGate = complianceGate
+
     writeFileSync(statePath, JSON.stringify(liveState, null, 2))
     logAction({ step: 'recompute_summary_after_engines', ok: true, summary: liveState.partVerificationSummary })
   } catch (err) {
-    console.error(`[chain] failed to re-stamp partVerificationSummary after Engine B/C: ${(err as Error).message}; continuing`)
+    console.error(`[chain] failed to re-stamp partVerificationSummary + G2 + G3 after Engine B/C: ${(err as Error).message}; continuing`)
     logAction({ step: 'recompute_summary_after_engines', ok: false, error: String(err).slice(0, 200) })
   }
 

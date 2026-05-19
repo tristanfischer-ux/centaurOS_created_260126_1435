@@ -350,8 +350,43 @@ async function processJob(job) {
         return
     }
 
-    // Optionally write a small state snapshot for diagnostics. Keep it under
-    // ~200 KB — full state.json is too large for jsonb in some cases.
+    // 2026-05-19 fix M8 (audit-found): also upload the full state.json +
+    // actions.jsonl as Storage objects alongside the PDF. Previously these
+    // were local-only on Mac Studio — if the machine was wiped or replaced,
+    // all diagnostic data was lost. Now they live in Supabase under the same
+    // user_id-scoped path with the same RLS as the PDF.
+    //
+    // Cost: typical state.json ~100-500 KB, actions.jsonl ~50-200 KB per run.
+    // Across 1000 jobs that's <1 GB — negligible vs the PDFs themselves (6 MB each).
+    const stateStoragePath = `${job.user_id}/${job.id}.state.json`
+    const actionsStoragePath = `${job.user_id}/${job.id}.actions.jsonl`
+    const actionsPath = resolve(jobDir, 'actions.jsonl')
+    try {
+        if (existsSync(statePath)) {
+            const stateBuf = readFileSync(statePath)
+            await supabase.storage.from('pdf-engine-pdfs').upload(stateStoragePath, stateBuf, {
+                contentType: 'application/json',
+                upsert: true,
+            })
+            log(`uploaded state.json (${(stateBuf.length / 1024).toFixed(1)} KB) → ${stateStoragePath}`)
+        }
+    } catch (err) {
+        log(`state.json upload failed (non-fatal): ${err instanceof Error ? err.message : err}`)
+    }
+    try {
+        if (existsSync(actionsPath)) {
+            const actionsBuf = readFileSync(actionsPath)
+            await supabase.storage.from('pdf-engine-pdfs').upload(actionsStoragePath, actionsBuf, {
+                contentType: 'application/x-ndjson',
+                upsert: true,
+            })
+            log(`uploaded actions.jsonl (${(actionsBuf.length / 1024).toFixed(1)} KB) → ${actionsStoragePath}`)
+        }
+    } catch (err) {
+        log(`actions.jsonl upload failed (non-fatal): ${err instanceof Error ? err.message : err}`)
+    }
+
+    // Compact state snapshot for the DB column (full state lives in Storage above).
     let stateSnap = null
     try {
         if (existsSync(statePath)) {
@@ -363,6 +398,17 @@ async function processJob(job) {
                 moduleCount: Array.isArray(parsed.moduleDecomposition?.modules)
                     ? parsed.moduleDecomposition.modules.length
                     : null,
+                // 2026-05-19 expanded snapshot — quick-look diagnostics without
+                // needing to fetch the full state.json from storage.
+                bom_total_gbp: parsed.cost_reality?.bom_total_gbp ?? null,
+                cost_reality_verdict: parsed.cost_reality?.verdict ?? null,
+                g1b_verdict: parsed.complianceGate?.verdict ?? null,
+                g3_manual_review: parsed.g3ManualReview ?? null,
+                g3_gap_count: Array.isArray(parsed.g3_review_gaps) ? parsed.g3_review_gaps.length : 0,
+                g5_unverified_count: Array.isArray(parsed.g5UnverifiedParts) ? parsed.g5UnverifiedParts.length : 0,
+                supplier_archetype_count: Array.isArray(parsed.suppliers) ? parsed.suppliers.length : 0,
+                state_storage_path: stateStoragePath,
+                actions_storage_path: actionsStoragePath,
                 savedAt: parsed.savedAt ?? null,
             }
         }
@@ -414,12 +460,80 @@ async function failJob(jobId, message) {
 
 // ─── Main loop ──────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 30_000
+const STALE_RUNNING_THRESHOLD_MS = 200 * 60 * 1000  // 200 min — anything older is a crashed run
 let running = false
+
+// 2026-05-19 fix M6 (audit-found stale-running recovery): two-part.
+//
+// PART A — at worker startup, mark any rows status='running' AND worker_id
+// matching THIS host as 'failed'. Rationale: if this worker process is alive
+// now (startup), any pre-existing 'running' row attributed to this host means
+// we crashed mid-job (Mac sleep, kernel panic, OOM, KeepAlive restart). The
+// underlying chain subprocess is gone; the row would sit at 'running' forever.
+// PART B — every poll, sweep for any 'running' row older than 200 min
+// (regardless of worker_id). Mac Studio runs ≤180 min thanks to M7's runChild
+// cap; anything past 200 min is a foreign crash or a SIGKILL-resistant hang.
+async function recoverStaleRunningRows() {
+    const hostPrefix = `mac-studio-${hostname()}-`
+    try {
+        // Part A: our-host pre-existing running rows (we crashed)
+        const { data: ourCrashed, error: e1 } = await supabase
+            .from('pdf_engine_runs')
+            .select('id, started_at, worker_id')
+            .eq('status', 'running')
+            .like('worker_id', `${hostPrefix}%`)
+            .neq('worker_id', WORKER_ID)  // exclude THIS worker process — we're alive
+        if (e1) {
+            log(`stale-running scan (host) failed: ${e1.message}`)
+        } else if (ourCrashed && ourCrashed.length > 0) {
+            for (const row of ourCrashed) {
+                log(`recovering crashed job ${row.id} (was ${row.worker_id}, claimed at ${row.started_at}) — marking failed`)
+                await supabase
+                    .from('pdf_engine_runs')
+                    .update({
+                        status: 'failed',
+                        ready_at: new Date().toISOString(),
+                        error_log: `Worker crashed mid-job (Mac sleep / kernel panic / OOM / KeepAlive restart). Original worker_id: ${row.worker_id}; current worker: ${WORKER_ID}. Re-submit the brief to retry.`,
+                    })
+                    .eq('id', row.id)
+                    .eq('status', 'running')  // CAS guard
+            }
+        }
+        // Part B: any-host long-running rows (foreign crash or hang)
+        const stalenessCutoff = new Date(Date.now() - STALE_RUNNING_THRESHOLD_MS).toISOString()
+        const { data: stale, error: e2 } = await supabase
+            .from('pdf_engine_runs')
+            .select('id, started_at, worker_id')
+            .eq('status', 'running')
+            .lt('started_at', stalenessCutoff)
+        if (e2) {
+            log(`stale-running scan (time) failed: ${e2.message}`)
+        } else if (stale && stale.length > 0) {
+            for (const row of stale) {
+                const ageMin = Math.floor((Date.now() - new Date(row.started_at).getTime()) / 60_000)
+                log(`recovering stale job ${row.id} (worker ${row.worker_id}, ${ageMin} min old) — marking failed`)
+                await supabase
+                    .from('pdf_engine_runs')
+                    .update({
+                        status: 'failed',
+                        ready_at: new Date().toISOString(),
+                        error_log: `Run wedged at status='running' for ${ageMin} minutes (>${STALE_RUNNING_THRESHOLD_MS / 60_000} min threshold). Worker hung or host died without recovery. Original worker_id: ${row.worker_id}. Re-submit the brief to retry.`,
+                    })
+                    .eq('id', row.id)
+                    .eq('status', 'running')  // CAS guard
+            }
+        }
+    } catch (err) {
+        log(`stale-running recovery threw: ${err instanceof Error ? err.message : err}`)
+    }
+}
 
 async function tick() {
     if (running) return
     running = true
     try {
+        // M6 Part B: scan for stale rows every poll. Cheap (1 query).
+        await recoverStaleRunningRows()
         const job = await claimOnePendingRun()
         if (job) {
             await processJob(job)
@@ -432,9 +546,12 @@ async function tick() {
 }
 
 log(`starting worker (poll ${POLL_INTERVAL_MS / 1000}s, repo ${REPO_ROOT})`)
-// fire-and-forget immediately, then on interval
-void tick()
-setInterval(tick, POLL_INTERVAL_MS)
+// M6 Part A: at startup, recover any rows that were running when we died.
+void recoverStaleRunningRows().then(() => {
+    // fire-and-forget immediately, then on interval
+    void tick()
+    setInterval(tick, POLL_INTERVAL_MS)
+})
 
 // Graceful shutdown — let any in-flight job finish via the running guard.
 function shutdown(signal) {

@@ -954,7 +954,7 @@ function priceVerdictStyle(verdict: PriceBandVerdict, absPct: number): { symbol:
 //   G2  state.cost_reality_rejection                                 — Jaccard reject details (optional)
 //       state.cost_reality_status === 'manual_review_required'       — general re-emit exhaustion
 
-type ManualReviewBadgeId = 'g0_physics' | 'g1b_compliance' | 'g3_completeness' | 'g4_grammar' | 'g5_parts' | 'g2_cost_reality' | 'k10_grammar'
+type ManualReviewBadgeId = 'g0_physics' | 'g1b_compliance' | 'g3_completeness' | 'g4_grammar' | 'g5_parts' | 'g2_cost_reality' | 'k10_grammar' | 'physics_critic'
 
 interface ManualReviewBadge {
   id: ManualReviewBadgeId
@@ -1094,6 +1094,38 @@ function collectManualReviewBadges(state: any): ManualReviewBadge[] {
       summary: `${g5Parts.length} part number${g5Parts.length === 1 ? '' : 's'} could not be verified against DigiKey / Mouser / Farnell / web — manual sourcing required.`,
       appendix: ['Stage 4.5 part-number verification did not find these SKUs at DigiKey, Mouser, Farnell, or via a Brave manufacturer-domain search. Each line is flagged in the Bill of Materials with an amber "?" badge; the supplier-resolution fallback for each is recorded below.', '', lines.join('\n') + more].join('\n'),
     })
+  }
+
+  // Physics Critic badge (2026-05-19 v5 — newly wired). The chain writes
+  // state.physicsCritique with scores + issues; before v5 the renderer
+  // dropped this on the floor. Fire when the critic flagged any high-
+  // severity findings (medium/low surface in appendix only).
+  const pcr = state?.physicsCritique
+  if (pcr && Array.isArray(pcr.issues)) {
+    const highIssues = pcr.issues.filter((i: any) => i.severity === 'high')
+    if (highIssues.length > 0) {
+      const lines = highIssues.slice(0, 10).map((i: any) =>
+        `[${i.severity}/${i.confidence}] ${i.dimension} @ ${i.where}: ${i.issue}${i.suggested_check ? `\n  Suggested check: ${i.suggested_check}` : ''}`)
+      const more = highIssues.length > 10 ? `\n…and ${highIssues.length - 10} more high-severity findings.` : ''
+      const scoreLine = pcr.scores
+        ? `Critic scores (0-10): brief→design ${pcr.scores.brief_to_design_fidelity}, engineering ${pcr.scores.engineering_plausibility}, coherence ${pcr.scores.internal_coherence}, parts ${pcr.scores.part_realism}, honesty ${pcr.scores.honesty_signal}.`
+        : ''
+      out.push({
+        id: 'physics_critic',
+        label: 'Physics critic',
+        severity: 'warn',
+        summary: `Physics critic flagged ${highIssues.length} high-severity engineering issue${highIssues.length === 1 ? '' : 's'} (${pcr.scores?.engineering_plausibility ?? '?'}/10 engineering-plausibility score).`,
+        appendix: [
+          pcr.headline ?? 'Physics & engineering review.',
+          scoreLine,
+          '',
+          'High-severity findings:',
+          lines.join('\n\n') + more,
+          '',
+          'These findings are LLM-judged with confidence enum (high|medium|low|unknown). A human engineer should verify each against datasheets / first-principles before acting on the design.',
+        ].filter(Boolean).join('\n'),
+      })
+    }
   }
 
   // G2 — Cost-reality (Engine A re-emit). Either Jaccard reject details OR a

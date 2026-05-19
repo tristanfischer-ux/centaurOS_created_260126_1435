@@ -32,6 +32,7 @@ const config: KnipConfig = {
     'scripts/serial-design-chain-v2.tsx',
     'scripts/estimate-missing-prices.tsx',
     'scripts/enrich-state-with-reference-anchor.tsx',
+    'scripts/enrich-state-with-suppliers.tsx',  // 2026-05-19 v5: Engine D
     'scripts/render-minimal-pdf.tsx',
     // Diagnostic CLI (read-only but consumes engine data).
     'scripts/diagnose-run.tsx',
@@ -44,8 +45,11 @@ const config: KnipConfig = {
     'scripts/serial-design-chain-v2.tsx',
     'scripts/estimate-missing-prices.tsx',
     'scripts/enrich-state-with-reference-anchor.tsx',
+    'scripts/enrich-state-with-suppliers.tsx',
     'scripts/render-minimal-pdf.tsx',
     'scripts/diagnose-run.tsx',
+    // 2026-05-19 v5: Engine D's transitive dependency helper.
+    'scripts/supplier-enrichment/**/*.{ts,tsx}',
   ],
   ignore: [
     // Test files are reachable via their runner, not the production entry.
