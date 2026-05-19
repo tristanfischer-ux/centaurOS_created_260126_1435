@@ -4368,7 +4368,7 @@ function classToSlug(productClass: string): string {
   const norm = String(productClass).toLowerCase().replace(/[_-]/g, ' ')
   if (norm.includes('bess') || norm.includes('battery energy storage')) return 'bess'
   if (norm.includes('cinematography') || norm.includes('drone') || norm.includes('quad') || norm.includes('uav')) return 'drone'
-  if (norm.includes('heat pump') || norm.includes('heatpump')) return 'heatpump'
+  if (norm.includes('heat pump') || norm.includes('heatpump') || norm.includes('thermal system') || norm === 'thermal') return 'heatpump'
   if (norm.includes('ev charger') || norm.includes('charger')) return 'ev-charger'
   if (norm.includes('edge ai') || norm.includes('inference appliance') || norm.includes('rack mount')) return 'edge-ai'
   if (norm.includes('bioreactor')) return 'bioreactor'
