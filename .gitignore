@@ -96,3 +96,33 @@ tsconfig.tsbuildinfo
 .aider*
 .env.prod
 .env.vercel
+
+# CREDENTIALS — never commit (2026-05-19)
+# API_KEYS.md is the canonical credential reference document — must stay local.
+API_KEYS.md
+DATABASES.md
+
+# Local iteration artifacts at repo root (generated PDFs, QA score dumps,
+# state snapshots, per-product run dirs). 466-file backlog discovered
+# 2026-05-19 included ~340 of these; cleaning patterns to prevent recurrence.
+output-*.pdf
+qa-scores-*.json
+chain-v*.pdf
+state-*.json
+*.log.txt
+
+# Per-product local run dirs (kept under /tmp/ in normal use; sometimes at root)
+/bess_*/
+/drone_*/
+/heatpump_*/
+/auv_*/
+/haps_*/
+/ev_*/
+/vfarm_*/
+/bioreactor_*/
+/cgm_*/
+/edge_ai_*/
+
+# Phase-N iteration scratch dirs at repo root
+/phase[0-9]*/
+/iter-[0-9]*/
