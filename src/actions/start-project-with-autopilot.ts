@@ -37,6 +37,7 @@
 
 import { createCadLabProject } from "@/actions/cad-lab-projects"
 import { createAdminClient } from "@/lib/supabase/admin"
+import { createClient as createServerSupabaseClient } from "@/lib/supabase/server"
 
 export type StartProjectWithAutopilotResult =
     | { ok: true; projectId: string }
@@ -133,12 +134,35 @@ export async function startProjectWithAutopilot(
     // produce the PDF via scripts/serial-design-chain-v2.tsx →
     // scripts/render-minimal-pdf.tsx. The workspace page polls the chain
     // status to show progress + download.
+    //
+    // CRITICAL: user_id MUST be set. The worker builds the Supabase Storage
+    // object path as `${job.user_id}/${job.id}.pdf` and the bucket's RLS
+    // policy enforces (storage.foldername(name))[1] = auth.uid()::text, so
+    // a missing user_id means (a) the path becomes `null/<id>.pdf` and
+    // (b) the requesting user can never download their own report. See
+    // [[forgeos_gotchas_f81c86fedfc51342]].
     try {
+        const userClient = await createServerSupabaseClient()
+        const { data: authData, error: authErr } = await userClient.auth.getUser()
+        const userId = authData?.user?.id
+        if (authErr || !userId) {
+            console.error(
+                "[start-project-with-autopilot] cannot resolve auth user — pdf_engine_runs insert skipped:",
+                authErr?.message ?? "no user in session",
+            )
+            return {
+                ok: false,
+                error: "Authentication required to start a project.",
+                errorCode: "NO_AUTH_USER",
+            }
+        }
+
         const admin = createAdminClient()
         const { error: jobErr } = await admin
             .from("pdf_engine_runs")
             .insert({
                 project_id: projectId,
+                user_id: userId,
                 brief_text: subject.trim(),
                 status: "pending",
             })

@@ -215,7 +215,22 @@ async function processJob(job) {
     }
 
     // Upload PDF — path layout: <user_id>/<job_id>.pdf
-    // Storage RLS uses (storage.foldername(name))[1] = auth.uid()::text.
+    // Storage RLS uses (storage.foldername(name))[1] = auth.uid()::text,
+    // so the requesting user can only download their own object. If
+    // job.user_id is null (e.g. a SQL-inserted test row, or any future
+    // insert that forgets to set user_id) the previous code silently
+    // produced the literal path `null/<id>.pdf` and broke RLS forever.
+    // Fail loudly instead — the row is the bug, not the upload.
+    if (!job.user_id || typeof job.user_id !== 'string') {
+        await failJob(
+            job.id,
+            `cannot build storage path: pdf_engine_runs.user_id is missing on this row. ` +
+            `The row must be inserted with user_id = auth user UUID so the storage bucket's ` +
+            `RLS ((storage.foldername(name))[1] = auth.uid()::text) lets the founder download ` +
+            `their own PDF. If you're SQL-inserting a synthetic test row, set user_id explicitly.`,
+        )
+        return
+    }
     const storagePath = `${job.user_id}/${job.id}.pdf`
     const pdfBuf = readFileSync(pdfPath)
 
