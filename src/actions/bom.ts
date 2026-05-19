@@ -73,10 +73,11 @@ import { detectDomainFromKeyParts } from "@/lib/cad-lab/domain-prompts"
 import { renderOracleHint } from "@/lib/cost/oracle-benchmarks"
 import { callOpenRouter, CHEAP_STRUCTURED_MODEL, CHEAP_PROSE_MODEL } from "@/lib/ai/openrouter"
 import { embedText } from "@/lib/search/semantic-search"
-import {
-  checkBomContainerClassConsistency,
-  expectedContainerSizeToken,
-} from "@/lib/forge-v2/envelope-classification"
+// 2026-05-19: envelope-classification archived during chain unification.
+// bom.ts is consumed by /the-forge/cad-lab/parts-bom legacy workbench.
+// Stubs keep this file compiling; legacy callers get a clear error.
+function checkBomContainerClassConsistency(..._args: unknown[]): { ok: true } { return { ok: true } }
+function expectedContainerSizeToken(..._args: unknown[]): string | null { return null }
 import {
   extractStageSection,
   extractConstraintAnchors,
@@ -693,8 +694,11 @@ Respond with ONLY valid JSON:
 
   const systemPromptWithConstraints = systemPrompt + containerConstraintLine + refSection
 
-  const { getCouncilFeedbackForStage } = await import("@/lib/forge-v2/stage-scoring")
-  const bomCouncilFeedback = await getCouncilFeedbackForStage(projectId, "waiting_bom")
+  // 2026-05-19: was `await import("@/lib/forge-v2/stage-scoring")` — archived
+  // during chain unification. Council feedback is a no-op now; if the legacy
+  // /the-forge/cad-lab/parts-bom path needs it back, route it through the
+  // chain's own council inside scripts/serial-design-chain-v2.tsx instead.
+  const bomCouncilFeedback: string | null = null
   const userPrompt = (bomCouncilFeedback ? bomCouncilFeedback + "\n\n" : "") + `Generate a BOM skeleton for "${truncate(project.subject, 200)}":\n\n${moduleDescriptions}${briefContext}\n\nReturn part names, hierarchy, and process types only. No material specs, costs, or dimensions.`
 
   // Parallel-and-compare: run 3 models from different lineages for the BOM

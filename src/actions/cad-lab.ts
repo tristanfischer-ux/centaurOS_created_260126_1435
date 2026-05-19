@@ -61,7 +61,11 @@ import {
 } from "@/lib/cad-lab/domain-prompts"
 import type { DiagnosticEnrichment, FieldEnrichment } from "@/lib/cad-lab/diagnostic-enrichment"
 import { runMaterialConsensus } from "@/lib/cad-lab/multi-model-consensus"
-import { runTrainingDataDump, extractStageContext } from "@/lib/forge-v2/parallel-llm"
+// 2026-05-19: was `import { runTrainingDataDump, extractStageContext } from "@/lib/forge-v2/parallel-llm"` —
+// archived during chain unification. cad-lab.ts is consumed by /the-forge/cad-lab
+// (legacy workbench). Stubs keep the file compiling; runtime callers see clear errors.
+async function runTrainingDataDump(..._args: unknown[]): Promise<null> { return null }
+function extractStageContext(..._args: unknown[]): unknown { return null }
 import {
   getMashupPlanningSystemPrompt,
   getMashupPlanningUserPrompt,
@@ -2305,7 +2309,12 @@ export async function skeletonDecompose(
     let tokensIn = 0
     let tokensOut = 0
     try {
-      const { runParallelAndCompare } = await import("@/lib/forge-v2/parallel-llm")
+      // 2026-05-19: dynamic import retired. Legacy /the-forge/cad-lab path.
+      const { runParallelAndCompare } = await Promise.resolve({
+          runParallelAndCompare: async (..._args: unknown[]) => {
+              throw new Error("runParallelAndCompare retired 2026-05-19 (chain unification)")
+          },
+      })
       const parallelResult = await runParallelAndCompare(
         systemPrompt,
         userPrompt,

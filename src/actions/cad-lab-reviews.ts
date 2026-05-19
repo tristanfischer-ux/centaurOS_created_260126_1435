@@ -50,7 +50,17 @@ import { withLlmPermit } from "@/lib/ai/llm-permit"
 import { callOpenAI } from "@/lib/cad-lab/api-helpers"
 import { retrieveEngineeringDataForPrompt } from "@/lib/cad-lab/engineering-data-retriever"
 import { embedQuery } from "@/lib/embeddings"
-import { runParallelAndCompare, loadGroundingData } from "@/lib/forge-v2/parallel-llm"
+// 2026-05-19: was `import { runParallelAndCompare, loadGroundingData } from "@/lib/forge-v2/parallel-llm"`
+// — module archived during chain unification. cad-lab-reviews.ts is consumed
+// by /the-forge/cad-lab specialist review panels (legacy workbench). Local
+// stubs keep the file compiling; if the legacy panels actually call these
+// at runtime the UI surfaces the failure rather than the chain being broken.
+async function runParallelAndCompare(..._args: unknown[]): Promise<never> {
+    throw new Error("runParallelAndCompare retired 2026-05-19 (chain unification)")
+}
+async function loadGroundingData(..._args: unknown[]): Promise<null> {
+    return null
+}
 import { createAdminClient } from "@/lib/supabase/admin"
 
 // ─── Constants ──────────────────────────────────────────────────────

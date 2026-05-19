@@ -34,9 +34,13 @@ import { Badge } from "@/components/ui/badge"
 // /the-forge-v2 hub, so project tiles must link to the V2 detail page, not the
 // legacy /the-forge/cad-lab workbench. See loop-25 fix (commit following 4119a72d).
 import { PromoteToProductButton } from "./promote-to-product-button"
-import { STAGE_NARRATIVES } from "@/lib/forge-narrative/stage-narratives"
+// 2026-05-19: forge-narrative/stage-narratives and forge-v2-autopilot are
+// archived (chain unification). This /the-forge legacy dashboard predates the
+// chain. Local stubs keep the file compiling; the card renders without
+// narrative labels for projects that don't have autopilot_state any more.
+const STAGE_NARRATIVES: Record<string, { label?: string; description?: string }> = {}
 import type { CadLabProjectSummary } from "@/actions/cad-lab-projects"
-import type { AutopilotStage } from "@/actions/forge-v2-autopilot"
+type AutopilotStage = string
 
 // ─── Poll interval ────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 8_000
