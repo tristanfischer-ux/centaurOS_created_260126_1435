@@ -141,3 +141,41 @@ To measure improvement across iterations:
 - Latest mermaid: `CHAIN-ENGINE-DIAGRAM-V5-FINAL.html`
 - Chain code: `scripts/serial-design-chain-v2.tsx` + `src/lib/pdf-engine-v2/stages/*`
 - Worker code: `scripts/pdf-engine-worker.mjs`
+
+## Iteration 2 (closed)
+
+**State:** `COMMITTED`
+**Brief ID:** `b73f1401-3379-4880-bae6-783599b2fd2c`
+**Chain time:** 24.5 min (vs iter-1 34.5 min — 29% faster)
+**Outcome:** status=`ready`, gatesPassed=`true`, designDecisions=0 (Phase 2 converged), BoM £3,955, 12 modules
+
+### Council results (2 of 3 — GPT-5.5 hit SSE timeout, retry pending)
+21 unique findings (Grok 6 + Opus 15). Top themes:
+- R290 system with R410A-only compressor (Copeland ZP25K5E-TFM) — refrigerant chemistry guard missing
+- DC link 20µF undersized (need 100-330µF) — Generator sizing rule missing
+- EMI filter 6A for 10.87A load — current-rating guard missing
+- Installed ASP £368/kW vs £600-900 market — install factor 0.40 too low
+- R290 leak sensor at lowest point (should be HIGH — R290 is lighter than air)
+- 60 unverified parts (down from 67)
+- Various component over/under-sizing (500mm fan, STM32F407, 150W heater, 8L vessel)
+
+### Code fixes landed (iter-2 commit)
+- F5 (carry-over): scripts/enrich-state-with-suppliers.tsx now uses getClassSuppliers() with alias map
+- F6 (carry-over fix): Supabase bucket policy migration — extended allowed_mime_types to include octet-stream/json/x-ndjson/text-plain
+
+### Deferred to iter-3+ (still substantial work)
+- Component-class price floors (compressor £400+, IGBT £95+, large caps £18+, EMI filter £50+ at ≥16A)
+- R290-only compressor filter in parts lookup
+- DC link capacitance sizing rule (C = P/(2πfV²ΔV) with ΔV=5%)
+- EMI filter current-rating guard (≥1.5× continuous compressor current)
+- Install factor recalibration for heat pump (0.40→0.80 OR confirm cost-cascade is correct)
+- R290 density correction + leak sensor placement guidance
+- Hydronic isolation valves in heat pump module template
+- Fan / MCU / heater right-sizing rules
+
+### Quality metric
+| HIGH | MED | LOW |
+|------|-----|-----|
+| ~10 | ~7 | ~4 |
+
+Down from iter-1's ~25/7/3 — meaningful HIGH-severity reduction (council noting many iter-1 issues fixed: empty suppliers ARG also fixed via supplier alias + bucket migration; cost £4086→£3955 closer to target; gatesPassed flipped false→true). Real progress.

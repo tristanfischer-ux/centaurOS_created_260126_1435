@@ -30,7 +30,7 @@
 import { readFileSync, writeFileSync, existsSync } from 'fs'
 import { execFileSync } from 'child_process'
 import { resolve } from 'path'
-import { CLASS_SUPPLIERS, type SupplierArchetype } from '../src/lib/pdf-engine-v2/class-suppliers'
+import { CLASS_SUPPLIERS, getClassSuppliers, type SupplierArchetype } from '../src/lib/pdf-engine-v2/class-suppliers'
 // Bug #5 (Tristan 2026-05-18): persist web-fallback candidates back to
 // forge-truth.db. See module for details on the architectural gap this closes.
 import {
@@ -2221,10 +2221,14 @@ async function enrichSuppliers(state: any): Promise<SupplierArchetypeOutput[]> {
     console.log(`[enrich-suppliers] normalised "${productClassRaw}" → "${productClass}"`)
   }
 
-  const cls = CLASS_SUPPLIERS[productClass]
+  // 2026-05-19 firestorm iter-2 fix: use getClassSuppliers() (which handles
+  // the classifier slug ↔ registry key alias map) instead of bare
+  // CLASS_SUPPLIERS[productClass]. Without this, the chain emits
+  // "thermal_system" but CLASS_SUPPLIERS is keyed by "heatpump" → 0 archetypes.
+  const cls = getClassSuppliers(productClass)
   if (!cls || cls.archetypes.length === 0) {
     console.error(
-      `[enrich-suppliers] no archetypes defined for product class "${productClass}" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts.`,
+      `[enrich-suppliers] no archetypes defined for product class "${productClass}" — supplier section will be empty for this product. Add archetypes to src/lib/pdf-engine-v2/class-suppliers.ts OR add an alias in SUPPLIER_CLASS_ALIASES.`,
     )
     return []
   }
