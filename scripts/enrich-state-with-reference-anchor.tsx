@@ -75,17 +75,31 @@ const BATCH_CONCURRENCY = 1  // single Python process; queries are I/O bound on 
 // advisory only — passed to the embedder as a query suffix.
 // ---------------------------------------------------------------------------
 
+// 2026-05-19 fix M5 (audit-found): expanded class-hint alias coverage.
+// Previously this map omitted many classifier-emitted slugs (mini_split_heatpump,
+// battery_energy_storage, residential_ess, commercial_heatpump, vfd, drone,
+// agv, amr, auv, traction_battery_pack, etc.). Missing slugs fall through to
+// full-corpus search without product-class bias, degrading reference-price
+// anchor quality. Mirrors the ENVELOPE_ALIASES + K10 ALIASES maps in the
+// chain. New product classes need entries here AND in those maps AND in
+// class-standards.ts / class-hazards.ts / class-price-bands.ts / class-cost-
+// structure.ts (renderer-side) to be fully integrated.
 const CORPUS_CLASS_HINT: Record<string, string> = {
   // BESS
   energy_storage: 'bess-utility-scale',
   bess: 'bess-utility-scale',
+  battery_energy_storage: 'bess-utility-scale',
+  residential_ess: 'bess-utility-scale',
   'battery energy storage system (bess)': 'bess-utility-scale',
   'bess-utility-scale': 'bess-utility-scale',
   // Heat pump
   thermal_system: 'heat-pump-residential',
   heatpump: 'heat-pump-residential',
   heat_pump: 'heat-pump-residential',
+  mini_split_heatpump: 'heat-pump-residential',
   'heat-pump-residential': 'heat-pump-residential',
+  commercial_heatpump: 'heat-pump-commercial',
+  'heat-pump-commercial': 'heat-pump-commercial',
   // CGM / wearable medical
   wearable_medical: 'wearable_medical_device',
   cgm: 'wearable_medical_device',
@@ -94,14 +108,35 @@ const CORPUS_CLASS_HINT: Record<string, string> = {
   ev_charger: 'dc_fast_ev_charger',
   'ev-charger': 'dc_fast_ev_charger',
   dc_fast_ev_charger: 'dc_fast_ev_charger',
-  // PV inverter
-  pv_string_inverter: 'pv_string_inverter',
-  // VFD
+  // Vehicle battery
+  traction_battery_pack: 'vehicle_battery_pack',
+  vehicle_battery: 'vehicle_battery_pack',
+  // VFD / motor drive
   motor_drive_vfd: 'vfd-motor-drive',
+  vfd: 'vfd-motor-drive',
+  motor_drive: 'vfd-motor-drive',
+  // PV / solar
+  pv_string_inverter: 'pv_string_inverter',
+  // AUV / subsea
+  auv: 'auv-subsea',
+  auv_subsea: 'auv-subsea',
+  // Drones / UAVs
+  drone: 'consumer_cinematography_drone',
+  consumer_drone: 'consumer_cinematography_drone',
+  industrial_inspection_drone: 'industrial_inspection_drone',
+  // Mobile robotics
+  agv: 'automated_guided_vehicle_agv',
+  amr: 'autonomous_mobile_robot_amr',
   // Other (best-effort)
   industrial_robot_arm: 'industrial_robot_arm',
   insulin_pump: 'insulin_pump',
   escalator: 'escalator',
+  bioreactor: 'bioreactor',
+  fuel_cell: 'fuel-cell-power-module',
+  electrolyser: 'hydrogen-electrolyser',
+  wind_turbine: 'wind-turbine-small',
+  pv_module: 'pv-module-residential',
+  industrial_3d_printer: 'industrial-3d-printer',
 }
 
 function resolveCorpusClassHint(state: any): string | null {
@@ -252,9 +287,24 @@ async function main(): Promise<void> {
   console.error(`[engine-c] product class hint: ${classHint || '(none — full-corpus search)'}`)
 
   const verifications: any[] = Array.isArray(state.partVerifications) ? state.partVerifications : []
-  const verifByWordId = new Map<string, any>()
+  // 2026-05-19 fix C1 (data-corruption bug): word_id is scoped per sub-module,
+  // not globally unique. Two modules each with a 'housing' or 'sensor' word
+  // would collide; the second .set() would overwrite the first and the BoM
+  // line for the FIRST module would get the SECOND module's prices/refs.
+  // Use compound key `{module}::{sub_module_id}::{word_id}` everywhere.
+  // Legacy bare-word_id map kept as fallback for old state files where the
+  // chain didn't write module/sub_module_id onto each verification row.
+  const compoundKey = (module: string | null | undefined, subModuleId: string | null | undefined, wordId: string | null | undefined): string =>
+    `${module ?? ''}::${subModuleId ?? ''}::${wordId ?? ''}`
+  const verifByCompoundId = new Map<string, any>()
+  const verifByLegacyWordId = new Map<string, any>()
   for (const v of verifications) {
-    if (v?.word_id) verifByWordId.set(String(v.word_id), v)
+    if (!v?.word_id) continue
+    if (v.module && v.sub_module_id) {
+      verifByCompoundId.set(compoundKey(v.module, v.sub_module_id, v.word_id), v)
+    } else {
+      verifByLegacyWordId.set(String(v.word_id), v)
+    }
   }
 
   // Build the request list. One entry per BoM word; skip words with no
@@ -266,14 +316,19 @@ async function main(): Promise<void> {
   for (const m of modules) {
     for (const sm of m?.sub_modules ?? []) {
       for (const w of sm?.words ?? []) {
-        const v = verifByWordId.get(String(w.id))
+        const v = verifByCompoundId.get(compoundKey(m.module, sm.id, w.id))
+          ?? verifByLegacyWordId.get(String(w.id))
         if (!v) continue
         const unit = effectiveUnitPriceGbp(v)
         if (unit <= 0) { skippedNoPrice += 1; continue }
         const query = buildQueryForWord(w, v)
         if (!query) continue
+        // request_id MUST be unique across the batch; using compound key here
+        // matches what the lookup map keys are, and survives `housing` collisions
+        // across modules. python doesn't care what the request_id is — it
+        // echoes it back as-is via NDJSON.
         requests.push({
-          request_id: String(w.id),
+          request_id: compoundKey(m.module, sm.id, w.id),
           query,
           class: classHint,
           word_ref: w,

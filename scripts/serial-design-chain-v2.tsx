@@ -1716,12 +1716,16 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
         .join('\n')}\n\nYour patches should address as many of these as you can verify. For findings with confidence=unknown you are NOT required to invent a value — leave the spec as-is.`
     : ''
 
+  // 2026-05-19 audit gap #11: removed misleading `groundWithGoogleSearch: true`.
+  // OpenRouter ignores the flag for Flash-Lite (see callLlm comment at :228-234
+  // — option kept as a no-op stub for backwards compat). Leaving it on R4 made
+  // readers think the reviewer was web-grounded when it wasn't. Removed.
+  // Real grounding requires the GEMINI_API_KEY escape valve (not yet wired).
   const r4 = await runReviewerStep({
-    label: 'STEP 8: R4 Flash-Lite review',  // was: "R4 Flash-Lite grounded" — never actually grounded
+    label: 'STEP 8: R4 Flash-Lite review',  // LM-only, not grounded
     model: FLASH_LITE,
     systemAppend: R4_FACTCHECK_APPEND + criticAppend,
     thinkingLevel: 'high',
-    groundWithGoogleSearch: true,
     brief: currentBriefText, parsedBrief: parsedResult.data, research, currentDesign: design,
     rawDumpPath: resolve(outDir, '8-r4-flashlite.raw.txt'),
     keyMetrics,
@@ -1790,10 +1794,20 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
   // Track the FINAL failed gate set so we can route unrepaired structural
   // gates to design-decisions after the loop bails.
   let finalFailedGates: any[] = []
+  // 2026-05-19 fix M2 (audit-found): track the final arithmetic + grammar
+  // gate run so we can persist them as state.grammarVerdicts. The chain
+  // previously wrote state.grammarVerdicts: null, hiding all per-gate detail
+  // from the renderer's gate-verdict panel.
+  let finalArith: ReturnType<typeof runArithmeticGates> | null = null
+  let finalGrammar: ReturnType<typeof runGrammarGates> | null = null
+  let finalIters = 0
   while (repairIter < PHASE2_MAX_ITERS && !allPassed) {
     const t = translate(design.modules ?? [], design.cross_module_grammar_links ?? [])
     const arith = runArithmeticGates(t.modules)
     const grammar = runGrammarGates(t.modules, t.crossLinks, productClass)
+    finalArith = arith
+    finalGrammar = grammar
+    finalIters = repairIter
     const failed = [...arith.results, ...grammar.results].filter(r => !r.passed && r.score < 0)
     finalFailedGates = failed
     console.error(`[chain] Phase 2 iter ${repairIter}: arith ${arith.passed} pass / ${arith.failed} fail; grammar ${grammar.passed} pass / ${grammar.failed} fail; total score ${arith.total_score + grammar.total_score}`)
@@ -2157,6 +2171,49 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     logAction({ step: 'structural_gate_routing', count: surfacedFromGates })
   }
 
+  // ── Manual-review badge wires (Tristan v3 gap closure 2026-05-19).
+  // The renderer's collectManualReviewBadges() at render-minimal-pdf.tsx:954
+  // surfaces 6 gate badges on the cover + inline + appendix. Until now only G0
+  // (physicsLedger) fired. G4 + G5 are cheap to derive from data the chain
+  // already produces:
+  //
+  //  G5 parts manual-review — derive from state.partVerifications array.
+  //  Any row with status='unverified' goes into g5UnverifiedParts[]. The
+  //  badge fires when the array is non-empty.
+  const g5UnverifiedParts = partVerifications
+    .filter(v => v.status === 'unverified')
+    .map(v => ({
+      part_number: v.part_number,
+      part_name: v.word_name,
+      reason: v.reasoning,
+      fallback_action: (v as any).fallback_action ?? null,
+    }))
+  const g5ManualReview = g5UnverifiedParts.length > 0
+  //
+  //  G4 grammar manual-review — fire when Phase 2 grammar gates failed AND
+  //  the chain bailed (allPassed=false). Attached to moduleDecomposition.
+  //  The chain's universal-grammar-gates already detected the violations;
+  //  the structural-gate router routed them to designDecisions. The renderer
+  //  surfaces the badge separately to highlight "this design needs grammar
+  //  review" at the cover-page strip level.
+  const g4FailedGrammar = !allPassed && finalFailedGates.some(g => {
+    const name = String(g.name ?? '')
+    return name === 'thermal_path_closes' ||
+           name === 'cross_module_required_links' ||
+           name === 'spatial_position_complete' ||
+           name === 'sub_module_word_density' ||
+           name === 'word_modifier_richness' ||
+           name === 'declared_links_unique' ||
+           name === 'sub_module_prose_covers_words' ||
+           name === 'module_prose_subset_of_sub_modules' ||
+           name === 'power_topology_closes' ||
+           name === 'modifier_consistency'
+  })
+  if (g4FailedGrammar && design) {
+    ;(design as any).g4ManualReview = true
+  }
+  logAction({ step: 'manual_review_badges', g4: g4FailedGrammar, g5_count: g5UnverifiedParts.length })
+
   // ── Acceptance status.
   // accepted_clean         — all gates pass + no design decisions surfaced
   // accepted_with_decisions — gates didn't all pass, but the unrepaired ones were
@@ -2183,7 +2240,6 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     naturalLanguageLayer: nl,
     briefOverviewProse: design.brief_overview_prose ?? null,
     keyMetrics: keyMetrics ?? null,
-    grammarVerdicts: null,
     brief: briefBlock,
     designDecisions,
     partVerifications,
@@ -2200,6 +2256,38 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     },
     physicsCritique: critique,
     physicsLedger,
+    // 2026-05-19 fix M1 (audit-found): worker reads state.gatesPassed for the
+    // pdf_engine_runs.state_snapshot_json column but chain never wrote it.
+    // DB snapshot was always {gatesPassed: null}. Write the actual boolean.
+    gatesPassed: allPassed,
+    // 2026-05-19 fix M2 (audit-found): write the final gate results object so
+    // the renderer can render per-gate pass/fail detail in the gate-verdict
+    // panel. Previously the chain wrote `grammarVerdicts: null`, hiding every
+    // arithmetic + grammar gate outcome from the PDF reader.
+    grammarVerdicts: finalArith && finalGrammar
+      ? {
+          iters_used: finalIters,
+          max_iters: PHASE2_MAX_ITERS,
+          all_passed: allPassed,
+          arithmetic: {
+            passed: finalArith.passed,
+            failed: finalArith.failed,
+            fired: finalArith.fired,
+            total_score: finalArith.total_score,
+            results: finalArith.results,
+          },
+          grammar: {
+            passed: finalGrammar.passed,
+            failed: finalGrammar.failed,
+            fired: finalGrammar.fired,
+            total_score: finalGrammar.total_score,
+            results: finalGrammar.results,
+          },
+        }
+      : null,
+    // Manual-review badge signals (renderer reads these for G4 + G5 cover-page strip + appendix).
+    g5ManualReview,
+    g5UnverifiedParts,
     acceptanceStatus,
     savedAt: new Date().toISOString(),
   }
@@ -2253,6 +2341,32 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     console.error('[chain] CHAIN_SKIP_ENGINE_C=1 — skipping Engine C reference-anchor step')
   }
 
+  // ── Engine D (suppliers, 2026-05-19): spawn enrich-state-with-suppliers.tsx
+  // to populate state.suppliers + state.suppliers_provenance. The renderer's
+  // SuppliersPage (render-minimal-pdf.tsx:4049) reads state.suppliers and
+  // renders §7 only when non-empty. Before this step was wired, every PDF
+  // shipped without §7 Suppliers despite the script existing at 2,550 lines.
+  // Discovered 2026-05-19 audit (see CHAIN-ENGINE-AUDIT-2026-05-19.md gap #1).
+  // The script queries ~/.forge-truth/forge-truth.db `companies` table (~28k
+  // rows, Companies House verified + web-sourced), with Brave Search fallback
+  // and Flash-Lite scoring (~£0.05-0.15/run, latency ~30-60s).
+  // Skip when CHAIN_SKIP_SUPPLIERS=1.
+  if (process.env.CHAIN_SKIP_SUPPLIERS !== '1') {
+    const tSuppliers = Date.now()
+    try {
+      execFileSync('npx', ['tsx', resolve(__dirname, 'enrich-state-with-suppliers.tsx'), statePath, '--write'], {
+        stdio: 'inherit',
+        cwd: resolve(__dirname, '..'),
+      })
+      logAction({ step: 'suppliers_enrichment', latency_ms: Date.now() - tSuppliers, ok: true })
+    } catch (err) {
+      console.error(`[chain] suppliers enrichment failed: ${(err as Error).message}; continuing without`)
+      logAction({ step: 'suppliers_enrichment', latency_ms: Date.now() - tSuppliers, ok: false, error: String(err).slice(0, 200) })
+    }
+  } else {
+    console.error('[chain] CHAIN_SKIP_SUPPLIERS=1 — skipping suppliers enrichment step')
+  }
+
   // ── Deployment envelope (Task #248, 2026-05-19): persist the canonical
   // shipping/installation envelope for the product class onto state. The PA
   // pipeline (stages/3-size-layout.ts) already does this but is NOT reachable
@@ -2267,7 +2381,39 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
       '',
     )
     if (productClass) {
-      let envelope = defaultEnvelopeForClass(productClass) ?? null
+      // 2026-05-19 fix M4 (audit-found): K10 shadow uses an ALIASES map to
+      // bridge classifier slugs to canonical class-graph keys, but the
+      // envelope lookup had no such bridge — classes like
+      // `mini_split_heatpump`, `energy_storage`, `vfd` got null envelopes.
+      // Apply the same alias normalisation here. Keep both lookups: alias-
+      // normalised first, then raw classifier slug as fallback.
+      const ENVELOPE_ALIASES: Record<string, string> = {
+        mini_split_heatpump: 'heat-pump-residential',
+        heat_pump: 'heat-pump-residential',
+        'heat-pump': 'heat-pump-residential',
+        heatpump: 'heat-pump-residential',
+        thermal_system: 'heat-pump-residential',
+        commercial_heatpump: 'heat-pump-commercial',
+        'heat-pump-commercial': 'heat-pump-commercial',
+        battery_energy_storage: 'bess-utility-scale',
+        energy_storage: 'bess-utility-scale',
+        bess: 'bess-utility-scale',
+        residential_ess: 'bess-utility-scale',
+        ev_charger: 'dc_fast_ev_charger',
+        'ev-charger': 'dc_fast_ev_charger',
+        traction_battery_pack: 'vehicle_battery_pack',
+        vehicle_battery: 'vehicle_battery_pack',
+        vfd: 'vfd-motor-drive',
+        motor_drive: 'vfd-motor-drive',
+        auv: 'auv-subsea',
+        drone: 'consumer_cinematography_drone',
+        agv: 'automated_guided_vehicle_agv',
+        amr: 'autonomous_mobile_robot_amr',
+      }
+      const aliased = ENVELOPE_ALIASES[productClass.toLowerCase()]
+      let envelope = (aliased ? defaultEnvelopeForClass(aliased) : null)
+        ?? defaultEnvelopeForClass(productClass)
+        ?? null
       // For container/cabinet/rack-categorised classes, prefer the size-aware
       // selector if we have allocated mass + volume aggregates from Engine B
       // or the brief's derived parameters. Categories per
@@ -2303,12 +2449,66 @@ Generate the full engineering decomposition (brief_overview_prose + modules + su
     logAction({ step: 'deployment_envelope', ok: false, error: String(err).slice(0, 200) })
   }
 
+  // 2026-05-19 fix M3 (audit-found): re-stamp partVerificationSummary after
+  // Engine B + Engine C have mutated state.partVerifications. The summary
+  // was computed at state-assembly time BEFORE Engine B added price-estimate
+  // rows + Engine C added engine_c_* fields, so the counts were stale on
+  // disk. Re-read, recompute, write back. Synchronous, no LLM. Fail-soft.
+  try {
+    const liveState = JSON.parse(readFileSync(statePath, 'utf-8'))
+    const pv = Array.isArray(liveState.partVerifications) ? liveState.partVerifications : []
+    liveState.partVerificationSummary = {
+      total: pv.length,
+      verified: pv.filter((v: any) => v.status === 'verified').length,
+      unverified: pv.filter((v: any) => v.status === 'unverified').length,
+      uncertain: pv.filter((v: any) => v.status === 'uncertain').length,
+      skipped: pv.filter((v: any) => v.status === 'skip').length,
+      stripped: liveState.partVerificationSummary?.stripped ?? 0,
+      recommendations_total: Array.isArray(liveState.partRecommendations) ? liveState.partRecommendations.length : 0,
+      recommendations_unknown: Array.isArray(liveState.partRecommendations)
+        ? liveState.partRecommendations.filter((r: any) => r.confidence === 'unknown').length
+        : 0,
+      // Engine B/C attribution: how many rows have price estimates / reference flags now?
+      with_price_estimate: pv.filter((v: any) => v.price_estimate_gbp != null).length,
+      with_engine_b_class: pv.filter((v: any) => v.engine_b_component_class != null && v.engine_b_component_class !== 'unknown').length,
+      with_engine_c_flag: pv.filter((v: any) => v.engine_c_flag != null).length,
+      engine_c_out_of_range: pv.filter((v: any) => v.engine_c_flag === 'over' || v.engine_c_flag === 'under').length,
+    }
+    writeFileSync(statePath, JSON.stringify(liveState, null, 2))
+    logAction({ step: 'recompute_summary_after_engines', ok: true, summary: liveState.partVerificationSummary })
+  } catch (err) {
+    console.error(`[chain] failed to re-stamp partVerificationSummary after Engine B/C: ${(err as Error).message}; continuing`)
+    logAction({ step: 'recompute_summary_after_engines', ok: false, error: String(err).slice(0, 200) })
+  }
+
   const pdfPath = resolve(outDir, 'chain-v2.pdf')
+  // 2026-05-19 fix C2: pass RENDER_NO_OPEN=1 to renderer in worker context so
+  // the renderer doesn't try to open Preview (LaunchAgent has no GUI session).
+  // The renderer already guards its own `open` call with RENDER_NO_OPEN; this
+  // ensures the env var propagates when the chain is itself invoked by the
+  // Mac Studio worker (process.env.PDF_ENGINE_WORKER=1 set by worker).
+  const renderEnv = { ...process.env }
+  if (process.env.PDF_ENGINE_WORKER === '1' && !renderEnv.RENDER_NO_OPEN) {
+    renderEnv.RENDER_NO_OPEN = '1'
+  }
   execFileSync('npx', ['tsx', resolve(__dirname, 'render-minimal-pdf.tsx'), statePath, pdfPath], {
     stdio: 'inherit',
     cwd: resolve(__dirname, '..'),
+    env: renderEnv,
   })
-  execFileSync('open', [pdfPath])
+  // 2026-05-19 fix C2 (audit-found production failure mode): wrap `open` in
+  // try/catch. The renderer's own `open` was guarded; this one was not. In
+  // the worker/LaunchAgent path, `open` can fail (no GUI session) and would
+  // throw — leaving the chain in a state where the PDF was successfully
+  // written but the entire run aborted before the chain's own success log.
+  // Silent in dev (where `open` works), critical in production.
+  if (process.env.PDF_ENGINE_WORKER !== '1' && process.env.RENDER_NO_OPEN !== '1') {
+    try {
+      execFileSync('open', [pdfPath])
+    } catch (err) {
+      console.error(`[chain] failed to open PDF locally (non-fatal): ${(err as Error).message}`)
+    }
+  }
   logAction({ step: 'render', path: pdfPath })
   console.error(`\n[chain] === FINAL ===  state: ${statePath}  pdf: ${pdfPath}  status=${acceptanceStatus}  gates_passed=${allPassed}  design_decisions=${designDecisions.length}`)
 }

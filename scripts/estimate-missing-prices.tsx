@@ -426,11 +426,27 @@ async function main() {
   )
   console.log(`[estimate] product_class=${productClass} annual_volume=${annualVolume.toLocaleString()} (${volumeSource})`)
 
-  // Build verificationByWordId index
+  // Build verificationByCompoundId index.
+  // 2026-05-19 fix C1 (audit-found data-corruption bug): previously keyed by
+  // bare `w.id` (`'housing'`, `'sensor'`, `'controller'`, etc.). Word IDs are
+  // SCOPED per sub-module — different modules with the same word ID collide
+  // and the second occurrence silently overwrites the first. Compound key
+  // `{module}::{sub_module_id}::{word_id}` makes every BoM line uniquely
+  // addressable. Legacy state files that wrote rows without module/sub_module_id
+  // also fall back to bare word_id so we don't break them.
   state.partVerifications = state.partVerifications ?? []
-  const verifByWordId = new Map<string, any>()
+  const compoundKey = (module: string | null | undefined, subModuleId: string | null | undefined, wordId: string | null | undefined): string =>
+    `${module ?? ''}::${subModuleId ?? ''}::${wordId ?? ''}`
+  const verifByCompoundId = new Map<string, any>()
+  const verifByLegacyWordId = new Map<string, any>()  // fallback for old rows
   for (const v of state.partVerifications) {
-    if (v.word_id) verifByWordId.set(v.word_id, v)
+    if (v.word_id) {
+      if (v.module && v.sub_module_id) {
+        verifByCompoundId.set(compoundKey(v.module, v.sub_module_id, v.word_id), v)
+      } else {
+        verifByLegacyWordId.set(v.word_id, v)
+      }
+    }
   }
 
   // Collect all targets that need estimates
@@ -438,7 +454,7 @@ async function main() {
   for (const m of state.moduleDecomposition?.modules ?? []) {
     for (const sm of m.sub_modules ?? []) {
       for (const w of sm.words ?? []) {
-        const existing = verifByWordId.get(w.id)
+        const existing = verifByCompoundId.get(compoundKey(m.module, sm.id, w.id)) ?? verifByLegacyWordId.get(w.id)
         if (existing?.distributor_price_gbp != null) continue
         if (existing?.price_estimate_gbp != null) continue
         const qmod = (w.modifier_characters ?? []).find((mc: any) => mc.kind === 'quantity')
@@ -621,7 +637,10 @@ async function main() {
 
   for (const { ctx, estimate } of results) {
     if (!estimate) continue
-    const existing = verifByWordId.get(ctx.word_id)
+    // 2026-05-19 fix C1: lookup by compound key (module::sub_module::word) with
+    // legacy bare word_id as fallback. Prevents cross-module overwrite.
+    const existing = verifByCompoundId.get(compoundKey(ctx.module, ctx.sub_module_id, ctx.word_id))
+      ?? verifByLegacyWordId.get(ctx.word_id)
     bySource[estimate.classification_source]! += 1
     byEstimate[estimate.estimate_source]! += 1
     classCounts[estimate.component_class] = (classCounts[estimate.component_class] || 0) + 1

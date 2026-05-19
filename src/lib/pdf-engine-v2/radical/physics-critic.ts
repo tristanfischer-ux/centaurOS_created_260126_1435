@@ -43,7 +43,11 @@ export interface CritiqueReport {
   latency_ms: number
 }
 
-const FLASH_LITE_MODEL = 'google/gemini-2.5-flash-lite'
+// 2026-05-19: bumped from gemini-2.5-flash-lite to gemini-3.1-flash-lite to
+// match the rest of the chain (was the only stage on 2.5 — model version drift
+// caught in the 2026-05-19 audit, gap #5). 3.1 is cheaper + smarter; JSON
+// schema is identical so no other changes needed.
+const FLASH_LITE_MODEL = 'google/gemini-3.1-flash-lite'
 
 function compactDesign(modules: any[], brief: any, keyMetrics: any, partSummary: any, decisions: any[]): any {
   const compactModules = (modules || []).map((m: any) => ({

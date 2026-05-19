@@ -32,7 +32,7 @@ const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const REPO_ROOT = resolve(__dirname, '..')
 
-function loadEnvFile(p) {
+function loadEnvFile(p, isOptional = false) {
     try {
         const text = readFileSync(p, 'utf-8')
         for (const line of text.split('\n')) {
@@ -42,8 +42,16 @@ function loadEnvFile(p) {
             const v = rest.join('=').replace(/^["']|["']$/g, '')
             if (!process.env[k]) process.env[k] = v
         }
-    } catch {
-        // ignore — file may not exist
+    } catch (err) {
+        // 2026-05-19 audit gap #13: distinguish missing-file from parse-error,
+        // and warn (not silent-swallow) when the file was expected.
+        if (err && err.code === 'ENOENT') {
+            if (!isOptional) {
+                console.error(`[pdf-engine-worker] env file not found: ${p} (silent degradation risk — some chain stages may run without their API key)`)
+            }
+        } else {
+            console.error(`[pdf-engine-worker] env file parse error: ${p}: ${err?.message ?? err}`)
+        }
     }
 }
 
@@ -52,8 +60,42 @@ for (const p of [
     resolve(homedir(), '.claude/secrets/distributor-apis.env'),
     resolve(homedir(), '.claude/secrets/tavily.env'),
     resolve(homedir(), '.claude/secrets/openrouter.env'),
+    // 2026-05-19 fix C5: also load OpenAI env file if present. Engine C needs
+    // OPENAI_API_KEY for text-embedding-3-small. Falls back to env if file
+    // doesn't exist (e.g. key is in .env.local).
+    resolve(homedir(), '.claude/secrets/openai.env'),
+    resolve(homedir(), '.claude/secrets/brave.env'),
 ]) {
     loadEnvFile(p)
+}
+
+// 2026-05-19 audit gap #13: surface which API keys are actually present after
+// env-file load. Missing keys silently degrade output (Tavily missing →
+// research synthesis empty; distributor keys missing → part-verification skip
+// distributor cascade). Worker fatal-exits on missing OPENROUTER (handled
+// below) — for the others, just warn.
+const KEY_CHECKS = [
+    { name: 'TAVILY_API_KEY', impact: 'research synthesis + part-verification web search' },
+    { name: 'MOUSER_API_KEY', impact: 'part-verification distributor cascade (Mouser)' },
+    { name: 'DIGIKEY_CLIENT_ID', impact: 'part-verification distributor cascade (DigiKey)' },
+    { name: 'FARNELL_API_KEY', impact: 'part-verification distributor cascade (Farnell)' },
+    { name: 'BRAVE_API_KEY', impact: 'supplier enrichment web fallback' },
+    // 2026-05-19 fix C5: Engine C (enrich-state-with-reference-anchor.tsx ->
+    // python3 scripts/rag/reference_lookup.py) calls OpenAI text-embedding-3-small
+    // to embed each BoM query before cosine similarity against forge-truth.db.
+    // Missing OPENAI_API_KEY → Engine C subprocess fails → chain catches and
+    // continues without reference anchors → cover-page REF panel empty + every
+    // engine_c_* field on partVerifications stays null. Surface this prominently.
+    { name: 'OPENAI_API_KEY', impact: 'Engine C reference-anchor embeddings (cover page REF panel + every BoM line\'s engine_c_* fields)' },
+]
+// Worker tells the chain it is running in production context. Used by the
+// chain to set RENDER_NO_OPEN=1 on the renderer subprocess (LaunchAgent has
+// no GUI session) and to skip the chain's own local `open` call.
+process.env.PDF_ENGINE_WORKER = '1'
+for (const { name, impact } of KEY_CHECKS) {
+    if (!process.env[name]) {
+        console.error(`[pdf-engine-worker] WARNING: ${name} not set — ${impact} will silently fail`)
+    }
 }
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -170,6 +212,15 @@ async function claimOnePendingRun() {
 }
 
 // ─── Run the engine for a claimed row ───────────────────────────────────────
+// 2026-05-19 fix M7 (audit-found): worker had no child-process timeout. A
+// single hung subprocess (network deadlock during an LLM call, frozen Python
+// process in Engine C, infinite loop in renderer) would block the worker
+// forever, stopping ALL future job processing. Add a hard timeout that
+// escalates SIGTERM → SIGKILL. Per chain telemetry, heatpump-class runs
+// take 60-90 min worst-case; bioreactor + BESS can reach 110 min. Cap at
+// 180 min to leave headroom for slower classes + retries inside the chain.
+const CHILD_TIMEOUT_MS = 180 * 60 * 1000  // 180 min hard cap
+
 function runChild(cmd, args, cwd, jobLogPath) {
     return new Promise((resolveP) => {
         const child = spawn(cmd, args, {
@@ -177,6 +228,23 @@ function runChild(cmd, args, cwd, jobLogPath) {
             env: process.env,
             stdio: ['ignore', 'pipe', 'pipe'],
         })
+        let timedOut = false
+        let sigkillTimer = null
+        const timeoutTimer = setTimeout(() => {
+            timedOut = true
+            log(`child process exceeded ${CHILD_TIMEOUT_MS / 60_000} min cap — sending SIGTERM`)
+            try { child.kill('SIGTERM') } catch (err) {
+                log(`SIGTERM threw: ${err?.message ?? err}`)
+            }
+            // Escalate to SIGKILL if the child doesn't exit cleanly within 30s.
+            sigkillTimer = setTimeout(() => {
+                log(`child still alive 30s after SIGTERM — escalating to SIGKILL`)
+                try { child.kill('SIGKILL') } catch (err) {
+                    log(`SIGKILL threw: ${err?.message ?? err}`)
+                }
+            }, 30_000)
+        }, CHILD_TIMEOUT_MS)
+
         const onData = (buf) => {
             const s = buf.toString()
             process.stdout.write(s)
@@ -186,10 +254,25 @@ function runChild(cmd, args, cwd, jobLogPath) {
                 // ignore
             }
         }
+        const cleanup = () => {
+            clearTimeout(timeoutTimer)
+            if (sigkillTimer) clearTimeout(sigkillTimer)
+        }
         child.stdout.on('data', onData)
         child.stderr.on('data', onData)
-        child.on('exit', (code) => resolveP(code ?? -1))
+        child.on('exit', (code) => {
+            cleanup()
+            if (timedOut) {
+                // Synthetic exit code: -2 = killed by worker timeout (distinguishes
+                // from -1 spawn error). processJob() will treat any non-zero exit
+                // as a fail, but the log line above tells the operator why.
+                resolveP(-2)
+            } else {
+                resolveP(code ?? -1)
+            }
+        })
         child.on('error', (err) => {
+            cleanup()
             log(`spawn error: ${err.message}`)
             resolveP(-1)
         })

@@ -708,6 +708,22 @@ function applyBatchEconomics(state: any, bomTotals: BomTotals | null, slugHint?:
   const scale = band.bom_scale_factor
   if (!Number.isFinite(scale) || scale <= 0 || scale === 1.0) return bomTotals
 
+  // 2026-05-19 fix C6 (audit-found systematic price error):
+  // Engine B writes per-row volume-anchored unit prices (engine_b_*). The W3
+  // scale below was originally introduced when prices were 1-off-distributor
+  // anchored, to estimate fab-scale. Now that Engine B has shipped, applying
+  // W3 on top of Engine B prices DOUBLE-COUNTS the volume correction —
+  // systematically wrong prices on every BoM line that has engine_b_*.
+  // estimate-missing-prices.tsx:35-40 explicitly notes "W3 retires the day
+  // Engine B ships" — that's now. Approach: per-row, skip W3 when the row
+  // carries engine_b_estimate_source (curve or flash_lite_unknown_class are
+  // both volume-aware). Legacy rows without that field (older state files,
+  // distributor-only lines) still get W3 so we don't over-correct them.
+  const rowAlreadyVolumeAnchored = (p: any): boolean => {
+    const s = p?.engine_b_estimate_source
+    return s === 'curve' || s === 'flash_lite_unknown_class'
+  }
+
   // Rebuild module / sub-module / grand totals from scaled line totals so
   // sums reconcile after pence rounding.
   let grandTotal_gbp = 0
@@ -717,7 +733,8 @@ function applyBatchEconomics(state: any, bomTotals: BomTotals | null, slugHint?:
     for (const sub of m.subs) {
       const newSub: BomSub = { id: sub.id, name: sub.name, parts: [], subtotal_gbp: 0 }
       for (const p of sub.parts) {
-        const scaledUnit = roundToPence(p.unit_price_gbp * scale)
+        const effectiveScale = rowAlreadyVolumeAnchored(p) ? 1.0 : scale
+        const scaledUnit = roundToPence(p.unit_price_gbp * effectiveScale)
         const scaledLine = roundToPence(scaledUnit * p.quantity)
         const newRow: BomPartRow = {
           ...p,
@@ -4529,9 +4546,31 @@ async function main() {
   const state = JSON.parse(readFileSync(statePath, 'utf-8'))
 
   const productClass = state.moduleDecomposition?.product_class
-  const rawSubject =
-    state.brief?.product_definition?.subject ||
-    (productClass ? humanise(productClass) : 'Engineering Report')
+  // 2026-05-19 fix C7 (audit-found): the renderer previously only checked one
+  // path (`state.brief.product_definition.subject`) which the chain never
+  // writes. The chain's actual briefBlock shape (per serial-design-chain-v2.tsx
+  // briefBlock construction) is { original_text, parsed_original, revised_text,
+  // parsed_revised, revision_history, was_revised }. parsed_original/parsed_revised
+  // are the brief parser's StructuredBriefJSON output, which emits `projectName`
+  // (not `subject`) per stages/0-brief-generation.ts. The result was every PDF
+  // title fell through to humanise(productClass) — e.g. "Heat Pump Residential"
+  // instead of the founder's actual project name. Multi-path fallback below.
+  const rawSubject = (
+    state.brief?.product_definition?.subject  // legacy / PA-orchestrator shape
+    || state.parsedBrief?.product_definition?.subject
+    || state.brief?.parsed_revised?.product_definition?.subject  // refined brief, if revised
+    || state.brief?.parsed_original?.product_definition?.subject  // original brief
+    || state.brief?.parsed_revised?.subject
+    || state.brief?.parsed_original?.subject
+    || state.parsedBrief?.subject
+    || state.brief?.parsed_revised?.projectName  // actual structured field per brief parser
+    || state.brief?.parsed_original?.projectName
+    || state.parsedBrief?.projectName
+    // First non-empty line of the brief text — last-resort but truthful.
+    || (typeof state.brief?.revised_text === 'string' && state.brief.revised_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').slice(0, 80))
+    || (typeof state.brief?.original_text === 'string' && state.brief.original_text.trim().split('\n').find((l: string) => l.trim())?.replace(/^#+\s*/, '').replace(/^Project Brief:\s*/i, '').slice(0, 80))
+    || (productClass ? humanise(productClass) : 'Engineering Report')
+  ) as string
   // Title case + preserve engineering acronyms (drawer 227e3c8fd74fcd32 bug #10:
   // brief parser emits "Battery energy storage system (bess)" — lowercases acronym).
   // Each word title-cased; known acronyms forced uppercase; small connector words

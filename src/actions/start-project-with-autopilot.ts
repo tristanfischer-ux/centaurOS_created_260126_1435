@@ -157,30 +157,93 @@ export async function startProjectWithAutopilot(
             }
         }
 
+        // 2026-05-19 fix C3 (audit-found gap): structured intake fields from
+        // the wizard (targetScale, marketSegment, geography, startupStage,
+        // additionalContext) were persisted to cad_lab_projects above but the
+        // chain only ever saw `subject.trim()` — the founder's structured
+        // constraints were invisible. Compose them into the brief_text the
+        // chain receives so the brief parser sees the full picture.
+        const briefText = composeBriefForChain(subject, wizardFields)
+
         const admin = createAdminClient()
         const { error: jobErr } = await admin
             .from("pdf_engine_runs")
             .insert({
                 project_id: projectId,
                 user_id: userId,
-                brief_text: subject.trim(),
+                brief_text: briefText,
                 status: "pending",
             })
         if (jobErr) {
+            // 2026-05-19 fix C4 (audit-found silent-failure gap): previously
+            // returned {ok:true, projectId} on insert failure, leaving the
+            // founder on a workspace page with no queued job. Surface the
+            // failure so the UI can show an error + retry.
             console.error(
                 "[start-project-with-autopilot] pdf_engine_runs insert failed:",
                 jobErr.message,
             )
-            return { ok: true, projectId } // project exists; founder can retry
+            return {
+                ok: false,
+                error: `Could not queue the report job: ${jobErr.message}. The project was created — retry from the workspace.`,
+                errorCode: "QUEUE_INSERT_FAILED",
+            }
         }
     } catch (err) {
+        const message = err instanceof Error ? err.message : String(err)
         console.error(
             "[start-project-with-autopilot] pdf_engine_runs insert threw:",
-            err instanceof Error ? err.message : err,
+            message,
         )
+        // 2026-05-19 fix C4: explicit failure path (was falling through to ok:true).
+        return {
+            ok: false,
+            error: `Could not queue the report job: ${message}. The project was created — retry from the workspace.`,
+            errorCode: "QUEUE_INSERT_THREW",
+        }
     }
 
     return { ok: true, projectId }
+}
+
+/**
+ * 2026-05-19 fix C3: compose the wizard's structured intake fields into the
+ * brief text the chain receives. The chain's brief parser (Gemini 3.1 Pro)
+ * is good at extracting structured constraints from prose, so we append a
+ * deterministic block at the end of the founder's subject describing every
+ * field that was filled in. The brief parser sees this and emits the
+ * corresponding parsedBrief.constraints / parsedBrief.market_segment /
+ * parsedBrief.geography / etc. — the chain stages then have full context.
+ *
+ * If wizardFields is empty or undefined, returns subject.trim() unchanged.
+ */
+function composeBriefForChain(subject: string, wizardFields?: WizardIntakeFields): string {
+    const trimmed = subject.trim()
+    if (!wizardFields) return trimmed
+    const lines: string[] = []
+    if (wizardFields.targetScale && wizardFields.targetScale.length > 0) {
+        const entries = wizardFields.targetScale
+            .filter(e => e && typeof e.value === 'number' && e.unit && e.dimension)
+            .map(e => `  - ${e.dimension}: ${e.value} ${e.unit}`)
+        if (entries.length > 0) {
+            lines.push('Target scale / capacity:')
+            lines.push(...entries)
+        }
+    }
+    if (wizardFields.marketSegment && wizardFields.marketSegment.trim().length > 0) {
+        lines.push(`Market segment: ${wizardFields.marketSegment.trim()}`)
+    }
+    if (wizardFields.geography && wizardFields.geography.length > 0) {
+        lines.push(`Geography: ${wizardFields.geography.filter(Boolean).join(', ')}`)
+    }
+    if (wizardFields.startupStage) {
+        lines.push(`Startup stage: ${wizardFields.startupStage}`)
+    }
+    if (wizardFields.additionalContext && wizardFields.additionalContext.trim().length > 0) {
+        lines.push(`Additional context: ${wizardFields.additionalContext.trim()}`)
+    }
+    if (lines.length === 0) return trimmed
+    return `${trimmed}\n\n— Structured intake (from wizard) —\n${lines.join('\n')}`
 }
 
 // ─── Private helpers ──────────────────────────────────────────────────────
