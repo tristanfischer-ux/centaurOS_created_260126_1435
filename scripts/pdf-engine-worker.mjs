@@ -122,6 +122,27 @@ async function claimOnePendingRun() {
     }
     if (!candidate) return null
 
+    // Step 1.5 — defense-in-depth: reject rows missing user_id BEFORE we
+    // claim them and burn 60-90 min of LLM compute. The downstream upload
+    // path needs `<user_id>/<job_id>.pdf` for storage RLS, so a row without
+    // user_id can never produce a downloadable PDF anyway. Fail the row
+    // fast so it doesn't sit at status='pending' forever and so the
+    // requester sees a clear error within seconds, not hours.
+    if (!candidate.user_id || typeof candidate.user_id !== 'string') {
+        log(`rejecting row ${candidate.id} at claim time — user_id is null/non-string`)
+        await supabase
+            .from('pdf_engine_runs')
+            .update({
+                status: 'failed',
+                error_log:
+                    'pdf_engine_runs.user_id missing on this row. The row must be inserted with user_id = auth user UUID so the storage bucket\'s RLS lets the founder download their PDF. If you\'re SQL-inserting a synthetic test row, set user_id explicitly. Failed at claim time to avoid wasting chain compute.',
+                ready_at: new Date().toISOString(),
+            })
+            .eq('id', candidate.id)
+            .eq('status', 'pending')
+        return null
+    }
+
     // Step 2 — atomically flip status='pending' → 'running'. The
     // .eq('status', 'pending') guard means a competing worker that already
     // claimed this row will produce an empty update — we just skip.
